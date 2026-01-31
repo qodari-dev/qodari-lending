@@ -1,0 +1,18 @@
+{
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "tabWidth": 2,
+  "semi": true,
+  "bracketSpacing": true,
+  "printWidth": 100,
+  "overrides": [
+    {
+      "files": "**/*.json",
+      "options": {
+        "printWidth": 130
+      }
+    }
+  ],
+  "plugins": ["prettier-plugin-tailwindcss"],
+  "pluginSearchDirs": false
+}

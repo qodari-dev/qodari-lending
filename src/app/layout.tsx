@@ -17,7 +17,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const auth = await getIamAuthContext();
-  console.log('auth', auth);
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`antialiased`}>

@@ -1,28 +1,46 @@
-import { jwtVerify, type JWTPayload } from 'jose';
-import { env } from '@/env';
+import { JWTPayload, jwtVerify } from 'jose';
+import { JWSSignatureVerificationFailed, JWTExpired } from 'jose/errors';
 
-export type IamAccessTokenPayload = JWTPayload & {
-  sub: string;
-  // TODO: Add implment how to get the data from me endpoint
-  user: {
-    id: string;
+const JWT_ALG = 'HS256';
+
+function getJwtSecretKey(jwtSecret: string): Uint8Array {
+  return new TextEncoder().encode(jwtSecret);
+}
+
+export type AccessTokenPayload = JWTPayload & {
+  sub: string; // userId or apiClientId
+  accountId: string; // current account
+  appId: string; // application.id
+  roles?: string[]; // slugs de roles de esa app en esa account (only for user tokens)
+  permissions: string[]; // "resource:action" de esa app en esa account
+  grantType?: 'client_credentials'; // Only for M2M tokens
+  // Basic user info (only for user tokens, not M2M)
+  user?: {
+    email: string;
     firstName: string;
     lastName: string;
-    email: string;
     isAdmin: boolean;
   };
-  accountId: string;
-  roles?: string[];
-  permissions?: string[];
 };
 
-const secretKey = new TextEncoder().encode(env.IAM_JWT_SECRET);
-
-export async function verifyIamAccessToken(token: string): Promise<IamAccessTokenPayload> {
-  const { payload } = await jwtVerify(token, secretKey, {
-    issuer: env.IAM_ISSUER,
-    audience: env.IAM_CLIENT_ID,
-  });
-
-  return payload as IamAccessTokenPayload;
+export async function verifyAccessToken(token: string, jwtSecret: string) {
+  try {
+    const { payload } = await jwtVerify(token, getJwtSecretKey(jwtSecret), {
+      algorithms: [JWT_ALG],
+    });
+    return payload as AccessTokenPayload & {
+      iss: string;
+      aud: string | string[];
+      exp: number;
+      iat: number;
+    };
+  } catch (error) {
+    if (error instanceof JWTExpired) {
+      throw new Error('Token expired');
+    }
+    if (error instanceof JWSSignatureVerificationFailed) {
+      throw new Error('Invalid signature');
+    }
+    throw new Error('Invalid token');
+  }
 }

@@ -29,13 +29,17 @@ export function createAuthStore(initialAuth: AuthContext | null = null): AuthSto
     },
 
     hasPermission: (perm) => {
-      const perms = get().auth?.permissions ?? [];
-      return perms.includes(perm);
+      const auth = get().auth;
+      if (!auth) return false;
+      if (!auth.user) return false;
+      if (auth.user.isAdmin) return true;
+      return !!auth.permissions?.includes(perm);
     },
 
     hasAnyPermission: (perms) => {
       const auth = get().auth;
       if (!auth) return false;
+      if (!auth.user) return false;
       if (auth.user.isAdmin) return true;
       return perms.some((p) => auth.permissions?.includes(p));
     },

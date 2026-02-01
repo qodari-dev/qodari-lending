@@ -6,8 +6,8 @@ const iamProxy = createIamProxy({
   iamBaseUrl: env.IAM_BASE_URL,
   clientId: env.IAM_CLIENT_ID,
   redirectUri: env.IAM_REDIRECT_URI,
-  accessTokenCookieName: 'timer_at',
-  publicPaths: ['/', '/oauth/callback'],
+  accessTokenCookieName: env.ACCESS_TOKEN_NAME,
+  publicPaths: ['/oauth/callback'],
 });
 
 export default function proxy(request: NextRequest) {

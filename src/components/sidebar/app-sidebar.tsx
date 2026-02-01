@@ -36,8 +36,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const canSeeDashboard = useHasPermission('dashboard:read');
 
-  // Extract accountSlug from pathname (e.g., /acme/admin/users -> acme)
-
   const data = React.useMemo(() => {
     return {
       user: {
@@ -48,7 +46,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       app: {
         name: 'Creditos',
         Logo: AppLogo,
-        url: `/admin`,
+        url: `/`,
       },
       navMain: [
         {
@@ -69,7 +67,40 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Configuracion',
           items: [
             {
-              title: 'Reports',
+              title: 'General',
+              icon: Download,
+              isActive: pathname.startsWith(`/reports`),
+              items: [
+                {
+                  title: 'Permisos por aplicación',
+                  url: `/reports/permissions-by-application`,
+                },
+              ],
+            },
+            {
+              title: 'Creditos',
+              icon: Download,
+              isActive: pathname.startsWith(`/reports`),
+              items: [
+                {
+                  title: 'Permisos por aplicación',
+                  url: `/reports/permissions-by-application`,
+                },
+              ],
+            },
+            {
+              title: 'Contable',
+              icon: Download,
+              isActive: pathname.startsWith(`/reports`),
+              items: [
+                {
+                  title: 'Permisos por aplicación',
+                  url: `/reports/permissions-by-application`,
+                },
+              ],
+            },
+            {
+              title: 'Terceros',
               icon: Download,
               isActive: pathname.startsWith(`/reports`),
               items: [

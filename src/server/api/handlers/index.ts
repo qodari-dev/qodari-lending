@@ -1,11 +1,11 @@
 import { contract } from '@/server/api/contracts';
 import { createNextHandler } from '@ts-rest/serverless/next';
-import { user } from './user';
+import { documentType } from './document-type';
 import { auth } from './auth';
 
 export const handler = createNextHandler(
   contract,
-  { user, auth },
+  { documentType, auth },
   {
     jsonQuery: true,
     responseValidation: true,

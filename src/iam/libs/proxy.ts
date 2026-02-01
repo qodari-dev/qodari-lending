@@ -1,5 +1,5 @@
-import { env } from "@/env";
-import { NextRequest, NextResponse } from "next/server";
+import { env } from '@/env';
+import { NextRequest, NextResponse } from 'next/server';
 
 export type IamProxyConfig = {
   iamBaseUrl: string;
@@ -9,16 +9,16 @@ export type IamProxyConfig = {
   publicPaths?: string[];
 };
 
-const DEFAULT_PUBLIC_PATHS = ["/", "/health", "/oauth/callback"];
+const DEFAULT_PUBLIC_PATHS = ['/oauth/callback'];
 
 function isPublicPath(pathname: string, publicPaths: string[]): boolean {
   if (publicPaths.includes(pathname)) return true;
 
-  if (pathname.startsWith("/_next")) return true;
-  if (pathname.startsWith("/public")) return true;
+  if (pathname.startsWith('/_next')) return true;
+  if (pathname.startsWith('/public')) return true;
 
-  if (pathname === "/favicon.ico") return true;
-  if (pathname.startsWith("/.well-known")) return true;
+  if (pathname === '/favicon.ico') return true;
+  if (pathname.startsWith('/.well-known')) return true;
 
   if (/\.(png|jpg|jpeg|gif|svg|ico|webp|avif)$/i.test(pathname)) return true;
   if (/\.(css|js|map)$/i.test(pathname)) return true;
@@ -28,9 +28,8 @@ function isPublicPath(pathname: string, publicPaths: string[]): boolean {
 }
 
 function randomString(length = 43): string {
-  const charset =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-  let result = "";
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  let result = '';
   const array = crypto.getRandomValues(new Uint8Array(length));
   array.forEach((v) => {
     result += charset[v % charset.length];
@@ -41,18 +40,15 @@ function randomString(length = 43): string {
 async function sha256Base64Url(input: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const bytes = new Uint8Array(hashBuffer);
 
-  let binary = "";
+  let binary = '';
   for (const b of bytes) {
     binary += String.fromCharCode(b);
   }
 
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function buildAuthorizeUrl(params: {
@@ -62,14 +58,14 @@ function buildAuthorizeUrl(params: {
   codeChallenge: string;
   state: string;
 }): string {
-  const url = new URL("/oauth/authorize", params.iamBaseUrl);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", params.clientId);
-  url.searchParams.set("redirect_uri", params.redirectUri);
-  url.searchParams.set("scope", "openid");
-  url.searchParams.set("state", params.state);
-  url.searchParams.set("code_challenge", params.codeChallenge);
-  url.searchParams.set("code_challenge_method", "S256");
+  const url = new URL('/oauth/authorize', params.iamBaseUrl);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('client_id', params.clientId);
+  url.searchParams.set('redirect_uri', params.redirectUri);
+  url.searchParams.set('scope', 'openid');
+  url.searchParams.set('state', params.state);
+  url.searchParams.set('code_challenge', params.codeChallenge);
+  url.searchParams.set('code_challenge_method', 'S256');
   return url.toString();
 }
 
@@ -81,7 +77,7 @@ function buildAuthorizeUrl(params: {
  */
 export function createIamProxy(config: IamProxyConfig) {
   const publicPaths = config.publicPaths ?? DEFAULT_PUBLIC_PATHS;
-  const secure = env.NODE_ENV === "production";
+  const secure = env.NODE_ENV === 'production';
 
   return async function iamProxy(request: NextRequest): Promise<NextResponse> {
     const { pathname } = request.nextUrl;
@@ -92,9 +88,7 @@ export function createIamProxy(config: IamProxyConfig) {
     }
 
     // 2) Ya hay access token → pasa
-    const accessToken = request.cookies.get(
-      config.accessTokenCookieName,
-    )?.value;
+    const accessToken = request.cookies.get(config.accessTokenCookieName)?.value;
     if (accessToken) {
       return NextResponse.next();
     }
@@ -114,25 +108,25 @@ export function createIamProxy(config: IamProxyConfig) {
 
     const response = NextResponse.redirect(authorizeUrl);
 
-    response.cookies.set("pkce_verifier", codeVerifier, {
+    response.cookies.set('pkce_verifier', codeVerifier, {
       httpOnly: true,
       secure,
-      sameSite: "lax",
-      path: "/",
+      sameSite: 'lax',
+      path: '/',
     });
 
-    response.cookies.set("oauth_state", state, {
+    response.cookies.set('oauth_state', state, {
       httpOnly: true,
       secure,
-      sameSite: "lax",
-      path: "/",
+      sameSite: 'lax',
+      path: '/',
     });
 
-    response.cookies.set("oauth_next", request.nextUrl.href, {
+    response.cookies.set('oauth_next', request.nextUrl.href, {
       httpOnly: true,
       secure,
-      sameSite: "lax",
-      path: "/",
+      sameSite: 'lax',
+      path: '/',
     });
 
     return response;

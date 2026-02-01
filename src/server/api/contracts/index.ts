@@ -1,12 +1,12 @@
 import { initContract } from '@ts-rest/core';
-import { user } from './user';
+import { documentType } from './document-type';
 import { auth } from './auth';
 
 const c = initContract();
 
 export const contract = c.router(
   {
-    user,
+    documentType,
     auth,
   },
   {

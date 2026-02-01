@@ -19,7 +19,6 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { getTsRestErrorMessage } from '@/utils/get-ts-rest-error-message';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 export function NavUser({
@@ -32,7 +31,6 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
-  const router = useRouter();
 
   const { mutateAsync: logout, isPending } = api.auth.logout.useMutation({
     onError(error) {
@@ -40,8 +38,11 @@ export function NavUser({
         description: getTsRestErrorMessage(error),
       });
     },
-    onSuccess() {
-      router.push(`/login`);
+    onSuccess(data) {
+      if (data.status === 200) {
+        // Redirect to IAM logout to clear IAM session
+        window.location.href = data.body.logoutUrl;
+      }
     },
   });
 

@@ -1,5 +1,6 @@
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
 import { initContract } from '@ts-rest/core';
+import { DocumentTypes } from '@/server/db';
 
 const c = initContract();
 
@@ -16,7 +17,7 @@ export const documentType = c.router(
         },
       } satisfies TsRestMetaData,
       responses: {
-        200: c.noBody(),
+        200: c.type<DocumentTypes[]>(),
         400: TsRestErrorSchema,
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,

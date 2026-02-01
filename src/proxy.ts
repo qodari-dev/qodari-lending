@@ -15,5 +15,6 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next|api/public|favicon.ico|public).*)'],
+  // Exclude: _next, api (all API routes handle their own auth), favicon.ico, public
+  matcher: ['/((?!_next|api|favicon.ico|public).*)'],
 };

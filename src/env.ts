@@ -28,6 +28,7 @@ export const env = createEnv({
   client: {
     NEXT_PUBLIC_API_URL: z.url(),
     NEXT_PUBLIC_APP_URL: z.url(),
+    NEXT_PUBLIC_IAM_PORTAL_URL: z.url(),
   },
   /*
    * Specify what values should be validated by your schemas above.
@@ -40,6 +41,7 @@ export const env = createEnv({
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_IAM_PORTAL_URL: process.env.NEXT_PUBLIC_IAM_PORTAL_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     ACCESS_TOKEN_NAME: process.env.ACCESS_TOKEN_NAME,
     REFRESH_TOKEN_NAME: process.env.REFRESH_TOKEN_NAME,

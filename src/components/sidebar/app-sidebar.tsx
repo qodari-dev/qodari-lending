@@ -1,6 +1,13 @@
 'use client';
 
-import { Download, Users } from 'lucide-react';
+import {
+  BookOpen,
+  ClipboardCheck,
+  CreditCard,
+  LayoutDashboard,
+  Settings,
+  Users,
+} from 'lucide-react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import * as React from 'react';
@@ -57,56 +64,148 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   {
                     title: 'Dashboard',
                     url: `/dashboard`,
-                    icon: Users,
+                    icon: LayoutDashboard,
                   },
                 ]
               : []),
           ],
         },
         {
-          title: 'Configuracion',
+          title: 'Configuración',
           items: [
             {
               title: 'General',
-              icon: Download,
-              isActive: pathname.startsWith(`/reports`),
+              icon: Settings,
+              isActive: pathname.startsWith(`/document-types`),
               items: [
                 {
-                  title: 'Permisos por aplicación',
-                  url: `/reports/permissions-by-application`,
+                  title: 'Settings',
+                  url: `/settings`,
                 },
-              ],
-            },
-            {
-              title: 'Creditos',
-              icon: Download,
-              isActive: pathname.startsWith(`/reports`),
-              items: [
                 {
-                  title: 'Permisos por aplicación',
-                  url: `/reports/permissions-by-application`,
+                  title: 'Tipos de documentos',
+                  url: `/document-types`,
+                },
+                {
+                  title: 'Razones de rechazo',
+                  url: `/rejection-reasons`,
+                },
+                {
+                  title: 'Formas de pago',
+                  url: `/repayment-methods`,
+                },
+                {
+                  title: 'Garantías de pago',
+                  url: `/payment-guarantee-types`,
+                },
+                {
+                  title: 'Periodicidad de pagos',
+                  url: `/payment-frequencies`,
+                },
+                {
+                  title: 'Tipos de inversión',
+                  url: `/investment-types`,
+                },
+                {
+                  title: 'Formas de pago (tesorería)',
+                  url: `/payment-tender-types`,
+                },
+                {
+                  title: 'Bancos',
+                  url: `/banks`,
                 },
               ],
             },
             {
               title: 'Contable',
-              icon: Download,
-              isActive: pathname.startsWith(`/reports`),
+              icon: BookOpen,
+              isActive: pathname.startsWith(`/gl-accounts`),
               items: [
                 {
-                  title: 'Permisos por aplicación',
-                  url: `/reports/permissions-by-application`,
+                  title: 'Plan único de cuentas',
+                  url: `/gl-accounts`,
+                },
+                {
+                  title: 'Centros de costo',
+                  url: `/cost-centers`,
+                },
+                {
+                  title: 'Distribuciones contables',
+                  url: `/accounting-distributions`,
+                },
+                {
+                  title: 'Tipos de recibos de abonos',
+                  url: `/payment-receipt-types`,
+                },
+                {
+                  title: 'Usuarios para recibos de abonos',
+                  url: `/user-payment-receipt-types`,
+                },
+              ],
+            },
+            {
+              title: 'Créditos',
+              icon: CreditCard,
+              isActive: pathname.startsWith(`/credit-`),
+              items: [
+                {
+                  title: 'Oficinas de afiliación',
+                  url: `/affiliation-offices`,
+                },
+                {
+                  title: 'Periodos contables',
+                  url: `/accounting-periods`,
+                },
+                {
+                  title: 'Fondos de créditos',
+                  url: `/credit-funds`,
+                },
+                {
+                  title: 'Usuarios oficina afiliación',
+                  url: `/user-affiliation-offices`,
+                },
+                {
+                  title: 'Tipos de créditos',
+                  url: `/credit-products`,
                 },
               ],
             },
             {
               title: 'Terceros',
-              icon: Download,
-              isActive: pathname.startsWith(`/reports`),
+              icon: Users,
+              isActive: pathname.startsWith(`/third-`),
               items: [
                 {
-                  title: 'Permisos por aplicación',
-                  url: `/reports/permissions-by-application`,
+                  title: 'Tipos de terceros',
+                  url: `/third-party-types`,
+                },
+                {
+                  title: 'Terceros',
+                  url: `/third-parties`,
+                },
+                {
+                  title: 'Empresas de seguros',
+                  url: `/insurance-companies`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          title: 'Operaciones',
+          items: [
+            {
+              title: 'Estudio de crédito',
+              icon: ClipboardCheck,
+              isActive: pathname.startsWith(`/simulation`) || pathname.startsWith(`/worker-study`),
+              items: [
+                {
+                  title: 'Simulación de crédito',
+                  url: `/simulation`,
+                },
+                {
+                  title: 'Estudio Trabajador',
+                  url: `/worker-study`,
                 },
               ],
             },

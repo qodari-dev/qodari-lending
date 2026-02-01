@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronsUpDown, LogOut } from 'lucide-react';
+import { ChevronsUpDown, LayoutGrid, LogOut } from 'lucide-react';
 
 import { api } from '@/clients/api';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -87,6 +87,12 @@ export function NavUser({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <a href={process.env.NEXT_PUBLIC_IAM_PORTAL_URL}>
+                <LayoutGrid />
+                Portal
+              </a>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleLogout} disabled={isPending}>
               <LogOut />
               Log out

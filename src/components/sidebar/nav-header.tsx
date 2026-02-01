@@ -23,7 +23,7 @@ export function NavHeader({
         >
           <Link href={url} className="flex items-center gap-2">
             <div className="text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg">
-              <Logo className="size-10" />
+              <Logo className="size-6" />
             </div>
             <div className="text-left text-sm leading-tight">
               <span className="truncate font-medium">{name}</span>

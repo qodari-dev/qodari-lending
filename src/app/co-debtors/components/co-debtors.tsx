@@ -50,7 +50,7 @@ export function CoDebtors() {
     handleSearchChange,
   } = useDataTable<CoDebtorSortField, CoDebtorInclude>({
     defaultPageSize: 20,
-    defaultIncludes: [],
+    defaultIncludes: ['identificationType', 'coDebtorsHome', 'coDebtorsWork'],
     defaultSorting: [{ field: 'createdAt', order: 'desc' }],
   });
 
@@ -165,8 +165,8 @@ export function CoDebtors() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estas seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion no se puede deshacer. Esto eliminara permanentemente el codeudor &quot;
-              {coDebtor?.documentType} {coDebtor?.documentNumber}&quot;.
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el codeudor
+              &quot;{coDebtor?.documentNumber}&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

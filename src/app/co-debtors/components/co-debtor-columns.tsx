@@ -11,12 +11,12 @@ import { CoDebtorRowActions } from './co-debtor-row-actions';
 // ============================================================================
 export const coDebtorColumns: ColumnDef<CoDebtor>[] = [
   {
-    accessorKey: 'documentType',
+    accessorKey: 'identificationTypeId',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo Doc." />,
     cell: ({ row }) => {
       return (
         <div className="flex flex-col">
-          <span className="font-medium">{row.original.documentType}</span>
+          <span className="font-medium">{row.original.identificationType?.name}</span>
         </div>
       );
     },

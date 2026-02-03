@@ -1,4 +1,14 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,10 +30,9 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  useCreateThirdParty,
-  useUpdateThirdParty,
-} from '@/hooks/queries/use-third-party-queries';
+import { useCities } from '@/hooks/queries/use-city-queries';
+import { useIdentificationTypes } from '@/hooks/queries/use-identification-type-queries';
+import { useCreateThirdParty, useUpdateThirdParty } from '@/hooks/queries/use-third-party-queries';
 import { useThirdPartyTypes } from '@/hooks/queries/use-third-party-type-queries';
 import {
   CreateThirdPartyBodySchema,
@@ -37,8 +46,9 @@ import {
 } from '@/schemas/third-party';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Controller, FormProvider, useForm, useWatch } from 'react-hook-form';
+import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
 
 type FormValues = z.infer<typeof CreateThirdPartyBodySchema>;
@@ -57,7 +67,7 @@ export function ThirdPartyForm({
   const form = useForm<FormValues>({
     resolver: zodResolver(CreateThirdPartyBodySchema),
     defaultValues: {
-      documentType: '',
+      identificationTypeId: 0,
       documentNumber: '',
       verificationDigit: '',
       personType: 'NATURAL',
@@ -70,6 +80,7 @@ export function ThirdPartyForm({
       sex: undefined,
       categoryCode: '',
       address: '',
+      cityId: 0,
       phone: '',
       mobilePhone: '',
       email: '',
@@ -84,14 +95,31 @@ export function ThirdPartyForm({
 
   const personType = useWatch({ control: form.control, name: 'personType' });
 
+  // Fetch identification types
+  const { data: identificationTypesData } = useIdentificationTypes({
+    limit: 100,
+    where: { and: [{ isActive: true }] },
+  });
+  const identificationTypes = identificationTypesData?.body?.data ?? [];
+
   // Fetch third party types for the select
   const { data: thirdPartyTypesData } = useThirdPartyTypes({ limit: 100 });
   const thirdPartyTypes = thirdPartyTypesData?.body?.data ?? [];
 
+  // City search with debounce
+  const [citySearch, setCitySearch] = useState('');
+  const [debouncedCitySearch] = useDebounce(citySearch, 300);
+  const { data: citiesData } = useCities({
+    search: debouncedCitySearch,
+    limit: 50,
+    where: { and: [{ isActive: true }] },
+  });
+  const cities = citiesData?.body?.data ?? [];
+
   useEffect(() => {
     if (opened) {
       form.reset({
-        documentType: thirdParty?.documentType ?? '',
+        identificationTypeId: thirdParty?.identificationTypeId ?? 0,
         documentNumber: thirdParty?.documentNumber ?? '',
         verificationDigit: thirdParty?.verificationDigit ?? '',
         personType: thirdParty?.personType ?? 'NATURAL',
@@ -104,6 +132,7 @@ export function ThirdPartyForm({
         sex: thirdParty?.sex ?? undefined,
         categoryCode: thirdParty?.categoryCode ?? '',
         address: thirdParty?.address ?? '',
+        cityId: thirdParty?.cityId ?? 0,
         phone: thirdParty?.phone ?? '',
         mobilePhone: thirdParty?.mobilePhone ?? '',
         email: thirdParty?.email ?? '',
@@ -114,6 +143,12 @@ export function ThirdPartyForm({
         employerBusinessName: thirdParty?.employerBusinessName ?? '',
         note: thirdParty?.note ?? '',
       });
+      // Set city search to current city name for editing
+      if (thirdParty?.city) {
+        setCitySearch(thirdParty.city.name);
+      } else {
+        setCitySearch('');
+      }
     }
   }, [opened, thirdParty, form]);
 
@@ -139,23 +174,35 @@ export function ThirdPartyForm({
       <SheetContent className="overflow-y-scroll sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Tercero</SheetTitle>
-          <SheetDescription>
-            Maneja la informacion del tercero.
-          </SheetDescription>
+          <SheetDescription>Maneja la informacion del tercero.</SheetDescription>
         </SheetHeader>
         <FormProvider {...form}>
           <form id={formId} onSubmit={form.handleSubmit(onSubmit, onSubmitError)} className="px-4">
             {/* Identificacion */}
             <FieldGroup>
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2">Identificacion</h3>
+              <h3 className="text-muted-foreground mb-2 text-sm font-semibold">Identificacion</h3>
               <div className="grid grid-cols-2 gap-4">
                 <Controller
-                  name="documentType"
+                  name="identificationTypeId"
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="documentType">Tipo de Documento</FieldLabel>
-                      <Input {...field} placeholder="CC, NIT, CE..." aria-invalid={fieldState.invalid} />
+                      <FieldLabel htmlFor="identificationTypeId">Tipo de Documento</FieldLabel>
+                      <Select
+                        onValueChange={(val) => field.onChange(Number(val))}
+                        value={field.value ? String(field.value) : ''}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {identificationTypes.map((type) => (
+                            <SelectItem key={type.id} value={String(type.id)}>
+                              {type.code} - {type.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -179,7 +226,12 @@ export function ThirdPartyForm({
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="verificationDigit">Digito Verificacion</FieldLabel>
-                      <Input {...field} value={field.value ?? ''} maxLength={1} aria-invalid={fieldState.invalid} />
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        maxLength={1}
+                        aria-invalid={fieldState.invalid}
+                      />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -212,7 +264,9 @@ export function ThirdPartyForm({
             {/* Datos Persona Natural */}
             {personType === 'NATURAL' && (
               <FieldGroup className="mt-6">
-                <h3 className="text-sm font-semibold text-muted-foreground mb-2">Datos Persona Natural</h3>
+                <h3 className="text-muted-foreground mb-2 text-sm font-semibold">
+                  Datos Persona Natural
+                </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <Controller
                     name="firstName"
@@ -220,7 +274,11 @@ export function ThirdPartyForm({
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="firstName">Primer Nombre</FieldLabel>
-                        <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                        <Input
+                          {...field}
+                          value={field.value ?? ''}
+                          aria-invalid={fieldState.invalid}
+                        />
                         {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                       </Field>
                     )}
@@ -231,7 +289,11 @@ export function ThirdPartyForm({
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="secondName">Segundo Nombre</FieldLabel>
-                        <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                        <Input
+                          {...field}
+                          value={field.value ?? ''}
+                          aria-invalid={fieldState.invalid}
+                        />
                         {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                       </Field>
                     )}
@@ -244,7 +306,11 @@ export function ThirdPartyForm({
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="firstLastName">Primer Apellido</FieldLabel>
-                        <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                        <Input
+                          {...field}
+                          value={field.value ?? ''}
+                          aria-invalid={fieldState.invalid}
+                        />
                         {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                       </Field>
                     )}
@@ -255,7 +321,11 @@ export function ThirdPartyForm({
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="secondLastName">Segundo Apellido</FieldLabel>
-                        <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                        <Input
+                          {...field}
+                          value={field.value ?? ''}
+                          aria-invalid={fieldState.invalid}
+                        />
                         {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                       </Field>
                     )}
@@ -289,14 +359,20 @@ export function ThirdPartyForm({
             {/* Datos Persona Juridica */}
             {personType === 'LEGAL' && (
               <FieldGroup className="mt-6">
-                <h3 className="text-sm font-semibold text-muted-foreground mb-2">Datos Persona Juridica</h3>
+                <h3 className="text-muted-foreground mb-2 text-sm font-semibold">
+                  Datos Persona Juridica
+                </h3>
                 <Controller
                   name="businessName"
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="businessName">Razon Social</FieldLabel>
-                      <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        aria-invalid={fieldState.invalid}
+                      />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -306,8 +382,14 @@ export function ThirdPartyForm({
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="representativeIdNumber">Cedula Representante Legal</FieldLabel>
-                      <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                      <FieldLabel htmlFor="representativeIdNumber">
+                        Cedula Representante Legal
+                      </FieldLabel>
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        aria-invalid={fieldState.invalid}
+                      />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -317,7 +399,7 @@ export function ThirdPartyForm({
 
             {/* Contacto */}
             <FieldGroup className="mt-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2">Contacto</h3>
+              <h3 className="text-muted-foreground mb-2 text-sm font-semibold">Contacto</h3>
               <Controller
                 name="address"
                 control={form.control}
@@ -325,6 +407,36 @@ export function ThirdPartyForm({
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="address">Direccion</FieldLabel>
                     <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="cityId"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="cityId">Ciudad</FieldLabel>
+                    <Combobox
+                      value={field.value ? String(field.value) : ''}
+                      onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
+                    >
+                      <ComboboxInput
+                        placeholder="Buscar ciudad..."
+                        value={citySearch}
+                        onChange={(e) => setCitySearch(e.target.value)}
+                      />
+                      <ComboboxContent>
+                        <ComboboxList>
+                          <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
+                          {cities.map((city) => (
+                            <ComboboxItem key={city.id} value={String(city.id)}>
+                              {city.code} - {city.name}
+                            </ComboboxItem>
+                          ))}
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -347,7 +459,11 @@ export function ThirdPartyForm({
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="mobilePhone">Celular</FieldLabel>
-                      <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        aria-invalid={fieldState.invalid}
+                      />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -359,7 +475,12 @@ export function ThirdPartyForm({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="email">Correo Electronico</FieldLabel>
-                    <Input {...field} value={field.value ?? ''} type="email" aria-invalid={fieldState.invalid} />
+                    <Input
+                      {...field}
+                      value={field.value ?? ''}
+                      type="email"
+                      aria-invalid={fieldState.invalid}
+                    />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -368,7 +489,7 @@ export function ThirdPartyForm({
 
             {/* Clasificacion */}
             <FieldGroup className="mt-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2">Clasificacion</h3>
+              <h3 className="text-muted-foreground mb-2 text-sm font-semibold">Clasificacion</h3>
               <div className="grid grid-cols-2 gap-4">
                 <Controller
                   name="thirdPartyTypeId"
@@ -425,7 +546,12 @@ export function ThirdPartyForm({
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="categoryCode">Codigo Categoria</FieldLabel>
-                      <Input {...field} value={field.value ?? ''} maxLength={1} aria-invalid={fieldState.invalid} />
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        maxLength={1}
+                        aria-invalid={fieldState.invalid}
+                      />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -452,7 +578,9 @@ export function ThirdPartyForm({
 
             {/* Datos Empleador */}
             <FieldGroup className="mt-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2">Datos Empleador (Opcional)</h3>
+              <h3 className="text-muted-foreground mb-2 text-sm font-semibold">
+                Datos Empleador (Opcional)
+              </h3>
               <div className="grid grid-cols-2 gap-4">
                 <Controller
                   name="employerDocumentNumber"
@@ -460,7 +588,11 @@ export function ThirdPartyForm({
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="employerDocumentNumber">NIT Empleador</FieldLabel>
-                      <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        aria-invalid={fieldState.invalid}
+                      />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -471,7 +603,11 @@ export function ThirdPartyForm({
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="employerBusinessName">Razon Social Empleador</FieldLabel>
-                      <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        aria-invalid={fieldState.invalid}
+                      />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -481,14 +617,19 @@ export function ThirdPartyForm({
 
             {/* Notas */}
             <FieldGroup className="mt-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2">Notas</h3>
+              <h3 className="text-muted-foreground mb-2 text-sm font-semibold">Notas</h3>
               <Controller
                 name="note"
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="note">Observaciones</FieldLabel>
-                    <Textarea {...field} value={field.value ?? ''} rows={3} aria-invalid={fieldState.invalid} />
+                    <Textarea
+                      {...field}
+                      value={field.value ?? ''}
+                      rows={3}
+                      aria-invalid={fieldState.invalid}
+                    />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}

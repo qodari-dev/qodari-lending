@@ -12,12 +12,14 @@ import { ThirdPartyRowActions } from './third-party-row-actions';
 // ============================================================================
 export const thirdPartyColumns: ColumnDef<ThirdParty>[] = [
   {
-    accessorKey: 'documentType',
+    accessorKey: 'identificationTypeId',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo Doc." />,
     cell: ({ row }) => {
+      const identificationType = row.original.identificationType;
       return (
         <div className="flex flex-col">
-          <span className="font-medium">{row.original.documentType}</span>
+          <span className="font-medium">{identificationType?.code ?? '-'}</span>
+          <span className="text-xs text-muted-foreground">{identificationType?.name ?? ''}</span>
         </div>
       );
     },
@@ -67,6 +69,18 @@ export const thirdPartyColumns: ColumnDef<ThirdParty>[] = [
       return (
         <div className="flex flex-col">
           <span>{row.original.phone}</span>
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: 'cityId',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Ciudad" />,
+    cell: ({ row }) => {
+      const city = row.original.city;
+      return (
+        <div className="flex flex-col">
+          <span>{city?.name ?? '-'}</span>
         </div>
       );
     },

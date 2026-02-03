@@ -20,14 +20,14 @@ import { z } from 'zod';
 const CoDebtorWhereFieldsSchema = z
   .object({
     id: z.union([z.number(), NumberOperatorsSchema]).optional(),
-    documentType: z.union([z.string(), StringOperatorsSchema]).optional(),
+    identificationTypeId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     documentNumber: z.union([z.string(), StringOperatorsSchema]).optional(),
     homeAddress: z.union([z.string(), StringOperatorsSchema]).optional(),
-    homeCityCode: z.union([z.string(), StringOperatorsSchema]).optional(),
+    homeCityId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     homePhone: z.union([z.string(), StringOperatorsSchema]).optional(),
     companyName: z.union([z.string(), StringOperatorsSchema]).optional(),
     workAddress: z.union([z.string(), StringOperatorsSchema]).optional(),
-    workCityCode: z.union([z.string(), StringOperatorsSchema]).optional(),
+    workCityId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     workPhone: z.union([z.string(), StringOperatorsSchema]).optional(),
     createdAt: z.union([z.coerce.date(), DateOperatorsSchema]).optional(),
     updatedAt: z.union([z.coerce.date(), DateOperatorsSchema]).optional(),
@@ -38,13 +38,25 @@ const CoDebtorWhereFieldsSchema = z
 // SORT
 // ============================================
 
-const CO_DEBTOR_SORT_FIELDS = ['id', 'documentType', 'documentNumber', 'companyName', 'createdAt', 'updatedAt'] as const;
+const CO_DEBTOR_SORT_FIELDS = [
+  'id',
+  'identificationTypeId',
+  'documentNumber',
+  'companyName',
+  'createdAt',
+  'updatedAt',
+] as const;
 
 // ============================================
 // INCLUDE
 // ============================================
 
-const CO_DEBTOR_INCLUDE_OPTIONS = ['loanApplicationCoDebtors'] as const;
+const CO_DEBTOR_INCLUDE_OPTIONS = [
+  'loanApplicationCoDebtors',
+  'identificationType',
+  'coDebtorsHome',
+  'coDebtorsWork',
+] as const;
 const CoDebtorIncludeSchema = createIncludeSchema(CO_DEBTOR_INCLUDE_OPTIONS);
 
 // ============================================
@@ -69,14 +81,14 @@ export const GetCoDebtorQuerySchema = z.object({
 // ============================================
 
 export const CreateCoDebtorBodySchema = z.object({
-  documentType: z.string().min(1).max(10),
+  identificationTypeId: z.number(),
   documentNumber: z.string().min(1).max(20),
   homeAddress: z.string().min(1).max(80),
-  homeCityCode: z.string().min(1).max(20),
+  homeCityId: z.number(),
   homePhone: z.string().min(1).max(20),
   companyName: z.string().min(1).max(80),
   workAddress: z.string().min(1).max(80),
-  workCityCode: z.string().min(1).max(20),
+  workCityId: z.number(),
   workPhone: z.string().min(1).max(20),
 });
 

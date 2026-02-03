@@ -24,7 +24,7 @@ type ThirdPartyColumn = keyof typeof thirdParties.$inferSelect;
 
 const THIRD_PARTY_FIELDS: FieldMap = {
   id: thirdParties.id,
-  documentType: thirdParties.documentType,
+  identificationTypeId: thirdParties.identificationTypeId,
   documentNumber: thirdParties.documentNumber,
   personType: thirdParties.personType,
   firstName: thirdParties.firstName,
@@ -32,6 +32,7 @@ const THIRD_PARTY_FIELDS: FieldMap = {
   businessName: thirdParties.businessName,
   phone: thirdParties.phone,
   email: thirdParties.email,
+  cityId: thirdParties.cityId,
   thirdPartyTypeId: thirdParties.thirdPartyTypeId,
   taxpayerType: thirdParties.taxpayerType,
   hasRut: thirdParties.hasRut,
@@ -48,6 +49,14 @@ const THIRD_PARTY_QUERY_CONFIG: QueryConfig = {
 const THIRD_PARTY_INCLUDES = createIncludeMap<typeof db.query.thirdParties>()({
   thirdPartyType: {
     relation: 'thirdPartyType',
+    config: true,
+  },
+  identificationType: {
+    relation: 'identificationType',
+    config: true,
+  },
+  city: {
+    relation: 'city',
     config: true,
   },
   loanApplications: {
@@ -180,7 +189,7 @@ export const thirdParty = tsr.router(contract.thirdParty, {
         action: 'create',
         functionName: 'create',
         resourceId: newThirdParty.id.toString(),
-        resourceLabel: `${newThirdParty.documentType} ${newThirdParty.documentNumber} - ${label}`,
+        resourceLabel: `${newThirdParty.documentNumber} - ${label}`,
         status: 'success',
         afterValue: {
           ...newThirdParty,
@@ -260,7 +269,7 @@ export const thirdParty = tsr.router(contract.thirdParty, {
         action: 'update',
         functionName: 'update',
         resourceId: existing.id.toString(),
-        resourceLabel: `${existing.documentType} ${existing.documentNumber} - ${label}`,
+        resourceLabel: `${existing.documentNumber} - ${label}`,
         status: 'success',
         beforeValue: {
           ...existing,
@@ -336,7 +345,7 @@ export const thirdParty = tsr.router(contract.thirdParty, {
         action: 'delete',
         functionName: 'delete',
         resourceId: existing.id.toString(),
-        resourceLabel: `${existing.documentType} ${existing.documentNumber} - ${label}`,
+        resourceLabel: `${existing.documentNumber} - ${label}`,
         status: 'success',
         beforeValue: {
           ...existing,

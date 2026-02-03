@@ -1,4 +1,4 @@
-import { db, documentTypes } from '@/server/db';
+import { db, cities } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { tsr } from '@ts-rest/serverless/next';
@@ -20,38 +20,35 @@ import {
 // CONFIG
 // ============================================
 
-type DocumentTypeColumn = keyof typeof documentTypes.$inferSelect;
+type CityColumn = keyof typeof cities.$inferSelect;
 
-const DOCUMENT_TYPE_FIELDS: FieldMap = {
-  id: documentTypes.id,
-  name: documentTypes.name,
-  isActive: documentTypes.isActive,
-  createdAt: documentTypes.createdAt,
-  updatedAt: documentTypes.updatedAt,
-} satisfies Partial<Record<DocumentTypeColumn, (typeof documentTypes)[DocumentTypeColumn]>>;
+const CITY_FIELDS: FieldMap = {
+  id: cities.id,
+  code: cities.code,
+  name: cities.name,
+  isActive: cities.isActive,
+  createdAt: cities.createdAt,
+  updatedAt: cities.updatedAt,
+} satisfies Partial<Record<CityColumn, (typeof cities)[CityColumn]>>;
 
-const DOCUMENT_TYPE_QUERY_CONFIG: QueryConfig = {
-  fields: DOCUMENT_TYPE_FIELDS,
-  searchFields: [documentTypes.name],
-  defaultSort: { column: documentTypes.createdAt, order: 'desc' },
+const CITY_QUERY_CONFIG: QueryConfig = {
+  fields: CITY_FIELDS,
+  searchFields: [cities.code, cities.name],
+  defaultSort: { column: cities.createdAt, order: 'desc' },
 };
 
-const DOCUMENT_TYPE_INCLUDES = createIncludeMap<typeof db.query.documentTypes>()({
-  creditProducts: {
-    relation: 'creditProductDocuments',
-    config: {
-      with: {
-        creditProduct: true,
-      },
-    },
+const CITY_INCLUDES = createIncludeMap<typeof db.query.cities>()({
+  coDebtorsHome: {
+    relation: 'coDebtorsHome',
+    config: true,
   },
-  loadApplications: {
-    relation: 'loanApplicationDocuments',
-    config: {
-      with: {
-        loanApplication: true,
-      },
-    },
+  coDebtorsWork: {
+    relation: 'coDebtorsWork',
+    config: true,
+  },
+  thirdParties: {
+    relation: 'thirdParties',
+    config: true,
   },
 });
 
@@ -59,9 +56,9 @@ const DOCUMENT_TYPE_INCLUDES = createIncludeMap<typeof db.query.documentTypes>()
 // HANDLER
 // ============================================
 
-export const documentType = tsr.router(contract.documentType, {
+export const city = tsr.router(contract.city, {
   // ==========================================
-  // LIST - GET /document-types
+  // LIST - GET /cities
   // ==========================================
   list: async ({ query }, { request, appRoute }) => {
     try {
@@ -74,19 +71,22 @@ export const documentType = tsr.router(contract.documentType, {
         orderBy,
         limit: queryLimit,
         offset,
-      } = buildQuery({ page, limit, search, where, sort }, DOCUMENT_TYPE_QUERY_CONFIG);
+      } = buildQuery({ page, limit, search, where, sort }, CITY_QUERY_CONFIG);
+
+      console.log('==============================');
+      console.log(whereClause);
 
       const [data, countResult] = await Promise.all([
-        db.query.documentTypes.findMany({
+        db.query.cities.findMany({
           where: whereClause,
-          with: buildTypedIncludes(include, DOCUMENT_TYPE_INCLUDES),
+          with: buildTypedIncludes(include, CITY_INCLUDES),
           orderBy: orderBy.length ? orderBy : undefined,
           limit: queryLimit,
           offset,
         }),
         db
           .select({ count: sql<number>`count(*)::int` })
-          .from(documentTypes)
+          .from(cities)
           .where(whereClause),
       ]);
 
@@ -101,24 +101,24 @@ export const documentType = tsr.router(contract.documentType, {
       return response;
     } catch (e) {
       return genericTsRestErrorResponse(e, {
-        genericMsg: 'Error al listar tipos de documento',
+        genericMsg: 'Error al listar ciudades',
       });
     }
   },
 
   // ==========================================
-  // GET - GET /document-types/:id
+  // GET - GET /cities/:id
   // ==========================================
   getById: async ({ params: { id }, query }, { request, appRoute }) => {
     try {
       await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-      const documentType = await db.query.documentTypes.findFirst({
-        where: eq(documentTypes.id, id),
-        with: buildTypedIncludes(query?.include, DOCUMENT_TYPE_INCLUDES),
+      const city = await db.query.cities.findFirst({
+        where: eq(cities.id, id),
+        with: buildTypedIncludes(query?.include, CITY_INCLUDES),
       });
 
-      if (!documentType) {
+      if (!city) {
         throwHttpError({
           status: 404,
           message: 'not found',
@@ -126,16 +126,16 @@ export const documentType = tsr.router(contract.documentType, {
         });
       }
 
-      return { status: 200, body: documentType };
+      return { status: 200, body: city };
     } catch (e) {
       return genericTsRestErrorResponse(e, {
-        genericMsg: `Error al obtener tipo de documento ${id}`,
+        genericMsg: `Error al obtener ciudad ${id}`,
       });
     }
   },
 
   // ==========================================
-  // CREATE - POST /document-types
+  // CREATE - POST /cities
   // ==========================================
   create: async ({ body }, { request, appRoute, nextRequest }) => {
     let session: UnifiedAuthContext | undefined;
@@ -151,10 +151,10 @@ export const documentType = tsr.router(contract.documentType, {
         });
       }
 
-      const newDocumentType = await db.transaction(async (tx) => {
-        const [newDocumentType] = await tx.insert(documentTypes).values(body).returning();
+      const newCity = await db.transaction(async (tx) => {
+        const [newCity] = await tx.insert(cities).values(body).returning();
 
-        return newDocumentType;
+        return newCity;
       });
 
       logAudit(session, {
@@ -162,20 +162,20 @@ export const documentType = tsr.router(contract.documentType, {
         actionKey: appRoute.metadata.permissionKey.actionKey,
         action: 'create',
         functionName: 'create',
-        resourceId: newDocumentType.id.toString(),
-        resourceLabel: `${newDocumentType.name}`,
+        resourceId: newCity.id.toString(),
+        resourceLabel: `${newCity.code} - ${newCity.name}`,
         status: 'success',
         afterValue: {
-          ...newDocumentType,
+          ...newCity,
         },
         ipAddress,
         userAgent,
       });
 
-      return { status: 201, body: newDocumentType };
+      return { status: 201, body: newCity };
     } catch (e) {
       const error = genericTsRestErrorResponse(e, {
-        genericMsg: 'Error al crear tipo de documento',
+        genericMsg: 'Error al crear ciudad',
       });
       await logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -195,7 +195,7 @@ export const documentType = tsr.router(contract.documentType, {
   },
 
   // ==========================================
-  // UPDATE - PATCH /document-types/:id
+  // UPDATE - PATCH /cities/:id
   // ==========================================
   update: async ({ params: { id }, body }, { request, appRoute, nextRequest }) => {
     let session: UnifiedAuthContext | undefined;
@@ -211,24 +211,20 @@ export const documentType = tsr.router(contract.documentType, {
         });
       }
 
-      const existing = await db.query.documentTypes.findFirst({
-        where: eq(documentTypes.id, id),
+      const existing = await db.query.cities.findFirst({
+        where: eq(cities.id, id),
       });
 
       if (!existing) {
         throwHttpError({
           status: 404,
-          message: `Document con ID ${id} no encontrado`,
+          message: `Ciudad con ID ${id} no encontrada`,
           code: 'NOT_FOUND',
         });
       }
 
       const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(documentTypes)
-          .set(body)
-          .where(eq(documentTypes.id, id))
-          .returning();
+        const [updated] = await tx.update(cities).set(body).where(eq(cities.id, id)).returning();
 
         return updated;
       });
@@ -239,7 +235,7 @@ export const documentType = tsr.router(contract.documentType, {
         action: 'update',
         functionName: 'update',
         resourceId: existing.id.toString(),
-        resourceLabel: `${existing.name}`,
+        resourceLabel: `${existing.code} - ${existing.name}`,
         status: 'success',
         beforeValue: {
           ...existing,
@@ -254,7 +250,7 @@ export const documentType = tsr.router(contract.documentType, {
       return { status: 200, body: updated };
     } catch (e) {
       const error = genericTsRestErrorResponse(e, {
-        genericMsg: `Error al actualizar tipo de documento ${id}`,
+        genericMsg: `Error al actualizar ciudad ${id}`,
       });
       await logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -275,7 +271,7 @@ export const documentType = tsr.router(contract.documentType, {
   },
 
   // ==========================================
-  // DELETE - DELETE /document-types/:id
+  // DELETE - DELETE /cities/:id
   // ==========================================
   delete: async ({ params: { id } }, { request, appRoute, nextRequest }) => {
     let session: UnifiedAuthContext | undefined;
@@ -291,19 +287,19 @@ export const documentType = tsr.router(contract.documentType, {
         });
       }
 
-      const existing = await db.query.documentTypes.findFirst({
-        where: eq(documentTypes.id, id),
+      const existing = await db.query.cities.findFirst({
+        where: eq(cities.id, id),
       });
 
       if (!existing) {
         throwHttpError({
           status: 404,
-          message: `Documento con ID ${id} no encontrado`,
+          message: `Ciudad con ID ${id} no encontrada`,
           code: 'NOT_FOUND',
         });
       }
 
-      await db.delete(documentTypes).where(eq(documentTypes.id, id));
+      await db.delete(cities).where(eq(cities.id, id));
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -311,7 +307,7 @@ export const documentType = tsr.router(contract.documentType, {
         action: 'delete',
         functionName: 'delete',
         resourceId: existing.id.toString(),
-        resourceLabel: `${existing.name}`,
+        resourceLabel: `${existing.code} - ${existing.name}`,
         status: 'success',
         beforeValue: {
           ...existing,
@@ -326,7 +322,7 @@ export const documentType = tsr.router(contract.documentType, {
       };
     } catch (e) {
       const error = genericTsRestErrorResponse(e, {
-        genericMsg: `Error al eliminar tipo de documento ${id}`,
+        genericMsg: `Error al eliminar ciudad ${id}`,
       });
       await logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,

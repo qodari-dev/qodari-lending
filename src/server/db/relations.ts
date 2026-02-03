@@ -32,7 +32,7 @@ import {
   insuranceRateRanges,
   creditProducts,
   creditProductCategories,
-  creditProductRequiredDocuments,
+  creditProductDocuments,
   creditProductAccounts,
   loanApplications,
   loanApplicationPledges,
@@ -71,13 +71,33 @@ import {
   portfolioProvisionSnapshotDetails,
   paymentAllocationPolicies,
   paymentAllocationPolicyRules,
+  cities,
+  identificationTypes,
 } from './schema';
+
+// ---------------------------------------------------------------------
+// Tipos de identificacion
+// ---------------------------------------------------------------------
+export const identificationTypesRelations = relations(identificationTypes, ({ many }) => ({
+  thirdParties: many(thirdParties),
+  insuranceCompanies: many(insuranceCompanies),
+  coDebtors: many(coDebtors),
+}));
+
+// ---------------------------------------------------------------------
+// Cities
+// ---------------------------------------------------------------------
+export const citiesRelations = relations(cities, ({ many }) => ({
+  coDebtorsHome: many(coDebtors, { relationName: 'coDebtorsHome' }),
+  coDebtorsWork: many(coDebtors, { relationName: 'coDebtorsWork' }),
+  thirdParties: many(thirdParties),
+}));
 
 // ---------------------------------------------------------------------
 // Concr43 - Tipos de documentos requeridos en solicitudes
 // ---------------------------------------------------------------------
 export const documentTypesRelations = relations(documentTypes, ({ many }) => ({
-  creditProductRequiredDocuments: many(creditProductRequiredDocuments),
+  creditProductDocuments: many(creditProductDocuments),
   loanApplicationDocuments: many(loanApplicationDocuments),
 }));
 
@@ -327,6 +347,14 @@ export const thirdPartiesRelations = relations(thirdParties, ({ one, many }) => 
     fields: [thirdParties.thirdPartyTypeId],
     references: [thirdPartyTypes.id],
   }),
+  city: one(cities, {
+    fields: [thirdParties.cityId],
+    references: [cities.id],
+  }),
+  identificationType: one(identificationTypes, {
+    fields: [thirdParties.identificationTypeId],
+    references: [identificationTypes.id],
+  }),
   loanApplications: many(loanApplications),
   loans: many(loans),
   accountingEntries: many(accountingEntries),
@@ -403,7 +431,7 @@ export const creditProductsRelations = relations(creditProducts, ({ one, many })
     references: [costCenters.id],
   }),
   creditProductCategories: many(creditProductCategories),
-  creditProductRequiredDocuments: many(creditProductRequiredDocuments),
+  creditProductDocuments: many(creditProductDocuments),
   creditProductAccounts: many(creditProductAccounts),
 }));
 
@@ -424,19 +452,16 @@ export const creditProductCategoriesRelations = relations(
 // ---------------------------------------------------------------------
 // Concr44 - Tipos de crédito vs Documentos requeridos (pivot)
 // ---------------------------------------------------------------------
-export const creditProductRequiredDocumentsRelations = relations(
-  creditProductRequiredDocuments,
-  ({ one }) => ({
-    creditProduct: one(creditProducts, {
-      fields: [creditProductRequiredDocuments.creditProductId],
-      references: [creditProducts.id],
-    }),
-    requiredDocumentType: one(documentTypes, {
-      fields: [creditProductRequiredDocuments.requiredDocumentTypeId],
-      references: [documentTypes.id],
-    }),
-  })
-);
+export const creditProductDocumentsRelations = relations(creditProductDocuments, ({ one }) => ({
+  creditProduct: one(creditProducts, {
+    fields: [creditProductDocuments.creditProductId],
+    references: [creditProducts.id],
+  }),
+  documentType: one(documentTypes, {
+    fields: [creditProductDocuments.documentTypeId],
+    references: [documentTypes.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr26 - Auxiliares por tipos de crédito
@@ -534,8 +559,22 @@ export const loanApplicationPledgesRelations = relations(loanApplicationPledges,
 // ---------------------------------------------------------------------
 // Concr40 - Codeudores
 // ---------------------------------------------------------------------
-export const coDebtorsRelations = relations(coDebtors, ({ many }) => ({
+export const coDebtorsRelations = relations(coDebtors, ({ many, one }) => ({
   loanApplicationCoDebtors: many(loanApplicationCoDebtors),
+  identificationType: one(identificationTypes, {
+    fields: [coDebtors.identificationTypeId],
+    references: [identificationTypes.id],
+  }),
+  coDebtorsHome: one(cities, {
+    relationName: 'coDebtorsHome',
+    fields: [coDebtors.homeCityId],
+    references: [cities.id],
+  }),
+  coDebtorsWork: one(cities, {
+    relationName: 'coDebtorsWork',
+    fields: [coDebtors.workCityId],
+    references: [cities.id],
+  }),
 }));
 
 // ---------------------------------------------------------------------
@@ -561,7 +600,7 @@ export const loanApplicationDocumentsRelations = relations(loanApplicationDocume
     references: [loanApplications.id],
   }),
   documentType: one(documentTypes, {
-    fields: [loanApplicationDocuments.requiredDocumentTypeId],
+    fields: [loanApplicationDocuments.documentTypeId],
     references: [documentTypes.id],
   }),
 }));

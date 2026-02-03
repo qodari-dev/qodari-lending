@@ -24,14 +24,14 @@ type CoDebtorColumn = keyof typeof coDebtors.$inferSelect;
 
 const CO_DEBTOR_FIELDS: FieldMap = {
   id: coDebtors.id,
-  documentType: coDebtors.documentType,
+  identificationTypeId: coDebtors.identificationTypeId,
   documentNumber: coDebtors.documentNumber,
   homeAddress: coDebtors.homeAddress,
-  homeCityCode: coDebtors.homeCityCode,
+  homeCityId: coDebtors.homeCityId,
   homePhone: coDebtors.homePhone,
   companyName: coDebtors.companyName,
   workAddress: coDebtors.workAddress,
-  workCityCode: coDebtors.workCityCode,
+  workCityId: coDebtors.workCityId,
   workPhone: coDebtors.workPhone,
   createdAt: coDebtors.createdAt,
   updatedAt: coDebtors.updatedAt,
@@ -51,6 +51,18 @@ const CO_DEBTOR_INCLUDES = createIncludeMap<typeof db.query.coDebtors>()({
         loanApplication: true,
       },
     },
+  },
+  identificationType: {
+    relation: 'identificationType',
+    config: true,
+  },
+  coDebtorsHome: {
+    relation: 'coDebtorsHome',
+    config: true,
+  },
+  coDebtorsWork: {
+    relation: 'coDebtorsWork',
+    config: true,
   },
 });
 
@@ -162,7 +174,7 @@ export const coDebtor = tsr.router(contract.coDebtor, {
         action: 'create',
         functionName: 'create',
         resourceId: newCoDebtor.id.toString(),
-        resourceLabel: `${newCoDebtor.documentType} ${newCoDebtor.documentNumber}`,
+        resourceLabel: `${newCoDebtor.documentNumber}`,
         status: 'success',
         afterValue: {
           ...newCoDebtor,
@@ -238,7 +250,7 @@ export const coDebtor = tsr.router(contract.coDebtor, {
         action: 'update',
         functionName: 'update',
         resourceId: existing.id.toString(),
-        resourceLabel: `${existing.documentType} ${existing.documentNumber}`,
+        resourceLabel: `${existing.documentNumber}`,
         status: 'success',
         beforeValue: {
           ...existing,
@@ -310,7 +322,7 @@ export const coDebtor = tsr.router(contract.coDebtor, {
         action: 'delete',
         functionName: 'delete',
         resourceId: existing.id.toString(),
-        resourceLabel: `${existing.documentType} ${existing.documentNumber}`,
+        resourceLabel: `${existing.documentNumber}`,
         status: 'success',
         beforeValue: {
           ...existing,

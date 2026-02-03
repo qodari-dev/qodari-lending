@@ -1,12 +1,7 @@
 import { DescriptionList, DescriptionSection } from '@/components/description-list';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import {
-  ThirdParty,
-  personTypeLabels,
-  sexLabels,
-  taxpayerTypeLabels,
-} from '@/schemas/third-party';
+import { ThirdParty, personTypeLabels, sexLabels, taxpayerTypeLabels } from '@/schemas/third-party';
 import { formatDate, formatCurrency } from '@/utils/formatters';
 import {
   Table,
@@ -31,14 +26,14 @@ export function ThirdPartyInfo({
   const isNatural = thirdParty.personType === 'NATURAL';
   const displayName = isNatural
     ? `${thirdParty.firstName ?? ''} ${thirdParty.secondName ?? ''} ${thirdParty.firstLastName ?? ''} ${thirdParty.secondLastName ?? ''}`.trim()
-    : thirdParty.businessName ?? '';
+    : (thirdParty.businessName ?? '');
 
   const sections: DescriptionSection[] = [
     {
       title: 'Identificacion',
       columns: 2,
       items: [
-        { label: 'Tipo de Documento', value: thirdParty.documentType },
+        { label: 'Tipo de Documento', value: thirdParty.identificationType?.name },
         { label: 'Numero de Documento', value: thirdParty.documentNumber },
         { label: 'Digito Verificacion', value: thirdParty.verificationDigit ?? '-' },
         {
@@ -82,6 +77,7 @@ export function ThirdPartyInfo({
       title: 'Contacto',
       columns: 2,
       items: [
+        { label: 'Ciudad', value: thirdParty.city?.name ?? '-' },
         { label: 'Direccion', value: thirdParty.address ?? '-' },
         { label: 'Telefono', value: thirdParty.phone },
         { label: 'Celular', value: thirdParty.mobilePhone ?? '-' },
@@ -142,8 +138,8 @@ export function ThirdPartyInfo({
       <SheetContent className="overflow-y-scroll sm:max-w-3xl">
         <SheetHeader>
           <SheetTitle>Informacion del Tercero</SheetTitle>
-          <p className="text-sm text-muted-foreground">
-            {thirdParty.documentType} {thirdParty.documentNumber} - {displayName}
+          <p className="text-muted-foreground text-sm">
+            {thirdParty.identificationType?.name} {thirdParty.documentNumber} - {displayName}
           </p>
         </SheetHeader>
         <div className="px-4">
@@ -151,9 +147,9 @@ export function ThirdPartyInfo({
 
           {/* Solicitudes de credito */}
           <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-4">Solicitudes de Credito</h3>
+            <h3 className="mb-4 text-lg font-semibold">Solicitudes de Credito</h3>
             {loanApplications.length > 0 ? (
-              <div className="border rounded-lg">
+              <div className="rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -172,23 +168,19 @@ export function ThirdPartyInfo({
                         <TableCell>{app.code ?? '-'}</TableCell>
                         <TableCell>{app.creditProduct?.name ?? '-'}</TableCell>
                         <TableCell>
-                          {app.requestedAmount
-                            ? formatCurrency(Number(app.requestedAmount))
-                            : '-'}
+                          {app.requestedAmount ? formatCurrency(Number(app.requestedAmount)) : '-'}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{app.status ?? '-'}</Badge>
                         </TableCell>
-                        <TableCell>
-                          {app.createdAt ? formatDate(app.createdAt) : '-'}
-                        </TableCell>
+                        <TableCell>{app.createdAt ? formatDate(app.createdAt) : '-'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground border rounded-lg">
+              <div className="text-muted-foreground rounded-lg border py-8 text-center">
                 No hay solicitudes de credito para este tercero.
               </div>
             )}
@@ -196,9 +188,9 @@ export function ThirdPartyInfo({
 
           {/* Creditos */}
           <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-4">Creditos Actuales</h3>
+            <h3 className="mb-4 text-lg font-semibold">Creditos Actuales</h3>
             {loans.length > 0 ? (
-              <div className="border rounded-lg">
+              <div className="rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -233,7 +225,7 @@ export function ThirdPartyInfo({
                 </Table>
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground border rounded-lg">
+              <div className="text-muted-foreground rounded-lg border py-8 text-center">
                 No hay creditos activos para este tercero.
               </div>
             )}

@@ -43,9 +43,10 @@ function isMenuActive(items: { url: string }[] | undefined, pathname: string): b
 }
 
 // Helper to add isActive to menu items automatically
-function withAutoActive<
-  T extends { items?: { url: string }[]; icon?: LucideIcon; title?: string },
->(menuItems: T[], pathname: string): (T & { isActive: boolean })[] {
+function withAutoActive<T extends { items?: { url: string }[]; icon?: LucideIcon; title?: string }>(
+  menuItems: T[],
+  pathname: string
+): (T & { isActive: boolean })[] {
   return menuItems.map((item) => ({
     ...item,
     isActive: isMenuActive(item.items, pathname),
@@ -104,6 +105,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 icon: Settings,
                 items: [
                   { title: 'Settings', url: `/credits-settings` },
+                  { title: 'Tipos de identification', url: `/identification-types` },
+                  { title: 'Ciudades', url: `/cities` },
                   { title: 'Tipos de documentos', url: `/document-types` },
                   { title: 'Motivos de rechazo', url: `/rejection-reasons` },
                   { title: 'Formas de pago', url: `/repayment-methods` },

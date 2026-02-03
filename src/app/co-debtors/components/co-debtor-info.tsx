@@ -28,7 +28,7 @@ export function CoDebtorInfo({
       title: 'Identificacion',
       columns: 2,
       items: [
-        { label: 'Tipo de Documento', value: coDebtor.documentType },
+        { label: 'Tipo de Documento', value: coDebtor.identificationType?.name },
         { label: 'Numero de Documento', value: coDebtor.documentNumber },
       ],
     },
@@ -37,7 +37,7 @@ export function CoDebtorInfo({
       columns: 2,
       items: [
         { label: 'Direccion', value: coDebtor.homeAddress },
-        { label: 'Codigo Ciudad', value: coDebtor.homeCityCode },
+        { label: 'Codigo Ciudad', value: coDebtor.coDebtorsHome?.name },
         { label: 'Telefono', value: coDebtor.homePhone },
       ],
     },
@@ -47,7 +47,7 @@ export function CoDebtorInfo({
       items: [
         { label: 'Empresa', value: coDebtor.companyName },
         { label: 'Direccion Trabajo', value: coDebtor.workAddress },
-        { label: 'Codigo Ciudad Trabajo', value: coDebtor.workCityCode },
+        { label: 'Codigo Ciudad Trabajo', value: coDebtor.coDebtorsWork?.name },
         { label: 'Telefono Trabajo', value: coDebtor.workPhone },
       ],
     },

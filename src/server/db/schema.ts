@@ -46,6 +46,46 @@ export const processTypeEnum = pgEnum('process_type', [
 ]);
 
 // ---------------------------------------------------------------------
+// Ciudades
+// Nota:
+// Catálogo de ciudades
+// Campo clave:
+// - code: codigo de la ciudad.
+// - name: nombre/descripcion de la ciudad.
+// ---------------------------------------------------------------------
+export const cities = pgTable(
+  'cities',
+  {
+    id: serial('id').primaryKey(),
+    code: varchar('code', { length: 5 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('uniq_cities_code').on(t.code)]
+);
+
+// ---------------------------------------------------------------------
+// Tipos de identificacion
+// Nota:
+// Catálogo de tipos de identificacion.
+// Campo clave:
+// - code: codigo del documento.
+// - name: nombre/descripcion del documento.
+// ---------------------------------------------------------------------
+export const identificationTypes = pgTable(
+  'identification_types',
+  {
+    id: serial('id').primaryKey(),
+    code: varchar('code', { length: 5 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('uniq_identification_types_name').on(t.name)]
+);
+
+// ---------------------------------------------------------------------
 // Concr43 - Tipos de documentos requeridos en solicitudes
 // Nota:
 // Catálogo de documentos que pueden exigirse en una solicitud de crédito.
@@ -565,8 +605,9 @@ export const thirdParties = pgTable(
   'third_parties',
   {
     id: serial('id').primaryKey(),
-    // Identificación
-    documentType: varchar('document_type', { length: 10 }).notNull(), // ej: CC, NIT, CE...
+    identificationTypeId: integer('identification_type_id')
+      .notNull()
+      .references(() => identificationTypes.id, { onDelete: 'restrict' }),
     documentNumber: varchar('document_number', { length: 17 }).notNull(),
     verificationDigit: varchar('verification_digit', { length: 1 }), // útil para NIT
 
@@ -588,6 +629,9 @@ export const thirdParties = pgTable(
     sex: sexEnum('sex'),
     categoryCode: varchar('category_code', { length: 1 }), // A,B,C,D
     address: varchar('address', { length: 80 }),
+    cityId: integer('city_id')
+      .notNull()
+      .references(() => cities.id, { onDelete: 'restrict' }),
 
     phone: varchar('phone', { length: 20 }).notNull(),
     mobilePhone: varchar('mobile_phone', { length: 20 }),
@@ -609,7 +653,7 @@ export const thirdParties = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_third_party_identity').on(t.documentType, t.documentNumber),
+    uniqueIndex('uniq_third_party_identity').on(t.identificationTypeId, t.documentNumber),
 
     index('idx_third_party_employer_doc').on(t.employerDocumentNumber),
     index('idx_third_party_type').on(t.thirdPartyTypeId),
@@ -659,7 +703,10 @@ export const insuranceCompanies = pgTable(
   {
     id: serial('id').primaryKey(),
 
-    taxId: varchar('tax_id', { length: 17 }).notNull(),
+    identificationTypeId: integer('identification_type_id')
+      .notNull()
+      .references(() => identificationTypes.id, { onDelete: 'restrict' }),
+    documentNumber: varchar('document_number', { length: 20 }).notNull(),
     verificationDigit: varchar('verification_digit', { length: 1 }),
 
     businessName: varchar('business_name', { length: 255 }).notNull(),
@@ -686,7 +733,12 @@ export const insuranceCompanies = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
-  (t) => [uniqueIndex('uniq_insurance_companies_tax_id').on(t.taxId)]
+  (t) => [
+    uniqueIndex('uniq_insurance_companies_document_number_id').on(
+      t.identificationTypeId,
+      t.documentNumber
+    ),
+  ]
 );
 
 // ---------------------------------------------------------------------
@@ -847,28 +899,23 @@ export const creditProductCategories = pgTable(
 // Define qué documentos se solicitan para cada producto de crédito.
 // Campos clave:
 // - creditProductId: producto de crédito.
-// - requiredDocumentTypeId: tipo de documento.
+// - documentTypeId: tipo de documento.
 // - isRequired: si es obligatorio o solo informativo.
 // =====================================================================
-export const creditProductRequiredDocuments = pgTable(
-  'credit_product_required_documents',
+export const creditProductDocuments = pgTable(
+  'credit_product_documents',
   {
     id: serial('id').primaryKey(),
     creditProductId: integer('credit_product_id')
       .notNull()
       .references(() => creditProducts.id, { onDelete: 'cascade' }),
-    requiredDocumentTypeId: integer('required_document_type_id')
+    documentTypeId: integer('document_type_id')
       .notNull()
       .references(() => documentTypes.id, { onDelete: 'restrict' }),
     isRequired: boolean('is_required').notNull().default(true),
     ...timestamps,
   },
-  (t) => [
-    uniqueIndex('uniq_credit_product_required_document').on(
-      t.creditProductId,
-      t.requiredDocumentTypeId
-    ),
-  ]
+  (t) => [uniqueIndex('uniq_credit_product_document').on(t.creditProductId, t.documentTypeId)]
 );
 
 // =====================================================================
@@ -1118,22 +1165,30 @@ export const coDebtors = pgTable(
   {
     id: serial('id').primaryKey(),
 
-    documentType: varchar('document_type', { length: 10 }).notNull(), // ej: CC, NIT, CE...
+    identificationTypeId: integer('identification_type_id')
+      .notNull()
+      .references(() => identificationTypes.id, { onDelete: 'restrict' }),
     // Concr40.numdoc
     documentNumber: varchar('document_number', { length: 20 }).notNull(),
 
     homeAddress: varchar('home_address', { length: 80 }).notNull(),
-    homeCityCode: varchar('home_city_code', { length: 20 }).notNull(),
+    homeCityId: integer('home_city_id')
+      .notNull()
+      .references(() => cities.id, { onDelete: 'restrict' }),
     homePhone: varchar('home_phone', { length: 20 }).notNull(),
 
     companyName: varchar('company_name', { length: 80 }).notNull(),
     workAddress: varchar('work_address', { length: 80 }).notNull(),
-    workCityCode: varchar('work_city_code', { length: 20 }).notNull(),
+    workCityId: integer('work_city_id')
+      .notNull()
+      .references(() => cities.id, { onDelete: 'restrict' }),
     workPhone: varchar('work_phone', { length: 20 }).notNull(),
 
     ...timestamps,
   },
-  (t) => [uniqueIndex('uniq_co_debtors_document_number').on(t.documentType, t.documentNumber)]
+  (t) => [
+    uniqueIndex('uniq_co_debtors_document_number').on(t.identificationTypeId, t.documentNumber),
+  ]
 );
 
 // ---------------------------------------------------------------------
@@ -1166,7 +1221,7 @@ export const loanApplicationCoDebtors = pgTable(
 // Nota:
 // Evidencia de documentos por solicitud. Permite marcar entrega y adjuntar archivo.
 // Campos clave:
-// - loanApplicationId + requiredDocumentTypeId: identifica el documento requerido.
+// - loanApplicationId + documentTypeId: identifica el documento requerido.
 // - isDelivered: indica si fue entregado.
 // - fileKey: referencia al archivo en el storage (S3/R2/GCS/etc).
 // ---------------------------------------------------------------------
@@ -1177,19 +1232,16 @@ export const loanApplicationDocuments = pgTable(
     loanApplicationId: integer('loan_application_id')
       .notNull()
       .references(() => loanApplications.id, { onDelete: 'cascade' }),
-    requiredDocumentTypeId: integer('required_document_type_id')
+    documentTypeId: integer('document_type_id')
       .notNull()
       .references(() => documentTypes.id, { onDelete: 'restrict' }),
     isDelivered: boolean('is_delivered').notNull().default(false),
-    // Storage reference (lo mínimo para poder descargar/ver el archivo)
     fileKey: varchar('file_key', { length: 512 }),
     uploadedByUserId: uuid('uploaded_by_user_id'),
-
+    uploadedByUserName: uuid('uploaded_by_user_name'),
     ...timestamps,
   },
-  (t) => [
-    uniqueIndex('uniq_application_document_type').on(t.loanApplicationId, t.requiredDocumentTypeId),
-  ]
+  (t) => [uniqueIndex('uniq_application_document_type').on(t.loanApplicationId, t.documentTypeId)]
 );
 
 // ------------------------------------------------------------

@@ -15,13 +15,20 @@ import * as React from 'react';
 
 import { PageContent, PageHeader } from '@/components/layout';
 import { Spinner } from '@/components/ui/spinner';
-import { useDeleteThirdParty, useThirdParties, useThirdParty } from '@/hooks/queries/use-third-party-queries';
-import { ThirdParty, ThirdPartyInclude, ThirdPartySortField } from '@/schemas/third-party';
+import {
+  useDeleteIdentificationType,
+  useIdentificationTypes,
+} from '@/hooks/queries/use-identification-type-queries';
+import {
+  IdentificationType,
+  IdentificationTypeInclude,
+  IdentificationTypeSortField,
+} from '@/schemas/identification-type';
 import { RowData, TableMeta } from '@tanstack/react-table';
-import { thirdPartyColumns } from './third-party-columns';
-import { ThirdPartyForm } from './third-party-form';
-import { ThirdPartyInfo } from './third-party-info';
-import { ThirdPartiesToolbar } from './third-party-toolbar';
+import { identificationTypeColumns } from './identification-type-columns';
+import { IdentificationTypeForm } from './identification-type-form';
+import { IdentificationTypeInfo } from './identification-type-info';
+import { IdentificationTypesToolbar } from './identification-type-toolbar';
 
 declare module '@tanstack/table-core' {
   interface TableMeta<TData extends RowData> {
@@ -31,9 +38,8 @@ declare module '@tanstack/table-core' {
   }
 }
 
-export function ThirdParties() {
-  const [thirdParty, setThirdParty] = React.useState<ThirdParty>();
-  const [selectedId, setSelectedId] = React.useState<number>();
+export function IdentificationTypes() {
+  const [identificationType, setIdentificationType] = React.useState<IdentificationType>();
 
   const {
     pageIndex,
@@ -44,72 +50,65 @@ export function ThirdParties() {
     handlePaginationChange,
     handleSortingChange,
     handleSearchChange,
-  } = useDataTable<ThirdPartySortField, ThirdPartyInclude>({
+  } = useDataTable<IdentificationTypeSortField, IdentificationTypeInclude>({
     defaultPageSize: 20,
-    defaultIncludes: ['thirdPartyType', 'identificationType', 'city'],
+    defaultIncludes: [],
     defaultSorting: [{ field: 'createdAt', order: 'desc' }],
   });
 
-  const { data, isLoading, isFetching, refetch } = useThirdParties(queryParams);
+  const { data, isLoading, isFetching, refetch } = useIdentificationTypes(queryParams);
 
-  // Query con include para obtener las solicitudes de credito y creditos
-  const { data: thirdPartyDetail } = useThirdParty(selectedId ?? 0, {
-    include: ['thirdPartyType', 'identificationType', 'city', 'loanApplications', 'loans'],
-    enabled: !!selectedId,
-  });
-
-  const { mutateAsync: deleteThirdParty, isPending: isDeleting } = useDeleteThirdParty();
+  const { mutateAsync: deleteIdentificationType, isPending: isDeleting } =
+    useDeleteIdentificationType();
 
   // ---- Handlers ----
   const [openedInfoSheet, setOpenedInfoSheet] = React.useState(false);
   const handleInfoSheetChange = React.useCallback(
     (open: boolean) => {
       if (open === false) {
-        setThirdParty(undefined);
-        setSelectedId(undefined);
+        setIdentificationType(undefined);
       }
       setOpenedInfoSheet(open);
     },
-    [setThirdParty, setOpenedInfoSheet]
+    [setIdentificationType, setOpenedInfoSheet]
   );
 
   const [openedFormSheet, setOpenedFormSheet] = React.useState(false);
   const handleFormSheetChange = React.useCallback(
     (open: boolean) => {
       if (open === false) {
-        setThirdParty(undefined);
+        setIdentificationType(undefined);
       }
       setOpenedFormSheet(open);
     },
-    [setThirdParty, setOpenedFormSheet]
+    [setIdentificationType, setOpenedFormSheet]
   );
 
   const [openedDeleteDialog, setOpenedDeleteDialog] = React.useState(false);
   const handleDelete = React.useCallback(async () => {
-    if (!thirdParty?.id) return;
-    await deleteThirdParty({ params: { id: thirdParty.id } });
-    setThirdParty(undefined);
+    if (!identificationType?.id) return;
+    await deleteIdentificationType({ params: { id: identificationType.id } });
+    setIdentificationType(undefined);
     setOpenedDeleteDialog(false);
-  }, [thirdParty, setThirdParty, setOpenedDeleteDialog, deleteThirdParty]);
+  }, [identificationType, setIdentificationType, setOpenedDeleteDialog, deleteIdentificationType]);
 
   const handleCreate = () => {
     handleFormSheetChange(true);
   };
-  const handleRowOpen = React.useCallback((row: ThirdParty) => {
-    setThirdParty(row);
-    setSelectedId(row.id);
+  const handleRowOpen = React.useCallback((row: IdentificationType) => {
+    setIdentificationType(row);
     setOpenedInfoSheet(true);
   }, []);
-  const handleRowEdit = React.useCallback((row: ThirdParty) => {
-    setThirdParty(row);
+  const handleRowEdit = React.useCallback((row: IdentificationType) => {
+    setIdentificationType(row);
     setOpenedFormSheet(true);
   }, []);
-  const handleRowDelete = React.useCallback((row: ThirdParty) => {
-    setThirdParty(row);
+  const handleRowDelete = React.useCallback((row: IdentificationType) => {
+    setIdentificationType(row);
     setOpenedDeleteDialog(true);
   }, []);
 
-  const tableMeta = React.useMemo<TableMeta<ThirdParty>>(
+  const tableMeta = React.useMemo<TableMeta<IdentificationType>>(
     () => ({
       onRowView: handleRowOpen,
       onRowDelete: handleRowDelete,
@@ -118,21 +117,15 @@ export function ThirdParties() {
     [handleRowOpen, handleRowDelete, handleRowEdit]
   );
 
-  // Get display name for the third party
-  const getThirdPartyDisplayName = (tp: ThirdParty | undefined) => {
-    if (!tp) return '';
-    if (tp.personType === 'NATURAL') {
-      return `${tp.firstName ?? ''} ${tp.firstLastName ?? ''}`.trim();
-    }
-    return tp.businessName ?? '';
-  };
-
   return (
     <>
-      <PageHeader title="Terceros" description="Administre los terceros del sistema." />
+      <PageHeader
+        title="Tipos de Identificación"
+        description="Administre el catálogo de tipos de identificación (CC, NIT, CE, etc.)."
+      />
       <PageContent>
         <DataTable
-          columns={thirdPartyColumns}
+          columns={identificationTypeColumns}
           data={data?.body?.data ?? []}
           pageCount={data?.body?.meta.totalPages ?? 0}
           pageIndex={pageIndex}
@@ -145,7 +138,7 @@ export function ThirdParties() {
           enableRowSelection
           pageSizeOptions={[10, 20, 30, 50]}
           toolbar={
-            <ThirdPartiesToolbar
+            <IdentificationTypesToolbar
               searchValue={searchValue}
               onSearchChange={handleSearchChange}
               onCreate={handleCreate}
@@ -153,18 +146,18 @@ export function ThirdParties() {
               isRefreshing={isFetching && !isLoading}
             />
           }
-          emptyMessage="No hay informacion. Intente ajustar los filtros."
+          emptyMessage="No hay información. Intente ajustar los filtros."
           meta={tableMeta}
         />
       </PageContent>
 
-      <ThirdPartyInfo
-        thirdParty={thirdPartyDetail?.body ?? thirdParty}
+      <IdentificationTypeInfo
+        identificationType={identificationType}
         opened={openedInfoSheet}
         onOpened={handleInfoSheetChange}
       />
-      <ThirdPartyForm
-        thirdParty={thirdParty}
+      <IdentificationTypeForm
+        identificationType={identificationType}
         opened={openedFormSheet}
         onOpened={handleFormSheetChange}
       />
@@ -172,10 +165,10 @@ export function ThirdParties() {
       <AlertDialog open={openedDeleteDialog} onOpenChange={setOpenedDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Estas seguro?</AlertDialogTitle>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion no se puede deshacer. Esto eliminara permanentemente el tercero
-              &quot;{thirdParty?.identificationType?.code ?? ''} {thirdParty?.documentNumber} - {getThirdPartyDisplayName(thirdParty)}&quot;.
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el tipo de
+              identificación &quot;{identificationType?.name}&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

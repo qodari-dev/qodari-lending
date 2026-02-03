@@ -220,7 +220,7 @@ export type PaginationMeta = z.infer<typeof PaginationMetaSchema>;
 // ============================================
 
 export const SearchSchema = z.object({
-  search: z.string().min(1).optional(),
+  search: z.string().optional(),
 });
 
 // ============================================

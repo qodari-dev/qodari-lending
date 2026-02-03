@@ -32,7 +32,7 @@ import type {
   insuranceRateRanges,
   creditProducts,
   creditProductCategories,
-  creditProductRequiredDocuments,
+  creditProductDocuments,
   creditProductAccounts,
   loanApplications,
   loanApplicationPledges,
@@ -71,13 +71,34 @@ import type {
   portfolioProvisionSnapshotDetails,
   paymentAllocationPolicies,
   paymentAllocationPolicyRules,
+  identificationTypes,
+  cities,
 } from './schema';
+
+// ---------------------------------------------------------------------
+// Tipos de identificacion
+// ---------------------------------------------------------------------
+export type IdentificationTypes = typeof identificationTypes.$inferSelect & {
+  thirdParties?: ThirdParties[];
+  insuranceCompanies?: InsuranceCompanies[];
+  coDebtors?: CoDebtors[];
+};
+export type NewIdentificationTypes = typeof identificationTypes.$inferInsert;
+
+// ---------------------------------------------------------------------
+// cities
+// ---------------------------------------------------------------------
+export type Cities = typeof cities.$inferSelect & {
+  coDebtorsHome?: CoDebtors[];
+  coDebtorsWork?: CoDebtors[];
+};
+export type NewCities = typeof cities.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr43 - Tipos de documentos requeridos en solicitudes
 // ---------------------------------------------------------------------
 export type DocumentTypes = typeof documentTypes.$inferSelect & {
-  creditProductRequiredDocuments?: CreditProductRequiredDocuments[];
+  creditProductDocuments?: CreditProductDocuments[];
   loanApplicationDocuments?: LoanApplicationDocuments[];
 };
 export type NewDocumentTypes = typeof documentTypes.$inferInsert;
@@ -286,12 +307,14 @@ export type NewThirdPartyTypes = typeof thirdPartyTypes.$inferInsert;
 // ---------------------------------------------------------------------
 export type ThirdParties = typeof thirdParties.$inferSelect & {
   thirdPartyType?: ThirdPartyTypes;
+  city?: Cities;
   loanApplications?: LoanApplications[];
   loans?: Loans[];
   accountingEntries?: AccountingEntries[];
   loansBorrowed?: Loans[];
   loansDisbursed?: Loans[];
   portfolioEntries?: PortfolioEntries[];
+  identificationType?: IdentificationTypes;
 };
 export type NewThirdParties = typeof thirdParties.$inferInsert;
 
@@ -324,7 +347,7 @@ export type CreditProducts = typeof creditProducts.$inferSelect & {
   studyGlAccount?: GlAccounts | null;
   costCenter?: CostCenters | null;
   creditProductCategories?: CreditProductCategories[];
-  creditProductRequiredDocuments?: CreditProductRequiredDocuments[];
+  creditProductDocuments?: CreditProductDocuments[];
   creditProductAccounts?: CreditProductAccounts[];
   paymentAllocationPolicy?: PaymentAllocationPolicies;
 };
@@ -342,11 +365,11 @@ export type NewCreditProductCategories = typeof creditProductCategories.$inferIn
 // ---------------------------------------------------------------------
 // Concr44 - Tipos de crédito vs Documentos requeridos (pivot)
 // ---------------------------------------------------------------------
-export type CreditProductRequiredDocuments = typeof creditProductRequiredDocuments.$inferSelect & {
+export type CreditProductDocuments = typeof creditProductDocuments.$inferSelect & {
   creditProduct?: CreditProducts;
   requiredDocumentType?: DocumentTypes;
 };
-export type NewCreditProductRequiredDocuments = typeof creditProductRequiredDocuments.$inferInsert;
+export type NewCreditProductDocuments = typeof creditProductDocuments.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr26 - Auxiliares por tipos de crédito
@@ -397,6 +420,9 @@ export type NewLoanApplicationPledges = typeof loanApplicationPledges.$inferInse
 // ---------------------------------------------------------------------
 export type CoDebtors = typeof coDebtors.$inferSelect & {
   loanApplicationCoDebtors?: LoanApplicationCoDebtors[];
+  coDebtorsHome?: Cities;
+  coDebtorsWork?: Cities;
+  identificationType?: IdentificationTypes;
 };
 export type NewCoDebtors = typeof coDebtors.$inferInsert;
 

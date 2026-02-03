@@ -62,7 +62,7 @@ export const taxpayerTypeLabels: Record<TaxpayerType, string> = {
 const ThirdPartyWhereFieldsSchema = z
   .object({
     id: z.union([z.number(), NumberOperatorsSchema]).optional(),
-    documentType: z.union([z.string(), StringOperatorsSchema]).optional(),
+    identificationTypeId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     documentNumber: z.union([z.string(), StringOperatorsSchema]).optional(),
     personType: z.union([z.enum(PERSON_TYPE_OPTIONS), StringOperatorsSchema]).optional(),
     firstName: z.union([z.string(), StringOperatorsSchema]).optional(),
@@ -70,6 +70,7 @@ const ThirdPartyWhereFieldsSchema = z
     businessName: z.union([z.string(), StringOperatorsSchema]).optional(),
     phone: z.union([z.string(), StringOperatorsSchema]).optional(),
     email: z.union([z.string(), StringOperatorsSchema]).optional(),
+    cityId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     thirdPartyTypeId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     taxpayerType: z.union([z.enum(TAXPAYER_TYPE_OPTIONS), StringOperatorsSchema]).optional(),
     hasRut: z.union([z.boolean(), BooleanOperatorsSchema]).optional(),
@@ -84,7 +85,7 @@ const ThirdPartyWhereFieldsSchema = z
 
 const THIRD_PARTY_SORT_FIELDS = [
   'id',
-  'documentType',
+  'identificationTypeId',
   'documentNumber',
   'personType',
   'firstName',
@@ -98,7 +99,13 @@ const THIRD_PARTY_SORT_FIELDS = [
 // INCLUDE
 // ============================================
 
-const THIRD_PARTY_INCLUDE_OPTIONS = ['thirdPartyType', 'loanApplications', 'loans'] as const;
+const THIRD_PARTY_INCLUDE_OPTIONS = [
+  'thirdPartyType',
+  'identificationType',
+  'city',
+  'loanApplications',
+  'loans',
+] as const;
 const ThirdPartyIncludeSchema = createIncludeSchema(THIRD_PARTY_INCLUDE_OPTIONS);
 
 // ============================================
@@ -123,7 +130,7 @@ export const GetThirdPartyQuerySchema = z.object({
 // ============================================
 
 export const CreateThirdPartyBodySchema = z.object({
-  documentType: z.string().min(1).max(10),
+  identificationTypeId: z.number(),
   documentNumber: z.string().min(1).max(17),
   verificationDigit: z.string().max(1).optional().nullable(),
   personType: z.enum(PERSON_TYPE_OPTIONS),
@@ -136,6 +143,7 @@ export const CreateThirdPartyBodySchema = z.object({
   sex: z.enum(SEX_OPTIONS).optional().nullable(),
   categoryCode: z.string().max(1).optional().nullable(),
   address: z.string().max(80).optional().nullable(),
+  cityId: z.number(),
   phone: z.string().min(1).max(20),
   mobilePhone: z.string().max(20).optional().nullable(),
   email: z.string().max(60).optional().nullable(),

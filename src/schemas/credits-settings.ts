@@ -1,0 +1,72 @@
+import { Contract } from '@/server/api/contracts';
+import { createIncludeSchema } from '@/server/utils/query/schemas';
+import { ClientInferResponseBody } from '@ts-rest/core';
+import { z } from 'zod';
+
+// ============================================
+// INCLUDE
+// ============================================
+
+const CREDITS_SETTINGS_INCLUDE_OPTIONS = [
+  'cashGlAccount',
+  'majorGlAccount',
+  'excessGlAccount',
+  'pledgeSubsidyGlAccount',
+  'writeOffGlAccount',
+  'defaultCostCenter',
+] as const;
+
+const CreditsSettingsIncludeSchema = createIncludeSchema(CREDITS_SETTINGS_INCLUDE_OPTIONS);
+
+// ============================================
+// QUERY SCHEMAS
+// ============================================
+
+export const GetCreditsSettingsQuerySchema = z.object({
+  include: CreditsSettingsIncludeSchema,
+});
+
+// ============================================
+// MUTATIONS
+// ============================================
+
+export const UpdateCreditsSettingsBodySchema = z.object({
+  auditTransactionsEnabled: z.boolean().optional(),
+  accountingSystemCode: z.string().max(2).optional(),
+  postAccountingOnline: z.boolean().optional(),
+  subsidyEnabled: z.boolean().optional(),
+  accountingEnabled: z.boolean().optional(),
+
+  // GL Accounts
+  cashGlAccountId: z.number().nullable().optional(),
+  majorGlAccountId: z.number().nullable().optional(),
+  excessGlAccountId: z.number().nullable().optional(),
+  pledgeSubsidyGlAccountId: z.number().nullable().optional(),
+  writeOffGlAccountId: z.number().nullable().optional(),
+
+  // Cost Center
+  defaultCostCenterId: z.number().nullable().optional(),
+
+  // Signatures
+  creditManagerName: z.string().max(50).nullable().optional(),
+  creditManagerTitle: z.string().max(80).nullable().optional(),
+  adminManagerName: z.string().max(50).nullable().optional(),
+  adminManagerTitle: z.string().max(80).nullable().optional(),
+  legalAdvisorName: z.string().max(50).nullable().optional(),
+  legalAdvisorTitle: z.string().max(80).nullable().optional(),
+  adminDirectorName: z.string().max(50).nullable().optional(),
+  adminDirectorTitle: z.string().max(80).nullable().optional(),
+  financeManagerName: z.string().max(50).nullable().optional(),
+  financeManagerTitle: z.string().max(80).nullable().optional(),
+});
+
+// ============================================
+// TYPES
+// ============================================
+
+export type CreditsSettings = ClientInferResponseBody<
+  Contract['creditsSettings']['get'],
+  200
+>;
+
+export type CreditsSettingsInclude = (typeof CREDITS_SETTINGS_INCLUDE_OPTIONS)[number];

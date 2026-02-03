@@ -20,7 +20,7 @@ export function NavMain({
   menus,
 }: {
   menus: {
-    title: string;
+    title?: string;
     items: {
       title: string;
       url?: string;
@@ -35,9 +35,9 @@ export function NavMain({
 }) {
   return (
     <SidebarGroup>
-      {menus.map((menu) => (
-        <Fragment key={menu.title}>
-          <SidebarGroupLabel>{menu.title}</SidebarGroupLabel>
+      {menus.map((menu, index) => (
+        <Fragment key={menu.title ?? `menu-${index}`}>
+          {menu.title && <SidebarGroupLabel>{menu.title}</SidebarGroupLabel>}
           <SidebarMenu>
             {menu.items.map((item) => {
               if (!item.items || item.items.length === 0)

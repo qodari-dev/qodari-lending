@@ -71,7 +71,7 @@ import type {
   portfolioProvisionSnapshotDetails,
   paymentAllocationPolicies,
   paymentAllocationPolicyRules,
-} from "./schema";
+} from './schema';
 
 // ---------------------------------------------------------------------
 // Concr43 - Tipos de documentos requeridos en solicitudes
@@ -102,12 +102,10 @@ export type NewRepaymentMethods = typeof repaymentMethods.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr11 - Garantías de pago
 // ---------------------------------------------------------------------
-export type PaymentGuaranteeTypes =
-  typeof paymentGuaranteeTypes.$inferSelect & {
-    loans?: Loans[];
-  };
-export type NewPaymentGuaranteeTypes =
-  typeof paymentGuaranteeTypes.$inferInsert;
+export type PaymentGuaranteeTypes = typeof paymentGuaranteeTypes.$inferSelect & {
+  loans?: Loans[];
+};
+export type NewPaymentGuaranteeTypes = typeof paymentGuaranteeTypes.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr13 - Periodicidad de pagos
@@ -181,31 +179,27 @@ export type NewCostCenters = typeof costCenters.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr05 - Distribuciones contables (tipos de distribución)
 // ---------------------------------------------------------------------
-export type AccountingDistributions =
-  typeof accountingDistributions.$inferSelect & {
-    accountingDistributionLines?: AccountingDistributionLines[];
+export type AccountingDistributions = typeof accountingDistributions.$inferSelect & {
+  accountingDistributionLines?: AccountingDistributionLines[];
 
-    creditProductsAsCapitalDistribution?: CreditProducts[];
-    creditProductsAsInterestDistribution?: CreditProducts[];
-    creditProductsAsLateInterestDistribution?: CreditProducts[];
+  creditProductsAsCapitalDistribution?: CreditProducts[];
+  creditProductsAsInterestDistribution?: CreditProducts[];
+  creditProductsAsLateInterestDistribution?: CreditProducts[];
 
-    insuranceCompaniesAsPaymentDistribution?: InsuranceCompanies[];
-    insuranceCompaniesAsMonthlyDistribution?: InsuranceCompanies[];
-  };
-export type NewAccountingDistributions =
-  typeof accountingDistributions.$inferInsert;
+  insuranceCompaniesAsPaymentDistribution?: InsuranceCompanies[];
+  insuranceCompaniesAsMonthlyDistribution?: InsuranceCompanies[];
+};
+export type NewAccountingDistributions = typeof accountingDistributions.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr06 - Auxiliares por distribuciones contables
 // ---------------------------------------------------------------------
-export type AccountingDistributionLines =
-  typeof accountingDistributionLines.$inferSelect & {
-    accountingDistribution?: AccountingDistributions;
-    glAccount?: GlAccounts;
-    costCenter?: CostCenters;
-  };
-export type NewAccountingDistributionLines =
-  typeof accountingDistributionLines.$inferInsert;
+export type AccountingDistributionLines = typeof accountingDistributionLines.$inferSelect & {
+  accountingDistribution?: AccountingDistributions;
+  glAccount?: GlAccounts;
+  costCenter?: CostCenters;
+};
+export type NewAccountingDistributionLines = typeof accountingDistributionLines.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr29 - Tipos de recibos de abonos
@@ -220,12 +214,10 @@ export type NewPaymentReceiptTypes = typeof paymentReceiptTypes.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr31 - Usuarios para recibos de abonos
 // ---------------------------------------------------------------------
-export type UserPaymentReceiptTypes =
-  typeof userPaymentReceiptTypes.$inferSelect & {
-    paymentReceiptType?: PaymentReceiptTypes;
-  };
-export type NewUserPaymentReceiptTypes =
-  typeof userPaymentReceiptTypes.$inferInsert;
+export type UserPaymentReceiptTypes = typeof userPaymentReceiptTypes.$inferSelect & {
+  paymentReceiptType?: PaymentReceiptTypes;
+};
+export type NewUserPaymentReceiptTypes = typeof userPaymentReceiptTypes.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr46 - Oficinas de afiliación
@@ -276,12 +268,10 @@ export type NewCreditFundBudgets = typeof creditFundBudgets.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr62 - Usuario ↔ Oficina de afiliación
 // ---------------------------------------------------------------------
-export type UserAffiliationOffices =
-  typeof userAffiliationOffices.$inferSelect & {
-    affiliationOffice?: AffiliationOffices;
-  };
-export type NewUserAffiliationOffices =
-  typeof userAffiliationOffices.$inferInsert;
+export type UserAffiliationOffices = typeof userAffiliationOffices.$inferSelect & {
+  affiliationOffice?: AffiliationOffices;
+};
+export type NewUserAffiliationOffices = typeof userAffiliationOffices.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr21 - Tipos de terceros
@@ -343,37 +333,31 @@ export type NewCreditProducts = typeof creditProducts.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr30 - Categorías por tipos de crédito (rangos de cuotas + factores)
 // ---------------------------------------------------------------------
-export type CreditProductCategories =
-  typeof creditProductCategories.$inferSelect & {
-    creditProduct?: CreditProducts;
-    creditProductLateInterestRules?: CreditProductLateInterestRules[];
-  };
-export type NewCreditProductCategories =
-  typeof creditProductCategories.$inferInsert;
+export type CreditProductCategories = typeof creditProductCategories.$inferSelect & {
+  creditProduct?: CreditProducts;
+  creditProductLateInterestRules?: CreditProductLateInterestRules[];
+};
+export type NewCreditProductCategories = typeof creditProductCategories.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr44 - Tipos de crédito vs Documentos requeridos (pivot)
 // ---------------------------------------------------------------------
-export type CreditProductRequiredDocuments =
-  typeof creditProductRequiredDocuments.$inferSelect & {
-    creditProduct?: CreditProducts;
-    requiredDocumentType?: DocumentTypes;
-  };
-export type NewCreditProductRequiredDocuments =
-  typeof creditProductRequiredDocuments.$inferInsert;
+export type CreditProductRequiredDocuments = typeof creditProductRequiredDocuments.$inferSelect & {
+  creditProduct?: CreditProducts;
+  requiredDocumentType?: DocumentTypes;
+};
+export type NewCreditProductRequiredDocuments = typeof creditProductRequiredDocuments.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr26 - Auxiliares por tipos de crédito
 // ---------------------------------------------------------------------
-export type CreditProductAccounts =
-  typeof creditProductAccounts.$inferSelect & {
-    creditProduct?: CreditProducts;
-    capitalAccount?: GlAccounts;
-    interestAccount?: GlAccounts;
-    lateInterestAccount?: GlAccounts;
-  };
-export type NewCreditProductAccounts =
-  typeof creditProductAccounts.$inferInsert;
+export type CreditProductAccounts = typeof creditProductAccounts.$inferSelect & {
+  creditProduct?: CreditProducts;
+  capitalAccount?: GlAccounts;
+  interestAccount?: GlAccounts;
+  lateInterestAccount?: GlAccounts;
+};
+export type NewCreditProductAccounts = typeof creditProductAccounts.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr39 - Solicitudes de créditos
@@ -403,12 +387,10 @@ export type NewLoanApplications = typeof loanApplications.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr16 - Pignoraciones por núcleo familiar
 // ---------------------------------------------------------------------
-export type LoanApplicationPledges =
-  typeof loanApplicationPledges.$inferSelect & {
-    loanApplication?: LoanApplications;
-  };
-export type NewLoanApplicationPledges =
-  typeof loanApplicationPledges.$inferInsert;
+export type LoanApplicationPledges = typeof loanApplicationPledges.$inferSelect & {
+  loanApplication?: LoanApplications;
+};
+export type NewLoanApplicationPledges = typeof loanApplicationPledges.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr40 - Codeudores
@@ -421,24 +403,20 @@ export type NewCoDebtors = typeof coDebtors.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr41 - Relación solicitud - codeudor
 // ---------------------------------------------------------------------
-export type LoanApplicationCoDebtors =
-  typeof loanApplicationCoDebtors.$inferSelect & {
-    loanApplication?: LoanApplications;
-    coDebtor?: CoDebtors;
-  };
-export type NewLoanApplicationCoDebtors =
-  typeof loanApplicationCoDebtors.$inferInsert;
+export type LoanApplicationCoDebtors = typeof loanApplicationCoDebtors.$inferSelect & {
+  loanApplication?: LoanApplications;
+  coDebtor?: CoDebtors;
+};
+export type NewLoanApplicationCoDebtors = typeof loanApplicationCoDebtors.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr45 - Documentos entregados en solicitudes
 // ---------------------------------------------------------------------
-export type LoanApplicationDocuments =
-  typeof loanApplicationDocuments.$inferSelect & {
-    loanApplication?: LoanApplications;
-    documentType?: DocumentTypes;
-  };
-export type NewLoanApplicationDocuments =
-  typeof loanApplicationDocuments.$inferInsert;
+export type LoanApplicationDocuments = typeof loanApplicationDocuments.$inferSelect & {
+  loanApplication?: LoanApplications;
+  documentType?: DocumentTypes;
+};
+export type NewLoanApplicationDocuments = typeof loanApplicationDocuments.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr08 - Créditos aprobados / liquidados
@@ -454,6 +432,7 @@ export type Loans = typeof loans.$inferSelect & {
   costCenter?: CostCenters | null;
   borrower?: ThirdParties;
   disbursementParty?: ThirdParties;
+  channel?: Channels | null;
 };
 export type NewLoans = typeof loans.$inferInsert;
 
@@ -468,12 +447,10 @@ export type NewLoanInstallments = typeof loanInstallments.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr52 — Acta diaria por oficina
 // ---------------------------------------------------------------------
-export type LoanApplicationActNumbers =
-  typeof loanApplicationActNumbers.$inferSelect & {
-    affiliationOffice?: AffiliationOffices;
-  };
-export type NewLoanApplicationActNumbers =
-  typeof loanApplicationActNumbers.$inferInsert;
+export type LoanApplicationActNumbers = typeof loanApplicationActNumbers.$inferSelect & {
+  affiliationOffice?: AffiliationOffices;
+};
+export type NewLoanApplicationActNumbers = typeof loanApplicationActNumbers.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr17 - Cartera por ítem (saldo actual)
@@ -527,28 +504,24 @@ export type NewLoanProcessStates = typeof loanProcessStates.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr63-Concr28 - Histórico cartera (aging snapshot)
 // ---------------------------------------------------------------------
-export type PortfolioAgingSnapshots =
-  typeof portfolioAgingSnapshots.$inferSelect & {
-    accountingPeriod?: AccountingPeriods;
-    affiliationOffice?: AffiliationOffices;
-    creditProduct?: CreditProducts;
-    glAccount?: GlAccounts;
-    loan?: Loans;
-    repaymentMethod?: RepaymentMethods;
-    thirdParty?: ThirdParties;
-  };
-export type NewPortfolioAgingSnapshots =
-  typeof portfolioAgingSnapshots.$inferInsert;
+export type PortfolioAgingSnapshots = typeof portfolioAgingSnapshots.$inferSelect & {
+  accountingPeriod?: AccountingPeriods;
+  affiliationOffice?: AffiliationOffices;
+  creditProduct?: CreditProducts;
+  glAccount?: GlAccounts;
+  loan?: Loans;
+  repaymentMethod?: RepaymentMethods;
+  thirdParty?: ThirdParties;
+};
+export type NewPortfolioAgingSnapshots = typeof portfolioAgingSnapshots.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr64 - Excedentes de nómina/libranza
 // ---------------------------------------------------------------------
-export type PayrollExcessPayments =
-  typeof payrollExcessPayments.$inferSelect & {
-    loan?: Loans;
-  };
-export type NewPayrollExcessPayments =
-  typeof payrollExcessPayments.$inferInsert;
+export type PayrollExcessPayments = typeof payrollExcessPayments.$inferSelect & {
+  loan?: Loans;
+};
+export type NewPayrollExcessPayments = typeof payrollExcessPayments.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr32 - Abonos
@@ -564,13 +537,11 @@ export type NewLoanPayments = typeof loanPayments.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr35 - Valores por formas de pago en abonos
 // ---------------------------------------------------------------------
-export type LoanPaymentMethodAllocations =
-  typeof loanPaymentMethodAllocations.$inferSelect & {
-    loanPayment?: LoanPayments;
-    collectionMethod?: PaymentTenderTypes;
-  };
-export type NewLoanPaymentMethodAllocations =
-  typeof loanPaymentMethodAllocations.$inferInsert;
+export type LoanPaymentMethodAllocations = typeof loanPaymentMethodAllocations.$inferSelect & {
+  loanPayment?: LoanPayments;
+  collectionMethod?: PaymentTenderTypes;
+};
+export type NewLoanPaymentMethodAllocations = typeof loanPaymentMethodAllocations.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr01 - Configuración global del módulo de créditos
@@ -581,10 +552,6 @@ export type CreditsSettings = typeof creditsSettings.$inferSelect & {
   excessGlAccount?: GlAccounts;
   pledgeSubsidyGlAccount?: GlAccounts;
   writeOffGlAccount?: GlAccounts;
-  fundRegisterGlAccount?: GlAccounts;
-  defaultCollectionMethod?: PaymentTenderTypes;
-  defaultRepaymentMethod?: RepaymentMethods;
-  defaultPaymentGuaranteeType?: PaymentGuaranteeTypes;
   defaultCostCenter?: CostCenters;
 };
 export type NewCreditsSettings = typeof creditsSettings.$inferInsert;
@@ -611,15 +578,13 @@ export type NewBillingConceptRules = typeof billingConceptRules.$inferInsert;
 // ---------------------------------------------------------------------
 // Concr07 (credit_products) -> Conceptos por producto
 // ---------------------------------------------------------------------
-export type CreditProductBillingConcepts =
-  typeof creditProductBillingConcepts.$inferSelect & {
-    creditProduct?: CreditProducts;
-    billingConcept?: BillingConcepts;
-    overrideBillingConceptRule?: BillingConceptRules;
-    overrideGlAccount?: GlAccounts;
-  };
-export type NewCreditProductBillingConcepts =
-  typeof creditProductBillingConcepts.$inferInsert;
+export type CreditProductBillingConcepts = typeof creditProductBillingConcepts.$inferSelect & {
+  creditProduct?: CreditProducts;
+  billingConcept?: BillingConcepts;
+  overrideBillingConceptRule?: BillingConceptRules;
+  overrideGlAccount?: GlAccounts;
+};
+export type NewCreditProductBillingConcepts = typeof creditProductBillingConcepts.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr08 (loans) -> Conceptos "congelados" por crédito (snapshot)
@@ -636,12 +601,10 @@ export type NewLoanBillingConcepts = typeof loanBillingConcepts.$inferInsert;
 // ---------------------------------------------------------------------
 // Reglas de interés de mora por edad de mora (días)
 // ---------------------------------------------------------------------
-export type CreditProductLateInterestRules =
-  typeof creditProductLateInterestRules.$inferSelect & {
-    creditProductCategory?: CreditProductCategories;
-  };
-export type NewCreditProductLateInterestRules =
-  typeof creditProductLateInterestRules.$inferInsert;
+export type CreditProductLateInterestRules = typeof creditProductLateInterestRules.$inferSelect & {
+  creditProductCategory?: CreditProductCategories;
+};
+export type NewCreditProductLateInterestRules = typeof creditProductLateInterestRules.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr59 - Convenios / Pagadurías
@@ -664,22 +627,18 @@ export type NewBillingCycleProfiles = typeof billingCycleProfiles.$inferInsert;
 // ---------------------------------------------------------------------
 // Billing Cycle Profile Cycles
 // ---------------------------------------------------------------------
-export type BillingCycleProfileCycles =
-  typeof billingCycleProfileCycles.$inferSelect & {
-    billingCycleProfile?: BillingCycleProfiles;
-  };
-export type NewBillingCycleProfileCycles =
-  typeof billingCycleProfileCycles.$inferInsert;
+export type BillingCycleProfileCycles = typeof billingCycleProfileCycles.$inferSelect & {
+  billingCycleProfile?: BillingCycleProfiles;
+};
+export type NewBillingCycleProfileCycles = typeof billingCycleProfileCycles.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Historial de evaluaciones de riesgo por solicitud
 // ---------------------------------------------------------------------
-export type LoanApplicationRiskAssessments =
-  typeof loanApplicationRiskAssessments.$inferSelect & {
-    loanApplication?: LoanApplications;
-  };
-export type NewLoanApplicationRiskAssessments =
-  typeof loanApplicationRiskAssessments.$inferInsert;
+export type LoanApplicationRiskAssessments = typeof loanApplicationRiskAssessments.$inferSelect & {
+  loanApplication?: LoanApplications;
+};
+export type NewLoanApplicationRiskAssessments = typeof loanApplicationRiskAssessments.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Canales de creación de créditos
@@ -692,32 +651,26 @@ export type NewChannels = typeof channels.$inferInsert;
 // ---------------------------------------------------------------------
 // Historial de estados (trazabilidad del ciclo)
 // ---------------------------------------------------------------------
-export type LoanApplicationStatusHistory =
-  typeof loanApplicationStatusHistory.$inferSelect & {
-    loanApplication?: LoanApplications;
-  };
-export type NewLoanApplicationStatusHistory =
-  typeof loanApplicationStatusHistory.$inferInsert;
+export type LoanApplicationStatusHistory = typeof loanApplicationStatusHistory.$inferSelect & {
+  loanApplication?: LoanApplications;
+};
+export type NewLoanApplicationStatusHistory = typeof loanApplicationStatusHistory.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Eventos / Integraciones (trazabilidad técnica + payloads)
 // ---------------------------------------------------------------------
-export type LoanApplicationEvents =
-  typeof loanApplicationEvents.$inferSelect & {
-    loanApplication?: LoanApplications;
-  };
-export type NewLoanApplicationEvents =
-  typeof loanApplicationEvents.$inferInsert;
+export type LoanApplicationEvents = typeof loanApplicationEvents.$inferSelect & {
+  loanApplication?: LoanApplications;
+};
+export type NewLoanApplicationEvents = typeof loanApplicationEvents.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Políticas de refinanciación / consolidación por producto
 // ---------------------------------------------------------------------
-export type CreditProductRefinancePolicies =
-  typeof creditProductRefinancePolicies.$inferSelect & {
-    creditProduct?: CreditProducts;
-  };
-export type NewCreditProductRefinancePolicies =
-  typeof creditProductRefinancePolicies.$inferInsert;
+export type CreditProductRefinancePolicies = typeof creditProductRefinancePolicies.$inferSelect & {
+  creditProduct?: CreditProducts;
+};
+export type NewCreditProductRefinancePolicies = typeof creditProductRefinancePolicies.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Aging Profiles - Perfiles de edades de cartera
@@ -744,14 +697,12 @@ export type NewAgingBuckets = typeof agingBuckets.$inferInsert;
 // ---------------------------------------------------------------------
 // Portfolio Provision Snapshots (cabecera)
 // ---------------------------------------------------------------------
-export type PortfolioProvisionSnapshots =
-  typeof portfolioProvisionSnapshots.$inferSelect & {
-    accountingPeriod?: AccountingPeriods;
-    agingProfile?: AgingProfiles;
-    portfolioProvisionSnapshotDetails?: PortfolioProvisionSnapshotDetails[];
-  };
-export type NewPortfolioProvisionSnapshots =
-  typeof portfolioProvisionSnapshots.$inferInsert;
+export type PortfolioProvisionSnapshots = typeof portfolioProvisionSnapshots.$inferSelect & {
+  accountingPeriod?: AccountingPeriods;
+  agingProfile?: AgingProfiles;
+  portfolioProvisionSnapshotDetails?: PortfolioProvisionSnapshotDetails[];
+};
+export type NewPortfolioProvisionSnapshots = typeof portfolioProvisionSnapshots.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Portfolio Provision Snapshot Details (detalle)
@@ -771,22 +722,18 @@ export type NewPortfolioProvisionSnapshotDetails =
 // Define una modalidad de imputación de pagos (NORMAL, PAGO_A_CAPITAL, etc.)
 // y cómo se maneja el excedente.
 // ---------------------------------------------------------------------
-export type PaymentAllocationPolicies =
-  typeof paymentAllocationPolicies.$inferSelect & {
-    paymentAllocationPolicyRules?: PaymentAllocationPolicyRules[];
-  };
-export type NewPaymentAllocationPolicies =
-  typeof paymentAllocationPolicies.$inferInsert;
+export type PaymentAllocationPolicies = typeof paymentAllocationPolicies.$inferSelect & {
+  paymentAllocationPolicyRules?: PaymentAllocationPolicyRules[];
+};
+export type NewPaymentAllocationPolicies = typeof paymentAllocationPolicies.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Payment Allocation Policy Rules - Reglas de prelación
 // Nota:
 // Define el orden (priority) y cómo imputar por concepto dentro de una política.
 // ---------------------------------------------------------------------
-export type PaymentAllocationPolicyRules =
-  typeof paymentAllocationPolicyRules.$inferSelect & {
-    paymentAllocationPolicy?: PaymentAllocationPolicies;
-    billingConcept?: BillingConcepts;
-  };
-export type NewPaymentAllocationPolicyRules =
-  typeof paymentAllocationPolicyRules.$inferInsert;
+export type PaymentAllocationPolicyRules = typeof paymentAllocationPolicyRules.$inferSelect & {
+  paymentAllocationPolicy?: PaymentAllocationPolicies;
+  billingConcept?: BillingConcepts;
+};
+export type NewPaymentAllocationPolicyRules = typeof paymentAllocationPolicyRules.$inferInsert;

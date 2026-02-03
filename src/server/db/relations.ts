@@ -5,7 +5,7 @@
 // Las relaciones permiten hacer queries con joins usando Drizzle Query API.
 // ---------------------------------------------------------------------
 
-import { relations } from "drizzle-orm";
+import { relations } from 'drizzle-orm';
 import {
   documentTypes,
   rejectionReasons,
@@ -71,7 +71,7 @@ import {
   portfolioProvisionSnapshotDetails,
   paymentAllocationPolicies,
   paymentAllocationPolicyRules,
-} from "./schema";
+} from './schema';
 
 // ---------------------------------------------------------------------
 // Concr43 - Tipos de documentos requeridos en solicitudes
@@ -84,64 +84,46 @@ export const documentTypesRelations = relations(documentTypes, ({ many }) => ({
 // ---------------------------------------------------------------------
 // Concr14 - Motivos de rechazo
 // ---------------------------------------------------------------------
-export const rejectionReasonsRelations = relations(
-  rejectionReasons,
-  ({ many }) => ({
-    loanApplications: many(loanApplications),
-  }),
-);
+export const rejectionReasonsRelations = relations(rejectionReasons, ({ many }) => ({
+  loanApplications: many(loanApplications),
+}));
 
 // ---------------------------------------------------------------------
 // Concr15 - Formas de pago (del crédito)
 // ---------------------------------------------------------------------
-export const repaymentMethodsRelations = relations(
-  repaymentMethods,
-  ({ many }) => ({
-    loanApplications: many(loanApplications),
-    loans: many(loans),
-  }),
-);
+export const repaymentMethodsRelations = relations(repaymentMethods, ({ many }) => ({
+  loanApplications: many(loanApplications),
+  loans: many(loans),
+}));
 
 // ---------------------------------------------------------------------
 // Concr11 - Garantías de pago
 // ---------------------------------------------------------------------
-export const paymentGuaranteeTypesRelations = relations(
-  paymentGuaranteeTypes,
-  ({ many }) => ({
-    loans: many(loans),
-  }),
-);
+export const paymentGuaranteeTypesRelations = relations(paymentGuaranteeTypes, ({ many }) => ({
+  loans: many(loans),
+}));
 
 // ---------------------------------------------------------------------
 // Concr13 - Periodicidad de pagos
 // ---------------------------------------------------------------------
-export const paymentFrequenciesRelations = relations(
-  paymentFrequencies,
-  ({ many }) => ({
-    loanApplications: many(loanApplications),
-    loans: many(loans),
-  }),
-);
+export const paymentFrequenciesRelations = relations(paymentFrequencies, ({ many }) => ({
+  loanApplications: many(loanApplications),
+  loans: many(loans),
+}));
 
 // ---------------------------------------------------------------------
 // Concr56 - Tipos de inversión
 // ---------------------------------------------------------------------
-export const investmentTypesRelations = relations(
-  investmentTypes,
-  ({ many }) => ({
-    loanApplications: many(loanApplications),
-  }),
-);
+export const investmentTypesRelations = relations(investmentTypes, ({ many }) => ({
+  loanApplications: many(loanApplications),
+}));
 
 // ---------------------------------------------------------------------
 // Concr53 - Formas de pago tesorería (medios de pago del abono)
 // ---------------------------------------------------------------------
-export const paymentTenderTypesRelations = relations(
-  paymentTenderTypes,
-  ({ many }) => ({
-    loanPaymentMethodAllocations: many(loanPaymentMethodAllocations),
-  }),
-);
+export const paymentTenderTypesRelations = relations(paymentTenderTypes, ({ many }) => ({
+  loanPaymentMethodAllocations: many(loanPaymentMethodAllocations),
+}));
 
 // ---------------------------------------------------------------------
 // Concr61 - Bancos
@@ -162,38 +144,35 @@ export const glAccountsRelations = relations(glAccounts, ({ many }) => ({
 
   // Concr26 - Mapeo contable por tipo de crédito (3 FKs a gl_accounts)
   creditProductAccountsAsCapital: many(creditProductAccounts, {
-    relationName: "capitalGlAccount",
+    relationName: 'capitalGlAccount',
   }),
   creditProductAccountsAsInterest: many(creditProductAccounts, {
-    relationName: "interestGlAccount",
+    relationName: 'interestGlAccount',
   }),
   creditProductAccountsAsLateInterest: many(creditProductAccounts, {
-    relationName: "lateInterestGlAccount",
+    relationName: 'lateInterestGlAccount',
   }),
 
   // Concr07 - Auxiliar estudio de crédito (auxest)
   creditProductsAsStudyGlAccount: many(creditProducts, {
-    relationName: "studyGlAccount",
+    relationName: 'studyGlAccount',
   }),
 
   // Concr01 - Settings
   creditsSettingsAsCashGlAccount: many(creditsSettings, {
-    relationName: "cashGlAccount",
+    relationName: 'cashGlAccount',
   }),
   creditsSettingsAsMajorGlAccount: many(creditsSettings, {
-    relationName: "majorGlAccount",
+    relationName: 'majorGlAccount',
   }),
   creditsSettingsAsExcessGlAccount: many(creditsSettings, {
-    relationName: "excessGlAccount",
+    relationName: 'excessGlAccount',
   }),
   creditsSettingsAsPledgeSubsidyGlAccount: many(creditsSettings, {
-    relationName: "pledgeSubsidyGlAccount",
+    relationName: 'pledgeSubsidyGlAccount',
   }),
   creditsSettingsAsWriteOffGlAccount: many(creditsSettings, {
-    relationName: "writeOffGlAccount",
-  }),
-  creditsSettingsAsFundRegisterGlAccount: many(creditsSettings, {
-    relationName: "fundRegisterGlAccount",
+    relationName: 'writeOffGlAccount',
   }),
 }));
 
@@ -210,31 +189,28 @@ export const costCentersRelations = relations(costCenters, ({ many }) => ({
 // ---------------------------------------------------------------------
 // Concr05 - Distribuciones contables (tipos de distribución)
 // ---------------------------------------------------------------------
-export const accountingDistributionsRelations = relations(
-  accountingDistributions,
-  ({ many }) => ({
-    accountingDistributionLines: many(accountingDistributionLines),
+export const accountingDistributionsRelations = relations(accountingDistributions, ({ many }) => ({
+  accountingDistributionLines: many(accountingDistributionLines),
 
-    // Concr07 (tipo de crédito) -> 3 referencias
-    creditProductsAsCapitalDistribution: many(creditProducts, {
-      relationName: "capitalDistribution",
-    }),
-    creditProductsAsInterestDistribution: many(creditProducts, {
-      relationName: "interestDistribution",
-    }),
-    creditProductsAsLateInterestDistribution: many(creditProducts, {
-      relationName: "lateInterestDistribution",
-    }),
-
-    // Concr25 (aseguradoras) -> 2 referencias
-    insuranceCompaniesAsTotalChargeDistribution: many(insuranceCompanies, {
-      relationName: "totalChargeDistribution",
-    }),
-    insuranceCompaniesAsMonthlyDistribution: many(insuranceCompanies, {
-      relationName: "monthlyDistribution",
-    }),
+  // Concr07 (tipo de crédito) -> 3 referencias
+  creditProductsAsCapitalDistribution: many(creditProducts, {
+    relationName: 'capitalDistribution',
   }),
-);
+  creditProductsAsInterestDistribution: many(creditProducts, {
+    relationName: 'interestDistribution',
+  }),
+  creditProductsAsLateInterestDistribution: many(creditProducts, {
+    relationName: 'lateInterestDistribution',
+  }),
+
+  // Concr25 (aseguradoras) -> 2 referencias
+  insuranceCompaniesAsTotalChargeDistribution: many(insuranceCompanies, {
+    relationName: 'totalChargeDistribution',
+  }),
+  insuranceCompaniesAsMonthlyDistribution: many(insuranceCompanies, {
+    relationName: 'monthlyDistribution',
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr06 - Auxiliares por distribuciones contables
@@ -254,65 +230,53 @@ export const accountingDistributionLinesRelations = relations(
       fields: [accountingDistributionLines.costCenterId],
       references: [costCenters.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
 // Concr29 - Tipos de recibos de abonos
 // ---------------------------------------------------------------------
-export const paymentReceiptTypesRelations = relations(
-  paymentReceiptTypes,
-  ({ many }) => ({
-    loanPayments: many(loanPayments),
-    userPaymentReceiptTypes: many(userPaymentReceiptTypes),
-    payrollExcessPayments: many(payrollExcessPayments),
-  }),
-);
+export const paymentReceiptTypesRelations = relations(paymentReceiptTypes, ({ many }) => ({
+  loanPayments: many(loanPayments),
+  userPaymentReceiptTypes: many(userPaymentReceiptTypes),
+  payrollExcessPayments: many(payrollExcessPayments),
+}));
 
 // ---------------------------------------------------------------------
 // Concr31 - Usuarios para recibos de abonos
 // ---------------------------------------------------------------------
-export const userPaymentReceiptTypesRelations = relations(
-  userPaymentReceiptTypes,
-  ({ one }) => ({
-    paymentReceiptType: one(paymentReceiptTypes, {
-      fields: [userPaymentReceiptTypes.paymentReceiptTypeId],
-      references: [paymentReceiptTypes.id],
-    }),
+export const userPaymentReceiptTypesRelations = relations(userPaymentReceiptTypes, ({ one }) => ({
+  paymentReceiptType: one(paymentReceiptTypes, {
+    fields: [userPaymentReceiptTypes.paymentReceiptTypeId],
+    references: [paymentReceiptTypes.id],
   }),
-);
+}));
 
 // ---------------------------------------------------------------------
 // Concr46 - Oficinas de afiliación
 // ---------------------------------------------------------------------
-export const affiliationOfficesRelations = relations(
-  affiliationOffices,
-  ({ one, many }) => ({
-    costCenter: one(costCenters, {
-      fields: [affiliationOffices.costCenterId],
-      references: [costCenters.id],
-    }),
-    loanApplications: many(loanApplications),
-    loans: many(loans),
-    loanApplicationDocuments: many(loanApplicationDocuments),
-    loanApplicationCoDebtors: many(loanApplicationCoDebtors),
-    loanApplicationActNumbers: many(loanApplicationActNumbers),
-    userAffiliationOffices: many(userAffiliationOffices),
-    portfolioAgingSnapshots: many(portfolioAgingSnapshots),
+export const affiliationOfficesRelations = relations(affiliationOffices, ({ one, many }) => ({
+  costCenter: one(costCenters, {
+    fields: [affiliationOffices.costCenterId],
+    references: [costCenters.id],
   }),
-);
+  loanApplications: many(loanApplications),
+  loans: many(loans),
+  loanApplicationDocuments: many(loanApplicationDocuments),
+  loanApplicationCoDebtors: many(loanApplicationCoDebtors),
+  loanApplicationActNumbers: many(loanApplicationActNumbers),
+  userAffiliationOffices: many(userAffiliationOffices),
+  portfolioAgingSnapshots: many(portfolioAgingSnapshots),
+}));
 
 // ---------------------------------------------------------------------
 // Concr27 - Periodos contables
 // ---------------------------------------------------------------------
-export const accountingPeriodsRelations = relations(
-  accountingPeriods,
-  ({ many }) => ({
-    processRuns: many(processRuns),
-    portfolioAgingSnapshots: many(portfolioAgingSnapshots),
-    creditFundBudgets: many(creditFundBudgets),
-  }),
-);
+export const accountingPeriodsRelations = relations(accountingPeriods, ({ many }) => ({
+  processRuns: many(processRuns),
+  portfolioAgingSnapshots: many(portfolioAgingSnapshots),
+  creditFundBudgets: many(creditFundBudgets),
+}));
 
 // ---------------------------------------------------------------------
 // Concr47 - Fondos de créditos
@@ -327,142 +291,121 @@ export const creditFundsRelations = relations(creditFunds, ({ many }) => ({
 // ---------------------------------------------------------------------
 // Concr48 - Presupuestos por fondos de créditos
 // ---------------------------------------------------------------------
-export const creditFundBudgetsRelations = relations(
-  creditFundBudgets,
-  ({ one }) => ({
-    creditFund: one(creditFunds, {
-      fields: [creditFundBudgets.creditFundId],
-      references: [creditFunds.id],
-    }),
-    accountingPeriod: one(accountingPeriods, {
-      fields: [creditFundBudgets.accountingPeriodId],
-      references: [accountingPeriods.id],
-    }),
+export const creditFundBudgetsRelations = relations(creditFundBudgets, ({ one }) => ({
+  creditFund: one(creditFunds, {
+    fields: [creditFundBudgets.creditFundId],
+    references: [creditFunds.id],
   }),
-);
+  accountingPeriod: one(accountingPeriods, {
+    fields: [creditFundBudgets.accountingPeriodId],
+    references: [accountingPeriods.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr62 - Usuario ↔ Oficina de afiliación
 // ---------------------------------------------------------------------
-export const userAffiliationOfficesRelations = relations(
-  userAffiliationOffices,
-  ({ one }) => ({
-    affiliationOffice: one(affiliationOffices, {
-      fields: [userAffiliationOffices.affiliationOfficeId],
-      references: [affiliationOffices.id],
-    }),
+export const userAffiliationOfficesRelations = relations(userAffiliationOffices, ({ one }) => ({
+  affiliationOffice: one(affiliationOffices, {
+    fields: [userAffiliationOffices.affiliationOfficeId],
+    references: [affiliationOffices.id],
   }),
-);
+}));
 
 // ---------------------------------------------------------------------
 // Concr21 - Tipos de terceros
 // ---------------------------------------------------------------------
-export const thirdPartyTypesRelations = relations(
-  thirdPartyTypes,
-  ({ many }) => ({
-    thirdParties: many(thirdParties),
-  }),
-);
+export const thirdPartyTypesRelations = relations(thirdPartyTypes, ({ many }) => ({
+  thirdParties: many(thirdParties),
+}));
 
 // ---------------------------------------------------------------------
 // Concr20 - Terceros
 // ---------------------------------------------------------------------
-export const thirdPartiesRelations = relations(
-  thirdParties,
-  ({ one, many }) => ({
-    thirdPartyType: one(thirdPartyTypes, {
-      fields: [thirdParties.thirdPartyTypeId],
-      references: [thirdPartyTypes.id],
-    }),
-    loanApplications: many(loanApplications),
-    loans: many(loans),
-    accountingEntries: many(accountingEntries),
-    // Relaciones inversas para loans (borrower y disbursementParty)
-    loansBorrowed: many(loans, { relationName: "loanBorrower" }),
-    loansDisbursed: many(loans, { relationName: "loanDisbursementParty" }),
-    portfolioEntries: many(portfolioEntries),
+export const thirdPartiesRelations = relations(thirdParties, ({ one, many }) => ({
+  thirdPartyType: one(thirdPartyTypes, {
+    fields: [thirdParties.thirdPartyTypeId],
+    references: [thirdPartyTypes.id],
   }),
-);
+  loanApplications: many(loanApplications),
+  loans: many(loans),
+  accountingEntries: many(accountingEntries),
+  // Relaciones inversas para loans (borrower y disbursementParty)
+  loansBorrowed: many(loans, { relationName: 'loanBorrower' }),
+  loansDisbursed: many(loans, { relationName: 'loanDisbursementParty' }),
+  portfolioEntries: many(portfolioEntries),
+}));
 
 // ---------------------------------------------------------------------
 // Concr25 - Empresas de seguros
 // ---------------------------------------------------------------------
-export const insuranceCompaniesRelations = relations(
-  insuranceCompanies,
-  ({ many, one }) => ({
-    insuranceRateRanges: many(insuranceRateRanges),
+export const insuranceCompaniesRelations = relations(insuranceCompanies, ({ many, one }) => ({
+  insuranceRateRanges: many(insuranceRateRanges),
 
-    // Concr05 - dos FKs => relationName para evitar ambigüedad
-    totalChargeDistribution: one(accountingDistributions, {
-      relationName: "totalChargeDistribution",
-      fields: [insuranceCompanies.totalChargeDistributionId],
-      references: [accountingDistributions.id],
-    }),
-    monthlyDistribution: one(accountingDistributions, {
-      relationName: "monthlyDistribution",
-      fields: [insuranceCompanies.monthlyDistributionId],
-      references: [accountingDistributions.id],
-    }),
+  // Concr05 - dos FKs => relationName para evitar ambigüedad
+  totalChargeDistribution: one(accountingDistributions, {
+    relationName: 'totalChargeDistribution',
+    fields: [insuranceCompanies.totalChargeDistributionId],
+    references: [accountingDistributions.id],
   }),
-);
+  monthlyDistribution: one(accountingDistributions, {
+    relationName: 'monthlyDistribution',
+    fields: [insuranceCompanies.monthlyDistributionId],
+    references: [accountingDistributions.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr34 - Valores de seguros (rangos)
 // ---------------------------------------------------------------------
-export const insuranceRateRangesRelations = relations(
-  insuranceRateRanges,
-  ({ one }) => ({
-    insuranceCompany: one(insuranceCompanies, {
-      fields: [insuranceRateRanges.insuranceCompanyId],
-      references: [insuranceCompanies.id],
-    }),
+export const insuranceRateRangesRelations = relations(insuranceRateRanges, ({ one }) => ({
+  insuranceCompany: one(insuranceCompanies, {
+    fields: [insuranceRateRanges.insuranceCompanyId],
+    references: [insuranceCompanies.id],
   }),
-);
+}));
 
 // ---------------------------------------------------------------------
 // Concr07 - Tipos / Líneas de crédito
 // ---------------------------------------------------------------------
-export const creditProductsRelations = relations(
-  creditProducts,
-  ({ one, many }) => ({
-    paymentAllocationPolicy: one(paymentAllocationPolicies, {
-      fields: [creditProducts.paymentAllocationPolicyId],
-      references: [paymentAllocationPolicies.id],
-    }),
-    creditFund: one(creditFunds, {
-      fields: [creditProducts.creditFundId],
-      references: [creditFunds.id],
-    }),
-    // 3 FKs -> relationName para evitar ambigüedad
-    capitalDistribution: one(accountingDistributions, {
-      relationName: "capitalDistribution",
-      fields: [creditProducts.capitalDistributionId],
-      references: [accountingDistributions.id],
-    }),
-    interestDistribution: one(accountingDistributions, {
-      relationName: "interestDistribution",
-      fields: [creditProducts.interestDistributionId],
-      references: [accountingDistributions.id],
-    }),
-    lateInterestDistribution: one(accountingDistributions, {
-      relationName: "lateInterestDistribution",
-      fields: [creditProducts.lateInterestDistributionId],
-      references: [accountingDistributions.id],
-    }),
-    studyGlAccount: one(glAccounts, {
-      relationName: "studyGlAccount",
-      fields: [creditProducts.studyGlAccountId],
-      references: [glAccounts.id],
-    }),
-    costCenter: one(costCenters, {
-      fields: [creditProducts.costCenterId],
-      references: [costCenters.id],
-    }),
-    creditProductCategories: many(creditProductCategories),
-    creditProductRequiredDocuments: many(creditProductRequiredDocuments),
-    creditProductAccounts: many(creditProductAccounts),
+export const creditProductsRelations = relations(creditProducts, ({ one, many }) => ({
+  paymentAllocationPolicy: one(paymentAllocationPolicies, {
+    fields: [creditProducts.paymentAllocationPolicyId],
+    references: [paymentAllocationPolicies.id],
   }),
-);
+  creditFund: one(creditFunds, {
+    fields: [creditProducts.creditFundId],
+    references: [creditFunds.id],
+  }),
+  // 3 FKs -> relationName para evitar ambigüedad
+  capitalDistribution: one(accountingDistributions, {
+    relationName: 'capitalDistribution',
+    fields: [creditProducts.capitalDistributionId],
+    references: [accountingDistributions.id],
+  }),
+  interestDistribution: one(accountingDistributions, {
+    relationName: 'interestDistribution',
+    fields: [creditProducts.interestDistributionId],
+    references: [accountingDistributions.id],
+  }),
+  lateInterestDistribution: one(accountingDistributions, {
+    relationName: 'lateInterestDistribution',
+    fields: [creditProducts.lateInterestDistributionId],
+    references: [accountingDistributions.id],
+  }),
+  studyGlAccount: one(glAccounts, {
+    relationName: 'studyGlAccount',
+    fields: [creditProducts.studyGlAccountId],
+    references: [glAccounts.id],
+  }),
+  costCenter: one(costCenters, {
+    fields: [creditProducts.costCenterId],
+    references: [costCenters.id],
+  }),
+  creditProductCategories: many(creditProductCategories),
+  creditProductRequiredDocuments: many(creditProductRequiredDocuments),
+  creditProductAccounts: many(creditProductAccounts),
+}));
 
 // ---------------------------------------------------------------------
 // Concr30 - Categorías por tipos de crédito (rangos de cuotas + factores)
@@ -475,7 +418,7 @@ export const creditProductCategoriesRelations = relations(
       references: [creditProducts.id],
     }),
     creditProductLateInterestRules: many(creditProductLateInterestRules),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
@@ -492,110 +435,101 @@ export const creditProductRequiredDocumentsRelations = relations(
       fields: [creditProductRequiredDocuments.requiredDocumentTypeId],
       references: [documentTypes.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
 // Concr26 - Auxiliares por tipos de crédito
 // ---------------------------------------------------------------------
-export const creditProductAccountsRelations = relations(
-  creditProductAccounts,
-  ({ one }) => ({
-    creditProduct: one(creditProducts, {
-      fields: [creditProductAccounts.creditProductId],
-      references: [creditProducts.id],
-    }),
-    // 3 FKs a gl_accounts => relationName
-    capitalGlAccount: one(glAccounts, {
-      relationName: "capitalGlAccount",
-      fields: [creditProductAccounts.capitalGlAccountId],
-      references: [glAccounts.id],
-    }),
-    interestGlAccount: one(glAccounts, {
-      relationName: "interestGlAccount",
-      fields: [creditProductAccounts.interestGlAccountId],
-      references: [glAccounts.id],
-    }),
-    lateInterestGlAccount: one(glAccounts, {
-      relationName: "lateInterestGlAccount",
-      fields: [creditProductAccounts.lateInterestGlAccountId],
-      references: [glAccounts.id],
-    }),
+export const creditProductAccountsRelations = relations(creditProductAccounts, ({ one }) => ({
+  creditProduct: one(creditProducts, {
+    fields: [creditProductAccounts.creditProductId],
+    references: [creditProducts.id],
   }),
-);
+  // 3 FKs a gl_accounts => relationName
+  capitalGlAccount: one(glAccounts, {
+    relationName: 'capitalGlAccount',
+    fields: [creditProductAccounts.capitalGlAccountId],
+    references: [glAccounts.id],
+  }),
+  interestGlAccount: one(glAccounts, {
+    relationName: 'interestGlAccount',
+    fields: [creditProductAccounts.interestGlAccountId],
+    references: [glAccounts.id],
+  }),
+  lateInterestGlAccount: one(glAccounts, {
+    relationName: 'lateInterestGlAccount',
+    fields: [creditProductAccounts.lateInterestGlAccountId],
+    references: [glAccounts.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr39 - Solicitudes de créditos
 // ---------------------------------------------------------------------
-export const loanApplicationsRelations = relations(
-  loanApplications,
-  ({ one, many }) => ({
-    affiliationOffice: one(affiliationOffices, {
-      fields: [loanApplications.affiliationOfficeId],
-      references: [affiliationOffices.id],
-    }),
-    creditFund: one(creditFunds, {
-      fields: [loanApplications.creditFundId],
-      references: [creditFunds.id],
-    }),
-    thirdParty: one(thirdParties, {
-      fields: [loanApplications.thirdPartyId],
-      references: [thirdParties.id],
-    }),
-    repaymentMethod: one(repaymentMethods, {
-      fields: [loanApplications.repaymentMethodId],
-      references: [repaymentMethods.id],
-    }),
-    bank: one(banks, {
-      fields: [loanApplications.bankId],
-      references: [banks.id],
-    }),
-    creditProduct: one(creditProducts, {
-      fields: [loanApplications.creditProductId],
-      references: [creditProducts.id],
-    }),
-    paymentFrequency: one(paymentFrequencies, {
-      fields: [loanApplications.paymentFrequencyId],
-      references: [paymentFrequencies.id],
-    }),
-    insuranceCompany: one(insuranceCompanies, {
-      fields: [loanApplications.insuranceCompanyId],
-      references: [insuranceCompanies.id],
-    }),
-    rejectionReason: one(rejectionReasons, {
-      fields: [loanApplications.rejectionReasonId],
-      references: [rejectionReasons.id],
-    }),
-    investmentType: one(investmentTypes, {
-      fields: [loanApplications.investmentTypeId],
-      references: [investmentTypes.id],
-    }),
-    channel: one(channels, {
-      fields: [loanApplications.channelId],
-      references: [channels.id],
-    }),
-
-    loanApplicationCoDebtors: many(loanApplicationCoDebtors),
-    loanApplicationDocuments: many(loanApplicationDocuments),
-    loanApplicationPledges: many(loanApplicationPledges),
-    loanApplicationStatusHistory: many(loanApplicationStatusHistory),
-    loanApplicationEvents: many(loanApplicationEvents),
-    loanApplicationRiskAssessments: many(loanApplicationRiskAssessments),
+export const loanApplicationsRelations = relations(loanApplications, ({ one, many }) => ({
+  affiliationOffice: one(affiliationOffices, {
+    fields: [loanApplications.affiliationOfficeId],
+    references: [affiliationOffices.id],
   }),
-);
+  creditFund: one(creditFunds, {
+    fields: [loanApplications.creditFundId],
+    references: [creditFunds.id],
+  }),
+  thirdParty: one(thirdParties, {
+    fields: [loanApplications.thirdPartyId],
+    references: [thirdParties.id],
+  }),
+  repaymentMethod: one(repaymentMethods, {
+    fields: [loanApplications.repaymentMethodId],
+    references: [repaymentMethods.id],
+  }),
+  bank: one(banks, {
+    fields: [loanApplications.bankId],
+    references: [banks.id],
+  }),
+  creditProduct: one(creditProducts, {
+    fields: [loanApplications.creditProductId],
+    references: [creditProducts.id],
+  }),
+  paymentFrequency: one(paymentFrequencies, {
+    fields: [loanApplications.paymentFrequencyId],
+    references: [paymentFrequencies.id],
+  }),
+  insuranceCompany: one(insuranceCompanies, {
+    fields: [loanApplications.insuranceCompanyId],
+    references: [insuranceCompanies.id],
+  }),
+  rejectionReason: one(rejectionReasons, {
+    fields: [loanApplications.rejectionReasonId],
+    references: [rejectionReasons.id],
+  }),
+  investmentType: one(investmentTypes, {
+    fields: [loanApplications.investmentTypeId],
+    references: [investmentTypes.id],
+  }),
+  channel: one(channels, {
+    fields: [loanApplications.channelId],
+    references: [channels.id],
+  }),
+
+  loanApplicationCoDebtors: many(loanApplicationCoDebtors),
+  loanApplicationDocuments: many(loanApplicationDocuments),
+  loanApplicationPledges: many(loanApplicationPledges),
+  loanApplicationStatusHistory: many(loanApplicationStatusHistory),
+  loanApplicationEvents: many(loanApplicationEvents),
+  loanApplicationRiskAssessments: many(loanApplicationRiskAssessments),
+}));
 
 // ---------------------------------------------------------------------
 // Concr16 - Pignoraciones por núcleo familiar
 // ---------------------------------------------------------------------
-export const loanApplicationPledgesRelations = relations(
-  loanApplicationPledges,
-  ({ one }) => ({
-    loanApplication: one(loanApplications, {
-      fields: [loanApplicationPledges.loanApplicationId],
-      references: [loanApplications.id],
-    }),
+export const loanApplicationPledgesRelations = relations(loanApplicationPledges, ({ one }) => ({
+  loanApplication: one(loanApplications, {
+    fields: [loanApplicationPledges.loanApplicationId],
+    references: [loanApplications.id],
   }),
-);
+}));
 
 // ---------------------------------------------------------------------
 // Concr40 - Codeudores
@@ -607,36 +541,30 @@ export const coDebtorsRelations = relations(coDebtors, ({ many }) => ({
 // ---------------------------------------------------------------------
 // Concr41 - Relación solicitud - codeudor
 // ---------------------------------------------------------------------
-export const loanApplicationCoDebtorsRelations = relations(
-  loanApplicationCoDebtors,
-  ({ one }) => ({
-    loanApplication: one(loanApplications, {
-      fields: [loanApplicationCoDebtors.loanApplicationId],
-      references: [loanApplications.id],
-    }),
-    coDebtor: one(coDebtors, {
-      fields: [loanApplicationCoDebtors.coDebtorId],
-      references: [coDebtors.id],
-    }),
+export const loanApplicationCoDebtorsRelations = relations(loanApplicationCoDebtors, ({ one }) => ({
+  loanApplication: one(loanApplications, {
+    fields: [loanApplicationCoDebtors.loanApplicationId],
+    references: [loanApplications.id],
   }),
-);
+  coDebtor: one(coDebtors, {
+    fields: [loanApplicationCoDebtors.coDebtorId],
+    references: [coDebtors.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr45 - Documentos entregados en solicitudes
 // ---------------------------------------------------------------------
-export const loanApplicationDocumentsRelations = relations(
-  loanApplicationDocuments,
-  ({ one }) => ({
-    loanApplication: one(loanApplications, {
-      fields: [loanApplicationDocuments.loanApplicationId],
-      references: [loanApplications.id],
-    }),
-    documentType: one(documentTypes, {
-      fields: [loanApplicationDocuments.requiredDocumentTypeId],
-      references: [documentTypes.id],
-    }),
+export const loanApplicationDocumentsRelations = relations(loanApplicationDocuments, ({ one }) => ({
+  loanApplication: one(loanApplications, {
+    fields: [loanApplicationDocuments.loanApplicationId],
+    references: [loanApplications.id],
   }),
-);
+  documentType: one(documentTypes, {
+    fields: [loanApplicationDocuments.requiredDocumentTypeId],
+    references: [documentTypes.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr08 - Créditos aprobados / liquidados
@@ -645,12 +573,12 @@ export const loansRelations = relations(loans, ({ one }) => ({
   borrower: one(thirdParties, {
     fields: [loans.thirdPartyId],
     references: [thirdParties.id],
-    relationName: "loanBorrower",
+    relationName: 'loanBorrower',
   }),
   disbursementParty: one(thirdParties, {
     fields: [loans.payeeThirdPartyId],
     references: [thirdParties.id],
-    relationName: "loanDisbursementParty",
+    relationName: 'loanDisbursementParty',
   }),
   loanApplication: one(loanApplications, {
     fields: [loans.loanApplicationId],
@@ -684,20 +612,21 @@ export const loansRelations = relations(loans, ({ one }) => ({
     fields: [loans.costCenterId],
     references: [costCenters.id],
   }),
+  channel: one(channels, {
+    fields: [loans.channelId],
+    references: [channels.id],
+  }),
 }));
 
 // ---------------------------------------------------------------------
 // Concr09 - Plan de pagos (cuotas)
 // ---------------------------------------------------------------------
-export const loanInstallmentsRelations = relations(
-  loanInstallments,
-  ({ one }) => ({
-    loan: one(loans, {
-      fields: [loanInstallments.loanId],
-      references: [loans.id],
-    }),
+export const loanInstallmentsRelations = relations(loanInstallments, ({ one }) => ({
+  loan: one(loans, {
+    fields: [loanInstallments.loanId],
+    references: [loans.id],
   }),
-);
+}));
 
 // ---------------------------------------------------------------------
 // Concr52 — Acta diaria por oficina
@@ -709,77 +638,68 @@ export const loanApplicationActNumbersRelations = relations(
       fields: [loanApplicationActNumbers.affiliationOfficeId],
       references: [affiliationOffices.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
 // Concr17 - Cartera por ítem (saldo actual)
 // ---------------------------------------------------------------------
-export const portfolioEntriesRelations = relations(
-  portfolioEntries,
-  ({ one }) => ({
-    glAccount: one(glAccounts, {
-      fields: [portfolioEntries.glAccountId],
-      references: [glAccounts.id],
-    }),
-    thirdParty: one(thirdParties, {
-      fields: [portfolioEntries.thirdPartyId],
-      references: [thirdParties.id],
-    }),
-    loan: one(loans, {
-      fields: [portfolioEntries.loanId],
-      references: [loans.id],
-    }),
+export const portfolioEntriesRelations = relations(portfolioEntries, ({ one }) => ({
+  glAccount: one(glAccounts, {
+    fields: [portfolioEntries.glAccountId],
+    references: [glAccounts.id],
   }),
-);
+  thirdParty: one(thirdParties, {
+    fields: [portfolioEntries.thirdPartyId],
+    references: [thirdParties.id],
+  }),
+  loan: one(loans, {
+    fields: [portfolioEntries.loanId],
+    references: [loans.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr22 - Movimientos contables
 // ---------------------------------------------------------------------
-export const accountingEntriesRelations = relations(
-  accountingEntries,
-  ({ one }) => ({
-    glAccount: one(glAccounts, {
-      fields: [accountingEntries.glAccountId],
-      references: [glAccounts.id],
-    }),
-    costCenter: one(costCenters, {
-      fields: [accountingEntries.costCenterId],
-      references: [costCenters.id],
-    }),
-    thirdParty: one(thirdParties, {
-      fields: [accountingEntries.thirdPartyId],
-      references: [thirdParties.id],
-    }),
-    loan: one(loans, {
-      fields: [accountingEntries.loanId],
-      references: [loans.id],
-    }),
-    processRun: one(processRuns, {
-      fields: [accountingEntries.processRunId],
-      references: [processRuns.id],
-    }),
+export const accountingEntriesRelations = relations(accountingEntries, ({ one }) => ({
+  glAccount: one(glAccounts, {
+    fields: [accountingEntries.glAccountId],
+    references: [glAccounts.id],
   }),
-);
+  costCenter: one(costCenters, {
+    fields: [accountingEntries.costCenterId],
+    references: [costCenters.id],
+  }),
+  thirdParty: one(thirdParties, {
+    fields: [accountingEntries.thirdPartyId],
+    references: [thirdParties.id],
+  }),
+  loan: one(loans, {
+    fields: [accountingEntries.loanId],
+    references: [loans.id],
+  }),
+  processRun: one(processRuns, {
+    fields: [accountingEntries.processRunId],
+    references: [processRuns.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr23 - Refinanciaciones / Reestructuraciones (links)
 // ---------------------------------------------------------------------
-export const loanRefinancingLinksRelations = relations(
-  loanRefinancingLinks,
-  ({ one }) => ({
-    refinancedLoan: one(loans, {
-      fields: [loanRefinancingLinks.loanId],
-      references: [loans.id],
-      relationName: "refinancedLoan",
-    }),
-    referenceLoan: one(loans, {
-      fields: [loanRefinancingLinks.referenceLoanId],
-      references: [loans.id],
-      relationName: "referenceLoan",
-    }),
+export const loanRefinancingLinksRelations = relations(loanRefinancingLinks, ({ one }) => ({
+  refinancedLoan: one(loans, {
+    fields: [loanRefinancingLinks.loanId],
+    references: [loans.id],
+    relationName: 'refinancedLoan',
   }),
-);
+  referenceLoan: one(loans, {
+    fields: [loanRefinancingLinks.referenceLoanId],
+    references: [loans.id],
+    relationName: 'referenceLoan',
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr33-Concr42 Process Runs
@@ -796,91 +716,79 @@ export const processRunsRelations = relations(processRuns, ({ one, many }) => ({
 // ---------------------------------------------------------------------
 // Loan Process State (idempotencia por crédito + tipo)
 // ---------------------------------------------------------------------
-export const loanProcessStatesRelations = relations(
-  loanProcessStates,
-  ({ one }) => ({
-    loan: one(loans, {
-      fields: [loanProcessStates.loanId],
-      references: [loans.id],
-    }),
-    lastProcessRun: one(processRuns, {
-      fields: [loanProcessStates.lastProcessRunId],
-      references: [processRuns.id],
-    }),
+export const loanProcessStatesRelations = relations(loanProcessStates, ({ one }) => ({
+  loan: one(loans, {
+    fields: [loanProcessStates.loanId],
+    references: [loans.id],
   }),
-);
+  lastProcessRun: one(processRuns, {
+    fields: [loanProcessStates.lastProcessRunId],
+    references: [processRuns.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr63-Concr28 - Histórico cartera (aging snapshot)
 // ---------------------------------------------------------------------
-export const portfolioAgingSnapshotsRelations = relations(
-  portfolioAgingSnapshots,
-  ({ one }) => ({
-    accountingPeriod: one(accountingPeriods, {
-      fields: [portfolioAgingSnapshots.accountingPeriodId],
-      references: [accountingPeriods.id],
-    }),
-    affiliationOffice: one(affiliationOffices, {
-      fields: [portfolioAgingSnapshots.affiliationOfficeId],
-      references: [affiliationOffices.id],
-    }),
-    creditProduct: one(creditProducts, {
-      fields: [portfolioAgingSnapshots.creditProductId],
-      references: [creditProducts.id],
-    }),
-    glAccount: one(glAccounts, {
-      fields: [portfolioAgingSnapshots.glAccountId],
-      references: [glAccounts.id],
-    }),
-    loan: one(loans, {
-      fields: [portfolioAgingSnapshots.loanId],
-      references: [loans.id],
-    }),
-    repaymentMethod: one(repaymentMethods, {
-      fields: [portfolioAgingSnapshots.repaymentMethodId],
-      references: [repaymentMethods.id],
-    }),
-    thirdParty: one(thirdParties, {
-      fields: [portfolioAgingSnapshots.thirdPartyId],
-      references: [thirdParties.id],
-    }),
+export const portfolioAgingSnapshotsRelations = relations(portfolioAgingSnapshots, ({ one }) => ({
+  accountingPeriod: one(accountingPeriods, {
+    fields: [portfolioAgingSnapshots.accountingPeriodId],
+    references: [accountingPeriods.id],
   }),
-);
+  affiliationOffice: one(affiliationOffices, {
+    fields: [portfolioAgingSnapshots.affiliationOfficeId],
+    references: [affiliationOffices.id],
+  }),
+  creditProduct: one(creditProducts, {
+    fields: [portfolioAgingSnapshots.creditProductId],
+    references: [creditProducts.id],
+  }),
+  glAccount: one(glAccounts, {
+    fields: [portfolioAgingSnapshots.glAccountId],
+    references: [glAccounts.id],
+  }),
+  loan: one(loans, {
+    fields: [portfolioAgingSnapshots.loanId],
+    references: [loans.id],
+  }),
+  repaymentMethod: one(repaymentMethods, {
+    fields: [portfolioAgingSnapshots.repaymentMethodId],
+    references: [repaymentMethods.id],
+  }),
+  thirdParty: one(thirdParties, {
+    fields: [portfolioAgingSnapshots.thirdPartyId],
+    references: [thirdParties.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr64 - Excedentes de nómina/libranza
 // ---------------------------------------------------------------------
-export const payrollExcessPaymentsRelations = relations(
-  payrollExcessPayments,
-  ({ one }) => ({
-    loan: one(loans, {
-      fields: [payrollExcessPayments.loanId],
-      references: [loans.id],
-    }),
+export const payrollExcessPaymentsRelations = relations(payrollExcessPayments, ({ one }) => ({
+  loan: one(loans, {
+    fields: [payrollExcessPayments.loanId],
+    references: [loans.id],
   }),
-);
+}));
 
 // ---------------------------------------------------------------------
 // Concr32 - Abonos
 // ---------------------------------------------------------------------
-export const loanPaymentsRelations = relations(
-  loanPayments,
-  ({ one, many }) => ({
-    loan: one(loans, {
-      fields: [loanPayments.loanId],
-      references: [loans.id],
-    }),
-    paymentReceiptType: one(paymentReceiptTypes, {
-      fields: [loanPayments.receiptTypeId],
-      references: [paymentReceiptTypes.id],
-    }),
-    glAccount: one(glAccounts, {
-      fields: [loanPayments.glAccountId],
-      references: [glAccounts.id],
-    }),
-    loanPaymentMethodAllocations: many(loanPaymentMethodAllocations),
+export const loanPaymentsRelations = relations(loanPayments, ({ one, many }) => ({
+  loan: one(loans, {
+    fields: [loanPayments.loanId],
+    references: [loans.id],
   }),
-);
+  paymentReceiptType: one(paymentReceiptTypes, {
+    fields: [loanPayments.receiptTypeId],
+    references: [paymentReceiptTypes.id],
+  }),
+  glAccount: one(glAccounts, {
+    fields: [loanPayments.glAccountId],
+    references: [glAccounts.id],
+  }),
+  loanPaymentMethodAllocations: many(loanPaymentMethodAllocations),
+}));
 
 // ---------------------------------------------------------------------
 // Concr35 - Valores por formas de pago en abonos
@@ -896,93 +804,66 @@ export const loanPaymentMethodAllocationsRelations = relations(
       fields: [loanPaymentMethodAllocations.collectionMethodId],
       references: [paymentTenderTypes.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
 // Concr01 - Configuración global del módulo de créditos
 // ---------------------------------------------------------------------
-export const creditsSettingsRelations = relations(
-  creditsSettings,
-  ({ one }) => ({
-    cashGlAccount: one(glAccounts, {
-      fields: [creditsSettings.cashGlAccountId],
-      references: [glAccounts.id],
-      relationName: "cashGlAccount",
-    }),
-    majorGlAccount: one(glAccounts, {
-      fields: [creditsSettings.majorGlAccountId],
-      references: [glAccounts.id],
-      relationName: "majorGlAccount",
-    }),
-    excessGlAccount: one(glAccounts, {
-      fields: [creditsSettings.excessGlAccountId],
-      references: [glAccounts.id],
-      relationName: "excessGlAccount",
-    }),
-    pledgeSubsidyGlAccount: one(glAccounts, {
-      fields: [creditsSettings.pledgeSubsidyGlAccountId],
-      references: [glAccounts.id],
-      relationName: "pledgeSubsidyGlAccount",
-    }),
-    writeOffGlAccount: one(glAccounts, {
-      fields: [creditsSettings.writeOffGlAccountId],
-      references: [glAccounts.id],
-      relationName: "writeOffGlAccount",
-    }),
-    fundRegisterGlAccount: one(glAccounts, {
-      fields: [creditsSettings.fundRegisterGlAccountId],
-      references: [glAccounts.id],
-      relationName: "fundRegisterGlAccount",
-    }),
-
-    defaultCollectionMethod: one(paymentTenderTypes, {
-      fields: [creditsSettings.defaultCollectionMethodId],
-      references: [paymentTenderTypes.id],
-    }),
-    defaultRepaymentMethod: one(repaymentMethods, {
-      fields: [creditsSettings.defaultRepaymentMethodId],
-      references: [repaymentMethods.id],
-    }),
-    defaultPaymentGuaranteeType: one(paymentGuaranteeTypes, {
-      fields: [creditsSettings.defaultGuaranteeTypeId],
-      references: [paymentGuaranteeTypes.id],
-    }),
-    defaultCostCenter: one(costCenters, {
-      fields: [creditsSettings.defaultCostCenterId],
-      references: [costCenters.id],
-    }),
+export const creditsSettingsRelations = relations(creditsSettings, ({ one }) => ({
+  cashGlAccount: one(glAccounts, {
+    fields: [creditsSettings.cashGlAccountId],
+    references: [glAccounts.id],
+    relationName: 'cashGlAccount',
   }),
-);
+  majorGlAccount: one(glAccounts, {
+    fields: [creditsSettings.majorGlAccountId],
+    references: [glAccounts.id],
+    relationName: 'majorGlAccount',
+  }),
+  excessGlAccount: one(glAccounts, {
+    fields: [creditsSettings.excessGlAccountId],
+    references: [glAccounts.id],
+    relationName: 'excessGlAccount',
+  }),
+  pledgeSubsidyGlAccount: one(glAccounts, {
+    fields: [creditsSettings.pledgeSubsidyGlAccountId],
+    references: [glAccounts.id],
+    relationName: 'pledgeSubsidyGlAccount',
+  }),
+  writeOffGlAccount: one(glAccounts, {
+    fields: [creditsSettings.writeOffGlAccountId],
+    references: [glAccounts.id],
+    relationName: 'writeOffGlAccount',
+  }),
+  defaultCostCenter: one(costCenters, {
+    fields: [creditsSettings.defaultCostCenterId],
+    references: [costCenters.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Billing Concepts - Catálogo
 // ---------------------------------------------------------------------
-export const billingConceptsRelations = relations(
-  billingConcepts,
-  ({ many, one }) => ({
-    billingConceptRules: many(billingConceptRules),
-    creditProductBillingConcepts: many(creditProductBillingConcepts),
-    loanBillingConcepts: many(loanBillingConcepts),
-    defaultGlAccount: one(glAccounts, {
-      fields: [billingConcepts.defaultGlAccountId],
-      references: [glAccounts.id],
-    }),
+export const billingConceptsRelations = relations(billingConcepts, ({ many, one }) => ({
+  billingConceptRules: many(billingConceptRules),
+  creditProductBillingConcepts: many(creditProductBillingConcepts),
+  loanBillingConcepts: many(loanBillingConcepts),
+  defaultGlAccount: one(glAccounts, {
+    fields: [billingConcepts.defaultGlAccountId],
+    references: [glAccounts.id],
   }),
-);
+}));
 
 // ---------------------------------------------------------------------
 // Billing Concept Rules - Reglas / Rangos / Vigencias
 // ---------------------------------------------------------------------
-export const billingConceptRulesRelations = relations(
-  billingConceptRules,
-  ({ one }) => ({
-    billingConcept: one(billingConcepts, {
-      fields: [billingConceptRules.billingConceptId],
-      references: [billingConcepts.id],
-    }),
+export const billingConceptRulesRelations = relations(billingConceptRules, ({ one }) => ({
+  billingConcept: one(billingConcepts, {
+    fields: [billingConceptRules.billingConceptId],
+    references: [billingConcepts.id],
   }),
-);
+}));
 
 // ---------------------------------------------------------------------
 // Concr07 (credit_products) -> Conceptos por producto
@@ -1006,37 +887,34 @@ export const creditProductBillingConceptsRelations = relations(
       fields: [creditProductBillingConcepts.overrideGlAccountId],
       references: [glAccounts.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
 // Concr08 (loans) -> Conceptos "congelados" por crédito (snapshot)
 // ---------------------------------------------------------------------
-export const loanBillingConceptsRelations = relations(
-  loanBillingConcepts,
-  ({ one }) => ({
-    loan: one(loans, {
-      fields: [loanBillingConcepts.loanId],
-      references: [loans.id],
-    }),
-    billingConcept: one(billingConcepts, {
-      fields: [loanBillingConcepts.billingConceptId],
-      references: [billingConcepts.id],
-    }),
-    sourceBillingConceptRule: one(billingConceptRules, {
-      fields: [loanBillingConcepts.sourceRuleId],
-      references: [billingConceptRules.id],
-    }),
-    glAccount: one(glAccounts, {
-      fields: [loanBillingConcepts.glAccountId],
-      references: [glAccounts.id],
-    }),
-    sourceCreditProductBillingConcept: one(creditProductBillingConcepts, {
-      fields: [loanBillingConcepts.sourceCreditProductConceptId],
-      references: [creditProductBillingConcepts.id],
-    }),
+export const loanBillingConceptsRelations = relations(loanBillingConcepts, ({ one }) => ({
+  loan: one(loans, {
+    fields: [loanBillingConcepts.loanId],
+    references: [loans.id],
   }),
-);
+  billingConcept: one(billingConcepts, {
+    fields: [loanBillingConcepts.billingConceptId],
+    references: [billingConcepts.id],
+  }),
+  sourceBillingConceptRule: one(billingConceptRules, {
+    fields: [loanBillingConcepts.sourceRuleId],
+    references: [billingConceptRules.id],
+  }),
+  glAccount: one(glAccounts, {
+    fields: [loanBillingConcepts.glAccountId],
+    references: [glAccounts.id],
+  }),
+  sourceCreditProductBillingConcept: one(creditProductBillingConcepts, {
+    fields: [loanBillingConcepts.sourceCreditProductConceptId],
+    references: [creditProductBillingConcepts.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Reglas de interés de mora por edad de mora (días)
@@ -1048,7 +926,7 @@ export const creditProductLateInterestRulesRelations = relations(
       fields: [creditProductLateInterestRules.creditProductCategoryId],
       references: [creditProductCategories.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
@@ -1061,20 +939,17 @@ export const agreementsRelations = relations(agreements, ({ many }) => ({
 // ---------------------------------------------------------------------
 // Billing Cycle Profiles
 // ---------------------------------------------------------------------
-export const billingCycleProfilesRelations = relations(
-  billingCycleProfiles,
-  ({ one, many }) => ({
-    creditProduct: one(creditProducts, {
-      fields: [billingCycleProfiles.creditProductId],
-      references: [creditProducts.id],
-    }),
-    agreement: one(agreements, {
-      fields: [billingCycleProfiles.agreementId],
-      references: [agreements.id],
-    }),
-    billingCycleProfileCycles: many(billingCycleProfileCycles),
+export const billingCycleProfilesRelations = relations(billingCycleProfiles, ({ one, many }) => ({
+  creditProduct: one(creditProducts, {
+    fields: [billingCycleProfiles.creditProductId],
+    references: [creditProducts.id],
   }),
-);
+  agreement: one(agreements, {
+    fields: [billingCycleProfiles.agreementId],
+    references: [agreements.id],
+  }),
+  billingCycleProfileCycles: many(billingCycleProfileCycles),
+}));
 
 // ---------------------------------------------------------------------
 // Billing Cycle Profile Cycles
@@ -1086,7 +961,7 @@ export const billingCycleProfileCyclesRelations = relations(
       fields: [billingCycleProfileCycles.billingCycleProfileId],
       references: [billingCycleProfiles.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
@@ -1099,7 +974,7 @@ export const loanApplicationRiskAssessmentsRelations = relations(
       fields: [loanApplicationRiskAssessments.loanApplicationId],
       references: [loanApplications.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
@@ -1107,6 +982,7 @@ export const loanApplicationRiskAssessmentsRelations = relations(
 // ---------------------------------------------------------------------
 export const channelsRelations = relations(channels, ({ many }) => ({
   loanApplications: many(loanApplications),
+  loans: many(loans),
 }));
 
 // ---------------------------------------------------------------------
@@ -1119,21 +995,18 @@ export const loanApplicationStatusHistoryRelations = relations(
       fields: [loanApplicationStatusHistory.loanApplicationId],
       references: [loanApplications.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
 // Eventos / Integraciones (trazabilidad técnica + payloads)
 // ---------------------------------------------------------------------
-export const loanApplicationEventsRelations = relations(
-  loanApplicationEvents,
-  ({ one }) => ({
-    loanApplication: one(loanApplications, {
-      fields: [loanApplicationEvents.loanApplicationId],
-      references: [loanApplications.id],
-    }),
+export const loanApplicationEventsRelations = relations(loanApplicationEvents, ({ one }) => ({
+  loanApplication: one(loanApplications, {
+    fields: [loanApplicationEvents.loanApplicationId],
+    references: [loanApplications.id],
   }),
-);
+}));
 
 // ---------------------------------------------------------------------
 // Políticas de refinanciación / consolidación por producto
@@ -1145,7 +1018,7 @@ export const creditProductRefinancePoliciesRelations = relations(
       fields: [creditProductRefinancePolicies.creditProductId],
       references: [creditProducts.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
@@ -1186,7 +1059,7 @@ export const portfolioProvisionSnapshotsRelations = relations(
       references: [agingProfiles.id],
     }),
     portfolioProvisionSnapshotDetails: many(portfolioProvisionSnapshotDetails),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
@@ -1207,7 +1080,7 @@ export const portfolioProvisionSnapshotDetailsRelations = relations(
       fields: [portfolioProvisionSnapshotDetails.agingBucketId],
       references: [agingBuckets.id],
     }),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
@@ -1220,7 +1093,7 @@ export const paymentAllocationPoliciesRelations = relations(
   paymentAllocationPolicies,
   ({ many }) => ({
     paymentAllocationPolicyRules: many(paymentAllocationPolicyRules),
-  }),
+  })
 );
 
 // ---------------------------------------------------------------------
@@ -1239,5 +1112,5 @@ export const paymentAllocationPolicyRulesRelations = relations(
       fields: [paymentAllocationPolicyRules.billingConceptId],
       references: [billingConcepts.id],
     }),
-  }),
+  })
 );

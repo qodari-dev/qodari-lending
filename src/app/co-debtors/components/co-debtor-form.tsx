@@ -3,21 +3,17 @@
 import { Button } from '@/components/ui/button';
 import {
   Combobox,
+  ComboboxCollection,
   ComboboxContent,
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
+  ComboboxTrigger,
+  ComboboxValue,
 } from '@/components/ui/combobox';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Sheet,
   SheetClose,
@@ -34,9 +30,9 @@ import { useIdentificationTypes } from '@/hooks/queries/use-identification-type-
 import { CoDebtor, CreateCoDebtorBodySchema } from '@/schemas/co-debtor';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { ChevronDownIcon } from 'lucide-react';
+import { useCallback, useId, useMemo, useRef } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
-import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
 
 type FormValues = z.infer<typeof CreateCoDebtorBodySchema>;
@@ -51,18 +47,19 @@ export function CoDebtorForm({
   onOpened(opened: boolean): void;
 }) {
   const formId = useId();
+  const sheetContentRef = useRef<HTMLDivElement | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(CreateCoDebtorBodySchema),
     defaultValues: {
-      identificationTypeId: 0,
+      identificationTypeId: undefined,
       documentNumber: '',
       homeAddress: '',
-      homeCityId: 0,
+      homeCityId: undefined,
       homePhone: '',
       companyName: '',
       workAddress: '',
-      workCityId: 0,
+      workCityId: undefined,
       workPhone: '',
     },
   });
@@ -71,48 +68,83 @@ export function CoDebtorForm({
   const { data: identificationTypesData } = useIdentificationTypes({
     limit: 100,
     where: { and: [{ isActive: true }] },
+    sort: [{ field: 'id', order: 'asc' }],
   });
-  const identificationTypes = identificationTypesData?.body?.data ?? [];
+  const identificationTypes = useMemo(() => {
+    return identificationTypesData?.body?.data ?? [];
+  }, [identificationTypesData]);
 
-  // Estado para búsqueda de ciudades
-  const [homeCitySearch, setHomeCitySearch] = useState('');
-  const [workCitySearch, setWorkCitySearch] = useState('');
-  const [debouncedHomeCitySearch] = useDebounce(homeCitySearch, 300);
-  const [debouncedWorkCitySearch] = useDebounce(workCitySearch, 300);
+  // Preparar items para el Combobox de tipos de identificación
+  const identificationTypeItems = useMemo(
+    () => identificationTypes.map((type) => String(type.id)),
+    [identificationTypes]
+  );
 
-  // Cargar ciudades con búsqueda
-  const { data: homeCitiesData } = useCities({
-    search: debouncedHomeCitySearch,
-    limit: 50,
+  const identificationTypeLabelsMap = useMemo(() => {
+    const map = new Map<string, string>();
+    identificationTypes.forEach((type) => {
+      map.set(String(type.id), `${type.code} - ${type.name}`);
+    });
+    return map;
+  }, [identificationTypes]);
+
+  const getIdentificationTypeLabel = useCallback(
+    (value: string | null) => {
+      if (!value) return '';
+      return identificationTypeLabelsMap.get(value) ?? value;
+    },
+    [identificationTypeLabelsMap]
+  );
+
+  // Cargar todas las ciudades activas (client-side filtering)
+  const { data: citiesData } = useCities({
+    limit: 2000,
     where: { and: [{ isActive: true }] },
+    sort: [{ field: 'name', order: 'asc' }],
   });
-  const { data: workCitiesData } = useCities({
-    search: debouncedWorkCitySearch,
-    limit: 50,
-    where: { and: [{ isActive: true }] },
-  });
+  const cities = useMemo(() => citiesData?.body?.data ?? [], [citiesData]);
 
-  const homeCities = homeCitiesData?.body?.data ?? [];
-  const workCities = workCitiesData?.body?.data ?? [];
+  // Preparar items para el Combobox (array de IDs como strings)
+  const cityItems = useMemo(() => cities.map((city) => String(city.id)), [cities]);
 
-  useEffect(() => {
-    if (opened) {
+  // Map para buscar labels por ID
+  const cityLabelsMap = useMemo(() => {
+    const map = new Map<string, string>();
+    cities.forEach((city) => {
+      map.set(String(city.id), `${city.code} - ${city.name}`);
+    });
+    return map;
+  }, [cities]);
+
+  // Función para obtener el label de un valor
+  const getCityLabel = useCallback(
+    (value: string | null) => {
+      if (!value) return '';
+      return cityLabelsMap.get(value) ?? value;
+    },
+    [cityLabelsMap]
+  );
+
+  const handleOpenedChange = useCallback(
+    (nextOpen: boolean) => {
+      onOpened(nextOpen);
+      if (!nextOpen) {
+        return;
+      }
       form.reset({
         identificationTypeId: coDebtor?.identificationTypeId ?? 0,
         documentNumber: coDebtor?.documentNumber ?? '',
         homeAddress: coDebtor?.homeAddress ?? '',
-        homeCityId: coDebtor?.homeCityId ?? 0,
+        homeCityId: coDebtor?.homeCityId ?? undefined,
         homePhone: coDebtor?.homePhone ?? '',
         companyName: coDebtor?.companyName ?? '',
         workAddress: coDebtor?.workAddress ?? '',
-        workCityId: coDebtor?.workCityId ?? 0,
+        workCityId: coDebtor?.workCityId ?? undefined,
         workPhone: coDebtor?.workPhone ?? '',
       });
-      // Reset search states
-      setHomeCitySearch('');
-      setWorkCitySearch('');
-    }
-  }, [opened, coDebtor, form]);
+    },
+    [coDebtor, form, onOpened]
+  );
 
   const { mutateAsync: create, isPending: isCreating } = useCreateCoDebtor();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateCoDebtor();
@@ -130,10 +162,9 @@ export function CoDebtorForm({
     },
     [coDebtor, create, update, onOpened]
   );
-
   return (
-    <Sheet open={opened} onOpenChange={onOpened}>
-      <SheetContent className="overflow-y-scroll sm:max-w-2xl">
+    <Sheet open={opened} onOpenChange={handleOpenedChange}>
+      <SheetContent ref={sheetContentRef} className="overflow-y-scroll sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Codeudor</SheetTitle>
           <SheetDescription>
@@ -151,21 +182,42 @@ export function CoDebtorForm({
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="identificationTypeId">Tipo de Documento</FieldLabel>
-                      <Select
-                        onValueChange={(val) => field.onChange(Number(val))}
-                        value={field.value ? String(field.value) : ''}
+                      <Combobox
+                        items={identificationTypeItems}
+                        value={field.value ? String(field.value) : null}
+                        onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
+                        itemToStringLabel={getIdentificationTypeLabel}
                       >
-                        <SelectTrigger aria-invalid={fieldState.invalid}>
-                          <SelectValue placeholder="Seleccione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {identificationTypes.map((type) => (
-                            <SelectItem key={type.id} value={String(type.id)}>
-                              {type.code} - {type.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <ComboboxTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full justify-between font-normal"
+                            >
+                              <ComboboxValue placeholder="Seleccione..." />
+                              <ChevronDownIcon className="text-muted-foreground size-4" />
+                            </Button>
+                          }
+                        />
+                        <ComboboxContent portalContainer={sheetContentRef}>
+                          <ComboboxInput
+                            placeholder="Buscar tipo..."
+                            showClear
+                            showTrigger={false}
+                          />
+                          <ComboboxList>
+                            <ComboboxEmpty>No se encontraron tipos</ComboboxEmpty>
+                            <ComboboxCollection>
+                              {(value) => (
+                                <ComboboxItem key={value} value={value}>
+                                  {getIdentificationTypeLabel(value)}
+                                </ComboboxItem>
+                              )}
+                            </ComboboxCollection>
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -207,20 +259,39 @@ export function CoDebtorForm({
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="homeCityId">Ciudad</FieldLabel>
                       <Combobox
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        onInputValueChange={setHomeCitySearch}
+                        items={cityItems}
+                        value={field.value ? String(field.value) : null}
+                        onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
+                        itemToStringLabel={getCityLabel}
                       >
-                        <ComboboxInput placeholder="Buscar ciudad..." showClear />
-                        <ComboboxContent>
+                        <ComboboxTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full justify-between font-normal"
+                            >
+                              <ComboboxValue placeholder="Seleccione..." />
+                              <ChevronDownIcon className="text-muted-foreground size-4" />
+                            </Button>
+                          }
+                        />
+                        <ComboboxContent portalContainer={sheetContentRef}>
+                          <ComboboxInput
+                            placeholder="Buscar ciudad..."
+                            showClear
+                            showTrigger={false}
+                          />
                           <ComboboxList>
-                            {homeCities.map((city) => (
-                              <ComboboxItem key={city.id} value={city.id}>
-                                {city.code} - {city.name}
-                              </ComboboxItem>
-                            ))}
+                            <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
+                            <ComboboxCollection>
+                              {(value) => (
+                                <ComboboxItem key={value} value={value}>
+                                  {getCityLabel(value)}
+                                </ComboboxItem>
+                              )}
+                            </ComboboxCollection>
                           </ComboboxList>
-                          <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
                         </ComboboxContent>
                       </Combobox>
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -273,20 +344,39 @@ export function CoDebtorForm({
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="workCityId">Ciudad Trabajo</FieldLabel>
                       <Combobox
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        onInputValueChange={setWorkCitySearch}
+                        items={cityItems}
+                        value={field.value ? String(field.value) : null}
+                        onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
+                        itemToStringLabel={getCityLabel}
                       >
-                        <ComboboxInput placeholder="Buscar ciudad..." showClear />
-                        <ComboboxContent>
+                        <ComboboxTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full justify-between font-normal"
+                            >
+                              <ComboboxValue placeholder="Seleccione..." />
+                              <ChevronDownIcon className="text-muted-foreground size-4" />
+                            </Button>
+                          }
+                        />
+                        <ComboboxContent portalContainer={sheetContentRef}>
+                          <ComboboxInput
+                            placeholder="Buscar ciudad..."
+                            showClear
+                            showTrigger={false}
+                          />
                           <ComboboxList>
-                            {workCities.map((city) => (
-                              <ComboboxItem key={city.id} value={city.id}>
-                                {city.code} - {city.name}
-                              </ComboboxItem>
-                            ))}
+                            <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
+                            <ComboboxCollection>
+                              {(value) => (
+                                <ComboboxItem key={value} value={value}>
+                                  {getCityLabel(value)}
+                                </ComboboxItem>
+                              )}
+                            </ComboboxCollection>
                           </ComboboxList>
-                          <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
                         </ComboboxContent>
                       </Combobox>
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

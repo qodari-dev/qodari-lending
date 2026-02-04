@@ -15,6 +15,14 @@ import {
 
 const Combobox = ComboboxPrimitive.Root;
 
+type ComboboxContentProps = ComboboxPrimitive.Popup.Props &
+  Pick<
+    ComboboxPrimitive.Positioner.Props,
+    'side' | 'align' | 'sideOffset' | 'alignOffset' | 'anchor'
+  > & {
+    portalContainer?: React.ComponentProps<typeof ComboboxPrimitive.Portal>['container'];
+  };
+
 function ComboboxValue({ ...props }: ComboboxPrimitive.Value.Props) {
   return <ComboboxPrimitive.Value data-slot="combobox-value" {...props} />;
 }
@@ -89,14 +97,11 @@ function ComboboxContent({
   align = 'start',
   alignOffset = 0,
   anchor,
+  portalContainer,
   ...props
-}: ComboboxPrimitive.Popup.Props &
-  Pick<
-    ComboboxPrimitive.Positioner.Props,
-    'side' | 'align' | 'sideOffset' | 'alignOffset' | 'anchor'
-  >) {
+}: ComboboxContentProps) {
   return (
-    <ComboboxPrimitive.Portal>
+    <ComboboxPrimitive.Portal container={portalContainer}>
       <ComboboxPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}

@@ -54,8 +54,8 @@ const CO_DEBTOR_SORT_FIELDS = [
 const CO_DEBTOR_INCLUDE_OPTIONS = [
   'loanApplicationCoDebtors',
   'identificationType',
-  'coDebtorsHome',
-  'coDebtorsWork',
+  'homeCity',
+  'workCity',
 ] as const;
 const CoDebtorIncludeSchema = createIncludeSchema(CO_DEBTOR_INCLUDE_OPTIONS);
 

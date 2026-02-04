@@ -710,6 +710,9 @@ export const insuranceCompanies = pgTable(
     verificationDigit: varchar('verification_digit', { length: 1 }),
 
     businessName: varchar('business_name', { length: 255 }).notNull(),
+    cityId: integer('city_id')
+      .notNull()
+      .references(() => cities.id, { onDelete: 'restrict' }),
     address: varchar('address', { length: 255 }).notNull(),
 
     phone: varchar('phone', { length: 20 }),
@@ -1168,7 +1171,6 @@ export const coDebtors = pgTable(
     identificationTypeId: integer('identification_type_id')
       .notNull()
       .references(() => identificationTypes.id, { onDelete: 'restrict' }),
-    // Concr40.numdoc
     documentNumber: varchar('document_number', { length: 20 }).notNull(),
 
     homeAddress: varchar('home_address', { length: 80 }).notNull(),

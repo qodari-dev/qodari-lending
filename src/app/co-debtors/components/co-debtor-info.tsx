@@ -37,7 +37,7 @@ export function CoDebtorInfo({
       columns: 2,
       items: [
         { label: 'Direccion', value: coDebtor.homeAddress },
-        { label: 'Codigo Ciudad', value: coDebtor.coDebtorsHome?.name },
+        { label: 'Codigo Ciudad', value: coDebtor.homeCity?.name },
         { label: 'Telefono', value: coDebtor.homePhone },
       ],
     },
@@ -47,7 +47,7 @@ export function CoDebtorInfo({
       items: [
         { label: 'Empresa', value: coDebtor.companyName },
         { label: 'Direccion Trabajo', value: coDebtor.workAddress },
-        { label: 'Codigo Ciudad Trabajo', value: coDebtor.coDebtorsWork?.name },
+        { label: 'Codigo Ciudad Trabajo', value: coDebtor.workCity?.name },
         { label: 'Telefono Trabajo', value: coDebtor.workPhone },
       ],
     },

@@ -88,9 +88,10 @@ export const identificationTypesRelations = relations(identificationTypes, ({ ma
 // Cities
 // ---------------------------------------------------------------------
 export const citiesRelations = relations(cities, ({ many }) => ({
-  coDebtorsHome: many(coDebtors, { relationName: 'coDebtorsHome' }),
-  coDebtorsWork: many(coDebtors, { relationName: 'coDebtorsWork' }),
+  coDebtorsHome: many(coDebtors, { relationName: 'homeCity' }),
+  coDebtorsWork: many(coDebtors, { relationName: 'workCity' }),
   thirdParties: many(thirdParties),
+  insuranceCompanies: many(insuranceCompanies),
 }));
 
 // ---------------------------------------------------------------------
@@ -369,6 +370,14 @@ export const thirdPartiesRelations = relations(thirdParties, ({ one, many }) => 
 // ---------------------------------------------------------------------
 export const insuranceCompaniesRelations = relations(insuranceCompanies, ({ many, one }) => ({
   insuranceRateRanges: many(insuranceRateRanges),
+  identificationType: one(identificationTypes, {
+    fields: [insuranceCompanies.identificationTypeId],
+    references: [identificationTypes.id],
+  }),
+  city: one(cities, {
+    fields: [insuranceCompanies.cityId],
+    references: [cities.id],
+  }),
 
   // Concr05 - dos FKs => relationName para evitar ambigüedad
   totalChargeDistribution: one(accountingDistributions, {
@@ -565,13 +574,13 @@ export const coDebtorsRelations = relations(coDebtors, ({ many, one }) => ({
     fields: [coDebtors.identificationTypeId],
     references: [identificationTypes.id],
   }),
-  coDebtorsHome: one(cities, {
-    relationName: 'coDebtorsHome',
+  homeCity: one(cities, {
+    relationName: 'homeCity',
     fields: [coDebtors.homeCityId],
     references: [cities.id],
   }),
-  coDebtorsWork: one(cities, {
-    relationName: 'coDebtorsWork',
+  workCity: one(cities, {
+    relationName: 'workCity',
     fields: [coDebtors.workCityId],
     references: [cities.id],
   }),

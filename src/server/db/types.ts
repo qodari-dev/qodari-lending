@@ -91,6 +91,8 @@ export type NewIdentificationTypes = typeof identificationTypes.$inferInsert;
 export type Cities = typeof cities.$inferSelect & {
   coDebtorsHome?: CoDebtors[];
   coDebtorsWork?: CoDebtors[];
+  thirdParties?: ThirdParties[];
+  insuranceCompanies?: InsuranceCompanies[];
 };
 export type NewCities = typeof cities.$inferInsert;
 
@@ -307,6 +309,7 @@ export type NewThirdPartyTypes = typeof thirdPartyTypes.$inferInsert;
 // ---------------------------------------------------------------------
 export type ThirdParties = typeof thirdParties.$inferSelect & {
   thirdPartyType?: ThirdPartyTypes;
+  identificationType?: IdentificationTypes;
   city?: Cities;
   loanApplications?: LoanApplications[];
   loans?: Loans[];
@@ -314,7 +317,6 @@ export type ThirdParties = typeof thirdParties.$inferSelect & {
   loansBorrowed?: Loans[];
   loansDisbursed?: Loans[];
   portfolioEntries?: PortfolioEntries[];
-  identificationType?: IdentificationTypes;
 };
 export type NewThirdParties = typeof thirdParties.$inferInsert;
 
@@ -322,6 +324,8 @@ export type NewThirdParties = typeof thirdParties.$inferInsert;
 // Concr25 - Empresas de seguros
 // ---------------------------------------------------------------------
 export type InsuranceCompanies = typeof insuranceCompanies.$inferSelect & {
+  identificationType?: IdentificationTypes;
+  city?: Cities;
   insuranceRateRanges?: InsuranceRateRanges[];
   totalChargeDistribution?: AccountingDistributions;
   monthlyDistribution?: AccountingDistributions;
@@ -420,8 +424,8 @@ export type NewLoanApplicationPledges = typeof loanApplicationPledges.$inferInse
 // ---------------------------------------------------------------------
 export type CoDebtors = typeof coDebtors.$inferSelect & {
   loanApplicationCoDebtors?: LoanApplicationCoDebtors[];
-  coDebtorsHome?: Cities;
-  coDebtorsWork?: Cities;
+  homeCity?: Cities;
+  workCity?: Cities;
   identificationType?: IdentificationTypes;
 };
 export type NewCoDebtors = typeof coDebtors.$inferInsert;

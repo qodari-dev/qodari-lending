@@ -18,7 +18,10 @@ export const env = createEnv({
     IAM_REDIRECT_URI: z.string(),
     IAM_ISSUER: z.string(),
     IAM_APP_SLUG: z.string(),
+    IAM_SLUG: z.string(),
     IAM_JWT_SECRET: z.string(),
+    IAM_M2M_CLIENT_ID: z.string(),
+    IAM_M2M_CLIENT_SECRET: z.string(),
   },
   /*
    * Environment variables available on the client (and server).
@@ -52,7 +55,10 @@ export const env = createEnv({
     IAM_REDIRECT_URI: process.env.IAM_REDIRECT_URI,
     IAM_ISSUER: process.env.IAM_ISSUER,
     IAM_APP_SLUG: process.env.IAM_APP_SLUG,
+    IAM_SLUG: process.env.IAM_SLUG,
     IAM_JWT_SECRET: process.env.IAM_JWT_SECRET,
+    IAM_M2M_CLIENT_ID: process.env.IAM_M2M_CLIENT_ID,
+    IAM_M2M_CLIENT_SECRET: process.env.IAM_M2M_CLIENT_SECRET,
   },
   // experimental__runtimeEnv: {
   //   NEXT_PUBLIC_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_PUBLISHABLE_KEY,

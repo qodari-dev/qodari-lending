@@ -56,12 +56,12 @@ const CO_DEBTOR_INCLUDES = createIncludeMap<typeof db.query.coDebtors>()({
     relation: 'identificationType',
     config: true,
   },
-  coDebtorsHome: {
-    relation: 'coDebtorsHome',
+  homeCity: {
+    relation: 'homeCity',
     config: true,
   },
-  coDebtorsWork: {
-    relation: 'coDebtorsWork',
+  workCity: {
+    relation: 'workCity',
     config: true,
   },
 });

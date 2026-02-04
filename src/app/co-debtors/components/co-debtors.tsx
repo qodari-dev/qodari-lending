@@ -50,7 +50,7 @@ export function CoDebtors() {
     handleSearchChange,
   } = useDataTable<CoDebtorSortField, CoDebtorInclude>({
     defaultPageSize: 20,
-    defaultIncludes: ['identificationType', 'coDebtorsHome', 'coDebtorsWork'],
+    defaultIncludes: ['identificationType', 'homeCity', 'workCity'],
     defaultSorting: [{ field: 'createdAt', order: 'desc' }],
   });
 
@@ -58,7 +58,7 @@ export function CoDebtors() {
 
   // Query con include para obtener las solicitudes de credito
   const { data: coDebtorDetail } = useCoDebtor(selectedId ?? 0, {
-    include: ['loanApplicationCoDebtors'],
+    include: ['loanApplicationCoDebtors', 'identificationType', 'homeCity', 'workCity'],
     enabled: !!selectedId,
   });
 
@@ -165,8 +165,8 @@ export function CoDebtors() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estas seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente el codeudor
-              &quot;{coDebtor?.documentNumber}&quot;.
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el codeudor &quot;
+              {coDebtor?.documentNumber}&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

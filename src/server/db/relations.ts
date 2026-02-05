@@ -174,11 +174,6 @@ export const glAccountsRelations = relations(glAccounts, ({ many }) => ({
     relationName: 'lateInterestGlAccount',
   }),
 
-  // Concr07 - Auxiliar estudio de crédito (auxest)
-  creditProductsAsStudyGlAccount: many(creditProducts, {
-    relationName: 'studyGlAccount',
-  }),
-
   // Concr01 - Settings
   creditsSettingsAsCashGlAccount: many(creditsSettings, {
     relationName: 'cashGlAccount',
@@ -429,11 +424,6 @@ export const creditProductsRelations = relations(creditProducts, ({ one, many })
     relationName: 'lateInterestDistribution',
     fields: [creditProducts.lateInterestDistributionId],
     references: [accountingDistributions.id],
-  }),
-  studyGlAccount: one(glAccounts, {
-    relationName: 'studyGlAccount',
-    fields: [creditProducts.studyGlAccountId],
-    references: [glAccounts.id],
   }),
   costCenter: one(costCenters, {
     fields: [creditProducts.costCenterId],

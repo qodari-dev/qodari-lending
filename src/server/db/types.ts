@@ -177,8 +177,6 @@ export type GlAccounts = typeof glAccounts.$inferSelect & {
   creditProductGlAccountsAsInterest?: CreditProductAccounts[];
   creditProductGlAccountsAsLateInterest?: CreditProductAccounts[];
 
-  creditProductsAsStudyAccount?: CreditProducts[];
-
   creditsSettingsAsCash?: CreditsSettings[];
   creditsSettingsAsMajor?: CreditsSettings[];
   creditsSettingsAsExcess?: CreditsSettings[];
@@ -348,7 +346,6 @@ export type CreditProducts = typeof creditProducts.$inferSelect & {
   capitalDistribution?: AccountingDistributions;
   interestDistribution?: AccountingDistributions;
   lateInterestDistribution?: AccountingDistributions;
-  studyGlAccount?: GlAccounts | null;
   costCenter?: CostCenters | null;
   creditProductCategories?: CreditProductCategories[];
   creditProductDocuments?: CreditProductDocuments[];

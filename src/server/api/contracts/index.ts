@@ -9,6 +9,7 @@ import { creditsSettingsContract } from './credits-settings';
 import { documentType } from './document-type';
 import { glAccount } from './gl-account';
 import { identificationType } from './identification-type';
+import { insuranceCompany } from './insurance-company';
 import { investmentType } from './investment-type';
 import { paymentFrequency } from './payment-frequency';
 import { paymentGuaranteeType } from './payment-guarantee-type';
@@ -32,6 +33,7 @@ export const contract = c.router(
     documentType,
     glAccount,
     identificationType,
+    insuranceCompany,
     investmentType,
     paymentFrequency,
     paymentGuaranteeType,

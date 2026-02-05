@@ -744,6 +744,10 @@ export const insuranceCompanies = pgTable(
   ]
 );
 
+export const insuranceRateRangeMetricEnum = pgEnum('insurance_rate_range_metric', [
+  'INSTALLMENT_COUNT', // # de cuotas
+  'CREDIT_AMOUNT', // monto del credito
+]);
 // ---------------------------------------------------------------------
 // Concr34 - Valores de seguros (rangos)
 // Nota (ES):
@@ -759,13 +763,19 @@ export const insuranceRateRanges = pgTable(
     insuranceCompanyId: integer('insurance_company_id')
       .notNull()
       .references(() => insuranceCompanies.id, { onDelete: 'cascade' }),
+    rangeMetric: insuranceRateRangeMetricEnum('range_metric').notNull(),
     valueFrom: integer('value_from').notNull(),
     valueTo: integer('value_to').notNull(),
     rateValue: decimal('rate_value', { precision: 12, scale: 5 }).notNull(),
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_insurance_rate_range').on(t.insuranceCompanyId, t.valueFrom, t.valueTo),
+    uniqueIndex('uniq_insurance_rate_range').on(
+      t.insuranceCompanyId,
+      t.rangeMetric,
+      t.valueFrom,
+      t.valueTo
+    ),
     check('chk_insurance_rate_range_order', sql`${t.valueFrom} <= ${t.valueTo}`),
   ]
 );
@@ -774,6 +784,7 @@ export const financingTypeEnum = pgEnum('financing_type', [
   'FIXED_AMOUNT', // Valor Fijo
   'ON_BALANCE', // Valor Sobre Saldo
 ]);
+
 // Modo configurado por producto (concr07 / creditProducts)
 export const riskEvaluationModeEnum = pgEnum('risk_evaluation_mode', [
   'NONE', // no integra / no valida
@@ -812,6 +823,9 @@ export const creditProducts = pgTable(
     financingType: financingTypeEnum('financing_type').notNull(),
     // Concr07.pagseg (S/N)
     paysInsurance: boolean('pays_insurance').notNull().default(false),
+    insuranceRangeMetric: insuranceRateRangeMetricEnum('insurance_range_metric')
+      .notNull()
+      .default('CREDIT_AMOUNT'),
     // Concr07.codcap/codint/codmor -> Concr05 (distribuciones)
     capitalDistributionId: integer('capital_distribution_id')
       .notNull()
@@ -826,12 +840,6 @@ export const creditProducts = pgTable(
     reportsToCreditBureau: boolean('reports_to_credit_bureau').notNull().default(false),
     // Concr07.numcuo (max cuotas)
     maxInstallments: integer('max_installments'),
-    // Concr07.estcre (valor estudio)
-    studyFeeAmount: decimal('study_fee_amount', { precision: 14, scale: 2 }),
-    // Concr07.auxest -> Concr18 (gl_accounts)
-    studyGlAccountId: integer('study_gl_account_id').references(() => glAccounts.id, {
-      onDelete: 'restrict',
-    }),
     // Concr07.codcen -> centro de costo
     costCenterId: integer('cost_center_id').references(() => costCenters.id, {
       onDelete: 'set null',

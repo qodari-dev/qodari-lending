@@ -10,13 +10,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { InsuranceCompany } from '@/schemas/insurance-company';
+import {
+  INSURANCE_RATE_RANGE_METRIC_LABELS,
+  InsuranceCompany,
+} from '@/schemas/insurance-company';
 import { formatDate } from '@/utils/formatters';
-
-const RANGE_METRIC_LABELS: Record<string, string> = {
-  INSTALLMENT_COUNT: 'Cuotas',
-  CREDIT_AMOUNT: 'Monto',
-};
 
 export function InsuranceCompanyInfo({
   insuranceCompany,
@@ -118,7 +116,7 @@ export function InsuranceCompanyInfo({
                   {rateRanges.map((range) => (
                     <TableRow key={range.id}>
                       <TableCell>
-                        {RANGE_METRIC_LABELS[range.rangeMetric] ?? range.rangeMetric}
+                        {INSURANCE_RATE_RANGE_METRIC_LABELS[range.rangeMetric] ?? range.rangeMetric}
                       </TableCell>
                       <TableCell className="text-muted-foreground font-mono text-xs">
                         {range.valueFrom}

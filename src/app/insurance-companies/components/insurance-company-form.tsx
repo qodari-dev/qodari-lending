@@ -33,6 +33,7 @@ import {
   useCreateInsuranceCompany,
   useUpdateInsuranceCompany,
 } from '@/hooks/queries/use-insurance-company-queries';
+import { useComboboxItems } from '@/hooks/use-combobox-items';
 import { CreateInsuranceCompanyBodySchema, InsuranceCompany } from '@/schemas/insurance-company';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -41,6 +42,8 @@ import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { InsuranceCompanyRateRangesForm } from './insurance-company-rate-ranges-form';
+import { City } from '@/schemas/city';
+import { IdentificationType } from '@/schemas/identification-type';
 
 type FormValues = z.infer<typeof CreateInsuranceCompanyBodySchema>;
 
@@ -82,29 +85,18 @@ export function InsuranceCompanyForm({
   const { data: identificationTypesData } = useIdentificationTypes({
     limit: 100,
     where: { and: [{ isActive: true }] },
+    sort: [{ field: 'id', order: 'asc' }],
   });
   const identificationTypes = useMemo(
     () => identificationTypesData?.body?.data ?? [],
     [identificationTypesData]
   );
-  const identificationTypeItems = useMemo(
-    () => identificationTypes.map((type) => String(type.id)),
-    [identificationTypes]
-  );
-  const identificationTypeLabelsMap = useMemo(() => {
-    const map = new Map<string, string>();
-    identificationTypes.forEach((type) => {
-      map.set(String(type.id), `${type.code} - ${type.name}`);
-    });
-    return map;
-  }, [identificationTypes]);
-  const getIdentificationTypeLabel = useCallback(
-    (value: string | null) => {
-      if (!value) return '';
-      return identificationTypeLabelsMap.get(value) ?? value;
-    },
-    [identificationTypeLabelsMap]
-  );
+  const { items: identificationTypeItems, getLabel: getIdentificationTypeLabel } =
+    useComboboxItems<IdentificationType>(
+      identificationTypes,
+      useCallback((t) => t.id, []),
+      useCallback((t) => `${t.code} - ${t.name}`, [])
+    );
 
   // Fetch cities
   const { data: citiesData } = useCities({
@@ -113,20 +105,10 @@ export function InsuranceCompanyForm({
     sort: [{ field: 'name', order: 'asc' }],
   });
   const cities = useMemo(() => citiesData?.body?.data ?? [], [citiesData]);
-  const cityItems = useMemo(() => cities.map((city) => String(city.id)), [cities]);
-  const cityLabelsMap = useMemo(() => {
-    const map = new Map<string, string>();
-    cities.forEach((city) => {
-      map.set(String(city.id), `${city.code} - ${city.name}`);
-    });
-    return map;
-  }, [cities]);
-  const getCityLabel = useCallback(
-    (value: string | null) => {
-      if (!value) return '';
-      return cityLabelsMap.get(value) ?? value;
-    },
-    [cityLabelsMap]
+  const { items: cityItems, getLabel: getCityLabel } = useComboboxItems<City>(
+    cities,
+    useCallback((c) => c.id, []),
+    useCallback((c) => `${c.code} - ${c.name}`, [])
   );
 
   useEffect(() => {

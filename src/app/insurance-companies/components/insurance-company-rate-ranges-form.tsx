@@ -30,6 +30,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
   CreateInsuranceCompanyBodySchema,
+  INSURANCE_RATE_RANGE_METRIC_LABELS,
   InsuranceRateRangeInput,
   InsuranceRateRangeInputSchema,
 } from '@/schemas/insurance-company';
@@ -41,11 +42,6 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 type FormValues = z.infer<typeof CreateInsuranceCompanyBodySchema>;
-
-const RANGE_METRIC_LABELS: Record<string, string> = {
-  INSTALLMENT_COUNT: 'Cuotas',
-  CREDIT_AMOUNT: 'Monto',
-};
 
 export function InsuranceCompanyRateRangesForm() {
   const form = useFormContext<FormValues>();
@@ -242,7 +238,7 @@ export function InsuranceCompanyRateRangesForm() {
           <TableBody>
             {fields.map((field, index) => (
               <TableRow key={field.id}>
-                <TableCell>{RANGE_METRIC_LABELS[field.rangeMetric] ?? field.rangeMetric}</TableCell>
+                <TableCell>{INSURANCE_RATE_RANGE_METRIC_LABELS[field.rangeMetric] ?? field.rangeMetric}</TableCell>
                 <TableCell className="text-muted-foreground font-mono text-xs">
                   {field.valueFrom}
                 </TableCell>

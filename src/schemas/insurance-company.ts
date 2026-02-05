@@ -69,6 +69,15 @@ export const GetInsuranceCompanyQuerySchema = z.object({
 });
 
 // ============================================
+// LABELS
+// ============================================
+
+export const INSURANCE_RATE_RANGE_METRIC_LABELS: Record<string, string> = {
+  INSTALLMENT_COUNT: 'Cuotas',
+  CREDIT_AMOUNT: 'Monto',
+};
+
+// ============================================
 // MUTATIONS
 // ============================================
 

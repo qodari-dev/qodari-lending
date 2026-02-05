@@ -392,6 +392,9 @@ export const paymentReceiptTypes = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     movementType: paymentReceiptMovementTypeEnum('movement_type').notNull(),
+    glAccountId: integer('gl_account_id')
+      .notNull()
+      .references(() => glAccounts.id, { onDelete: 'restrict' }),
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
@@ -415,14 +418,11 @@ export const userPaymentReceiptTypes = pgTable(
   'user_payment_receipt_types',
   {
     id: serial('id').primaryKey(),
-
-    // IAM externo: usa UUID (o cambia a varchar si tu IAM no es uuid)
+    // IAM externo
     userId: uuid('user_id').notNull(),
-
     paymentReceiptTypeId: integer('payment_receipt_type_id')
       .notNull()
       .references(() => paymentReceiptTypes.id, { onDelete: 'cascade' }),
-
     isDefault: boolean('is_default').notNull().default(false),
 
     ...timestamps,

@@ -1,6 +1,7 @@
 import { contract } from '@/server/api/contracts';
 import { createNextHandler } from '@ts-rest/serverless/next';
 import { auth } from './auth';
+import { accountingDistribution } from './accounting-distribution';
 import { bank } from './bank';
 import { channel } from './channel';
 import { city } from './city';
@@ -22,7 +23,7 @@ import { thirdPartyType } from './third-party-type';
 
 export const handler = createNextHandler(
   contract,
-  { auth, bank, channel, city, coDebtor, costCenter, creditsSettings: creditsSettingsHandler, documentType, glAccount, identificationType, insuranceCompany, investmentType, paymentFrequency, paymentGuaranteeType, paymentTenderType, rejectionReason, repaymentMethod, thirdParty, thirdPartyType },
+  { auth, accountingDistribution, bank, channel, city, coDebtor, costCenter, creditsSettings: creditsSettingsHandler, documentType, glAccount, identificationType, insuranceCompany, investmentType, paymentFrequency, paymentGuaranteeType, paymentTenderType, rejectionReason, repaymentMethod, thirdParty, thirdPartyType },
   {
     jsonQuery: true,
     responseValidation: true,

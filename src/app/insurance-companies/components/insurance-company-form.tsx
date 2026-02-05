@@ -33,7 +33,8 @@ import {
   useCreateInsuranceCompany,
   useUpdateInsuranceCompany,
 } from '@/hooks/queries/use-insurance-company-queries';
-import { useComboboxItems } from '@/hooks/use-combobox-items';
+import { City } from '@/schemas/city';
+import { IdentificationType } from '@/schemas/identification-type';
 import { CreateInsuranceCompanyBodySchema, InsuranceCompany } from '@/schemas/insurance-company';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,8 +43,6 @@ import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { InsuranceCompanyRateRangesForm } from './insurance-company-rate-ranges-form';
-import { City } from '@/schemas/city';
-import { IdentificationType } from '@/schemas/identification-type';
 
 type FormValues = z.infer<typeof CreateInsuranceCompanyBodySchema>;
 
@@ -91,12 +90,6 @@ export function InsuranceCompanyForm({
     () => identificationTypesData?.body?.data ?? [],
     [identificationTypesData]
   );
-  const { items: identificationTypeItems, getLabel: getIdentificationTypeLabel } =
-    useComboboxItems<IdentificationType>(
-      identificationTypes,
-      useCallback((t) => t.id, []),
-      useCallback((t) => `${t.code} - ${t.name}`, [])
-    );
 
   // Fetch cities
   const { data: citiesData } = useCities({
@@ -105,10 +98,15 @@ export function InsuranceCompanyForm({
     sort: [{ field: 'name', order: 'asc' }],
   });
   const cities = useMemo(() => citiesData?.body?.data ?? [], [citiesData]);
-  const { items: cityItems, getLabel: getCityLabel } = useComboboxItems<City>(
-    cities,
-    useCallback((c) => c.id, []),
-    useCallback((c) => `${c.code} - ${c.name}`, [])
+
+  // Helpers para encontrar objetos por ID
+  const findIdentificationType = useCallback(
+    (id: number | undefined) => identificationTypes.find((t) => t.id === id) ?? null,
+    [identificationTypes]
+  );
+  const findCity = useCallback(
+    (id: number | undefined) => cities.find((c) => c.id === id) ?? null,
+    [cities]
   );
 
   useEffect(() => {
@@ -190,10 +188,15 @@ export function InsuranceCompanyForm({
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel htmlFor="identificationTypeId">Tipo de Documento</FieldLabel>
                           <Combobox
-                            items={identificationTypeItems}
-                            value={field.value ? String(field.value) : null}
-                            onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
-                            itemToStringLabel={getIdentificationTypeLabel}
+                            items={identificationTypes}
+                            value={findIdentificationType(field.value)}
+                            onValueChange={(val: IdentificationType | null) =>
+                              field.onChange(val?.id ?? undefined)
+                            }
+                            itemToStringValue={(item: IdentificationType) => String(item.id)}
+                            itemToStringLabel={(item: IdentificationType) =>
+                              `${item.code} - ${item.name}`
+                            }
                           >
                             <ComboboxTrigger
                               render={
@@ -216,9 +219,9 @@ export function InsuranceCompanyForm({
                               <ComboboxList>
                                 <ComboboxEmpty>No se encontraron tipos</ComboboxEmpty>
                                 <ComboboxCollection>
-                                  {(value) => (
-                                    <ComboboxItem key={value} value={value}>
-                                      {getIdentificationTypeLabel(value)}
+                                  {(item: IdentificationType) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
                                     </ComboboxItem>
                                   )}
                                 </ComboboxCollection>
@@ -284,10 +287,13 @@ export function InsuranceCompanyForm({
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel htmlFor="cityId">Ciudad</FieldLabel>
                           <Combobox
-                            items={cityItems}
-                            value={field.value ? String(field.value) : null}
-                            onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
-                            itemToStringLabel={getCityLabel}
+                            items={cities}
+                            value={findCity(field.value)}
+                            onValueChange={(val: City | null) =>
+                              field.onChange(val?.id ?? undefined)
+                            }
+                            itemToStringValue={(item: City) => String(item.id)}
+                            itemToStringLabel={(item: City) => `${item.code} - ${item.name}`}
                           >
                             <ComboboxTrigger
                               render={
@@ -310,9 +316,9 @@ export function InsuranceCompanyForm({
                               <ComboboxList>
                                 <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
                                 <ComboboxCollection>
-                                  {(value) => (
-                                    <ComboboxItem key={value} value={value}>
-                                      {getCityLabel(value)}
+                                  {(item: City) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
                                     </ComboboxItem>
                                   )}
                                 </ComboboxCollection>

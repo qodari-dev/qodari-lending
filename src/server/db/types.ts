@@ -172,6 +172,7 @@ export type GlAccounts = typeof glAccounts.$inferSelect & {
   portfolioEntries?: PortfolioEntries[];
   portfolioAgingSnapshots?: PortfolioAgingSnapshots[];
   loanPayments?: LoanPayments[];
+  paymentReceiptTypes?: PaymentReceiptTypes[];
 
   creditProductGlAccountsAsCapital?: CreditProductAccounts[];
   creditProductGlAccountsAsInterest?: CreditProductAccounts[];
@@ -226,6 +227,7 @@ export type NewAccountingDistributionLines = typeof accountingDistributionLines.
 // Concr29 - Tipos de recibos de abonos
 // ---------------------------------------------------------------------
 export type PaymentReceiptTypes = typeof paymentReceiptTypes.$inferSelect & {
+  glAccount?: GlAccounts;
   loanPayments?: LoanPayments[];
   userPaymentReceiptTypes?: UserPaymentReceiptTypes[];
   payrollExcessPayments?: PayrollExcessPayments[];

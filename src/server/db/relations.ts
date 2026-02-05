@@ -162,6 +162,7 @@ export const glAccountsRelations = relations(glAccounts, ({ many }) => ({
   portfolioEntries: many(portfolioEntries),
   portfolioAgingSnapshots: many(portfolioAgingSnapshots),
   loanPayments: many(loanPayments),
+  paymentReceiptTypes: many(paymentReceiptTypes),
 
   // Concr26 - Mapeo contable por tipo de crédito (3 FKs a gl_accounts)
   creditProductAccountsAsCapital: many(creditProductAccounts, {
@@ -252,10 +253,14 @@ export const accountingDistributionLinesRelations = relations(
 // ---------------------------------------------------------------------
 // Concr29 - Tipos de recibos de abonos
 // ---------------------------------------------------------------------
-export const paymentReceiptTypesRelations = relations(paymentReceiptTypes, ({ many }) => ({
+export const paymentReceiptTypesRelations = relations(paymentReceiptTypes, ({ many, one }) => ({
   loanPayments: many(loanPayments),
   userPaymentReceiptTypes: many(userPaymentReceiptTypes),
   payrollExcessPayments: many(payrollExcessPayments),
+  glAccount: one(glAccounts, {
+    fields: [paymentReceiptTypes.glAccountId],
+    references: [glAccounts.id],
+  }),
 }));
 
 // ---------------------------------------------------------------------

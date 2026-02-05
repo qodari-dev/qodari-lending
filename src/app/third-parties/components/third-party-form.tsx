@@ -37,6 +37,8 @@ import { useCities } from '@/hooks/queries/use-city-queries';
 import { useIdentificationTypes } from '@/hooks/queries/use-identification-type-queries';
 import { useCreateThirdParty, useUpdateThirdParty } from '@/hooks/queries/use-third-party-queries';
 import { useThirdPartyTypes } from '@/hooks/queries/use-third-party-type-queries';
+import { City } from '@/schemas/city';
+import { IdentificationType } from '@/schemas/identification-type';
 import {
   CreateThirdPartyBodySchema,
   ThirdParty,
@@ -50,7 +52,7 @@ import {
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { Controller, FormProvider, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -109,28 +111,6 @@ export function ThirdPartyForm({
     [identificationTypesData]
   );
 
-  // Preparar items para el Combobox de tipos de identificación
-  const identificationTypeItems = useMemo(
-    () => identificationTypes.map((type) => String(type.id)),
-    [identificationTypes]
-  );
-
-  const identificationTypeLabelsMap = useMemo(() => {
-    const map = new Map<string, string>();
-    identificationTypes.forEach((type) => {
-      map.set(String(type.id), `${type.code} - ${type.name}`);
-    });
-    return map;
-  }, [identificationTypes]);
-
-  const getIdentificationTypeLabel = useCallback(
-    (value: string | null) => {
-      if (!value) return '';
-      return identificationTypeLabelsMap.get(value) ?? value;
-    },
-    [identificationTypeLabelsMap]
-  );
-
   // Fetch third party types for the select
   const { data: thirdPartyTypesData } = useThirdPartyTypes({ limit: 100 });
   const thirdPartyTypes = useMemo(
@@ -146,33 +126,20 @@ export function ThirdPartyForm({
   });
   const cities = useMemo(() => citiesData?.body?.data ?? [], [citiesData]);
 
-  // Preparar items para el Combobox de ciudades
-  const cityItems = useMemo(() => cities.map((city) => String(city.id)), [cities]);
-
-  const cityLabelsMap = useMemo(() => {
-    const map = new Map<string, string>();
-    cities.forEach((city) => {
-      map.set(String(city.id), `${city.code} - ${city.name}`);
-    });
-    return map;
-  }, [cities]);
-
-  const getCityLabel = useCallback(
-    (value: string | null) => {
-      if (!value) return '';
-      return cityLabelsMap.get(value) ?? value;
-    },
-    [cityLabelsMap]
+  // Helpers para encontrar objetos por ID
+  const findIdentificationType = useCallback(
+    (id: number | undefined) => identificationTypes.find((t) => t.id === id) ?? null,
+    [identificationTypes]
+  );
+  const findCity = useCallback(
+    (id: number | undefined) => cities.find((c) => c.id === id) ?? null,
+    [cities]
   );
 
-  const handleOpenedChange = useCallback(
-    (nextOpen: boolean) => {
-      onOpened(nextOpen);
-      if (!nextOpen) {
-        return;
-      }
+  useEffect(() => {
+    if (opened) {
       form.reset({
-        identificationTypeId: thirdParty?.identificationTypeId ?? 0,
+        identificationTypeId: thirdParty?.identificationTypeId ?? undefined,
         documentNumber: thirdParty?.documentNumber ?? '',
         verificationDigit: thirdParty?.verificationDigit ?? '',
         personType: thirdParty?.personType ?? 'NATURAL',
@@ -185,20 +152,19 @@ export function ThirdPartyForm({
         sex: thirdParty?.sex ?? undefined,
         categoryCode: thirdParty?.categoryCode ?? '',
         address: thirdParty?.address ?? '',
-        cityId: thirdParty?.cityId ?? 0,
+        cityId: thirdParty?.cityId ?? undefined,
         phone: thirdParty?.phone ?? '',
         mobilePhone: thirdParty?.mobilePhone ?? '',
         email: thirdParty?.email ?? '',
-        thirdPartyTypeId: thirdParty?.thirdPartyTypeId ?? 0,
+        thirdPartyTypeId: thirdParty?.thirdPartyTypeId ?? undefined,
         taxpayerType: thirdParty?.taxpayerType ?? 'NATURAL_PERSON',
         hasRut: thirdParty?.hasRut ?? false,
         employerDocumentNumber: thirdParty?.employerDocumentNumber ?? '',
         employerBusinessName: thirdParty?.employerBusinessName ?? '',
         note: thirdParty?.note ?? '',
       });
-    },
-    [thirdParty, form, onOpened]
-  );
+    }
+  }, [opened, thirdParty, form]);
 
   const { mutateAsync: create, isPending: isCreating } = useCreateThirdParty();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateThirdParty();
@@ -218,7 +184,7 @@ export function ThirdPartyForm({
   );
 
   return (
-    <Sheet open={opened} onOpenChange={handleOpenedChange}>
+    <Sheet open={opened} onOpenChange={onOpened}>
       <SheetContent ref={sheetContentRef} className="overflow-y-scroll sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Tercero</SheetTitle>
@@ -237,10 +203,15 @@ export function ThirdPartyForm({
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="identificationTypeId">Tipo de Documento</FieldLabel>
                       <Combobox
-                        items={identificationTypeItems}
-                        value={field.value ? String(field.value) : null}
-                        onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
-                        itemToStringLabel={getIdentificationTypeLabel}
+                        items={identificationTypes}
+                        value={findIdentificationType(field.value)}
+                        onValueChange={(val: IdentificationType | null) =>
+                          field.onChange(val?.id ?? undefined)
+                        }
+                        itemToStringValue={(item: IdentificationType) => String(item.id)}
+                        itemToStringLabel={(item: IdentificationType) =>
+                          `${item.code} - ${item.name}`
+                        }
                       >
                         <ComboboxTrigger
                           render={
@@ -263,9 +234,9 @@ export function ThirdPartyForm({
                           <ComboboxList>
                             <ComboboxEmpty>No se encontraron tipos</ComboboxEmpty>
                             <ComboboxCollection>
-                              {(value) => (
-                                <ComboboxItem key={value} value={value}>
-                                  {getIdentificationTypeLabel(value)}
+                              {(item: IdentificationType) => (
+                                <ComboboxItem key={item.id} value={item}>
+                                  {item.code} - {item.name}
                                 </ComboboxItem>
                               )}
                             </ComboboxCollection>
@@ -487,10 +458,11 @@ export function ThirdPartyForm({
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="cityId">Ciudad</FieldLabel>
                     <Combobox
-                      items={cityItems}
-                      value={field.value ? String(field.value) : null}
-                      onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
-                      itemToStringLabel={getCityLabel}
+                      items={cities}
+                      value={findCity(field.value)}
+                      onValueChange={(val: City | null) => field.onChange(val?.id ?? undefined)}
+                      itemToStringValue={(item: City) => String(item.id)}
+                      itemToStringLabel={(item: City) => `${item.code} - ${item.name}`}
                     >
                       <ComboboxTrigger
                         render={
@@ -513,9 +485,9 @@ export function ThirdPartyForm({
                         <ComboboxList>
                           <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
                           <ComboboxCollection>
-                            {(value) => (
-                              <ComboboxItem key={value} value={value}>
-                                {getCityLabel(value)}
+                            {(item: City) => (
+                              <ComboboxItem key={item.id} value={item}>
+                                {item.code} - {item.name}
                               </ComboboxItem>
                             )}
                           </ComboboxCollection>

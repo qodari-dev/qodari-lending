@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import { auth } from './auth';
 import { bank } from './bank';
+import { accountingDistribution } from './accounting-distribution';
 import { channel } from './channel';
 import { city } from './city';
 import { coDebtor } from './co-debtor';
@@ -24,6 +25,7 @@ const c = initContract();
 export const contract = c.router(
   {
     auth,
+    accountingDistribution,
     bank,
     channel,
     city,

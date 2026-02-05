@@ -27,11 +27,13 @@ import { Spinner } from '@/components/ui/spinner';
 import { useCities } from '@/hooks/queries/use-city-queries';
 import { useCreateCoDebtor, useUpdateCoDebtor } from '@/hooks/queries/use-co-debtor-queries';
 import { useIdentificationTypes } from '@/hooks/queries/use-identification-type-queries';
+import { City } from '@/schemas/city';
 import { CoDebtor, CreateCoDebtorBodySchema } from '@/schemas/co-debtor';
+import { IdentificationType } from '@/schemas/identification-type';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -70,33 +72,12 @@ export function CoDebtorForm({
     where: { and: [{ isActive: true }] },
     sort: [{ field: 'id', order: 'asc' }],
   });
-  const identificationTypes = useMemo(() => {
-    return identificationTypesData?.body?.data ?? [];
-  }, [identificationTypesData]);
-
-  // Preparar items para el Combobox de tipos de identificación
-  const identificationTypeItems = useMemo(
-    () => identificationTypes.map((type) => String(type.id)),
-    [identificationTypes]
+  const identificationTypes = useMemo(
+    () => identificationTypesData?.body?.data ?? [],
+    [identificationTypesData]
   );
 
-  const identificationTypeLabelsMap = useMemo(() => {
-    const map = new Map<string, string>();
-    identificationTypes.forEach((type) => {
-      map.set(String(type.id), `${type.code} - ${type.name}`);
-    });
-    return map;
-  }, [identificationTypes]);
-
-  const getIdentificationTypeLabel = useCallback(
-    (value: string | null) => {
-      if (!value) return '';
-      return identificationTypeLabelsMap.get(value) ?? value;
-    },
-    [identificationTypeLabelsMap]
-  );
-
-  // Cargar todas las ciudades activas (client-side filtering)
+  // Cargar todas las ciudades activas
   const { data: citiesData } = useCities({
     limit: 2000,
     where: { and: [{ isActive: true }] },
@@ -104,35 +85,20 @@ export function CoDebtorForm({
   });
   const cities = useMemo(() => citiesData?.body?.data ?? [], [citiesData]);
 
-  // Preparar items para el Combobox (array de IDs como strings)
-  const cityItems = useMemo(() => cities.map((city) => String(city.id)), [cities]);
-
-  // Map para buscar labels por ID
-  const cityLabelsMap = useMemo(() => {
-    const map = new Map<string, string>();
-    cities.forEach((city) => {
-      map.set(String(city.id), `${city.code} - ${city.name}`);
-    });
-    return map;
-  }, [cities]);
-
-  // Función para obtener el label de un valor
-  const getCityLabel = useCallback(
-    (value: string | null) => {
-      if (!value) return '';
-      return cityLabelsMap.get(value) ?? value;
-    },
-    [cityLabelsMap]
+  // Helpers para encontrar objetos por ID
+  const findIdentificationType = useCallback(
+    (id: number | undefined) => identificationTypes.find((t) => t.id === id) ?? null,
+    [identificationTypes]
+  );
+  const findCity = useCallback(
+    (id: number | undefined) => cities.find((c) => c.id === id) ?? null,
+    [cities]
   );
 
-  const handleOpenedChange = useCallback(
-    (nextOpen: boolean) => {
-      onOpened(nextOpen);
-      if (!nextOpen) {
-        return;
-      }
+  useEffect(() => {
+    if (opened) {
       form.reset({
-        identificationTypeId: coDebtor?.identificationTypeId ?? 0,
+        identificationTypeId: coDebtor?.identificationTypeId ?? undefined,
         documentNumber: coDebtor?.documentNumber ?? '',
         homeAddress: coDebtor?.homeAddress ?? '',
         homeCityId: coDebtor?.homeCityId ?? undefined,
@@ -142,9 +108,8 @@ export function CoDebtorForm({
         workCityId: coDebtor?.workCityId ?? undefined,
         workPhone: coDebtor?.workPhone ?? '',
       });
-    },
-    [coDebtor, form, onOpened]
-  );
+    }
+  }, [opened, coDebtor, form]);
 
   const { mutateAsync: create, isPending: isCreating } = useCreateCoDebtor();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateCoDebtor();
@@ -162,8 +127,9 @@ export function CoDebtorForm({
     },
     [coDebtor, create, update, onOpened]
   );
+
   return (
-    <Sheet open={opened} onOpenChange={handleOpenedChange}>
+    <Sheet open={opened} onOpenChange={onOpened}>
       <SheetContent ref={sheetContentRef} className="overflow-y-scroll sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Codeudor</SheetTitle>
@@ -183,10 +149,15 @@ export function CoDebtorForm({
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="identificationTypeId">Tipo de Documento</FieldLabel>
                       <Combobox
-                        items={identificationTypeItems}
-                        value={field.value ? String(field.value) : null}
-                        onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
-                        itemToStringLabel={getIdentificationTypeLabel}
+                        items={identificationTypes}
+                        value={findIdentificationType(field.value)}
+                        onValueChange={(val: IdentificationType | null) =>
+                          field.onChange(val?.id ?? undefined)
+                        }
+                        itemToStringValue={(item: IdentificationType) => String(item.id)}
+                        itemToStringLabel={(item: IdentificationType) =>
+                          `${item.code} - ${item.name}`
+                        }
                       >
                         <ComboboxTrigger
                           render={
@@ -209,9 +180,9 @@ export function CoDebtorForm({
                           <ComboboxList>
                             <ComboboxEmpty>No se encontraron tipos</ComboboxEmpty>
                             <ComboboxCollection>
-                              {(value) => (
-                                <ComboboxItem key={value} value={value}>
-                                  {getIdentificationTypeLabel(value)}
+                              {(item: IdentificationType) => (
+                                <ComboboxItem key={item.id} value={item}>
+                                  {item.code} - {item.name}
                                 </ComboboxItem>
                               )}
                             </ComboboxCollection>
@@ -259,10 +230,11 @@ export function CoDebtorForm({
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="homeCityId">Ciudad</FieldLabel>
                       <Combobox
-                        items={cityItems}
-                        value={field.value ? String(field.value) : null}
-                        onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
-                        itemToStringLabel={getCityLabel}
+                        items={cities}
+                        value={findCity(field.value)}
+                        onValueChange={(val: City | null) => field.onChange(val?.id ?? undefined)}
+                        itemToStringValue={(item: City) => String(item.id)}
+                        itemToStringLabel={(item: City) => `${item.code} - ${item.name}`}
                       >
                         <ComboboxTrigger
                           render={
@@ -285,9 +257,9 @@ export function CoDebtorForm({
                           <ComboboxList>
                             <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
                             <ComboboxCollection>
-                              {(value) => (
-                                <ComboboxItem key={value} value={value}>
-                                  {getCityLabel(value)}
+                              {(item: City) => (
+                                <ComboboxItem key={item.id} value={item}>
+                                  {item.code} - {item.name}
                                 </ComboboxItem>
                               )}
                             </ComboboxCollection>
@@ -344,10 +316,11 @@ export function CoDebtorForm({
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="workCityId">Ciudad Trabajo</FieldLabel>
                       <Combobox
-                        items={cityItems}
-                        value={field.value ? String(field.value) : null}
-                        onValueChange={(val) => field.onChange(val ? Number(val) : undefined)}
-                        itemToStringLabel={getCityLabel}
+                        items={cities}
+                        value={findCity(field.value)}
+                        onValueChange={(val: City | null) => field.onChange(val?.id ?? undefined)}
+                        itemToStringValue={(item: City) => String(item.id)}
+                        itemToStringLabel={(item: City) => `${item.code} - ${item.name}`}
                       >
                         <ComboboxTrigger
                           render={
@@ -370,9 +343,9 @@ export function CoDebtorForm({
                           <ComboboxList>
                             <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
                             <ComboboxCollection>
-                              {(value) => (
-                                <ComboboxItem key={value} value={value}>
-                                  {getCityLabel(value)}
+                              {(item: City) => (
+                                <ComboboxItem key={item.id} value={item}>
+                                  {item.code} - {item.name}
                                 </ComboboxItem>
                               )}
                             </ComboboxCollection>

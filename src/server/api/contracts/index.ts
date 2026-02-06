@@ -13,10 +13,12 @@ import { creditsSettingsContract } from './credits-settings';
 import { documentType } from './document-type';
 import { glAccount } from './gl-account';
 import { identificationType } from './identification-type';
+import { iamUser } from './iam-user';
 import { insuranceCompany } from './insurance-company';
 import { investmentType } from './investment-type';
 import { paymentFrequency } from './payment-frequency';
 import { paymentGuaranteeType } from './payment-guarantee-type';
+import { paymentReceiptType } from './payment-receipt-type';
 import { paymentTenderType } from './payment-tender-type';
 import { rejectionReason } from './rejection-reason';
 import { repaymentMethod } from './repayment-method';
@@ -41,10 +43,12 @@ export const contract = c.router(
     documentType,
     glAccount,
     identificationType,
+    iamUser,
     insuranceCompany,
     investmentType,
     paymentFrequency,
     paymentGuaranteeType,
+    paymentReceiptType,
     paymentTenderType,
     rejectionReason,
     repaymentMethod,

@@ -475,7 +475,8 @@ export const accountingPeriods = pgTable(
     month: integer('month').notNull(), // 1..12
     isClosed: boolean('is_closed').notNull().default(false),
     closedAt: timestamp('closed_at', { withTimezone: false }),
-    closedByUserId: uuid('closed_by_user_id'), // IAM externo (o varchar si no es uuid)
+    closedByUserId: uuid('closed_by_user_id'), // IAM externo
+    closedByUserName: uuid('closed_by_user_name'), // IAM externo
     ...timestamps,
   },
   (t) => [uniqueIndex('uniq_accounting_period_year_month').on(t.year, t.month)]

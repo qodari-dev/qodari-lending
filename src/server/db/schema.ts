@@ -443,6 +443,9 @@ export const affiliationOffices = pgTable(
   {
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
+    cityId: integer('city_id')
+      .notNull()
+      .references(() => cities.id, { onDelete: 'restrict' }),
     address: varchar('address', { length: 255 }).notNull(),
     phone: varchar('phone', { length: 20 }),
     representativeName: varchar('representative_name', {

@@ -91,6 +91,7 @@ export const citiesRelations = relations(cities, ({ many }) => ({
   coDebtorsHome: many(coDebtors, { relationName: 'homeCity' }),
   coDebtorsWork: many(coDebtors, { relationName: 'workCity' }),
   thirdParties: many(thirdParties),
+  affiliationOffices: many(affiliationOffices),
   insuranceCompanies: many(insuranceCompanies),
 }));
 
@@ -280,6 +281,10 @@ export const affiliationOfficesRelations = relations(affiliationOffices, ({ one,
   costCenter: one(costCenters, {
     fields: [affiliationOffices.costCenterId],
     references: [costCenters.id],
+  }),
+  city: one(cities, {
+    fields: [affiliationOffices.cityId],
+    references: [cities.id],
   }),
   loanApplications: many(loanApplications),
   loans: many(loans),

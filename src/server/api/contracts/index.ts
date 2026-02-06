@@ -8,6 +8,7 @@ import { channel } from './channel';
 import { city } from './city';
 import { coDebtor } from './co-debtor';
 import { costCenter } from './cost-center';
+import { creditFund } from './credit-fund';
 import { creditsSettingsContract } from './credits-settings';
 import { documentType } from './document-type';
 import { glAccount } from './gl-account';
@@ -35,6 +36,7 @@ export const contract = c.router(
     city,
     coDebtor,
     costCenter,
+    creditFund,
     creditsSettings: creditsSettingsContract,
     documentType,
     glAccount,

@@ -2796,18 +2796,10 @@ export const agingProfiles = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 150 }).notNull(),
     isActive: boolean('is_active').notNull().default(true),
-    effectiveFrom: date('effective_from'),
-    effectiveTo: date('effective_to'),
     note: varchar('note', { length: 255 }),
     ...timestamps,
   },
-  (t) => [
-    index('idx_aging_profiles_active').on(t.isActive),
-    check(
-      'chk_aging_profiles_effective_order',
-      sql`${t.effectiveTo} IS NULL OR ${t.effectiveFrom} IS NULL OR ${t.effectiveFrom} <= ${t.effectiveTo}`
-    ),
-  ]
+  (t) => [index('idx_aging_profiles_active').on(t.isActive)]
 );
 
 export const agingBuckets = pgTable(

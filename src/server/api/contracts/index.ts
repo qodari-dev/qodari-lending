@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import { accountingDistribution } from './accounting-distribution';
 import { accountingPeriod } from './accounting-period';
+import { agingProfile } from './aging-profile';
 import { auth } from './auth';
 import { bank } from './bank';
 import { channel } from './channel';
@@ -27,6 +28,7 @@ export const contract = c.router(
   {
     accountingDistribution,
     accountingPeriod,
+    agingProfile,
     auth,
     bank,
     channel,

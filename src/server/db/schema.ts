@@ -446,9 +446,9 @@ export const affiliationOffices = pgTable(
     address: varchar('address', { length: 255 }).notNull(),
     phone: varchar('phone', { length: 20 }),
     representativeName: varchar('representative_name', {
-      length: 40,
+      length: 255,
     }).notNull(),
-    email: varchar('email', { length: 30 }),
+    email: varchar('email', { length: 255 }),
     costCenterId: integer('cost_center_id').references(() => costCenters.id, {
       onDelete: 'set null',
     }),
@@ -550,6 +550,7 @@ export const userAffiliationOffices = pgTable(
     id: serial('id').primaryKey(),
     // IAM externo: UUID
     userId: uuid('user_id').notNull(),
+    userName: varchar('user_name', { length: 255 }).notNull(),
     affiliationOfficeId: integer('affiliation_office_id')
       .notNull()
       .references(() => affiliationOffices.id, { onDelete: 'restrict' }),

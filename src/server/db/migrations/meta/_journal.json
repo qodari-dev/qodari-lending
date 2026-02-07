@@ -43,6 +43,13 @@
       "when": 1770420180637,
       "tag": "0005_absurd_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770422902569,
+      "tag": "0006_public_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

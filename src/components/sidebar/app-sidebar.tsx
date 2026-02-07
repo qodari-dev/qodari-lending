@@ -163,7 +163,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 title: 'Estudio de crédito',
                 icon: ClipboardCheck,
                 items: [
-                  { title: 'Simulación de crédito', url: `/simulation` },
+                  { title: 'Simulación de crédito', url: `/credit-simulation` },
                   { title: 'Estudio Trabajador', url: `/worker-study` },
                 ],
               },

@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import { accountingDistribution } from './accounting-distribution';
 import { accountingPeriod } from './accounting-period';
+import { affiliationOffice } from './affiliation-office';
 import { agingProfile } from './aging-profile';
 import { auth } from './auth';
 import { bank } from './bank';
@@ -31,6 +32,7 @@ export const contract = c.router(
   {
     accountingDistribution,
     accountingPeriod,
+    affiliationOffice,
     agingProfile,
     auth,
     bank,

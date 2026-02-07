@@ -50,6 +50,13 @@
       "when": 1770422902569,
       "tag": "0006_public_kate_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770429881354,
+      "tag": "0007_glossy_cyclops",
+      "breakpoints": true
     }
   ]
 }

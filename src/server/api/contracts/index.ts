@@ -8,6 +8,8 @@ import { bank } from './bank';
 import { channel } from './channel';
 import { city } from './city';
 import { coDebtor } from './co-debtor';
+import { creditProduct } from './credit-product';
+import { creditSimulation } from './credit-simulation';
 import { costCenter } from './cost-center';
 import { creditFund } from './credit-fund';
 import { creditsSettingsContract } from './credits-settings';
@@ -39,6 +41,8 @@ export const contract = c.router(
     channel,
     city,
     coDebtor,
+    creditProduct,
+    creditSimulation,
     costCenter,
     creditFund,
     creditsSettings: creditsSettingsContract,

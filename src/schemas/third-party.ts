@@ -1,4 +1,5 @@
 import { Contract } from '@/server/api/contracts';
+import { categoryCodeLabels, CategoryCode, CategoryCodeSchema } from '@/schemas/category';
 import {
   BooleanOperatorsSchema,
   createIncludeSchema,
@@ -50,6 +51,9 @@ export const taxpayerTypeLabels: Record<TaxpayerType, string> = {
   NATURAL_PERSON: 'Persona Natural',
   OTHER: 'Otro',
 };
+
+export { categoryCodeLabels };
+export type { CategoryCode };
 
 // ============================================
 // SCHEMAS
@@ -141,7 +145,7 @@ export const CreateThirdPartyBodySchema = z.object({
   secondName: z.string().max(15).optional().nullable(),
   businessName: z.string().max(60).optional().nullable(),
   sex: z.enum(SEX_OPTIONS).optional().nullable(),
-  categoryCode: z.string().max(1).optional().nullable(),
+  categoryCode: CategoryCodeSchema,
   address: z.string().max(80).optional().nullable(),
   cityId: z.number(),
   phone: z.string().min(1).max(20),

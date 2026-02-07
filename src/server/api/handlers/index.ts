@@ -11,6 +11,8 @@ import { channel } from './channel';
 import { city } from './city';
 import { coDebtor } from './co-debtor';
 import { costCenter } from './cost-center';
+import { creditProduct } from './credit-product';
+import { creditSimulation } from './credit-simulation';
 import { creditsSettingsHandler } from './credits-settings';
 import { documentType } from './document-type';
 import { glAccount } from './gl-account';
@@ -29,7 +31,7 @@ import { thirdPartyType } from './third-party-type';
 
 export const handler = createNextHandler(
   contract,
-  { accountingDistribution, accountingPeriod, affiliationOffice, agingProfile, auth, bank, channel, city, coDebtor, costCenter, creditFund, creditsSettings: creditsSettingsHandler, documentType, glAccount, iamUser, identificationType, insuranceCompany, investmentType, paymentFrequency, paymentGuaranteeType, paymentReceiptType, paymentTenderType, rejectionReason, repaymentMethod, thirdParty, thirdPartyType },
+  { accountingDistribution, accountingPeriod, affiliationOffice, agingProfile, auth, bank, channel, city, coDebtor, costCenter, creditFund, creditProduct, creditSimulation, creditsSettings: creditsSettingsHandler, documentType, glAccount, iamUser, identificationType, insuranceCompany, investmentType, paymentFrequency, paymentGuaranteeType, paymentReceiptType, paymentTenderType, rejectionReason, repaymentMethod, thirdParty, thirdPartyType },
   {
     jsonQuery: true,
     responseValidation: true,

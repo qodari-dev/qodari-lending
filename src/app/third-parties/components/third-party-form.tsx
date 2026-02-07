@@ -38,6 +38,7 @@ import { useIdentificationTypes } from '@/hooks/queries/use-identification-type-
 import { useCreateThirdParty, useUpdateThirdParty } from '@/hooks/queries/use-third-party-queries';
 import { useThirdPartyTypes } from '@/hooks/queries/use-third-party-type-queries';
 import { City } from '@/schemas/city';
+import { categoryCodeSelectOptions } from '@/schemas/category';
 import { IdentificationType } from '@/schemas/identification-type';
 import {
   CreateThirdPartyBodySchema,
@@ -84,7 +85,7 @@ export function ThirdPartyForm({
       secondName: '',
       businessName: '',
       sex: undefined,
-      categoryCode: '',
+      categoryCode: 'D',
       address: '',
       cityId: undefined,
       phone: '',
@@ -150,7 +151,7 @@ export function ThirdPartyForm({
         secondName: thirdParty?.secondName ?? '',
         businessName: thirdParty?.businessName ?? '',
         sex: thirdParty?.sex ?? undefined,
-        categoryCode: thirdParty?.categoryCode ?? '',
+        categoryCode: thirdParty?.categoryCode ?? 'D',
         address: thirdParty?.address ?? '',
         cityId: thirdParty?.cityId ?? undefined,
         phone: thirdParty?.phone ?? '',
@@ -603,12 +604,21 @@ export function ThirdPartyForm({
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="categoryCode">Codigo Categoria</FieldLabel>
-                      <Input
-                        {...field}
+                      <Select
+                        onValueChange={(value) => field.onChange(value || null)}
                         value={field.value ?? ''}
-                        maxLength={1}
-                        aria-invalid={fieldState.invalid}
-                      />
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categoryCodeSelectOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}

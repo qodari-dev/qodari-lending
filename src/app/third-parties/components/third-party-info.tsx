@@ -1,7 +1,13 @@
 import { DescriptionList, DescriptionSection } from '@/components/description-list';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { ThirdParty, personTypeLabels, sexLabels, taxpayerTypeLabels } from '@/schemas/third-party';
+import {
+  categoryCodeLabels,
+  ThirdParty,
+  personTypeLabels,
+  sexLabels,
+  taxpayerTypeLabels,
+} from '@/schemas/third-party';
 import { formatDate, formatCurrency } from '@/utils/formatters';
 import {
   Table,
@@ -90,7 +96,10 @@ export function ThirdPartyInfo({
       items: [
         { label: 'Tipo de Tercero', value: thirdParty.thirdPartyType?.name ?? '-' },
         { label: 'Tipo Contribuyente', value: taxpayerTypeLabels[thirdParty.taxpayerType] },
-        { label: 'Codigo Categoria', value: thirdParty.categoryCode ?? '-' },
+        {
+          label: 'Codigo Categoria',
+          value: thirdParty.categoryCode ? categoryCodeLabels[thirdParty.categoryCode] : '-',
+        },
         {
           label: 'Tiene RUT',
           value: (

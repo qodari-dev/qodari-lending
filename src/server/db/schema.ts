@@ -590,6 +590,7 @@ export const taxpayerTypeEnum = pgEnum('taxpayer_type', [
 ]);
 // Sexo enum
 export const sexEnum = pgEnum('sex', ['M', 'F']);
+export const categoryCodeEnum = pgEnum('category_code', ['A', 'B', 'C', 'D']);
 
 // ---------------------------------------------------------------------
 // Concr20 - Terceros
@@ -629,7 +630,7 @@ export const thirdParties = pgTable(
 
     // Datos generales
     sex: sexEnum('sex'),
-    categoryCode: varchar('category_code', { length: 1 }), // A,B,C,D
+    categoryCode: categoryCodeEnum('category_code').notNull(),
     address: varchar('address', { length: 80 }),
     cityId: integer('city_id')
       .notNull()
@@ -879,7 +880,7 @@ export const creditProductCategories = pgTable(
     creditProductId: integer('credit_product_id')
       .notNull()
       .references(() => creditProducts.id, { onDelete: 'cascade' }),
-    categoryCode: varchar('category_code', { length: 1 }).notNull(),
+    categoryCode: categoryCodeEnum('category_code').notNull(),
     installmentsFrom: integer('installments_from').notNull(),
     installmentsTo: integer('installments_to').notNull(),
     financingFactor: decimal('financing_factor', {
@@ -1027,7 +1028,7 @@ export const loanApplications = pgTable(
     // mancat S/N -> boolean
     isCategoryManual: boolean('is_category_manual').notNull().default(false),
     // codcat
-    categoryCode: varchar('category_code', { length: 1 }).notNull(),
+    categoryCode: categoryCodeEnum('category_code').notNull(),
 
     // forpag -> tu tabla “repayment_methods” (libranza/pignoración/etc)
     repaymentMethodId: integer('repayment_method_id')
@@ -1837,7 +1838,7 @@ export const portfolioAgingSnapshots = pgTable(
       .notNull()
       .references(() => thirdParties.id, { onDelete: 'restrict' }),
 
-    categoryCode: varchar('category_code', { length: 1 }),
+    categoryCode: categoryCodeEnum('category_code'),
 
     principalAmount: decimal('principal_amount', {
       precision: 14,

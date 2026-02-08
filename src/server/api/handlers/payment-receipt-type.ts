@@ -24,6 +24,7 @@ type PaymentReceiptTypeColumn = keyof typeof paymentReceiptTypes.$inferSelect;
 
 const PAYMENT_RECEIPT_TYPE_FIELDS: FieldMap = {
   id: paymentReceiptTypes.id,
+  code: paymentReceiptTypes.code,
   name: paymentReceiptTypes.name,
   movementType: paymentReceiptTypes.movementType,
   glAccountId: paymentReceiptTypes.glAccountId,
@@ -36,7 +37,7 @@ const PAYMENT_RECEIPT_TYPE_FIELDS: FieldMap = {
 
 const PAYMENT_RECEIPT_TYPE_QUERY_CONFIG: QueryConfig = {
   fields: PAYMENT_RECEIPT_TYPE_FIELDS,
-  searchFields: [paymentReceiptTypes.name],
+  searchFields: [paymentReceiptTypes.code, paymentReceiptTypes.name],
   defaultSort: { column: paymentReceiptTypes.createdAt, order: 'desc' },
 };
 

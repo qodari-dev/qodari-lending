@@ -32,6 +32,11 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 
 export const paymentReceiptTypeColumns: ColumnDef<PaymentReceiptType>[] = [
   {
+    accessorKey: 'code',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Codigo" />,
+    cell: ({ row }) => <span className="font-mono">{row.original.code}</span>,
+  },
+  {
     accessorKey: 'name',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Nombre" />,
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,

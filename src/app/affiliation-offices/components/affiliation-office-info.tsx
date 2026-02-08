@@ -23,6 +23,7 @@ export function AffiliationOfficeInfo({
       title: 'Informacion Basica',
       columns: 2,
       items: [
+        { label: 'Codigo', value: affiliationOffice.code },
         { label: 'Nombre', value: affiliationOffice.name },
         { label: 'Ciudad', value: affiliationOffice.city?.name ?? affiliationOffice.cityId },
         { label: 'Direccion', value: affiliationOffice.address },

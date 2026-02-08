@@ -39,7 +39,7 @@ import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
-import { Controller, FormProvider, useForm } from 'react-hook-form';
+import { Controller, FormProvider, type Resolver, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { AffiliationOfficeUsersForm } from './affiliation-office-users-form';
 
@@ -58,8 +58,9 @@ export function AffiliationOfficeForm({
   const sheetContentRef = useRef<HTMLDivElement | null>(null);
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(CreateAffiliationOfficeBodySchema),
+    resolver: zodResolver(CreateAffiliationOfficeBodySchema) as Resolver<FormValues>,
     defaultValues: {
+      code: '',
       name: '',
       cityId: undefined,
       address: '',
@@ -97,6 +98,7 @@ export function AffiliationOfficeForm({
   useEffect(() => {
     if (opened) {
       form.reset({
+        code: affiliationOffice?.code ?? '',
         name: affiliationOffice?.name ?? '',
         cityId: affiliationOffice?.cityId ?? undefined,
         address: affiliationOffice?.address ?? '',
@@ -161,6 +163,24 @@ export function AffiliationOfficeForm({
               <TabsContent value="office" className="space-y-4 pt-2">
                 <FieldGroup>
                   <Controller
+                    name="code"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid}>
+                        <FieldLabel htmlFor="code">Codigo</FieldLabel>
+                        <Input
+                          {...field}
+                          maxLength={5}
+                          value={field.value ?? ''}
+                          onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+
+                  <Controller
                     name="name"
                     control={form.control}
                     render={({ field, fieldState }) => (
@@ -181,7 +201,9 @@ export function AffiliationOfficeForm({
                         <Combobox
                           items={cities}
                           value={findCity(field.value)}
-                          onValueChange={(value: City | null) => field.onChange(value?.id ?? undefined)}
+                          onValueChange={(value: City | null) =>
+                            field.onChange(value?.id ?? undefined)
+                          }
                           itemToStringValue={(item: City) => String(item.id)}
                           itemToStringLabel={(item: City) => item.name}
                         >
@@ -198,7 +220,11 @@ export function AffiliationOfficeForm({
                             }
                           />
                           <ComboboxContent portalContainer={sheetContentRef}>
-                            <ComboboxInput placeholder="Buscar ciudad..." showClear showTrigger={false} />
+                            <ComboboxInput
+                              placeholder="Buscar ciudad..."
+                              showClear
+                              showTrigger={false}
+                            />
                             <ComboboxList>
                               <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
                               <ComboboxCollection>
@@ -284,7 +310,9 @@ export function AffiliationOfficeForm({
                         <Combobox
                           items={costCenters}
                           value={findCostCenter(field.value)}
-                          onValueChange={(value: CostCenter | null) => field.onChange(value?.id ?? null)}
+                          onValueChange={(value: CostCenter | null) =>
+                            field.onChange(value?.id ?? null)
+                          }
                           itemToStringValue={(item: CostCenter) => String(item.id)}
                           itemToStringLabel={(item: CostCenter) => `${item.code} - ${item.name}`}
                         >

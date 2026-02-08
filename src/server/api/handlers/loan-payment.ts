@@ -75,7 +75,7 @@ const LOAN_PAYMENT_INCLUDES = createIncludeMap<typeof db.query.loanPayments>()({
   },
 });
 
-function buildPaymentNumber(): string {
+function buildPaymentNumber(prefix: string): string {
   const now = new Date();
   const yy = String(now.getUTCFullYear()).slice(-2);
   const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
@@ -84,15 +84,19 @@ function buildPaymentNumber(): string {
   const mi = String(now.getUTCMinutes()).padStart(2, '0');
   const ss = String(now.getUTCSeconds()).padStart(2, '0');
   const rnd = String(Math.floor(Math.random() * 900) + 100);
-  return `AB${yy}${mm}${dd}${hh}${mi}${ss}${rnd}`;
+  const normalizedPrefix = prefix.trim().toUpperCase();
+  return `${normalizedPrefix}${yy}${mm}${dd}${hh}${mi}${ss}${rnd}`;
 }
 
-async function ensureUniquePaymentNumber(receiptTypeId: number): Promise<string> {
+async function ensureUniquePaymentNumber(args: {
+  receiptTypeId: number;
+  prefix: string;
+}): Promise<string> {
   for (let index = 0; index < 10; index += 1) {
-    const paymentNumber = buildPaymentNumber();
+    const paymentNumber = buildPaymentNumber(args.prefix);
     const exists = await db.query.loanPayments.findFirst({
       where: and(
-        eq(loanPayments.receiptTypeId, receiptTypeId),
+        eq(loanPayments.receiptTypeId, args.receiptTypeId),
         eq(loanPayments.paymentNumber, paymentNumber)
       ),
       columns: { id: true },
@@ -284,6 +288,15 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         });
       }
 
+      const receiptTypeCode = availableReceiptType.paymentReceiptType.code?.trim().toUpperCase();
+      if (!receiptTypeCode) {
+        throwHttpError({
+          status: 400,
+          message: 'El tipo de recibo seleccionado no tiene codigo configurado',
+          code: 'BAD_REQUEST',
+        });
+      }
+
       const collectionMethodIds = [
         ...new Set(body.loanPaymentMethodAllocations.map((item) => item.collectionMethodId)),
       ];
@@ -314,7 +327,10 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         });
       }
 
-      const paymentNumber = await ensureUniquePaymentNumber(body.receiptTypeId);
+      const paymentNumber = await ensureUniquePaymentNumber({
+        receiptTypeId: body.receiptTypeId,
+        prefix: receiptTypeCode,
+      });
       const nowDate = formatDateOnly(new Date());
 
       const [created] = await db.transaction(async (tx) => {

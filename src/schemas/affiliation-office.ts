@@ -17,6 +17,7 @@ import { z } from 'zod';
 const AffiliationOfficeWhereFieldsSchema = z
   .object({
     id: z.union([z.number(), NumberOperatorsSchema]).optional(),
+    code: z.union([z.string(), StringOperatorsSchema]).optional(),
     name: z.union([z.string(), StringOperatorsSchema]).optional(),
     cityId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     address: z.union([z.string(), StringOperatorsSchema]).optional(),
@@ -36,6 +37,7 @@ const AffiliationOfficeWhereFieldsSchema = z
 
 const AFFILIATION_OFFICE_SORT_FIELDS = [
   'id',
+  'code',
   'name',
   'cityId',
   'address',
@@ -84,7 +86,17 @@ export const UserAffiliationOfficeInputSchema = z.object({
 
 export type UserAffiliationOfficeInput = z.infer<typeof UserAffiliationOfficeInputSchema>;
 
+const AffiliationOfficeCodeSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim().toUpperCase() : value),
+  z
+    .string()
+    .min(2, 'Codigo requerido')
+    .max(5, 'Codigo maximo de 5 caracteres')
+    .regex(/^[A-Z0-9]+$/, 'El codigo solo permite letras mayusculas y numeros')
+);
+
 const AffiliationOfficeBaseSchema = z.object({
+  code: AffiliationOfficeCodeSchema,
   name: z.string().min(1).max(255),
   cityId: z.number().int().positive(),
   address: z.string().min(1).max(255),

@@ -24,6 +24,7 @@ type AffiliationOfficeColumn = keyof typeof affiliationOffices.$inferSelect;
 
 const AFFILIATION_OFFICE_FIELDS: FieldMap = {
   id: affiliationOffices.id,
+  code: affiliationOffices.code,
   name: affiliationOffices.name,
   cityId: affiliationOffices.cityId,
   address: affiliationOffices.address,
@@ -40,7 +41,7 @@ const AFFILIATION_OFFICE_FIELDS: FieldMap = {
 
 const AFFILIATION_OFFICE_QUERY_CONFIG: QueryConfig = {
   fields: AFFILIATION_OFFICE_FIELDS,
-  searchFields: [affiliationOffices.name, affiliationOffices.representativeName],
+  searchFields: [affiliationOffices.code, affiliationOffices.name, affiliationOffices.representativeName],
   defaultSort: { column: affiliationOffices.createdAt, order: 'desc' },
 };
 

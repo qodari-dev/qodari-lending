@@ -180,7 +180,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 title: 'Abonos',
                 icon: HandCoins,
                 items: [
-                  { title: 'Abono Individual', url: `/loan-payment` },
+                  { title: 'Abono Individual', url: `/loan-payments` },
                   { title: 'Abono por libranza', url: `/loan-payments` },
                   { title: 'Abono por archivo', url: `/loan-payment-file` },
                 ],

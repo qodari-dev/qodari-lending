@@ -42,7 +42,7 @@ import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
-import { Controller, FormProvider, useForm } from 'react-hook-form';
+import { Controller, FormProvider, type Resolver, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { PaymentReceiptTypeUsersForm } from './payment-receipt-type-users-form';
 
@@ -61,8 +61,9 @@ export function PaymentReceiptTypeForm({
   const sheetContentRef = useRef<HTMLDivElement | null>(null);
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(CreatePaymentReceiptTypeBodySchema),
+    resolver: zodResolver(CreatePaymentReceiptTypeBodySchema) as Resolver<FormValues>,
     defaultValues: {
+      code: '',
       name: '',
       movementType: 'RECEIPT',
       glAccountId: undefined,
@@ -85,6 +86,7 @@ export function PaymentReceiptTypeForm({
   useEffect(() => {
     if (opened) {
       form.reset({
+        code: paymentReceiptType?.code ?? '',
         name: paymentReceiptType?.name ?? '',
         movementType: paymentReceiptType?.movementType ?? 'RECEIPT',
         glAccountId: paymentReceiptType?.glAccountId ?? undefined,
@@ -137,6 +139,24 @@ export function PaymentReceiptTypeForm({
 
               <TabsContent value="receiptType" className="space-y-4 pt-2">
                 <FieldGroup>
+                  <Controller
+                    name="code"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid}>
+                        <FieldLabel htmlFor="code">Codigo</FieldLabel>
+                        <Input
+                          {...field}
+                          maxLength={5}
+                          value={field.value ?? ''}
+                          onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+
                   <Controller
                     name="name"
                     control={form.control}

@@ -390,6 +390,7 @@ export const paymentReceiptTypes = pgTable(
   'payment_receipt_types',
   {
     id: serial('id').primaryKey(),
+    code: varchar('code', { length: 5 }).notNull(),
     name: varchar('name', { length: 255 }).notNull(),
     movementType: paymentReceiptMovementTypeEnum('movement_type').notNull(),
     glAccountId: integer('gl_account_id')
@@ -398,7 +399,10 @@ export const paymentReceiptTypes = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
-  (t) => [uniqueIndex('uniq_payment_receipt_types_name').on(t.name)]
+  (t) => [
+    uniqueIndex('uniq_payment_receipt_types_code').on(t.code),
+    uniqueIndex('uniq_payment_receipt_types_name').on(t.name),
+  ]
 );
 
 // ---------------------------------------------------------------------
@@ -439,6 +443,7 @@ export const affiliationOffices = pgTable(
   'affiliation_offices',
   {
     id: serial('id').primaryKey(),
+    code: varchar('code', { length: 5 }).notNull(),
     name: varchar('name', { length: 255 }).notNull(),
     cityId: integer('city_id')
       .notNull()
@@ -455,7 +460,10 @@ export const affiliationOffices = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
-  (t) => [uniqueIndex('uniq_affiliation_offices_name').on(t.name)]
+  (t) => [
+    uniqueIndex('uniq_affiliation_offices_code').on(t.code),
+    uniqueIndex('uniq_affiliation_offices_name').on(t.name),
+  ]
 );
 
 // ---------------------------------------------------------------------

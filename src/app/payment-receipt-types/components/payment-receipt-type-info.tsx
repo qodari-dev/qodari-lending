@@ -27,6 +27,7 @@ export function PaymentReceiptTypeInfo({
       title: 'Informacion Basica',
       columns: 2,
       items: [
+        { label: 'Codigo', value: paymentReceiptType.code },
         { label: 'Nombre', value: paymentReceiptType.name },
         {
           label: 'Movimiento',

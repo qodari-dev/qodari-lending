@@ -39,6 +39,7 @@ export const paymentReceiptMovementTypeLabels: Record<PaymentReceiptMovementType
 const PaymentReceiptTypeWhereFieldsSchema = z
   .object({
     id: z.union([z.number(), NumberOperatorsSchema]).optional(),
+    code: z.union([z.string(), StringOperatorsSchema]).optional(),
     name: z.union([z.string(), StringOperatorsSchema]).optional(),
     movementType: z
       .union([z.enum(PAYMENT_RECEIPT_MOVEMENT_TYPE_OPTIONS), StringOperatorsSchema])
@@ -56,6 +57,7 @@ const PaymentReceiptTypeWhereFieldsSchema = z
 
 const PAYMENT_RECEIPT_TYPE_SORT_FIELDS = [
   'id',
+  'code',
   'name',
   'movementType',
   'glAccountId',
@@ -100,7 +102,17 @@ export const UserPaymentReceiptTypeInputSchema = z.object({
 
 export type UserPaymentReceiptTypeInput = z.infer<typeof UserPaymentReceiptTypeInputSchema>;
 
+const PaymentReceiptTypeCodeSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim().toUpperCase() : value),
+  z
+    .string()
+    .min(2, 'Codigo requerido')
+    .max(5, 'Codigo maximo de 5 caracteres')
+    .regex(/^[A-Z0-9]+$/, 'El codigo solo permite letras mayusculas y numeros')
+);
+
 const PaymentReceiptTypeBaseSchema = z.object({
+  code: PaymentReceiptTypeCodeSchema,
   name: z.string().min(1).max(255),
   movementType: z.enum(PAYMENT_RECEIPT_MOVEMENT_TYPE_OPTIONS),
   glAccountId: z.number().int().positive(),

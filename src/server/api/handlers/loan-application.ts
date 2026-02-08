@@ -1,4 +1,5 @@
 import {
+  affiliationOffices,
   coDebtors,
   creditProductCategories,
   creditProductDocuments,
@@ -287,7 +288,7 @@ async function validateRequiredDocuments(args: {
   }
 }
 
-function generateCreditNumber(): string {
+function generateCreditNumber(prefix: string): string {
   const now = new Date();
   const yy = String(now.getUTCFullYear()).slice(-2);
   const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
@@ -296,12 +297,13 @@ function generateCreditNumber(): string {
   const mi = String(now.getUTCMinutes()).padStart(2, '0');
   const ss = String(now.getUTCSeconds()).padStart(2, '0');
   const rnd = Math.floor(Math.random() * 900 + 100);
-  return `SC${yy}${mm}${dd}${hh}${mi}${ss}${rnd}`;
+  const normalizedPrefix = prefix.trim().toUpperCase().slice(0, 5);
+  return `${normalizedPrefix}${yy}${mm}${dd}${hh}${mi}${ss}${rnd}`;
 }
 
-async function ensureUniqueCreditNumber() {
+async function ensureUniqueCreditNumber(prefix: string) {
   for (let i = 0; i < 5; i += 1) {
-    const creditNumber = generateCreditNumber();
+    const creditNumber = generateCreditNumber(prefix);
     const exists = await db.query.loanApplications.findFirst({
       where: eq(loanApplications.creditNumber, creditNumber),
       columns: { id: true },
@@ -493,7 +495,31 @@ export const loanApplication = tsr.router(contract.loanApplication, {
 
       const pledgesData = body.pledgesSubsidy ? (body.loanApplicationPledges ?? []) : [];
 
-      const creditNumber = await ensureUniqueCreditNumber();
+      const office = await db.query.affiliationOffices.findFirst({
+        where: eq(affiliationOffices.id, body.affiliationOfficeId),
+        columns: {
+          code: true,
+        },
+      });
+
+      if (!office) {
+        throwHttpError({
+          status: 404,
+          message: 'Oficina de afiliacion no encontrada',
+          code: 'NOT_FOUND',
+        });
+      }
+
+      const officeCode = office?.code?.trim().toUpperCase();
+      if (!officeCode) {
+        throwHttpError({
+          status: 400,
+          message: 'La oficina de afiliacion no tiene codigo configurado',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const creditNumber = await ensureUniqueCreditNumber(officeCode);
       const statusDate = formatDateOnly(new Date());
 
       const [created] = await db.transaction(async (tx) => {

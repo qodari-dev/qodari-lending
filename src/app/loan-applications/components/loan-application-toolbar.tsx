@@ -1,13 +1,28 @@
 'use client';
 
+import {
+  loanApplicationStatusLabels,
+  LOAN_APPLICATION_STATUS_OPTIONS,
+  type LoanApplicationStatus,
+} from '@/schemas/loan-application';
 import { Button } from '@/components/ui/button';
+import {
+  DatePickerWithRangeFilter,
+  SimpleSelectFilter,
+} from '@/components/data-table/data-table-faceted-filter';
 import { Input } from '@/components/ui/input';
 import { useHasPermission } from '@/stores/auth-store-provider';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, X } from 'lucide-react';
+import { DateRange } from 'react-day-picker';
 
 interface ToolbarProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
+  statusFilter?: LoanApplicationStatus;
+  onStatusFilterChange: (value: LoanApplicationStatus | undefined) => void;
+  rangeDateFilter?: DateRange;
+  onRangeDateFilterChange: (value: DateRange | undefined) => void;
+  onReset: () => void;
   onRefresh?: () => void;
   onCreate?: () => void;
   isRefreshing?: boolean;
@@ -16,11 +31,23 @@ interface ToolbarProps {
 export function LoanApplicationsToolbar({
   searchValue,
   onSearchChange,
+  statusFilter,
+  onStatusFilterChange,
+  rangeDateFilter,
+  onRangeDateFilterChange,
+  onReset,
   onRefresh,
   onCreate,
   isRefreshing = false,
 }: ToolbarProps) {
   const canCreate = useHasPermission('loan-applications:create');
+  const hasActiveFilters =
+    Boolean(searchValue) || Boolean(statusFilter) || Boolean(rangeDateFilter?.from);
+
+  const statusOptions = LOAN_APPLICATION_STATUS_OPTIONS.map((status) => ({
+    label: loanApplicationStatusLabels[status],
+    value: status,
+  }));
 
   return (
     <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -31,6 +58,19 @@ export function LoanApplicationsToolbar({
           onChange={(event) => onSearchChange(event.target.value)}
           className="md:max-w-xs"
         />
+        <DatePickerWithRangeFilter value={rangeDateFilter} onValueChange={onRangeDateFilterChange} />
+        <SimpleSelectFilter
+          title="Estado"
+          options={statusOptions}
+          value={statusFilter}
+          onValueChange={(value) => onStatusFilterChange(value as LoanApplicationStatus | undefined)}
+        />
+        {hasActiveFilters && (
+          <Button variant="ghost" onClick={onReset} className="h-9 px-2 lg:px-3">
+            Limpiar
+            <X className="ml-2 h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center space-x-2">

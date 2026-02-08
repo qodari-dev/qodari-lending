@@ -44,7 +44,7 @@ export const loanApplication = c.router(
     },
     listActNumbers: {
       method: 'GET',
-      path: '/act-numbers',
+      path: '/act-numbers/list',
       query: ListLoanApplicationActNumbersQuerySchema,
       metadata: {
         auth: 'required',

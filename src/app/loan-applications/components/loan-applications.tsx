@@ -36,6 +36,8 @@ import { useThirdParties } from '@/hooks/queries/use-third-party-queries';
 import {
   LoanApplication,
   LoanApplicationInclude,
+  LOAN_APPLICATION_STATUS_OPTIONS,
+  LoanApplicationStatus,
   LoanApplicationSortField,
 } from '@/schemas/loan-application';
 import { formatDateISO } from '@/utils/formatters';
@@ -84,10 +86,13 @@ export function LoanApplications() {
     pageSize,
     sorting,
     searchValue,
+    filters,
     queryParams,
     handlePaginationChange,
     handleSortingChange,
     handleSearchChange,
+    handleFilterChange,
+    resetFilters,
   } = useDataTable<LoanApplicationSortField, LoanApplicationInclude>({
     defaultPageSize: 20,
     defaultIncludes: [
@@ -107,6 +112,24 @@ export function LoanApplications() {
   });
 
   const { data, isLoading, isFetching, refetch } = useLoanApplications(queryParams);
+
+  const rangeDateFilter = React.useMemo(() => {
+    const applicationDate = filters.applicationDate as { gte?: Date; lte?: Date } | undefined;
+    if (!applicationDate) return undefined;
+    const from = applicationDate.gte;
+    const to = applicationDate.lte;
+    if (!from && !to) return undefined;
+    return { from, to };
+  }, [filters.applicationDate]);
+
+  const statusFilter = React.useMemo(() => {
+    const status = filters.status;
+    if (!status || typeof status !== 'string') return undefined;
+    if (LOAN_APPLICATION_STATUS_OPTIONS.includes(status as LoanApplicationStatus)) {
+      return status as LoanApplicationStatus;
+    }
+    return undefined;
+  }, [filters.status]);
   const { mutateAsync: approveLoanApplication, isPending: isApproving } =
     useApproveLoanApplication();
   const { mutateAsync: cancelLoanApplication, isPending: isCanceling } = useCancelLoanApplication();
@@ -333,6 +356,21 @@ export function LoanApplications() {
             <LoanApplicationsToolbar
               searchValue={searchValue}
               onSearchChange={handleSearchChange}
+              statusFilter={statusFilter}
+              onStatusFilterChange={(value) => handleFilterChange('status', value)}
+              rangeDateFilter={rangeDateFilter}
+              onRangeDateFilterChange={(value) => {
+                if (value?.from && value?.to) {
+                  handleFilterChange('applicationDate', { gte: value.from, lte: value.to });
+                } else if (value?.from) {
+                  handleFilterChange('applicationDate', { gte: value.from });
+                } else if (value?.to) {
+                  handleFilterChange('applicationDate', { lte: value.to });
+                } else {
+                  handleFilterChange('applicationDate', undefined);
+                }
+              }}
+              onReset={resetFilters}
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}

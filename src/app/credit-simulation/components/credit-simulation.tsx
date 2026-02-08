@@ -50,6 +50,7 @@ import { Controller, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { financingTypeLabels } from '@/schemas/credit-product';
+import { getTsRestErrorMessage } from '@/utils/get-ts-rest-error-message';
 
 const FormSchema = CalculateCreditSimulationBodySchema;
 type FormValues = z.infer<typeof FormSchema>;
@@ -172,9 +173,7 @@ export function CreditSimulation() {
 
       setResult(response.body);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'No fue posible calcular la simulacion';
-      toast.error(message);
+      toast.error(getTsRestErrorMessage(error));
     }
   };
 

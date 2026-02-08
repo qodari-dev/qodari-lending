@@ -57,6 +57,20 @@
       "when": 1770429881354,
       "tag": "0007_glossy_cyclops",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1770499235174,
+      "tag": "0008_peaceful_nightcrawler",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1770506277422,
+      "tag": "0009_next_doomsday",
+      "breakpoints": true
     }
   ]
 }

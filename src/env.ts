@@ -22,6 +22,12 @@ export const env = createEnv({
     IAM_JWT_SECRET: z.string(),
     IAM_M2M_CLIENT_ID: z.string(),
     IAM_M2M_CLIENT_SECRET: z.string(),
+    // DigitalOcean Spaces
+    DO_SPACES_ENDPOINT: z.string().url(),
+    DO_SPACES_BUCKET: z.string(),
+    DO_SPACES_KEY: z.string(),
+    DO_SPACES_SECRET: z.string(),
+    DO_SPACES_REGION: z.string().default('nyc3'),
   },
   /*
    * Environment variables available on the client (and server).
@@ -32,6 +38,7 @@ export const env = createEnv({
     NEXT_PUBLIC_API_URL: z.url(),
     NEXT_PUBLIC_APP_URL: z.url(),
     NEXT_PUBLIC_IAM_PORTAL_URL: z.url(),
+    NEXT_PUBLIC_STORAGE_URL: z.string().url(),
   },
   /*
    * Specify what values should be validated by your schemas above.
@@ -59,6 +66,13 @@ export const env = createEnv({
     IAM_JWT_SECRET: process.env.IAM_JWT_SECRET,
     IAM_M2M_CLIENT_ID: process.env.IAM_M2M_CLIENT_ID,
     IAM_M2M_CLIENT_SECRET: process.env.IAM_M2M_CLIENT_SECRET,
+    // DigitalOcean Spaces
+    DO_SPACES_ENDPOINT: process.env.DO_SPACES_ENDPOINT,
+    DO_SPACES_BUCKET: process.env.DO_SPACES_BUCKET,
+    DO_SPACES_KEY: process.env.DO_SPACES_KEY,
+    DO_SPACES_SECRET: process.env.DO_SPACES_SECRET,
+    DO_SPACES_REGION: process.env.DO_SPACES_REGION,
+    NEXT_PUBLIC_STORAGE_URL: process.env.NEXT_PUBLIC_STORAGE_URL,
   },
   // experimental__runtimeEnv: {
   //   NEXT_PUBLIC_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_PUBLISHABLE_KEY,

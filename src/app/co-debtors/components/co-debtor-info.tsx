@@ -98,7 +98,7 @@ export function CoDebtorInfo({
                     {loanApplications.map((app) => (
                       <TableRow key={app?.id}>
                         <TableCell className="font-medium">{app?.id}</TableCell>
-                        <TableCell>{app?.code ?? '-'}</TableCell>
+                        <TableCell>{app?.creditNumber ?? '-'}</TableCell>
                         <TableCell>
                           {app?.requestedAmount ? formatCurrency(Number(app.requestedAmount)) : '-'}
                         </TableCell>

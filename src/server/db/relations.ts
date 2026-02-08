@@ -123,6 +123,7 @@ export const repaymentMethodsRelations = relations(repaymentMethods, ({ many }) 
 // ---------------------------------------------------------------------
 export const paymentGuaranteeTypesRelations = relations(paymentGuaranteeTypes, ({ many }) => ({
   loans: many(loans),
+  loanApplications: many(loanApplications),
 }));
 
 // ---------------------------------------------------------------------
@@ -545,6 +546,10 @@ export const loanApplicationsRelations = relations(loanApplications, ({ one, man
   channel: one(channels, {
     fields: [loanApplications.channelId],
     references: [channels.id],
+  }),
+  paymentGuaranteeType: one(paymentGuaranteeTypes, {
+    fields: [loanApplications.paymentGuaranteeTypeId],
+    references: [paymentGuaranteeTypes.id],
   }),
 
   loanApplicationCoDebtors: many(loanApplicationCoDebtors),

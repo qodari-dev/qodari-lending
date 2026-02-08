@@ -979,8 +979,6 @@ export const loanApplicationStatusEnum = pgEnum('loan_application_status', [
   'CANCELED',
 ]);
 
-export const loanApprovalTypeEnum = pgEnum('loan_approval_type', ['IMMEDIATE', 'NON_IMMEDIATE']);
-
 export const riskStatusEnum = pgEnum('risk_status', [
   'NOT_REQUIRED',
   'PENDING',
@@ -1007,19 +1005,25 @@ export const loanApplications = pgTable(
   'loan_applications',
   {
     id: serial('id').primaryKey(),
-    code: varchar('code', { length: 20 }).notNull().unique(),
+    creditNumber: varchar('credit_number', { length: 20 }).notNull().unique(),
     // Fondo asignado
     creditFundId: integer('credit_fund_id')
       .references(() => creditFunds.id, {
         onDelete: 'restrict',
       })
       .notNull(),
+    channelId: integer('channel_id')
+      .notNull()
+      .references(() => channels.id, {
+        onDelete: 'set null',
+      }),
     applicationDate: date('application_date').notNull(),
     affiliationOfficeId: integer('affiliation_office_id')
       .notNull()
       .references(() => affiliationOffices.id, { onDelete: 'restrict' }),
     // IAM externo
     createdByUserId: uuid('created_by_user_id').notNull(),
+    createdByUserName: varchar('created_by_user_name', { length: 255 }).notNull(),
     // Solicitante (tercero)
     thirdPartyId: integer('third_party_id')
       .notNull()
@@ -1031,9 +1035,14 @@ export const loanApplications = pgTable(
     categoryCode: categoryCodeEnum('category_code').notNull(),
 
     // forpag -> tu tabla “repayment_methods” (libranza/pignoración/etc)
-    repaymentMethodId: integer('repayment_method_id')
-      .notNull()
-      .references(() => repaymentMethods.id, { onDelete: 'restrict' }),
+    repaymentMethodId: integer('repayment_method_id').references(() => repaymentMethods.id, {
+      onDelete: 'restrict',
+    }),
+    // garantía
+    paymentGuaranteeTypeId: integer('payment_guarantee_type_id').references(
+      () => paymentGuaranteeTypes.id,
+      { onDelete: 'restrict' }
+    ),
 
     // pigsub S/N -> boolean
     pledgesSubsidy: boolean('pledges_subsidy').notNull().default(false),
@@ -1084,15 +1093,12 @@ export const loanApplications = pgTable(
       scale: 2,
     }).notNull(),
     approvedAmount: decimal('approved_amount', { precision: 14, scale: 2 }),
-    approvalType: loanApprovalTypeEnum('approval_type'),
 
     investmentTypeId: integer('investment_type_id').references(() => investmentTypes.id, {
       onDelete: 'restrict',
     }),
 
     status: loanApplicationStatusEnum('status').notNull().default('PENDING'),
-
-    receivedDate: date('received_date').notNull(),
 
     // IAM externo
     statusChangedByUserId: uuid('status_changed_by_user_id'),
@@ -1102,7 +1108,8 @@ export const loanApplications = pgTable(
       onDelete: 'restrict',
     }),
 
-    note: varchar('note', { length: 255 }),
+    note: text('note'),
+    statusNote: text('status_note'),
     // aprseg enum('N','S') -> boolean
     isInsuranceApproved: boolean('is_insurance_approved').notNull().default(false),
 
@@ -1113,9 +1120,6 @@ export const loanApplications = pgTable(
     riskScore: decimal('risk_score', { precision: 12, scale: 5 }),
     riskCheckedAt: timestamp('risk_checked_at', { withTimezone: true }),
     riskNote: varchar('risk_note', { length: 255 }),
-    channelId: integer('channel_id').references(() => channels.id, {
-      onDelete: 'set null',
-    }),
   },
   (t) => [
     index('idx_loan_applications_date_office').on(t.applicationDate, t.affiliationOfficeId),
@@ -1144,8 +1148,8 @@ export const loanApplicationPledges = pgTable(
     loanApplicationId: integer('loan_application_id')
       .notNull()
       .references(() => loanApplications.id, { onDelete: 'cascade' }),
-    agreementCode: varchar('agreement_code', { length: 20 }).notNull(),
-    spouseDocumentNumber: varchar('spouse_document_number', { length: 20 }),
+    pledgeCode: varchar('pledge_code', { length: 20 }).notNull(),
+    documentNumber: varchar('document_number', { length: 20 }),
     beneficiaryCode: integer('beneficiary_code').notNull(),
     pledgedAmount: decimal('pledged_amount', {
       precision: 14,
@@ -1157,11 +1161,11 @@ export const loanApplicationPledges = pgTable(
   (t) => [
     uniqueIndex('uniq_pledge_application_beneficiary').on(
       t.loanApplicationId,
-      t.agreementCode,
+      t.pledgeCode,
       t.beneficiaryCode
     ),
     index('idx_pledges_application').on(t.loanApplicationId),
-    index('idx_pledges_agreement').on(t.agreementCode),
+    index('idx_pledges_pledge_code').on(t.pledgeCode),
   ]
 );
 
@@ -1297,13 +1301,14 @@ export const loans = pgTable(
   {
     id: serial('id').primaryKey(),
     // código del crédito.
-    code: varchar('code', { length: 20 }).notNull().unique(),
+    creditNumber: varchar('credit_number', { length: 20 }).notNull().unique(),
     creditFundId: integer('credit_fund_id').references(() => creditFunds.id, {
       onDelete: 'restrict',
     }),
 
     // IAM externo (sin FK)
     createdByUserId: uuid('created_by_user_id').notNull(),
+    createdByUserName: varchar('created_by_user_name', { length: 255 }).notNull(),
 
     // fecha de registro/aprobación en el sistema
     recordDate: date('record_date').notNull(),
@@ -1345,14 +1350,6 @@ export const loans = pgTable(
     }),
     insuranceValue: decimal('insurance_value', { precision: 14, scale: 2 }),
 
-    // Fondo/registro ??????? // otro seguro al credito
-    fundRegisterTaxId: varchar('fund_register_tax_id', { length: 20 }),
-    fundRegisterValue: decimal('fund_register_value', {
-      precision: 14,
-      scale: 2,
-    }),
-
-    // Flag legacy: desestcre
     discountStudyCredit: boolean('discount_study_credit').notNull().default(false),
 
     costCenterId: integer('cost_center_id').references(() => costCenters.id, {
@@ -1379,10 +1376,11 @@ export const loans = pgTable(
 
     // IAM externo (quien cambió el estado)
     statusChangedByUserId: uuid('status_changed_by_user_id'),
+    statusChangedByUserName: varchar('status_changed_by_user_name', { length: 255 }),
 
     note: varchar('note', { length: 255 }),
 
-    // numcom: comprobante/numero contable (si aplica)
+    // numcom: oficina-creditonumber
     voucherNumber: varchar('voucher_number', { length: 30 }),
 
     paymentFrequencyId: integer('payment_frequency_id').references(() => paymentFrequencies.id, {
@@ -1425,7 +1423,7 @@ export const loans = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_loans_code').on(t.code),
+    uniqueIndex('uniq_loans_credit_number').on(t.creditNumber),
 
     index('idx_loans_application').on(t.loanApplicationId),
     index('idx_loans_status').on(t.status),
@@ -1535,9 +1533,6 @@ export const loanApplicationActNumbers = pgTable(
     actDate: date('act_date').notNull(),
 
     actNumber: varchar('act_number', { length: 20 }).notNull(),
-
-    // IAM externo (opcional): quién generó/registró el acta
-    generatedByUserId: uuid('generated_by_user_id'),
 
     ...timestamps,
   },
@@ -2687,7 +2682,8 @@ export const loanApplicationStatusHistory = pgTable(
     changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
 
     // quién cambió el estado (nullable si fue job/automatización)
-    changedByUserId: uuid('changed_by_user_id').notNull(),
+    changedByUserId: uuid('changed_by_user_id'),
+    changedByUserName: varchar('changed_by_user_name', { length: 255 }),
 
     note: varchar('note', { length: 255 }),
 

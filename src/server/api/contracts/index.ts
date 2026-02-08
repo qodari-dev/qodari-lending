@@ -19,6 +19,7 @@ import { identificationType } from './identification-type';
 import { iamUser } from './iam-user';
 import { insuranceCompany } from './insurance-company';
 import { investmentType } from './investment-type';
+import { loanApplication } from './loan-application';
 import { paymentFrequency } from './payment-frequency';
 import { paymentGuaranteeType } from './payment-guarantee-type';
 import { paymentReceiptType } from './payment-receipt-type';
@@ -52,6 +53,7 @@ export const contract = c.router(
     iamUser,
     insuranceCompany,
     investmentType,
+    loanApplication,
     paymentFrequency,
     paymentGuaranteeType,
     paymentReceiptType,

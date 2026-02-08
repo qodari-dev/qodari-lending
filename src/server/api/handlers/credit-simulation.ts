@@ -8,18 +8,10 @@ import {
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { calculateCreditSimulation } from '@/server/utils/credit-simulation';
+import { roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, eq, lte, gte } from 'drizzle-orm';
 import { contract } from '../contracts';
-
-function toNumber(value: string | number | null | undefined): number {
-  if (value === null || value === undefined) return 0;
-  return typeof value === 'number' ? value : Number(value);
-}
-
-function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 export const creditSimulation = tsr.router(contract.creditSimulation, {
   calculate: async ({ body }, { request, appRoute }) => {

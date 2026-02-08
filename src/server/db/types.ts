@@ -128,6 +128,7 @@ export type NewRepaymentMethods = typeof repaymentMethods.$inferInsert;
 // ---------------------------------------------------------------------
 export type PaymentGuaranteeTypes = typeof paymentGuaranteeTypes.$inferSelect & {
   loans?: Loans[];
+  loanApplications?: LoanApplications[];
 };
 export type NewPaymentGuaranteeTypes = typeof paymentGuaranteeTypes.$inferInsert;
 
@@ -372,7 +373,7 @@ export type NewCreditProductCategories = typeof creditProductCategories.$inferIn
 // ---------------------------------------------------------------------
 export type CreditProductDocuments = typeof creditProductDocuments.$inferSelect & {
   creditProduct?: CreditProducts;
-  requiredDocumentType?: DocumentTypes;
+  documentType?: DocumentTypes;
 };
 export type NewCreditProductDocuments = typeof creditProductDocuments.$inferInsert;
 
@@ -402,6 +403,7 @@ export type LoanApplications = typeof loanApplications.$inferSelect & {
   rejectionReason?: RejectionReasons | null;
   investmentType?: InvestmentTypes | null;
   channel?: Channels | null;
+  paymentGuaranteeType?: PaymentGuaranteeTypes;
 
   loanApplicationCoDebtors?: LoanApplicationCoDebtors[];
   loanApplicationDocuments?: LoanApplicationDocuments[];

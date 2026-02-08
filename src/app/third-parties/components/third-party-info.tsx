@@ -174,7 +174,7 @@ export function ThirdPartyInfo({
                     {loanApplications.map((app) => (
                       <TableRow key={app.id}>
                         <TableCell className="font-medium">{app.id}</TableCell>
-                        <TableCell>{app.code ?? '-'}</TableCell>
+                        <TableCell>{app.creditNumber ?? '-'}</TableCell>
                         <TableCell>{app.creditProduct?.name ?? '-'}</TableCell>
                         <TableCell>
                           {app.requestedAmount ? formatCurrency(Number(app.requestedAmount)) : '-'}
@@ -215,7 +215,7 @@ export function ThirdPartyInfo({
                     {loans.map((loan) => (
                       <TableRow key={loan.id}>
                         <TableCell className="font-medium">{loan.id}</TableCell>
-                        <TableCell>{loan.code ?? '-'}</TableCell>
+                        <TableCell>{loan.creditNumber ?? '-'}</TableCell>
                         <TableCell>{loan.creditFund?.name ?? '-'}</TableCell>
                         <TableCell>
                           {loan.principalAmount

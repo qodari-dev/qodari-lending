@@ -2447,49 +2447,25 @@ export const agreements = pgTable(
   'agreements',
   {
     id: serial('id').primaryKey(),
-
-    // concr59.idecon (PK legacy)
-    legacyIdecon: varchar('legacy_idecon', { length: 7 }).notNull(),
-
-    // concr59.tipo
-    typeCode: varchar('type_code', { length: 1 }).notNull(),
-
-    // concr59.convenio
     agreementCode: varchar('agreement_code', { length: 20 }).notNull(),
-
-    // concr59.nit
-    nit: varchar('nit', { length: 17 }).notNull(),
-
-    // concr59.razsoc
+    documentNumber: varchar('document_number', { length: 17 }).notNull(),
     businessName: varchar('business_name', { length: 80 }).notNull(),
-
-    // concr59.direccion / telefono / codzon / repleg
+    cityId: integer('city_id')
+      .notNull()
+      .references(() => cities.id, { onDelete: 'restrict' }),
     address: varchar('address', { length: 120 }),
     phone: varchar('phone', { length: 20 }),
-    zoneCode: varchar('zone_code', { length: 5 }),
     legalRepresentative: varchar('legal_representative', { length: 80 }),
-
-    // concr59.fecini / fecfin
     startDate: date('start_date').notNull(),
     endDate: date('end_date'),
-
-    // concr59.nota
     note: varchar('note', { length: 255 }),
-
-    // concr59.estado / fecest
-    statusCode: varchar('status_code', { length: 1 }).notNull(),
-    statusDate: date('status_date'),
-
-    // bandera operativa (además del status legacy)
     isActive: boolean('is_active').notNull().default(true),
-
+    statusDate: date('status_date'),
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_agreements_legacy_idecon').on(t.legacyIdecon),
     uniqueIndex('uniq_agreements_agreement_code').on(t.agreementCode),
-    index('idx_agreements_nit').on(t.nit),
-    index('idx_agreements_status').on(t.statusCode),
+    index('idx_agreements_nit').on(t.documentNumber),
     index('idx_agreements_is_active').on(t.isActive),
 
     check(
@@ -2522,41 +2498,25 @@ export const billingCycleProfiles = pgTable(
   'billing_cycle_profiles',
   {
     id: serial('id').primaryKey(),
-
     name: varchar('name', { length: 150 }).notNull(),
-
     creditProductId: integer('credit_product_id')
       .notNull()
       .references(() => creditProducts.id, { onDelete: 'cascade' }),
-
     // Convenio/pagaduría. null => default del producto
     agreementId: integer('agreement_id').references(() => agreements.id, {
       onDelete: 'set null',
     }),
-
     // # de ciclos dentro del mes (1,2,3...)
     cyclesPerMonth: integer('cycles_per_month').notNull().default(1),
-
     weekendPolicy: weekendPolicyEnum('weekend_policy').notNull().default('NEXT_BUSINESS_DAY'),
-
-    // vigencia opcional del perfil (por cambios de política)
-    effectiveFrom: date('effective_from'),
-    effectiveTo: date('effective_to'),
-
     isActive: boolean('is_active').notNull().default(true),
-
     ...timestamps,
   },
   (t) => [
     index('idx_billing_cycle_profiles_product').on(t.creditProductId),
     index('idx_billing_cycle_profiles_agreement').on(t.agreementId),
     index('idx_billing_cycle_profiles_active').on(t.isActive),
-
     check('chk_billing_cycle_profiles_cycles_per_month_min', sql`${t.cyclesPerMonth} >= 1`),
-    check(
-      'chk_billing_cycle_profiles_effective_order',
-      sql`${t.effectiveTo} IS NULL OR ${t.effectiveFrom} IS NULL OR ${t.effectiveFrom} <= ${t.effectiveTo}`
-    ),
   ]
 );
 
@@ -2573,28 +2533,21 @@ export const billingCycleProfileCycles = pgTable(
   'billing_cycle_profile_cycles',
   {
     id: serial('id').primaryKey(),
-
     billingCycleProfileId: integer('billing_cycle_profile_id')
       .notNull()
       .references(() => billingCycleProfiles.id, { onDelete: 'cascade' }),
-
     // 1..N dentro del mes
     cycleInMonth: integer('cycle_in_month').notNull(),
-
     cutoffDay: integer('cutoff_day').notNull(), // día del mes (corte)
     runDay: integer('run_day').notNull(), // día del mes (generación)
     expectedPayDay: integer('expected_pay_day'), // opcional (día del mes esperado de pago)
-
     isActive: boolean('is_active').notNull().default(true),
-
     ...timestamps,
   },
   (t) => [
     uniqueIndex('uniq_billing_cycle_profile_cycle').on(t.billingCycleProfileId, t.cycleInMonth),
     index('idx_billing_cycle_profile_cycles_profile').on(t.billingCycleProfileId),
-
     check('chk_billing_cycle_profile_cycles_cycle_in_month_min', sql`${t.cycleInMonth} >= 1`),
-
     // Validación de días (1..31)
     check('chk_billing_cycle_profile_cycles_cutoff_day', sql`${t.cutoffDay} BETWEEN 1 AND 31`),
     check('chk_billing_cycle_profile_cycles_run_day', sql`${t.runDay} BETWEEN 1 AND 31`),

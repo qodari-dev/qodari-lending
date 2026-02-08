@@ -93,6 +93,7 @@ export const citiesRelations = relations(cities, ({ many }) => ({
   thirdParties: many(thirdParties),
   affiliationOffices: many(affiliationOffices),
   insuranceCompanies: many(insuranceCompanies),
+  agreements: many(agreements),
 }));
 
 // ---------------------------------------------------------------------
@@ -997,8 +998,12 @@ export const creditProductLateInterestRulesRelations = relations(
 // ---------------------------------------------------------------------
 // Concr59 - Convenios / Pagadurías
 // ---------------------------------------------------------------------
-export const agreementsRelations = relations(agreements, ({ many }) => ({
+export const agreementsRelations = relations(agreements, ({ many, one }) => ({
   billingCycleProfiles: many(billingCycleProfiles),
+  city: one(cities, {
+    fields: [agreements.cityId],
+    references: [cities.id],
+  }),
 }));
 
 // ---------------------------------------------------------------------

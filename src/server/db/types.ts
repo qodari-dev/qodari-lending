@@ -94,6 +94,7 @@ export type Cities = typeof cities.$inferSelect & {
   thirdParties?: ThirdParties[];
   insuranceCompanies?: InsuranceCompanies[];
   affiliationOffices?: AffiliationOffices[];
+  agreements?: Agreements[];
 };
 export type NewCities = typeof cities.$inferInsert;
 
@@ -653,6 +654,7 @@ export type NewCreditProductLateInterestRules = typeof creditProductLateInterest
 // ---------------------------------------------------------------------
 export type Agreements = typeof agreements.$inferSelect & {
   billingCycleProfiles?: BillingCycleProfiles[];
+  city?: Cities;
 };
 export type NewAgreements = typeof agreements.$inferInsert;
 

@@ -14,6 +14,7 @@ import { costCenter } from './cost-center';
 import { creditFund } from './credit-fund';
 import { creditsSettingsContract } from './credits-settings';
 import { documentType } from './document-type';
+import { dashboard } from './dashboard';
 import { glAccount } from './gl-account';
 import { identificationType } from './identification-type';
 import { iamUser } from './iam-user';
@@ -49,6 +50,7 @@ export const contract = c.router(
     costCenter,
     creditFund,
     creditsSettings: creditsSettingsContract,
+    dashboard,
     documentType,
     glAccount,
     identificationType,

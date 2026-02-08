@@ -1957,11 +1957,11 @@ export const loanPayments = pgTable(
       .references(() => paymentReceiptTypes.id, { onDelete: 'restrict' }),
 
     // documento char(7) (número recibo)
-    code: varchar('code', { length: 7 }).notNull(),
+    paymentNumber: varchar('payment_number', { length: 50 }).notNull(),
 
     // tipmov char(1) (REDUNDANTE: se deriva de receiptType.movementType)
     // Si quieres auditar “como llegó” en legacy, déjalo opcional:
-    movementTypeSnapshot: paymentReceiptMovementTypeEnum('movement_type_snapshot'),
+    movementType: paymentReceiptMovementTypeEnum('movement_type'),
 
     // fecha
     paymentDate: date('payment_date').notNull(),
@@ -1974,7 +1974,7 @@ export const loanPayments = pgTable(
       .notNull()
       .references(() => loans.id, { onDelete: 'restrict' }),
 
-    description: varchar('description', { length: 150 }).notNull(),
+    description: text('description').notNull(),
 
     // valor total del abono
     amount: decimal('amount', { precision: 14, scale: 2 }).notNull(),
@@ -1992,37 +1992,32 @@ export const loanPayments = pgTable(
 
     // libranza / nómina
     payrollReferenceNumber: varchar('payroll_reference_number', { length: 7 }),
-    payrollPayerTaxId: varchar('payroll_payer_tax_id', { length: 15 }),
+    payrollPayerDocumentNumber: varchar('payroll_payer_document_number', { length: 15 }),
 
     // usuario (IAM externo)
     createdByUserId: uuid('created_by_user_id').notNull(),
+    createdByUserName: varchar('created_by_user_name', { length: 255 }).notNull(),
 
-    // desglose legacy
-    cashAmount: decimal('cash_amount', { precision: 14, scale: 2 }),
-    checkAmount: decimal('check_amount', { precision: 14, scale: 2 }),
-    creditAmount: decimal('credit_amount', { precision: 14, scale: 2 }),
-    returnedAmount: decimal('returned_amount', { precision: 14, scale: 2 }),
-
-    note: varchar('note', { length: 255 }),
+    note: text('note'),
+    noteStatus: text('note_status'),
+    updatedByUserId: uuid('updated_by_user_id'),
+    updatedByUserName: varchar('updated_by_user_name', { length: 255 }),
 
     // valmay int (lo dejo legacy hasta entenderlo 100%)
-    legacyValmay: integer('legacy_valmay'),
+    overpaidAmount: integer('over_paid_amount'),
 
     // auxiliar (cuando aplica por auxiliar)
     glAccountId: integer('gl_account_id').references(() => glAccounts.id, {
       onDelete: 'restrict',
     }),
 
-    // interfaz enum('N','S')
-    isInterfaced: boolean('is_interfaced').notNull().default(false),
-
-    legacySub43Mark: varchar('legacy_sub43_mark', { length: 2 }),
-    legacySub43Document: varchar('legacy_sub43_document', { length: 8 }),
+    subsiCode: varchar('subsi_code', { length: 2 }),
+    subsiDocument: varchar('subsi_document', { length: 8 }),
 
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_loan_payment_receipt').on(t.receiptTypeId, t.code),
+    uniqueIndex('uniq_loan_payment_receipt').on(t.receiptTypeId, t.paymentNumber),
     index('idx_loan_payment_loan_date').on(t.loanId, t.paymentDate),
     index('idx_loan_payment_status').on(t.status),
   ]
@@ -2039,24 +2034,18 @@ export const loanPaymentMethodAllocations = pgTable(
   'loan_payment_method_allocations',
   {
     id: serial('id').primaryKey(),
-
     loanPaymentId: integer('loan_payment_id')
       .notNull()
       .references(() => loanPayments.id, { onDelete: 'cascade' }),
-
     // Concr35.forma (FK a Concr53)
     collectionMethodId: integer('collection_method_id')
       .notNull()
       .references(() => paymentTenderTypes.id, { onDelete: 'restrict' }),
-
     // Concr35.numero
     lineNumber: integer('line_number').notNull(),
-
     // Concr35.mnum (referencia: transferencia, voucher, autorización, etc.)
     tenderReference: varchar('tender_reference', { length: 50 }),
-
     amount: decimal('amount', { precision: 14, scale: 2 }).notNull(),
-
     ...timestamps,
   },
   (t) => [

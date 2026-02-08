@@ -622,7 +622,7 @@ export const loanApplicationDocumentsRelations = relations(loanApplicationDocume
 // ---------------------------------------------------------------------
 // Concr08 - Créditos aprobados / liquidados
 // ---------------------------------------------------------------------
-export const loansRelations = relations(loans, ({ one }) => ({
+export const loansRelations = relations(loans, ({ one, many }) => ({
   borrower: one(thirdParties, {
     fields: [loans.thirdPartyId],
     references: [thirdParties.id],
@@ -669,6 +669,18 @@ export const loansRelations = relations(loans, ({ one }) => ({
     fields: [loans.channelId],
     references: [channels.id],
   }),
+  loanProcessStates: one(loanProcessStates, {
+    fields: [loans.id],
+    references: [loanProcessStates.loanId],
+  }),
+  loanInstallments: many(loanInstallments),
+  portfolioEntries: many(portfolioEntries),
+  accountingEntries: many(accountingEntries),
+  loanRefinancingLinksRefinanced: many(loanRefinancingLinks, { relationName: 'refinancedLoan' }),
+  loanRefinancingLinksReference: many(loanRefinancingLinks, { relationName: 'referenceLoan' }),
+  portfolioAgingSnapshots: many(portfolioAgingSnapshots),
+  payrollExcessPayments: many(payrollExcessPayments),
+  loanPayments: many(loanPayments),
 }));
 
 // ---------------------------------------------------------------------

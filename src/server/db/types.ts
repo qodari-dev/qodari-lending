@@ -466,6 +466,15 @@ export type Loans = typeof loans.$inferSelect & {
   borrower?: ThirdParties;
   disbursementParty?: ThirdParties;
   channel?: Channels | null;
+  loanProcessStates?: LoanProcessStates;
+  loanInstallments?: LoanInstallments[];
+  portfolioEntries?: PortfolioEntries[];
+  accountingEntries?: AccountingEntries[];
+  loanRefinancingLinksRefinanced?: LoanRefinancingLinks[];
+  loanRefinancingLinksReference?: LoanRefinancingLinks[];
+  portfolioAgingSnapshots?: PortfolioAgingSnapshots[];
+  payrollExcessPayments?: PayrollExcessPayments[];
+  loanPayments?: LoanPayments[];
 };
 export type NewLoans = typeof loans.$inferInsert;
 

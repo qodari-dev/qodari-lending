@@ -20,7 +20,9 @@ import { identificationType } from './identification-type';
 import { iamUser } from './iam-user';
 import { insuranceCompany } from './insurance-company';
 import { investmentType } from './investment-type';
+import { loan } from './loan';
 import { loanApplication } from './loan-application';
+import { loanPayment } from './loan-payment';
 import { paymentFrequency } from './payment-frequency';
 import { paymentGuaranteeType } from './payment-guarantee-type';
 import { paymentReceiptType } from './payment-receipt-type';
@@ -32,7 +34,7 @@ import { thirdPartyType } from './third-party-type';
 
 export const handler = createNextHandler(
   contract,
-  { accountingDistribution, accountingPeriod, affiliationOffice, agingProfile, auth, bank, channel, city, coDebtor, costCenter, creditFund, creditProduct, creditSimulation, creditsSettings: creditsSettingsHandler, documentType, glAccount, iamUser, identificationType, insuranceCompany, investmentType, loanApplication, paymentFrequency, paymentGuaranteeType, paymentReceiptType, paymentTenderType, rejectionReason, repaymentMethod, thirdParty, thirdPartyType },
+  { accountingDistribution, accountingPeriod, affiliationOffice, agingProfile, auth, bank, channel, city, coDebtor, costCenter, creditFund, creditProduct, creditSimulation, creditsSettings: creditsSettingsHandler, documentType, glAccount, iamUser, identificationType, insuranceCompany, investmentType, loan, loanApplication, loanPayment, paymentFrequency, paymentGuaranteeType, paymentReceiptType, paymentTenderType, rejectionReason, repaymentMethod, thirdParty, thirdPartyType },
   {
     jsonQuery: true,
     responseValidation: true,

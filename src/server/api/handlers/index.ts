@@ -2,11 +2,13 @@ import { contract } from '@/server/api/contracts';
 import { createNextHandler } from '@ts-rest/serverless/next';
 import { accountingDistribution } from './accounting-distribution';
 import { affiliationOffice } from './affiliation-office';
+import { agreement } from './agreement';
 import { agingProfile } from './aging-profile';
 import { creditFund } from './credit-fund';
 import { accountingPeriod } from './accounting-period';
 import { auth } from './auth';
 import { bank } from './bank';
+import { billingCycleProfile } from './billing-cycle-profile';
 import { channel } from './channel';
 import { city } from './city';
 import { coDebtor } from './co-debtor';
@@ -35,7 +37,7 @@ import { thirdPartyType } from './third-party-type';
 
 export const handler = createNextHandler(
   contract,
-  { accountingDistribution, accountingPeriod, affiliationOffice, agingProfile, auth, bank, channel, city, coDebtor, costCenter, creditFund, creditProduct, creditSimulation, creditsSettings: creditsSettingsHandler, dashboard, documentType, glAccount, iamUser, identificationType, insuranceCompany, investmentType, loan, loanApplication, loanPayment, paymentFrequency, paymentGuaranteeType, paymentReceiptType, paymentTenderType, rejectionReason, repaymentMethod, thirdParty, thirdPartyType },
+  { accountingDistribution, accountingPeriod, affiliationOffice, agreement, agingProfile, auth, bank, billingCycleProfile, channel, city, coDebtor, costCenter, creditFund, creditProduct, creditSimulation, creditsSettings: creditsSettingsHandler, dashboard, documentType, glAccount, iamUser, identificationType, insuranceCompany, investmentType, loan, loanApplication, loanPayment, paymentFrequency, paymentGuaranteeType, paymentReceiptType, paymentTenderType, rejectionReason, repaymentMethod, thirdParty, thirdPartyType },
   {
     jsonQuery: true,
     responseValidation: true,

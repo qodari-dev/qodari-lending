@@ -1,4 +1,11 @@
-import { db, loanInstallments, loanPayments, loans } from '@/server/db';
+import {
+  db,
+  loanAgreementHistory,
+  loanInstallments,
+  loanPayments,
+  loans,
+  loanStatusHistory,
+} from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { buildTypedIncludes, createIncludeMap } from '@/server/utils/query/include-builder';
@@ -18,6 +25,7 @@ const LOAN_FIELDS: FieldMap = {
   id: loans.id,
   creditNumber: loans.creditNumber,
   loanApplicationId: loans.loanApplicationId,
+  agreementId: loans.agreementId,
   thirdPartyId: loans.thirdPartyId,
   payeeThirdPartyId: loans.payeeThirdPartyId,
   status: loans.status,
@@ -72,6 +80,10 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
         loanApplicationPledges: true,
       },
     },
+  },
+  agreement: {
+    relation: 'agreement',
+    config: true,
   },
   creditFund: {
     relation: 'creditFund',
@@ -132,6 +144,21 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
         },
       },
       orderBy: [desc(loanPayments.paymentDate), desc(loanPayments.id)],
+    },
+  },
+  loanAgreementHistory: {
+    relation: 'loanAgreementHistory',
+    config: {
+      with: {
+        agreement: true,
+      },
+      orderBy: [desc(loanAgreementHistory.changedAt)],
+    },
+  },
+  loanStatusHistory: {
+    relation: 'loanStatusHistory',
+    config: {
+      orderBy: [desc(loanStatusHistory.changedAt)],
     },
   },
 });

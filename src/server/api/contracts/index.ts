@@ -1,10 +1,12 @@
 import { initContract } from '@ts-rest/core';
 import { accountingDistribution } from './accounting-distribution';
 import { accountingPeriod } from './accounting-period';
+import { agreement } from './agreement';
 import { affiliationOffice } from './affiliation-office';
 import { agingProfile } from './aging-profile';
 import { auth } from './auth';
 import { bank } from './bank';
+import { billingCycleProfile } from './billing-cycle-profile';
 import { channel } from './channel';
 import { city } from './city';
 import { coDebtor } from './co-debtor';
@@ -38,10 +40,12 @@ export const contract = c.router(
   {
     accountingDistribution,
     accountingPeriod,
+    agreement,
     affiliationOffice,
     agingProfile,
     auth,
     bank,
+    billingCycleProfile,
     channel,
     city,
     coDebtor,

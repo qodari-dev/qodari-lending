@@ -1324,6 +1324,10 @@ export const loans = pgTable(
     loanApplicationId: integer('loan_application_id')
       .notNull()
       .references(() => loanApplications.id, { onDelete: 'restrict' }),
+    // Convenio/pagaduria vigente para el cobro del credito
+    agreementId: integer('agreement_id').references(() => agreements.id, {
+      onDelete: 'set null',
+    }),
 
     // Deudor (solicitante)
     thirdPartyId: integer('third_party_id')
@@ -1434,12 +1438,84 @@ export const loans = pgTable(
     uniqueIndex('uniq_loans_credit_number').on(t.creditNumber),
 
     index('idx_loans_application').on(t.loanApplicationId),
+    index('idx_loans_agreement').on(t.agreementId),
     index('idx_loans_status').on(t.status),
     index('idx_loans_start_status').on(t.creditStartDate, t.status),
     index('idx_loans_office').on(t.affiliationOfficeId),
     index('idx_loans_third_party').on(t.thirdPartyId),
     index('idx_loans_payee').on(t.payeeThirdPartyId),
     index('idx_loans_disbursement_status').on(t.disbursementStatus),
+  ]
+);
+
+// ---------------------------------------------------------------------
+// Historial de convenios por credito
+// Nota (ES):
+// Traza los cambios de convenio asociados al credito a lo largo del tiempo.
+// El primer registro se crea al aprobar la solicitud.
+// ---------------------------------------------------------------------
+export const loanAgreementHistory = pgTable(
+  'loan_agreement_history',
+  {
+    id: serial('id').primaryKey(),
+
+    loanId: integer('loan_id')
+      .notNull()
+      .references(() => loans.id, { onDelete: 'cascade' }),
+
+    agreementId: integer('agreement_id')
+      .notNull()
+      .references(() => agreements.id, { onDelete: 'restrict' }),
+
+    effectiveDate: date('effective_date').notNull(),
+    changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+
+    changedByUserId: uuid('changed_by_user_id'),
+    changedByUserName: varchar('changed_by_user_name', { length: 255 }),
+
+    note: varchar('note', { length: 255 }),
+    metadata: jsonb('metadata'),
+
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_loan_agreement_history_loan').on(t.loanId),
+    index('idx_loan_agreement_history_changed_at').on(t.changedAt),
+    index('idx_loan_agreement_history_agreement').on(t.agreementId),
+  ]
+);
+
+// ---------------------------------------------------------------------
+// Historial de estados del credito
+// Nota (ES):
+// Traza cambios de estado del credito (GENERATED, ACTIVE, PAID, etc).
+// El primer registro se crea al aprobar la solicitud.
+// ---------------------------------------------------------------------
+export const loanStatusHistory = pgTable(
+  'loan_status_history',
+  {
+    id: serial('id').primaryKey(),
+
+    loanId: integer('loan_id')
+      .notNull()
+      .references(() => loans.id, { onDelete: 'cascade' }),
+
+    fromStatus: loanStatusEnum('from_status'),
+    toStatus: loanStatusEnum('to_status').notNull(),
+
+    changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+
+    changedByUserId: uuid('changed_by_user_id'),
+    changedByUserName: varchar('changed_by_user_name', { length: 255 }),
+
+    note: varchar('note', { length: 255 }),
+    metadata: jsonb('metadata'),
+
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_loan_status_history_loan').on(t.loanId),
+    index('idx_loan_status_history_changed_at').on(t.changedAt),
   ]
 );
 

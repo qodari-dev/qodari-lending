@@ -40,6 +40,8 @@ import type {
   loanApplicationCoDebtors,
   loanApplicationDocuments,
   loans,
+  loanAgreementHistory,
+  loanStatusHistory,
   loanInstallments,
   loanApplicationActNumbers,
   portfolioEntries,
@@ -457,6 +459,7 @@ export type NewLoanApplicationDocuments = typeof loanApplicationDocuments.$infer
 // ---------------------------------------------------------------------
 export type Loans = typeof loans.$inferSelect & {
   loanApplication?: LoanApplications;
+  agreement?: Agreements | null;
   creditFund?: CreditFunds | null;
   repaymentMethod?: RepaymentMethods;
   paymentFrequency?: PaymentFrequencies | null;
@@ -476,8 +479,27 @@ export type Loans = typeof loans.$inferSelect & {
   portfolioAgingSnapshots?: PortfolioAgingSnapshots[];
   payrollExcessPayments?: PayrollExcessPayments[];
   loanPayments?: LoanPayments[];
+  loanAgreementHistory?: LoanAgreementHistory[];
+  loanStatusHistory?: LoanStatusHistory[];
 };
 export type NewLoans = typeof loans.$inferInsert;
+
+// ---------------------------------------------------------------------
+// Historial de convenios por credito
+// ---------------------------------------------------------------------
+export type LoanAgreementHistory = typeof loanAgreementHistory.$inferSelect & {
+  loan?: Loans;
+  agreement?: Agreements;
+};
+export type NewLoanAgreementHistory = typeof loanAgreementHistory.$inferInsert;
+
+// ---------------------------------------------------------------------
+// Historial de estados del credito
+// ---------------------------------------------------------------------
+export type LoanStatusHistory = typeof loanStatusHistory.$inferSelect & {
+  loan?: Loans;
+};
+export type NewLoanStatusHistory = typeof loanStatusHistory.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr09 - Plan de pagos (cuotas)
@@ -653,6 +675,8 @@ export type NewCreditProductLateInterestRules = typeof creditProductLateInterest
 // Concr59 - Convenios / Pagadurías
 // ---------------------------------------------------------------------
 export type Agreements = typeof agreements.$inferSelect & {
+  loans?: Loans[];
+  loanAgreementHistory?: LoanAgreementHistory[];
   billingCycleProfiles?: BillingCycleProfiles[];
   city?: Cities;
 };

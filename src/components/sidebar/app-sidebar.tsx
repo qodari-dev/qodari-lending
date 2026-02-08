@@ -137,6 +137,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Periodos contables', url: `/accounting-periods` },
                   { title: 'Fondos de créditos', url: `/credit-funds` },
                   { title: 'Conceptos de facturacion', url: `/billing-concepts` },
+                  { title: 'Perfiles de facturacion', url: `/billing-cycle-profiles` },
                   { title: 'Tipos de créditos', url: `/credit-products` },
                 ],
               },

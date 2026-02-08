@@ -40,6 +40,8 @@ import {
   loanApplicationCoDebtors,
   loanApplicationDocuments,
   loans,
+  loanAgreementHistory,
+  loanStatusHistory,
   loanInstallments,
   loanApplicationActNumbers,
   portfolioEntries,
@@ -638,6 +640,10 @@ export const loansRelations = relations(loans, ({ one, many }) => ({
     fields: [loans.loanApplicationId],
     references: [loanApplications.id],
   }),
+  agreement: one(agreements, {
+    fields: [loans.agreementId],
+    references: [agreements.id],
+  }),
   creditFund: one(creditFunds, {
     fields: [loans.creditFundId],
     references: [creditFunds.id],
@@ -682,6 +688,32 @@ export const loansRelations = relations(loans, ({ one, many }) => ({
   portfolioAgingSnapshots: many(portfolioAgingSnapshots),
   payrollExcessPayments: many(payrollExcessPayments),
   loanPayments: many(loanPayments),
+  loanAgreementHistory: many(loanAgreementHistory),
+  loanStatusHistory: many(loanStatusHistory),
+}));
+
+// ---------------------------------------------------------------------
+// Historial de convenios por credito
+// ---------------------------------------------------------------------
+export const loanAgreementHistoryRelations = relations(loanAgreementHistory, ({ one }) => ({
+  loan: one(loans, {
+    fields: [loanAgreementHistory.loanId],
+    references: [loans.id],
+  }),
+  agreement: one(agreements, {
+    fields: [loanAgreementHistory.agreementId],
+    references: [agreements.id],
+  }),
+}));
+
+// ---------------------------------------------------------------------
+// Historial de estados del credito
+// ---------------------------------------------------------------------
+export const loanStatusHistoryRelations = relations(loanStatusHistory, ({ one }) => ({
+  loan: one(loans, {
+    fields: [loanStatusHistory.loanId],
+    references: [loans.id],
+  }),
 }));
 
 // ---------------------------------------------------------------------
@@ -999,6 +1031,8 @@ export const creditProductLateInterestRulesRelations = relations(
 // Concr59 - Convenios / Pagadurías
 // ---------------------------------------------------------------------
 export const agreementsRelations = relations(agreements, ({ many, one }) => ({
+  loans: many(loans),
+  loanAgreementHistory: many(loanAgreementHistory),
   billingCycleProfiles: many(billingCycleProfiles),
   city: one(cities, {
     fields: [agreements.cityId],

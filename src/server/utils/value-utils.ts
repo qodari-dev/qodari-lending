@@ -16,6 +16,12 @@ export function formatDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
+export function toDbDate(value: Date | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return formatDateOnly(value);
+}
+
 export function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }

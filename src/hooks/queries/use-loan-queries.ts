@@ -19,6 +19,7 @@ function defaultQuery(filters?: Partial<ListLoansQuery>) {
     include: filters?.include ?? [
       'borrower',
       'disbursementParty',
+      'agreement',
       'affiliationOffice',
       'paymentFrequency',
       'loanApplication',

@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { useAgreements } from '@/hooks/queries/use-agreement-queries';
 import {
   useApproveLoanApplication,
   useCancelLoanApplication,
@@ -156,6 +157,13 @@ export function LoanApplications() {
   });
   const paymentGuaranteeTypes = paymentGuaranteeTypesData?.body?.data ?? [];
 
+  const { data: agreementsData } = useAgreements({
+    limit: 1000,
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'businessName', order: 'asc' }],
+  });
+  const agreements = React.useMemo(() => agreementsData?.body?.data ?? [], [agreementsData]);
+
   const { data: thirdPartiesData } = useThirdParties({
     limit: 1000,
     sort: [{ field: 'createdAt', order: 'desc' }],
@@ -193,6 +201,7 @@ export function LoanApplications() {
   const [approvePaymentGuaranteeTypeId, setApprovePaymentGuaranteeTypeId] = React.useState<
     number | undefined
   >();
+  const [approveAgreementId, setApproveAgreementId] = React.useState<number | undefined>();
   const [approveApprovedAmount, setApproveApprovedAmount] = React.useState('');
   const [approveActNumber, setApproveActNumber] = React.useState('');
   const [approvePayeeThirdPartyId, setApprovePayeeThirdPartyId] = React.useState<
@@ -228,6 +237,7 @@ export function LoanApplications() {
     setLoanApplication(row);
     setApproveRepaymentMethodId(row.repaymentMethodId ?? undefined);
     setApprovePaymentGuaranteeTypeId(row.paymentGuaranteeTypeId ?? undefined);
+    setApproveAgreementId(undefined);
     setApproveApprovedAmount(String(row.requestedAmount ?? '0'));
     setApproveActNumber(row.actNumber ?? '');
     setApprovePayeeThirdPartyId(row.thirdPartyId);
@@ -252,6 +262,11 @@ export function LoanApplications() {
     if (!openedApproveDialog || approveActNumber || !actNumbers.length) return;
     setApproveActNumber(actNumbers[0]?.actNumber ?? '');
   }, [actNumbers, approveActNumber, openedApproveDialog]);
+
+  React.useEffect(() => {
+    if (!openedApproveDialog || approveAgreementId || !agreements.length) return;
+    setApproveAgreementId(agreements[0]?.id);
+  }, [agreements, approveAgreementId, openedApproveDialog]);
 
   const submitCancel = React.useCallback(async () => {
     if (!loanApplication?.id) return;
@@ -288,6 +303,7 @@ export function LoanApplications() {
       !loanApplication?.id ||
       !approveRepaymentMethodId ||
       !approvePaymentGuaranteeTypeId ||
+      !approveAgreementId ||
       !approveApprovedAmount.trim() ||
       !approveActNumber.trim() ||
       !approvePayeeThirdPartyId ||
@@ -301,6 +317,7 @@ export function LoanApplications() {
       body: {
         repaymentMethodId: approveRepaymentMethodId,
         paymentGuaranteeTypeId: approvePaymentGuaranteeTypeId,
+        agreementId: approveAgreementId,
         approvedAmount: approveApprovedAmount.trim(),
         actNumber: approveActNumber.trim(),
         payeeThirdPartyId: approvePayeeThirdPartyId,
@@ -312,6 +329,7 @@ export function LoanApplications() {
     setLoanApplication(undefined);
   }, [
     approveActNumber,
+    approveAgreementId,
     approveApprovedAmount,
     approveFirstCollectionDate,
     approveLoanApplication,
@@ -445,6 +463,25 @@ export function LoanApplications() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="approveAgreementId">Convenio</Label>
+              <Select
+                value={approveAgreementId ? String(approveAgreementId) : ''}
+                onValueChange={(value) => setApproveAgreementId(value ? Number(value) : undefined)}
+              >
+                <SelectTrigger id="approveAgreementId">
+                  <SelectValue placeholder="Seleccione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {agreements.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.agreementCode} - {item.businessName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="approveApprovedAmount">Valor aprobado</Label>
               <Input
                 id="approveApprovedAmount"
@@ -518,6 +555,7 @@ export function LoanApplications() {
                 isApproving ||
                 !approveRepaymentMethodId ||
                 !approvePaymentGuaranteeTypeId ||
+                !approveAgreementId ||
                 !approveApprovedAmount.trim() ||
                 !approveActNumber.trim() ||
                 !approvePayeeThirdPartyId ||

@@ -77,6 +77,7 @@ const LoanWhereFieldsSchema = z
     id: z.union([z.number(), NumberOperatorsSchema]).optional(),
     creditNumber: z.union([z.string(), StringOperatorsSchema]).optional(),
     loanApplicationId: z.union([z.number(), NumberOperatorsSchema]).optional(),
+    agreementId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     thirdPartyId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     payeeThirdPartyId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     status: z.union([z.enum(LOAN_STATUS_OPTIONS), StringOperatorsSchema]).optional(),
@@ -95,6 +96,7 @@ const LoanWhereFieldsSchema = z
 const LOAN_SORT_FIELDS = [
   'id',
   'creditNumber',
+  'agreementId',
   'status',
   'recordDate',
   'creditStartDate',
@@ -106,6 +108,7 @@ const LOAN_SORT_FIELDS = [
 
 const LOAN_INCLUDE_OPTIONS = [
   'loanApplication',
+  'agreement',
   'creditFund',
   'repaymentMethod',
   'paymentFrequency',
@@ -118,6 +121,8 @@ const LOAN_INCLUDE_OPTIONS = [
   'channel',
   'loanInstallments',
   'loanPayments',
+  'loanAgreementHistory',
+  'loanStatusHistory',
 ] as const;
 
 const LoanIncludeSchema = createIncludeSchema(LOAN_INCLUDE_OPTIONS);

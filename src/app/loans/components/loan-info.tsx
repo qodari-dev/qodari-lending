@@ -55,6 +55,7 @@ function StatusBadge({ status }: { status: LoanStatus }) {
 const LOAN_DETAIL_INCLUDES: LoanInclude[] = [
   'borrower',
   'disbursementParty',
+  'agreement',
   'creditFund',
   'repaymentMethod',
   'paymentFrequency',
@@ -117,6 +118,12 @@ export function LoanInfo({
           items: [
             { label: 'Titular', value: getPartyLabel(detail.borrower) },
             { label: 'Desembolso a', value: getPartyLabel(detail.disbursementParty) },
+            {
+              label: 'Convenio',
+              value: detail.agreement
+                ? `${detail.agreement.agreementCode} - ${detail.agreement.businessName}`
+                : '-',
+            },
             { label: 'Fondo', value: detail.creditFund?.name ?? '-' },
             { label: 'Aseguradora', value: detail.insuranceCompany?.businessName ?? '-' },
             { label: 'Forma de pago', value: detail.repaymentMethod?.name ?? detail.repaymentMethodId },

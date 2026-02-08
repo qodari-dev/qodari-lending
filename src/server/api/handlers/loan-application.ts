@@ -1,4 +1,5 @@
 import {
+  agreements,
   affiliationOffices,
   coDebtors,
   creditProductCategories,
@@ -11,9 +12,11 @@ import {
   loanApplicationDocuments,
   loanApplicationPledges,
   loanApplications,
+  loanAgreementHistory,
   loanApplicationStatusHistory,
   loanInstallments,
   loans,
+  loanStatusHistory,
   paymentFrequencies,
   paymentGuaranteeTypes,
   rejectionReasons,
@@ -1226,6 +1229,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const [
         repaymentMethod,
         paymentGuaranteeType,
+        agreement,
         payeeThirdParty,
         product,
         paymentFrequency,
@@ -1242,6 +1246,10 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             eq(paymentGuaranteeTypes.id, body.paymentGuaranteeTypeId),
             eq(paymentGuaranteeTypes.isActive, true)
           ),
+        }),
+        db.query.agreements.findFirst({
+          where: and(eq(agreements.id, body.agreementId), eq(agreements.isActive, true)),
+          columns: { id: true },
         }),
         db.query.thirdParties.findFirst({
           where: eq(thirdParties.id, body.payeeThirdPartyId),
@@ -1279,6 +1287,14 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         throwHttpError({
           status: 404,
           message: 'Tipo de garantia no encontrado',
+          code: 'NOT_FOUND',
+        });
+      }
+
+      if (!agreement) {
+        throwHttpError({
+          status: 404,
+          message: 'Convenio no encontrado',
           code: 'NOT_FOUND',
         });
       }
@@ -1370,6 +1386,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             createdByUserName: userName || userId,
             recordDate: statusDate,
             loanApplicationId: existing.id,
+            agreementId: body.agreementId,
             thirdPartyId: existing.thirdPartyId,
             payeeThirdPartyId: body.payeeThirdPartyId,
             installments: existing.installments,
@@ -1396,6 +1413,32 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           })
           .returning();
 
+        await tx.insert(loanAgreementHistory).values({
+          loanId: loan.id,
+          agreementId: body.agreementId,
+          effectiveDate: statusDate,
+          changedByUserId: userId,
+          changedByUserName: userName || userId,
+          note: 'Convenio asignado al aprobar solicitud',
+          metadata: {
+            sourceLoanApplicationId: id,
+            actNumber: body.actNumber,
+          },
+        });
+
+        await tx.insert(loanStatusHistory).values({
+          loanId: loan.id,
+          fromStatus: null,
+          toStatus: 'GENERATED',
+          changedByUserId: userId,
+          changedByUserName: userName || userId,
+          note: 'Credito generado desde aprobacion de solicitud',
+          metadata: {
+            sourceLoanApplicationId: id,
+            actNumber: body.actNumber,
+          },
+        });
+
         await tx.insert(loanInstallments).values(
           schedule.installments.map((installment) => ({
             loanId: loan.id,
@@ -1419,6 +1462,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             loanId: loan.id,
             approvedAmount: toDecimalString(approvedAmount),
             actNumber: body.actNumber,
+            agreementId: body.agreementId,
             payeeThirdPartyId: body.payeeThirdPartyId,
             firstCollectionDate,
           },

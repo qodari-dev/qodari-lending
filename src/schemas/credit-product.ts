@@ -89,6 +89,7 @@ const CREDIT_PRODUCT_INCLUDE_OPTIONS = [
   'costCenter',
   'creditProductRefinancePolicy',
   'creditProductCategories',
+  'creditProductLateInterestRules',
   'creditProductRequiredDocuments',
   'creditProductAccounts',
 ] as const;
@@ -120,11 +121,22 @@ export const CreditProductCategoryInputSchema = z.object({
   installmentsFrom: z.number().int().positive(),
   installmentsTo: z.number().int().positive(),
   financingFactor: z.string().min(1, 'Factor financiacion es requerido'),
-  lateFactor: z.string().min(1, 'Factor mora es requerido'),
   pledgeFactor: z.string().nullable().optional(),
 });
 
 export type CreditProductCategoryInput = z.infer<typeof CreditProductCategoryInputSchema>;
+
+export const CreditProductLateInterestRuleInputSchema = z.object({
+  categoryCode: CategoryCodeSchema,
+  daysFrom: z.number().int().min(0),
+  daysTo: z.number().int().min(0).nullable().optional(),
+  lateFactor: z.string().min(1, 'Factor mora es requerido'),
+  isActive: z.boolean(),
+});
+
+export type CreditProductLateInterestRuleInput = z.infer<
+  typeof CreditProductLateInterestRuleInputSchema
+>;
 
 export const CreditProductRequiredDocumentInputSchema = z.object({
   documentTypeId: z.number().int().positive(),
@@ -179,6 +191,7 @@ const CreditProductBaseSchema = z.object({
   isActive: z.boolean(),
   creditProductRefinancePolicy: CreditProductRefinancePolicyInputSchema.nullable().optional(),
   creditProductCategories: CreditProductCategoryInputSchema.array().optional(),
+  creditProductLateInterestRules: CreditProductLateInterestRuleInputSchema.array().optional(),
   creditProductRequiredDocuments: CreditProductRequiredDocumentInputSchema.array().optional(),
   creditProductAccounts: CreditProductAccountInputSchema.array().optional(),
 });
@@ -197,6 +210,11 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
         categoryCode: string;
         installmentsFrom: number;
         installmentsTo: number;
+      }[];
+      creditProductLateInterestRules?: {
+        categoryCode: string;
+        daysFrom: number;
+        daysTo?: number | null;
       }[];
       creditProductRequiredDocuments?: {
         documentTypeId: number;
@@ -230,6 +248,40 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
             path: ['creditProductCategories'],
           });
           i = categories.length;
+          break;
+        }
+      }
+    }
+
+    const lateInterestRules = data.creditProductLateInterestRules ?? [];
+    for (const rule of lateInterestRules) {
+      if (rule.daysTo != null && rule.daysFrom > rule.daysTo) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Dias desde debe ser menor o igual a dias hasta',
+          path: ['creditProductLateInterestRules'],
+        });
+        break;
+      }
+    }
+
+    for (let i = 0; i < lateInterestRules.length; i += 1) {
+      for (let j = i + 1; j < lateInterestRules.length; j += 1) {
+        const a = lateInterestRules[i];
+        const b = lateInterestRules[j];
+
+        if (a.categoryCode !== b.categoryCode) continue;
+
+        const aTo = a.daysTo ?? Number.POSITIVE_INFINITY;
+        const bTo = b.daysTo ?? Number.POSITIVE_INFINITY;
+        const overlaps = a.daysFrom <= bTo && b.daysFrom <= aTo;
+        if (overlaps) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'No puede haber rangos de mora superpuestos para la misma categoria',
+            path: ['creditProductLateInterestRules'],
+          });
+          i = lateInterestRules.length;
           break;
         }
       }

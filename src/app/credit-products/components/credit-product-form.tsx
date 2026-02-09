@@ -61,6 +61,7 @@ import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { CreditProductAccountsForm } from './credit-product-accounts-form';
 import { CreditProductCategoriesForm } from './credit-product-categories-form';
+import { CreditProductLateInterestRulesForm } from './credit-product-late-interest-rules-form';
 import { CreditProductRefinancePolicyForm } from './credit-product-refinance-policy-form';
 import { CreditProductRequiredDocumentsForm } from './credit-product-required-documents-form';
 
@@ -110,6 +111,7 @@ export function CreditProductForm({
         isActive: false,
       },
       creditProductCategories: [],
+      creditProductLateInterestRules: [],
       creditProductRequiredDocuments: [],
       creditProductAccounts: [],
     },
@@ -210,8 +212,15 @@ export function CreditProductForm({
             installmentsFrom: category.installmentsFrom,
             installmentsTo: category.installmentsTo,
             financingFactor: category.financingFactor,
-            lateFactor: category.lateFactor,
             pledgeFactor: category.pledgeFactor ?? null,
+          })) ?? [],
+        creditProductLateInterestRules:
+          creditProduct?.creditProductLateInterestRules?.map((rule) => ({
+            categoryCode: rule.categoryCode,
+            daysFrom: rule.daysFrom,
+            daysTo: rule.daysTo ?? null,
+            lateFactor: rule.lateFactor,
+            isActive: rule.isActive,
           })) ?? [],
         creditProductRequiredDocuments: currentDocuments.map((document) => ({
           documentTypeId: document.documentTypeId,
@@ -250,7 +259,7 @@ export function CreditProductForm({
         <SheetHeader>
           <SheetTitle>{creditProduct ? 'Editar Tipo de Credito' : 'Nuevo Tipo de Credito'}</SheetTitle>
           <SheetDescription>
-            Configure el producto de credito, categorias, documentos requeridos y cuentas.
+            Configure el producto de credito, categorias, reglas de mora, documentos y cuentas.
           </SheetDescription>
         </SheetHeader>
 
@@ -260,6 +269,7 @@ export function CreditProductForm({
               <TabsList className="mb-4 w-full">
                 <TabsTrigger value="product">Producto</TabsTrigger>
                 <TabsTrigger value="categories">Categorias</TabsTrigger>
+                <TabsTrigger value="lateInterestRules">Reglas mora</TabsTrigger>
                 <TabsTrigger value="requiredDocuments">Documentos</TabsTrigger>
                 <TabsTrigger value="refinancePolicy">Refinanciacion</TabsTrigger>
                 <TabsTrigger value="accounts">Cuentas</TabsTrigger>
@@ -696,6 +706,10 @@ export function CreditProductForm({
 
               <TabsContent value="categories" className="pt-2">
                 <CreditProductCategoriesForm />
+              </TabsContent>
+
+              <TabsContent value="lateInterestRules" className="pt-2">
+                <CreditProductLateInterestRulesForm />
               </TabsContent>
 
               <TabsContent value="requiredDocuments" className="pt-2">

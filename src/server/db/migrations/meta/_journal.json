@@ -113,6 +113,20 @@
       "when": 1770590400000,
       "tag": "0015_solid_wolfsbane",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1770598150958,
+      "tag": "0016_large_vulcan",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1770601105692,
+      "tag": "0017_eager_doctor_faustus",
+      "breakpoints": true
     }
   ]
 }

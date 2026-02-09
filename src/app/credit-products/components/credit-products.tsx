@@ -55,6 +55,7 @@ export function CreditProducts() {
       'costCenter',
       'creditProductRefinancePolicy',
       'creditProductCategories',
+      'creditProductLateInterestRules',
       'creditProductRequiredDocuments',
       'creditProductAccounts',
     ],
@@ -127,7 +128,7 @@ export function CreditProducts() {
     <>
       <PageHeader
         title="Tipos de Creditos"
-        description="Administre lineas de credito, categorias, documentos y cuentas contables."
+        description="Administre lineas de credito, categorias, reglas de mora, documentos y cuentas."
       />
       <PageContent>
         <DataTable

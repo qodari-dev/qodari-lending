@@ -27,6 +27,7 @@ function defaultQuery(filters?: Partial<ListCreditProductsQuery>) {
       'costCenter',
       'creditProductRefinancePolicy',
       'creditProductCategories',
+      'creditProductLateInterestRules',
       'creditProductRequiredDocuments',
       'creditProductAccounts',
     ],

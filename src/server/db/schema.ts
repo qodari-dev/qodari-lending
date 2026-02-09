@@ -11,6 +11,7 @@ import {
   check,
   date,
   decimal,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -884,7 +885,6 @@ export const creditProducts = pgTable(
 // - categoryCode: categoría del afiliado/cliente (según reglas del cliente).
 // - installmentsFrom/To: rango de cuotas al que aplica.
 // - financingFactor: factor para cálculo financiero.
-// - lateFactor: factor para mora.
 // - pledgeFactor: factor para pignoración (si aplica).
 // =====================================================================
 export const creditProductCategories = pgTable(
@@ -1695,6 +1695,13 @@ export const portfolioEntries = pgTable(
     index('idx_portfolio_due_status').on(t.dueDate, t.status),
     index('idx_portfolio_third_party').on(t.thirdPartyId),
     index('idx_portfolio_gl_account').on(t.glAccountId),
+    check('chk_portfolio_entry_charge_nonneg', sql`${t.chargeAmount} >= 0`),
+    check('chk_portfolio_entry_payment_nonneg', sql`${t.paymentAmount} >= 0`),
+    check(
+      'chk_portfolio_entry_balance_formula',
+      sql`${t.balance} = ${t.chargeAmount} - ${t.paymentAmount}`
+    ),
+    check('chk_portfolio_entry_balance_nonneg', sql`${t.balance} >= 0`),
   ]
 );
 
@@ -1810,6 +1817,7 @@ export const loanRefinancingLinks = pgTable(
   },
   (t) => [
     uniqueIndex('uniq_loan_ref_link').on(t.loanId, t.referenceLoanId),
+    check('chk_loan_ref_link_not_self', sql`${t.loanId} <> ${t.referenceLoanId}`),
     index('idx_ref_link_reference_loan').on(t.referenceLoanId),
   ]
 );
@@ -1836,7 +1844,8 @@ export const processRuns = pgTable(
       .references(() => accountingPeriods.id, { onDelete: 'restrict' })
       .notNull(),
     processDate: date('process_date').notNull(),
-    executedByUserId: integer('executed_by_user_id').notNull(),
+    executedByUserId: uuid('executed_by_user_id').notNull(),
+    executedByUserName: varchar('executed_by_user_name', { length: 255 }).notNull(),
     executedAt: timestamp('executed_at', { withTimezone: false }).notNull(),
     status: processRunStatusEnum('status').notNull().default('COMPLETED'),
     note: text('note'),
@@ -1868,7 +1877,7 @@ export const loanProcessStates = pgTable(
     lastProcessedDate: date('last_processed_date').notNull(),
     // Trazabilidad
     lastProcessRunId: integer('last_process_run_id')
-      .references(() => processRuns.id, { onDelete: 'set null' })
+      .references(() => processRuns.id, { onDelete: 'restrict' })
       .notNull(),
     //control de fallos
     lastError: text('last_error'),
@@ -1895,9 +1904,11 @@ export const portfolioAgingSnapshots = pgTable(
     accountingPeriodId: integer('accounting_period_id')
       .notNull()
       .references(() => accountingPeriods.id, { onDelete: 'restrict' }),
-    agingProfileId: integer('aging_profile_id').references(() => agingProfiles.id, {
-      onDelete: 'restrict',
-    }),
+    agingProfileId: integer('aging_profile_id')
+      .references(() => agingProfiles.id, {
+        onDelete: 'restrict',
+      })
+      .notNull(),
 
     // fecgen / horgen / usugen (legacy)
     generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1960,7 +1971,12 @@ export const portfolioAgingSnapshots = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_portfolio_aging_snapshot').on(t.accountingPeriodId, t.loanId, t.glAccountId),
+    uniqueIndex('uniq_portfolio_aging_snapshot').on(
+      t.accountingPeriodId,
+      t.agingProfileId,
+      t.loanId,
+      t.glAccountId
+    ),
 
     index('idx_portfolio_aging_period').on(t.accountingPeriodId),
     index('idx_portfolio_aging_office_period').on(t.affiliationOfficeId, t.accountingPeriodId),
@@ -2351,6 +2367,7 @@ export const billingConceptRules = pgTable(
   (t) => [
     index('idx_billing_concept_rules_concept').on(t.billingConceptId),
     index('idx_billing_concept_rules_active').on(t.billingConceptId, t.isActive),
+    uniqueIndex('uniq_billing_concept_rule_id_concept').on(t.id, t.billingConceptId),
     check(
       'chk_billing_concept_rules_tier_requires_metric',
       sql`${t.calcMethod} <> 'TIERED' OR ${t.rangeMetric} IS NOT NULL`
@@ -2358,6 +2375,30 @@ export const billingConceptRules = pgTable(
     check(
       'chk_billing_concept_rules_range_order',
       sql`${t.valueFrom} IS NULL OR ${t.valueTo} IS NULL OR ${t.valueFrom} <= ${t.valueTo}`
+    ),
+    check(
+      'chk_billing_rules_percentage_required',
+      sql`${t.calcMethod} <> 'PERCENTAGE' OR (${t.baseAmount} IS NOT NULL AND ${t.rate} IS NOT NULL)`
+    ),
+    check(
+      'chk_billing_rules_percentage_no_amount',
+      sql`${t.calcMethod} <> 'PERCENTAGE' OR ${t.amount} IS NULL`
+    ),
+    check(
+      'chk_billing_rules_fixed_amount_required',
+      sql`${t.calcMethod} <> 'FIXED_AMOUNT' OR ${t.amount} IS NOT NULL`
+    ),
+    check(
+      'chk_billing_rules_fixed_amount_no_rate',
+      sql`${t.calcMethod} <> 'FIXED_AMOUNT' OR (${t.baseAmount} IS NULL AND ${t.rate} IS NULL)`
+    ),
+    check(
+      'chk_billing_rules_tier_requires_value_source',
+      sql`${t.calcMethod} <> 'TIERED' OR (${t.amount} IS NOT NULL OR (${t.baseAmount} IS NOT NULL AND ${t.rate} IS NOT NULL))`
+    ),
+    check(
+      'chk_billing_rules_effective_order',
+      sql`${t.effectiveFrom} IS NULL OR ${t.effectiveTo} IS NULL OR ${t.effectiveFrom} <= ${t.effectiveTo}`
     ),
   ]
 );
@@ -2389,9 +2430,8 @@ export const creditProductBillingConcepts = pgTable(
     }),
 
     // puedes forzar una regla específica o dejar que se elija la regla activa por vigencia/rango
-    overrideRuleId: integer('override_rule_id').references(() => billingConceptRules.id, {
-      onDelete: 'set null',
-    }),
+
+    overrideRuleId: integer('override_rule_id'),
 
     // orden sugerido (también te sirve luego para prioridad de aplicación de pagos)
     chargeOrder: integer('charge_order').notNull().default(0),
@@ -2401,6 +2441,11 @@ export const creditProductBillingConcepts = pgTable(
   (t) => [
     uniqueIndex('uniq_credit_product_billing_concepts').on(t.creditProductId, t.billingConceptId),
     index('idx_credit_product_billing_concepts_product').on(t.creditProductId),
+    foreignKey({
+      columns: [t.overrideRuleId, t.billingConceptId],
+      foreignColumns: [billingConceptRules.id, billingConceptRules.billingConceptId],
+      name: 'fk_credit_product_billing_concepts_override_rule_concept',
+    }),
   ]
 );
 
@@ -2648,7 +2693,8 @@ export const loanApplicationRiskAssessments = pgTable(
       .references(() => loanApplications.id, { onDelete: 'cascade' }),
 
     // trazabilidad
-    executedByUserId: integer('executed_by_user_id').notNull(),
+    executedByUserId: uuid('executed_by_user_id').notNull(),
+    executedByUserName: varchar('executed_by_user_id', { length: 255 }).notNull(),
     executedAt: timestamp('executed_at', { withTimezone: true }).notNull().defaultNow(),
 
     // resultado normalizado
@@ -3049,6 +3095,7 @@ export const paymentAllocationPolicyRules = pgTable(
   },
   (t) => [
     uniqueIndex('uniq_payment_alloc_rule_order').on(t.policyId, t.priority),
+    uniqueIndex('uniq_payment_alloc_rule_concept').on(t.policyId, t.billingConceptId),
     index('idx_payment_alloc_rules_policy').on(t.policyId),
     index('idx_payment_alloc_rules_concept').on(t.billingConceptId),
 

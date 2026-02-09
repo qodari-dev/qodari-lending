@@ -2,6 +2,7 @@ import {
   db,
   creditProducts,
   creditProductCategories,
+  creditProductLateInterestRules,
   creditProductDocuments,
   creditProductAccounts,
   creditProductRefinancePolicies,
@@ -80,6 +81,10 @@ const CREDIT_PRODUCT_INCLUDES = createIncludeMap<typeof db.query.creditProducts>
   },
   creditProductCategories: {
     relation: 'creditProductCategories',
+    config: true,
+  },
+  creditProductLateInterestRules: {
+    relation: 'creditProductLateInterestRules',
     config: true,
   },
   creditProductRequiredDocuments: {
@@ -197,6 +202,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
       const {
         creditProductRefinancePolicy: refinancePolicyData,
         creditProductCategories: categoriesData,
+        creditProductLateInterestRules: lateInterestRulesData,
         creditProductRequiredDocuments: requiredDocumentsData,
         creditProductAccounts: accountsData,
         ...productData
@@ -209,6 +215,15 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           await tx.insert(creditProductCategories).values(
             categoriesData.map((category) => ({
               ...category,
+              creditProductId: product.id,
+            }))
+          );
+        }
+
+        if (lateInterestRulesData?.length) {
+          await tx.insert(creditProductLateInterestRules).values(
+            lateInterestRulesData.map((rule) => ({
+              ...rule,
               creditProductId: product.id,
             }))
           );
@@ -253,6 +268,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         afterValue: {
           ...created,
           _creditProductCategories: categoriesData ?? [],
+          _creditProductLateInterestRules: lateInterestRulesData ?? [],
           _creditProductRequiredDocuments: requiredDocumentsData ?? [],
           _creditProductAccounts: accountsData ?? [],
           _creditProductRefinancePolicy: refinancePolicyData ?? null,
@@ -312,9 +328,18 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         });
       }
 
-      const [existingCategories, existingDocuments, existingAccounts, existingRefinancePolicy] = await Promise.all([
+      const [
+        existingCategories,
+        existingLateInterestRules,
+        existingDocuments,
+        existingAccounts,
+        existingRefinancePolicy,
+      ] = await Promise.all([
         db.query.creditProductCategories.findMany({
           where: eq(creditProductCategories.creditProductId, id),
+        }),
+        db.query.creditProductLateInterestRules.findMany({
+          where: eq(creditProductLateInterestRules.creditProductId, id),
         }),
         db.query.creditProductDocuments.findMany({
           where: eq(creditProductDocuments.creditProductId, id),
@@ -330,6 +355,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
       const {
         creditProductRefinancePolicy: refinancePolicyData,
         creditProductCategories: categoriesData,
+        creditProductLateInterestRules: lateInterestRulesData,
         creditProductRequiredDocuments: requiredDocumentsData,
         creditProductAccounts: accountsData,
         ...productData
@@ -351,6 +377,21 @@ export const creditProduct = tsr.router(contract.creditProduct, {
             await tx.insert(creditProductCategories).values(
               categoriesData.map((category) => ({
                 ...category,
+                creditProductId: id,
+              }))
+            );
+          }
+        }
+
+        if (lateInterestRulesData) {
+          await tx
+            .delete(creditProductLateInterestRules)
+            .where(eq(creditProductLateInterestRules.creditProductId, id));
+
+          if (lateInterestRulesData.length) {
+            await tx.insert(creditProductLateInterestRules).values(
+              lateInterestRulesData.map((rule) => ({
+                ...rule,
                 creditProductId: id,
               }))
             );
@@ -414,6 +455,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         beforeValue: {
           ...existing,
           _creditProductCategories: existingCategories,
+          _creditProductLateInterestRules: existingLateInterestRules,
           _creditProductRequiredDocuments: existingDocuments,
           _creditProductAccounts: existingAccounts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
@@ -421,6 +463,8 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         afterValue: {
           ...updated,
           _creditProductCategories: categoriesData ?? existingCategories,
+          _creditProductLateInterestRules:
+            lateInterestRulesData ?? existingLateInterestRules,
           _creditProductRequiredDocuments: requiredDocumentsData ?? existingDocuments,
           _creditProductAccounts: accountsData ?? existingAccounts,
           _creditProductRefinancePolicy:
@@ -484,9 +528,18 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         });
       }
 
-      const [existingCategories, existingDocuments, existingAccounts, existingRefinancePolicy] = await Promise.all([
+      const [
+        existingCategories,
+        existingLateInterestRules,
+        existingDocuments,
+        existingAccounts,
+        existingRefinancePolicy,
+      ] = await Promise.all([
         db.query.creditProductCategories.findMany({
           where: eq(creditProductCategories.creditProductId, id),
+        }),
+        db.query.creditProductLateInterestRules.findMany({
+          where: eq(creditProductLateInterestRules.creditProductId, id),
         }),
         db.query.creditProductDocuments.findMany({
           where: eq(creditProductDocuments.creditProductId, id),
@@ -512,6 +565,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         beforeValue: {
           ...existing,
           _creditProductCategories: existingCategories,
+          _creditProductLateInterestRules: existingLateInterestRules,
           _creditProductRequiredDocuments: existingDocuments,
           _creditProductAccounts: existingAccounts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
@@ -519,6 +573,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         afterValue: {
           ...deleted,
           _creditProductCategories: existingCategories,
+          _creditProductLateInterestRules: existingLateInterestRules,
           _creditProductRequiredDocuments: existingDocuments,
           _creditProductAccounts: existingAccounts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,

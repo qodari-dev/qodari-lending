@@ -14,16 +14,20 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  useCreditProducts,
-  useDeleteCreditProduct,
-} from '@/hooks/queries/use-credit-product-queries';
-import { CreditProduct, CreditProductInclude, CreditProductSortField } from '@/schemas/credit-product';
+  useBillingConcepts,
+  useDeleteBillingConcept,
+} from '@/hooks/queries/use-billing-concept-queries';
+import {
+  BillingConcept,
+  BillingConceptInclude,
+  BillingConceptSortField,
+} from '@/schemas/billing-concept';
 import { RowData, TableMeta } from '@tanstack/react-table';
 import * as React from 'react';
-import { creditProductColumns } from './credit-product-columns';
-import { CreditProductForm } from './credit-product-form';
-import { CreditProductInfo } from './credit-product-info';
-import { CreditProductsToolbar } from './credit-product-toolbar';
+import { billingConceptColumns } from './billing-concept-columns';
+import { BillingConceptForm } from './billing-concept-form';
+import { BillingConceptInfo } from './billing-concept-info';
+import { BillingConceptsToolbar } from './billing-concept-toolbar';
 
 declare module '@tanstack/table-core' {
   interface TableMeta<TData extends RowData> {
@@ -33,8 +37,8 @@ declare module '@tanstack/table-core' {
   }
 }
 
-export function CreditProducts() {
-  const [creditProduct, setCreditProduct] = React.useState<CreditProduct>();
+export function BillingConcepts() {
+  const [billingConcept, setBillingConcept] = React.useState<BillingConcept>();
 
   const {
     pageIndex,
@@ -45,79 +49,65 @@ export function CreditProducts() {
     handlePaginationChange,
     handleSortingChange,
     handleSearchChange,
-  } = useDataTable<CreditProductSortField, CreditProductInclude>({
+  } = useDataTable<BillingConceptSortField, BillingConceptInclude>({
     defaultPageSize: 20,
-    defaultIncludes: [
-      'creditFund',
-      'paymentAllocationPolicy',
-      'capitalDistribution',
-      'interestDistribution',
-      'lateInterestDistribution',
-      'costCenter',
-      'creditProductRefinancePolicy',
-      'creditProductCategories',
-      'creditProductLateInterestRules',
-      'creditProductRequiredDocuments',
-      'creditProductAccounts',
-      'creditProductBillingConcepts',
-    ],
+    defaultIncludes: ['defaultGlAccount', 'billingConceptRules'],
     defaultSorting: [{ field: 'createdAt', order: 'desc' }],
   });
 
-  const { data, isLoading, isFetching, refetch } = useCreditProducts(queryParams);
-
-  const { mutateAsync: deleteCreditProduct, isPending: isDeleting } = useDeleteCreditProduct();
+  const { data, isLoading, isFetching, refetch } = useBillingConcepts(queryParams);
+  const { mutateAsync: deleteBillingConcept, isPending: isDeleting } = useDeleteBillingConcept();
 
   const [openedInfoSheet, setOpenedInfoSheet] = React.useState(false);
   const handleInfoSheetChange = React.useCallback(
     (open: boolean) => {
       if (!open) {
-        setCreditProduct(undefined);
+        setBillingConcept(undefined);
       }
       setOpenedInfoSheet(open);
     },
-    [setCreditProduct, setOpenedInfoSheet]
+    [setBillingConcept, setOpenedInfoSheet]
   );
 
   const [openedFormSheet, setOpenedFormSheet] = React.useState(false);
   const handleFormSheetChange = React.useCallback(
     (open: boolean) => {
       if (!open) {
-        setCreditProduct(undefined);
+        setBillingConcept(undefined);
       }
       setOpenedFormSheet(open);
     },
-    [setCreditProduct, setOpenedFormSheet]
+    [setBillingConcept, setOpenedFormSheet]
   );
 
   const [openedDeleteDialog, setOpenedDeleteDialog] = React.useState(false);
   const handleDelete = React.useCallback(async () => {
-    if (!creditProduct?.id) return;
-    await deleteCreditProduct({ params: { id: creditProduct.id } });
-    setCreditProduct(undefined);
+    if (!billingConcept?.id) return;
+    await deleteBillingConcept({ params: { id: billingConcept.id } });
+    setBillingConcept(undefined);
     setOpenedDeleteDialog(false);
-  }, [creditProduct, setCreditProduct, setOpenedDeleteDialog, deleteCreditProduct]);
+  }, [billingConcept, deleteBillingConcept]);
 
   const handleCreate = () => {
     handleFormSheetChange(true);
   };
 
-  const handleRowOpen = React.useCallback((row: CreditProduct) => {
-    setCreditProduct(row);
+  const handleRowOpen = React.useCallback((row: BillingConcept) => {
+    setBillingConcept(row);
     setOpenedInfoSheet(true);
   }, []);
 
-  const handleRowEdit = React.useCallback((row: CreditProduct) => {
-    setCreditProduct(row);
+  const handleRowEdit = React.useCallback((row: BillingConcept) => {
+    setBillingConcept(row);
     setOpenedFormSheet(true);
   }, []);
 
-  const handleRowDelete = React.useCallback((row: CreditProduct) => {
-    setCreditProduct(row);
+  const handleRowDelete = React.useCallback((row: BillingConcept) => {
+    setBillingConcept(row);
     setOpenedDeleteDialog(true);
   }, []);
 
-  const tableMeta = React.useMemo<TableMeta<CreditProduct>>(
+  const tableMeta = React.useMemo<TableMeta<BillingConcept>>(
     () => ({
       onRowView: handleRowOpen,
       onRowDelete: handleRowDelete,
@@ -129,12 +119,12 @@ export function CreditProducts() {
   return (
     <>
       <PageHeader
-        title="Tipos de Creditos"
-        description="Administre lineas de credito, categorias, reglas de mora, documentos y cuentas."
+        title="Conceptos de Facturacion"
+        description="Administre conceptos facturables y sus reglas de calculo."
       />
       <PageContent>
         <DataTable
-          columns={creditProductColumns}
+          columns={billingConceptColumns}
           data={data?.body?.data ?? []}
           pageCount={data?.body?.meta.totalPages ?? 0}
           pageIndex={pageIndex}
@@ -147,7 +137,7 @@ export function CreditProducts() {
           enableRowSelection
           pageSizeOptions={[10, 20, 30, 50]}
           toolbar={
-            <CreditProductsToolbar
+            <BillingConceptsToolbar
               searchValue={searchValue}
               onSearchChange={handleSearchChange}
               onCreate={handleCreate}
@@ -160,13 +150,13 @@ export function CreditProducts() {
         />
       </PageContent>
 
-      <CreditProductInfo
-        creditProduct={creditProduct}
+      <BillingConceptInfo
+        billingConcept={billingConcept}
         opened={openedInfoSheet}
         onOpened={handleInfoSheetChange}
       />
-      <CreditProductForm
-        creditProduct={creditProduct}
+      <BillingConceptForm
+        billingConcept={billingConcept}
         opened={openedFormSheet}
         onOpened={handleFormSheetChange}
       />
@@ -176,12 +166,14 @@ export function CreditProducts() {
           <AlertDialogHeader>
             <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion no se puede deshacer. Esto eliminara permanentemente el tipo de credito
-              &quot;{creditProduct?.name}&quot; y su configuracion asociada.
+              Esta accion no se puede deshacer. Esto eliminara permanentemente el concepto
+              &quot;{billingConcept?.code} - {billingConcept?.name}&quot; y todas sus reglas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setOpenedDeleteDialog(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setOpenedDeleteDialog(false)}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction disabled={isDeleting} onClick={handleDelete}>
               {isDeleting && <Spinner />}
               Eliminar

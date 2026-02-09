@@ -6,6 +6,7 @@ import { affiliationOffice } from './affiliation-office';
 import { agingProfile } from './aging-profile';
 import { auth } from './auth';
 import { bank } from './bank';
+import { billingConcept } from './billing-concept';
 import { billingCycleProfile } from './billing-cycle-profile';
 import { channel } from './channel';
 import { city } from './city';
@@ -27,6 +28,7 @@ import { loanApplication } from './loan-application';
 import { loanPayment } from './loan-payment';
 import { paymentFrequency } from './payment-frequency';
 import { paymentGuaranteeType } from './payment-guarantee-type';
+import { paymentAllocationPolicy } from './payment-allocation-policy';
 import { paymentReceiptType } from './payment-receipt-type';
 import { paymentTenderType } from './payment-tender-type';
 import { rejectionReason } from './rejection-reason';
@@ -45,6 +47,7 @@ export const contract = c.router(
     agingProfile,
     auth,
     bank,
+    billingConcept,
     billingCycleProfile,
     channel,
     city,
@@ -66,6 +69,7 @@ export const contract = c.router(
     loanPayment,
     paymentFrequency,
     paymentGuaranteeType,
+    paymentAllocationPolicy,
     paymentReceiptType,
     paymentTenderType,
     rejectionReason,

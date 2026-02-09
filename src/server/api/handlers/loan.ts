@@ -40,7 +40,7 @@ const LOAN_FIELDS: FieldMap = {
 
 const LOAN_QUERY_CONFIG: QueryConfig = {
   fields: LOAN_FIELDS,
-  searchFields: [loans.creditNumber, loans.voucherNumber],
+  searchFields: [loans.creditNumber],
   defaultSort: { column: loans.createdAt, order: 'desc' },
 };
 
@@ -185,7 +185,10 @@ export const loan = tsr.router(contract.loan, {
           limit: queryLimit,
           offset,
         }),
-        db.select({ count: sql<number>`count(*)::int` }).from(loans).where(whereClause),
+        db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(loans)
+          .where(whereClause),
       ]);
 
       const totalCount = countResult[0]?.count ?? 0;

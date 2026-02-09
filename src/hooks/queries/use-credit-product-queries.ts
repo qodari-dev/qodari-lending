@@ -21,6 +21,7 @@ function defaultQuery(filters?: Partial<ListCreditProductsQuery>) {
     limit: filters?.limit ?? 20,
     include: filters?.include ?? [
       'creditFund',
+      'paymentAllocationPolicy',
       'capitalDistribution',
       'interestDistribution',
       'lateInterestDistribution',
@@ -30,6 +31,7 @@ function defaultQuery(filters?: Partial<ListCreditProductsQuery>) {
       'creditProductLateInterestRules',
       'creditProductRequiredDocuments',
       'creditProductAccounts',
+      'creditProductBillingConcepts',
     ],
     sort: filters?.sort ?? [],
     where: filters?.where,

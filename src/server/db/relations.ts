@@ -451,6 +451,7 @@ export const creditProductsRelations = relations(creditProducts, ({ one, many })
   creditProductDocuments: many(creditProductDocuments),
   creditProductAccounts: many(creditProductAccounts),
   creditProductLateInterestRules: many(creditProductLateInterestRules),
+  creditProductBillingConcepts: many(creditProductBillingConcepts),
 }));
 
 // ---------------------------------------------------------------------
@@ -1210,7 +1211,7 @@ export const paymentAllocationPolicyRulesRelations = relations(
   paymentAllocationPolicyRules,
   ({ one }) => ({
     paymentAllocationPolicy: one(paymentAllocationPolicies, {
-      fields: [paymentAllocationPolicyRules.policyId],
+      fields: [paymentAllocationPolicyRules.paymentAllocationPolicyId],
       references: [paymentAllocationPolicies.id],
     }),
     billingConcept: one(billingConcepts, {

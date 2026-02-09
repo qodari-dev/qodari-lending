@@ -1397,9 +1397,6 @@ export const loans = pgTable(
 
     note: varchar('note', { length: 255 }),
 
-    // numcom: oficina-creditonumber
-    voucherNumber: varchar('voucher_number', { length: 30 }),
-
     paymentFrequencyId: integer('payment_frequency_id').references(() => paymentFrequencies.id, {
       onDelete: 'restrict',
     }),
@@ -1649,37 +1646,25 @@ export const portfolioEntries = pgTable(
   'portfolio_entries',
   {
     id: serial('id').primaryKey(),
-
     glAccountId: integer('gl_account_id')
       .notNull()
       .references(() => glAccounts.id, { onDelete: 'restrict' }),
-
     thirdPartyId: integer('third_party_id')
       .notNull()
       .references(() => thirdParties.id, { onDelete: 'restrict' }),
-
     loanId: integer('loan_id')
       .notNull()
       .references(() => loans.id, { onDelete: 'cascade' }),
-
     installmentNumber: integer('installment_number').notNull().default(0),
-
     // equivalente a concr22.fecven / tconcr17.fecven
     dueDate: date('due_date').notNull(),
-
     // equivalente a tconcr17.valor / abonos / saldo
     chargeAmount: decimal('charge_amount', { precision: 14, scale: 2 }).notNull().default('0'),
     paymentAmount: decimal('payment_amount', { precision: 14, scale: 2 }).notNull().default('0'),
     balance: decimal('balance', { precision: 14, scale: 2 }).notNull().default('0'),
-
     // equivalente a tconcr17.fecha (último movimiento aplicado)
     lastMovementDate: date('last_movement_date'),
-
     status: portfolioEntryStatusEnum('status').notNull().default('OPEN'),
-
-    // estado legacy (si lo quieres guardar tal cual)
-    legacyStatusCode: varchar('legacy_status_code', { length: 1 }),
-
     ...timestamps,
   },
   (t) => [
@@ -1705,6 +1690,21 @@ export const portfolioEntries = pgTable(
   ]
 );
 
+export const accountingEntriesStatusEnum = pgEnum('accounting_entries_status', [
+  'DRAFT',
+  'POSTED',
+  'VOIDED',
+]);
+
+export const accountingEntrySourceTypeEnum = pgEnum('accounting_entry_source_type', [
+  'LOAN_APPROVAL',
+  'LOAN_PAYMENT',
+  'LOAN_PAYMENT_VOID',
+  'PROCESS_RUN',
+  'MANUAL_ADJUSTMENT',
+  'REFINANCE',
+]);
+
 // ---------------------------------------------------------------------
 // Concr22 - Movimientos contables
 // Nota (ES):
@@ -1712,20 +1712,17 @@ export const portfolioEntries = pgTable(
 // alimenta/actualiza cartera (portfolio_entries) si la cuenta lo requiere (Concr18.detalla != 'N').
 // Campos clave:
 // - glAccountId + loanId + installmentNumber: para cartera.
-// - voucherNumber (numcom): comprobante.
 // - processType + documentCode + sequence: llave funcional legacy.
 // ---------------------------------------------------------------------
 export const accountingEntries = pgTable(
   'accounting_entries',
   {
     id: serial('id').primaryKey(),
-
     // concr22.tipo / documento / sec (llave legacy)
     processType: processTypeEnum('process_type').notNull(),
     documentCode: varchar('document_code', { length: 7 }).notNull(),
     sequence: integer('sequence').notNull(),
 
-    voucherNumber: varchar('voucher_number', { length: 13 }).notNull(),
     entryDate: date('entry_date').notNull(),
 
     glAccountId: integer('gl_account_id')
@@ -1754,15 +1751,12 @@ export const accountingEntries = pgTable(
     installmentNumber: integer('installment_number'),
     dueDate: date('due_date'),
 
-    checkNumber: varchar('check_number', { length: 7 }),
+    status: accountingEntriesStatusEnum('status').notNull().default('DRAFT'),
+    statusDate: date('status_date'),
 
-    // estado: al menos 'C' es contabilizado
-    statusCode: varchar('status_code', { length: 1 }).notNull(),
-
-    transactionTypeCode: varchar('transaction_type_code', { length: 1 }),
-    transactionDocument: varchar('transaction_document', {
-      length: 7,
-    }).notNull(),
+    sourceType: accountingEntrySourceTypeEnum('source_type').notNull(),
+    sourceId: varchar('source_id', { length: 64 }).notNull(),
+    reversalOfEntryId: integer('reversal_of_entry_id'),
     processRunId: integer('process_run_id').references(() => processRuns.id, {
       onDelete: 'restrict',
     }),
@@ -1770,18 +1764,22 @@ export const accountingEntries = pgTable(
   },
   (t) => [
     uniqueIndex('uniq_accounting_entry_legacy_key').on(t.processType, t.documentCode, t.sequence),
-
     index('idx_entries_process_run').on(t.processRunId),
-
     // índices para cartera / consultas típicas
     index('idx_entries_loan_installment_due_status').on(
       t.loanId,
       t.installmentNumber,
       t.dueDate,
-      t.statusCode
+      t.status
     ),
-    index('idx_entries_gl_third_party_status').on(t.glAccountId, t.thirdPartyId, t.statusCode),
-    index('idx_entries_voucher').on(t.voucherNumber, t.entryDate),
+    index('idx_entries_gl_third_party_status').on(t.glAccountId, t.thirdPartyId, t.status),
+    foreignKey({
+      columns: [t.reversalOfEntryId],
+      foreignColumns: [t.id],
+      name: 'fk_accounting_entries_reversal_of_entry',
+    }),
+    index('idx_accounting_entries_source').on(t.sourceType, t.sourceId),
+    index('idx_accounting_entries_reversal').on(t.reversalOfEntryId),
   ]
 );
 
@@ -2239,9 +2237,9 @@ export const billingConceptTypeEnum = pgEnum('billing_concept_type', [
   'PRINCIPAL',
   'INTEREST',
   'LATE_INTEREST',
+  'INSURANCE', // seguro
 
   'FEE', // cuota de manejo, estudio, etc.
-  'INSURANCE', // seguro
   'GUARANTEE', // FGA u otras garantías
   'OTHER',
 ]);
@@ -2289,22 +2287,18 @@ export const billingConcepts = pgTable(
     // Ej: "FGA", "CUOTA_MANEJO", "ESTUDIO_CREDITO", "SEGURO"
     code: varchar('code', { length: 50 }).notNull(),
     name: varchar('name', { length: 150 }).notNull(),
+    description: text('description'),
     isSystem: boolean('is_system').notNull().default(false),
 
     conceptType: billingConceptTypeEnum('concept_type').notNull(),
-
     // defaults (se pueden sobre-escribir en producto o en crédito)
     defaultFrequency: billingConceptFrequencyEnum('default_frequency').notNull(),
     defaultFinancingMode: billingConceptFinancingModeEnum('default_financing_mode').notNull(),
-
     // auxiliar / cuenta contable por defecto
     defaultGlAccountId: integer('default_gl_account_id').references(() => glAccounts.id, {
       onDelete: 'restrict',
     }),
-
     isActive: boolean('is_active').notNull().default(true),
-    description: text('description'),
-
     ...timestamps,
   },
   (t) => [uniqueIndex('uniq_billing_concepts_code').on(t.code)]
@@ -2410,32 +2404,20 @@ export const creditProductBillingConcepts = pgTable(
   'credit_product_billing_concepts',
   {
     id: serial('id').primaryKey(),
-
     creditProductId: integer('credit_product_id')
       .notNull()
       .references(() => creditProducts.id, { onDelete: 'cascade' }),
-
     billingConceptId: integer('billing_concept_id')
       .notNull()
       .references(() => billingConcepts.id, { onDelete: 'restrict' }),
-
     isEnabled: boolean('is_enabled').notNull().default(true),
-    isMandatory: boolean('is_mandatory').notNull().default(true),
-
     // override por producto (si necesitas)
     overrideFrequency: billingConceptFrequencyEnum('override_frequency'),
     overrideFinancingMode: billingConceptFinancingModeEnum('override_financing_mode'),
     overrideGlAccountId: integer('override_gl_account_id').references(() => glAccounts.id, {
       onDelete: 'restrict',
     }),
-
-    // puedes forzar una regla específica o dejar que se elija la regla activa por vigencia/rango
-
     overrideRuleId: integer('override_rule_id'),
-
-    // orden sugerido (también te sirve luego para prioridad de aplicación de pagos)
-    chargeOrder: integer('charge_order').notNull().default(0),
-
     ...timestamps,
   },
   (t) => [
@@ -2495,12 +2477,6 @@ export const loanBillingConcepts = pgTable(
     maxAmount: decimal('max_amount', { precision: 14, scale: 2 }),
     roundingMode: billingConceptRoundingModeEnum('rounding_mode').notNull().default('NEAREST'),
     roundingDecimals: integer('rounding_decimals').notNull().default(2),
-
-    // vigencia dentro del crédito (ej: seguro solo durante el plazo)
-    startDate: date('start_date'),
-    endDate: date('end_date'),
-
-    isActive: boolean('is_active').notNull().default(true),
 
     ...timestamps,
   },
@@ -3050,20 +3026,16 @@ export const paymentAllocationPolicies = pgTable(
   'payment_allocation_policies',
   {
     id: serial('id').primaryKey(),
-    code: varchar('code', { length: 40 }).notNull(), // ej: NORMAL, CAPITAL_ONLY
     name: varchar('name', { length: 120 }).notNull(),
-
     overpaymentHandling: overpaymentHandlingEnum('overpayment_handling')
       .notNull()
       .default('EXCESS_BALANCE'),
-
     isActive: boolean('is_active').notNull().default(true),
     note: varchar('note', { length: 255 }),
-
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_payment_allocation_policies_code').on(t.code),
+    uniqueIndex('uniq_payment_allocation_policies_name').on(t.name),
     index('idx_payment_allocation_policies_active').on(t.isActive),
   ]
 );
@@ -3072,31 +3044,26 @@ export const paymentAllocationPolicyRules = pgTable(
   'payment_allocation_policy_rules',
   {
     id: serial('id').primaryKey(),
-
-    policyId: integer('policy_id')
+    paymentAllocationPolicyId: integer('payment_allocation_policy_id')
       .notNull()
-      .references(() => paymentAllocationPolicies.id, { onDelete: 'cascade' }),
-
+      .references(() => paymentAllocationPolicies.id, { onDelete: 'restrict' }),
     // prelación
     priority: integer('priority').notNull(),
-
     // destino de imputación (SYSTEM o CUSTOM)
     billingConceptId: integer('billing_concept_id')
       .notNull()
       .references(() => billingConcepts.id, { onDelete: 'restrict' }),
-
     scope: allocationScopeEnum('scope').notNull().default('PAST_DUE_FIRST'),
     orderWithin: orderWithinEnum('order_within').notNull().default('DUE_DATE_ASC'),
-
-    isActive: boolean('is_active').notNull().default(true),
-    note: varchar('note', { length: 255 }),
-
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_payment_alloc_rule_order').on(t.policyId, t.priority),
-    uniqueIndex('uniq_payment_alloc_rule_concept').on(t.policyId, t.billingConceptId),
-    index('idx_payment_alloc_rules_policy').on(t.policyId),
+    uniqueIndex('uniq_payment_alloc_rule_order').on(t.paymentAllocationPolicyId, t.priority),
+    uniqueIndex('uniq_payment_alloc_rule_concept').on(
+      t.paymentAllocationPolicyId,
+      t.billingConceptId
+    ),
+    index('idx_payment_alloc_rules_policy').on(t.paymentAllocationPolicyId),
     index('idx_payment_alloc_rules_concept').on(t.billingConceptId),
 
     check('chk_payment_alloc_rule_priority_min', sql`${t.priority} >= 1`),

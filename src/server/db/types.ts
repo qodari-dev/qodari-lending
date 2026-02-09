@@ -359,6 +359,7 @@ export type CreditProducts = typeof creditProducts.$inferSelect & {
   creditProductCategories?: CreditProductCategories[];
   creditProductDocuments?: CreditProductDocuments[];
   creditProductAccounts?: CreditProductAccounts[];
+  creditProductBillingConcepts?: CreditProductBillingConcepts[];
   paymentAllocationPolicy?: PaymentAllocationPolicies;
   creditProductLateInterestRules?: CreditProductLateInterestRules[];
 };

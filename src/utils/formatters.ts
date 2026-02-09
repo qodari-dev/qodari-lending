@@ -86,6 +86,13 @@ export function formatDateISO(value: DateInput): string {
 }
 
 /**
+ * Alias para inputs tipo date (yyyy-MM-dd)
+ */
+export function formatDateOnly(value: DateInput): string {
+  return formatDateISO(value);
+}
+
+/**
  * Custom format
  */
 export function formatDateCustom(value: DateInput, formatStr: string): string {

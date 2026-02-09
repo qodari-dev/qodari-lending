@@ -127,6 +127,27 @@
       "when": 1770601105692,
       "tag": "0017_eager_doctor_faustus",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1770648509098,
+      "tag": "0018_dark_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1770650831965,
+      "tag": "0019_open_vulture",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1770655998965,
+      "tag": "0020_lyrical_millenium_guard",
+      "breakpoints": true
     }
   ]
 }

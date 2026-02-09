@@ -17,6 +17,10 @@ import {
   insuranceRangeMetricLabels,
   riskEvaluationModeLabels,
 } from '@/schemas/credit-product';
+import {
+  billingConceptFinancingModeLabels,
+  billingConceptFrequencyLabels,
+} from '@/schemas/billing-concept';
 import { formatDate } from '@/utils/formatters';
 
 export function CreditProductInfo({
@@ -47,11 +51,30 @@ export function CreditProductInfo({
     lateInterestGlAccount?: { code: string; name: string };
   };
 
+  type BillingConceptView = {
+    id: number;
+    billingConceptId: number;
+    isEnabled: boolean;
+    overrideFrequency: 'ONE_TIME' | 'MONTHLY' | 'PER_INSTALLMENT' | 'PER_EVENT' | null;
+    overrideFinancingMode:
+      | 'DISCOUNT_FROM_DISBURSEMENT'
+      | 'FINANCED_IN_LOAN'
+      | 'BILLED_SEPARATELY'
+      | null;
+    overrideGlAccountId: number | null;
+    overrideRuleId: number | null;
+    billingConcept?: { code: string; name: string };
+    overrideGlAccount?: { code: string; name: string };
+  };
+
   const requiredDocuments = ((creditProduct as unknown as { creditProductDocuments?: unknown[] })
     .creditProductDocuments ?? []) as RequiredDocumentView[];
 
   const accounts = ((creditProduct as unknown as { creditProductAccounts?: unknown[] })
     .creditProductAccounts ?? []) as AccountView[];
+
+  const billingConcepts = ((creditProduct as unknown as { creditProductBillingConcepts?: unknown[] })
+    .creditProductBillingConcepts ?? []) as BillingConceptView[];
 
   const sections: DescriptionSection[] = [
     {
@@ -61,8 +84,8 @@ export function CreditProductInfo({
         { label: 'Nombre', value: creditProduct.name },
         { label: 'Fondo', value: creditProduct.creditFund?.name ?? creditProduct.creditFundId },
         {
-          label: 'Politica aplicacion (ID)',
-          value: creditProduct.paymentAllocationPolicyId,
+          label: 'Politica aplicacion',
+          value: creditProduct.paymentAllocationPolicy?.name ?? creditProduct.paymentAllocationPolicyId,
         },
         { label: 'Modelo XML', value: creditProduct.xmlModelId ?? '-' },
         {
@@ -151,6 +174,7 @@ export function CreditProductInfo({
               <TabsTrigger value="lateRules">Reglas mora</TabsTrigger>
               <TabsTrigger value="documents">Documentos</TabsTrigger>
               <TabsTrigger value="accounts">Cuentas</TabsTrigger>
+              <TabsTrigger value="billingConcepts">Conceptos</TabsTrigger>
               <TabsTrigger value="refinance">Refinanciacion</TabsTrigger>
             </TabsList>
 
@@ -292,6 +316,60 @@ export function CreditProductInfo({
               ) : (
                 <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
                   No hay cuentas configuradas.
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="billingConcepts" className="space-y-2">
+              <h3 className="text-sm font-semibold">Conceptos de facturacion</h3>
+              {billingConcepts.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Concepto</TableHead>
+                      <TableHead>Frecuencia</TableHead>
+                      <TableHead>Modo</TableHead>
+                      <TableHead>Cuenta</TableHead>
+                      <TableHead>Regla</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {billingConcepts.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          {item.billingConcept
+                            ? `${item.billingConcept.code} - ${item.billingConcept.name}`
+                            : item.billingConceptId}
+                        </TableCell>
+                        <TableCell>
+                          {item.overrideFrequency
+                            ? billingConceptFrequencyLabels[item.overrideFrequency]
+                            : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {item.overrideFinancingMode
+                            ? billingConceptFinancingModeLabels[item.overrideFinancingMode]
+                            : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {item.overrideGlAccount
+                            ? `${item.overrideGlAccount.code} - ${item.overrideGlAccount.name}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell>{item.overrideRuleId ? `Regla #${item.overrideRuleId}` : '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.isEnabled ? 'default' : 'outline'}>
+                            {item.isEnabled ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                  No hay conceptos configurados.
                 </div>
               )}
             </TabsContent>

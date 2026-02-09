@@ -40,9 +40,11 @@ import {
   useUpdateCreditProduct,
 } from '@/hooks/queries/use-credit-product-queries';
 import { useCreditFunds } from '@/hooks/queries/use-credit-fund-queries';
+import { usePaymentAllocationPolicies } from '@/hooks/queries/use-payment-allocation-policy-queries';
 import { AccountingDistribution } from '@/schemas/accounting-distribution';
 import { CostCenter } from '@/schemas/cost-center';
 import { CreditFund } from '@/schemas/credit-fund';
+import { PaymentAllocationPolicy } from '@/schemas/payment-allocation-policy';
 import {
   CreateCreditProductBodySchema,
   CreditProduct,
@@ -60,6 +62,7 @@ import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { CreditProductAccountsForm } from './credit-product-accounts-form';
+import { CreditProductBillingConceptsForm } from './credit-product-billing-concepts-form';
 import { CreditProductCategoriesForm } from './credit-product-categories-form';
 import { CreditProductLateInterestRulesForm } from './credit-product-late-interest-rules-form';
 import { CreditProductRefinancePolicyForm } from './credit-product-refinance-policy-form';
@@ -114,6 +117,7 @@ export function CreditProductForm({
       creditProductLateInterestRules: [],
       creditProductRequiredDocuments: [],
       creditProductAccounts: [],
+      creditProductBillingConcepts: [],
     },
   });
 
@@ -141,6 +145,15 @@ export function CreditProductForm({
   });
   const costCenters = useMemo(() => costCentersData?.body?.data ?? [], [costCentersData]);
 
+  const { data: paymentAllocationPoliciesData } = usePaymentAllocationPolicies({
+    limit: 1000,
+    sort: [{ field: 'name', order: 'asc' }],
+  });
+  const paymentAllocationPolicies = useMemo(
+    () => paymentAllocationPoliciesData?.body?.data ?? [],
+    [paymentAllocationPoliciesData]
+  );
+
   const findCreditFund = useCallback(
     (id: number | undefined) => creditFunds.find((item) => item.id === id) ?? null,
     [creditFunds]
@@ -154,6 +167,11 @@ export function CreditProductForm({
   const findCostCenter = useCallback(
     (id: number | null | undefined) => costCenters.find((item) => item.id === id) ?? null,
     [costCenters]
+  );
+
+  const findPaymentAllocationPolicy = useCallback(
+    (id: number | undefined) => paymentAllocationPolicies.find((item) => item.id === id) ?? null,
+    [paymentAllocationPolicies]
   );
 
   useEffect(() => {
@@ -232,6 +250,15 @@ export function CreditProductForm({
             interestGlAccountId: account.interestGlAccountId,
             lateInterestGlAccountId: account.lateInterestGlAccountId,
           })) ?? [],
+        creditProductBillingConcepts:
+          creditProduct?.creditProductBillingConcepts?.map((billingConcept) => ({
+            billingConceptId: billingConcept.billingConceptId,
+            isEnabled: billingConcept.isEnabled,
+            overrideFrequency: billingConcept.overrideFrequency ?? null,
+            overrideFinancingMode: billingConcept.overrideFinancingMode ?? null,
+            overrideGlAccountId: billingConcept.overrideGlAccountId ?? null,
+            overrideRuleId: billingConcept.overrideRuleId ?? null,
+          })) ?? [],
       });
     }
   }, [opened, creditProduct, form]);
@@ -273,6 +300,7 @@ export function CreditProductForm({
                 <TabsTrigger value="requiredDocuments">Documentos</TabsTrigger>
                 <TabsTrigger value="refinancePolicy">Refinanciacion</TabsTrigger>
                 <TabsTrigger value="accounts">Cuentas</TabsTrigger>
+                <TabsTrigger value="billingConcepts">Conceptos</TabsTrigger>
               </TabsList>
 
               <TabsContent value="product" className="space-y-4 pt-2">
@@ -335,18 +363,50 @@ export function CreditProductForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="paymentAllocationPolicyId">Politica de aplicacion (ID)</FieldLabel>
-                          <Input
-                            id="paymentAllocationPolicyId"
-                            type="number"
-                            value={field.value ?? ''}
-                            onChange={(event) =>
-                              field.onChange(
-                                event.target.value ? Number(event.target.value) : undefined
-                              )
+                          <FieldLabel htmlFor="paymentAllocationPolicyId">
+                            Politica de aplicacion
+                          </FieldLabel>
+                          <Combobox
+                            items={paymentAllocationPolicies}
+                            value={findPaymentAllocationPolicy(field.value)}
+                            onValueChange={(value: PaymentAllocationPolicy | null) =>
+                              field.onChange(value?.id ?? undefined)
                             }
-                            aria-invalid={fieldState.invalid}
-                          />
+                            itemToStringValue={(item: PaymentAllocationPolicy) => String(item.id)}
+                            itemToStringLabel={(item: PaymentAllocationPolicy) => item.name}
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent portalContainer={sheetContentRef}>
+                              <ComboboxInput
+                                placeholder="Buscar politica..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>
+                                  No se encontraron politicas
+                                </ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: PaymentAllocationPolicy) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -722,6 +782,10 @@ export function CreditProductForm({
 
               <TabsContent value="accounts" className="pt-2">
                 <CreditProductAccountsForm />
+              </TabsContent>
+
+              <TabsContent value="billingConcepts" className="pt-2">
+                <CreditProductBillingConceptsForm />
               </TabsContent>
             </Tabs>
           </form>

@@ -6,6 +6,7 @@ import {
   creditProductDocuments,
   creditProductAccounts,
   creditProductRefinancePolicies,
+  creditProductBillingConcepts,
 } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
@@ -102,6 +103,16 @@ const CREDIT_PRODUCT_INCLUDES = createIncludeMap<typeof db.query.creditProducts>
         capitalGlAccount: true,
         interestGlAccount: true,
         lateInterestGlAccount: true,
+      },
+    },
+  },
+  creditProductBillingConcepts: {
+    relation: 'creditProductBillingConcepts',
+    config: {
+      with: {
+        billingConcept: true,
+        overrideBillingConceptRule: true,
+        overrideGlAccount: true,
       },
     },
   },
@@ -205,6 +216,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         creditProductLateInterestRules: lateInterestRulesData,
         creditProductRequiredDocuments: requiredDocumentsData,
         creditProductAccounts: accountsData,
+        creditProductBillingConcepts: billingConceptsData,
         ...productData
       } = body;
 
@@ -247,6 +259,15 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           );
         }
 
+        if (billingConceptsData?.length) {
+          await tx.insert(creditProductBillingConcepts).values(
+            billingConceptsData.map((billingConcept) => ({
+              ...billingConcept,
+              creditProductId: product.id,
+            }))
+          );
+        }
+
         if (refinancePolicyData) {
           await tx.insert(creditProductRefinancePolicies).values({
             ...refinancePolicyData,
@@ -271,6 +292,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductLateInterestRules: lateInterestRulesData ?? [],
           _creditProductRequiredDocuments: requiredDocumentsData ?? [],
           _creditProductAccounts: accountsData ?? [],
+          _creditProductBillingConcepts: billingConceptsData ?? [],
           _creditProductRefinancePolicy: refinancePolicyData ?? null,
         },
         ipAddress,
@@ -333,6 +355,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         existingLateInterestRules,
         existingDocuments,
         existingAccounts,
+        existingBillingConcepts,
         existingRefinancePolicy,
       ] = await Promise.all([
         db.query.creditProductCategories.findMany({
@@ -347,6 +370,9 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         db.query.creditProductAccounts.findMany({
           where: eq(creditProductAccounts.creditProductId, id),
         }),
+        db.query.creditProductBillingConcepts.findMany({
+          where: eq(creditProductBillingConcepts.creditProductId, id),
+        }),
         db.query.creditProductRefinancePolicies.findFirst({
           where: eq(creditProductRefinancePolicies.creditProductId, id),
         }),
@@ -358,6 +384,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         creditProductLateInterestRules: lateInterestRulesData,
         creditProductRequiredDocuments: requiredDocumentsData,
         creditProductAccounts: accountsData,
+        creditProductBillingConcepts: billingConceptsData,
         ...productData
       } = body;
 
@@ -428,6 +455,21 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           }
         }
 
+        if (billingConceptsData) {
+          await tx
+            .delete(creditProductBillingConcepts)
+            .where(eq(creditProductBillingConcepts.creditProductId, id));
+
+          if (billingConceptsData.length) {
+            await tx.insert(creditProductBillingConcepts).values(
+              billingConceptsData.map((billingConcept) => ({
+                ...billingConcept,
+                creditProductId: id,
+              }))
+            );
+          }
+        }
+
         if (refinancePolicyData !== undefined) {
           await tx
             .delete(creditProductRefinancePolicies)
@@ -467,6 +509,8 @@ export const creditProduct = tsr.router(contract.creditProduct, {
             lateInterestRulesData ?? existingLateInterestRules,
           _creditProductRequiredDocuments: requiredDocumentsData ?? existingDocuments,
           _creditProductAccounts: accountsData ?? existingAccounts,
+          _creditProductBillingConcepts:
+            billingConceptsData ?? existingBillingConcepts,
           _creditProductRefinancePolicy:
             refinancePolicyData !== undefined
               ? (refinancePolicyData ?? null)
@@ -533,6 +577,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         existingLateInterestRules,
         existingDocuments,
         existingAccounts,
+        existingBillingConcepts,
         existingRefinancePolicy,
       ] = await Promise.all([
         db.query.creditProductCategories.findMany({
@@ -546,6 +591,9 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         }),
         db.query.creditProductAccounts.findMany({
           where: eq(creditProductAccounts.creditProductId, id),
+        }),
+        db.query.creditProductBillingConcepts.findMany({
+          where: eq(creditProductBillingConcepts.creditProductId, id),
         }),
         db.query.creditProductRefinancePolicies.findFirst({
           where: eq(creditProductRefinancePolicies.creditProductId, id),
@@ -568,6 +616,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductLateInterestRules: existingLateInterestRules,
           _creditProductRequiredDocuments: existingDocuments,
           _creditProductAccounts: existingAccounts,
+          _creditProductBillingConcepts: existingBillingConcepts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
         },
         afterValue: {
@@ -576,6 +625,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductLateInterestRules: existingLateInterestRules,
           _creditProductRequiredDocuments: existingDocuments,
           _creditProductAccounts: existingAccounts,
+          _creditProductBillingConcepts: existingBillingConcepts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
         },
         ipAddress,

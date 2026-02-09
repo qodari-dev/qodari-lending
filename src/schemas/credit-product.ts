@@ -92,6 +92,7 @@ const CREDIT_PRODUCT_INCLUDE_OPTIONS = [
   'creditProductLateInterestRules',
   'creditProductRequiredDocuments',
   'creditProductAccounts',
+  'creditProductBillingConcepts',
 ] as const;
 const CreditProductIncludeSchema = createIncludeSchema(CREDIT_PRODUCT_INCLUDE_OPTIONS);
 
@@ -155,6 +156,25 @@ export const CreditProductAccountInputSchema = z.object({
 
 export type CreditProductAccountInput = z.infer<typeof CreditProductAccountInputSchema>;
 
+export const CreditProductBillingConceptInputSchema = z.object({
+  billingConceptId: z.number().int().positive(),
+  isEnabled: z.boolean(),
+  overrideFrequency: z
+    .enum(['ONE_TIME', 'MONTHLY', 'PER_INSTALLMENT', 'PER_EVENT'])
+    .nullable()
+    .optional(),
+  overrideFinancingMode: z
+    .enum(['DISCOUNT_FROM_DISBURSEMENT', 'FINANCED_IN_LOAN', 'BILLED_SEPARATELY'])
+    .nullable()
+    .optional(),
+  overrideGlAccountId: z.number().int().positive().nullable().optional(),
+  overrideRuleId: z.number().int().positive().nullable().optional(),
+});
+
+export type CreditProductBillingConceptInput = z.infer<
+  typeof CreditProductBillingConceptInputSchema
+>;
+
 export const CreditProductRefinancePolicyInputSchema = z.object({
   allowRefinance: z.boolean(),
   allowConsolidation: z.boolean(),
@@ -194,6 +214,7 @@ const CreditProductBaseSchema = z.object({
   creditProductLateInterestRules: CreditProductLateInterestRuleInputSchema.array().optional(),
   creditProductRequiredDocuments: CreditProductRequiredDocumentInputSchema.array().optional(),
   creditProductAccounts: CreditProductAccountInputSchema.array().optional(),
+  creditProductBillingConcepts: CreditProductBillingConceptInputSchema.array().optional(),
 });
 
 const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
@@ -220,6 +241,9 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
         documentTypeId: number;
       }[];
       creditProductAccounts?: unknown[];
+      creditProductBillingConcepts?: {
+        billingConceptId: number;
+      }[];
     };
 
     const categories = data.creditProductCategories ?? [];
@@ -308,6 +332,20 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
         message: 'Solo se permite una configuracion de cuentas por producto',
         path: ['creditProductAccounts'],
       });
+    }
+
+    const billingConcepts = data.creditProductBillingConcepts ?? [];
+    const billingConceptIds = new Set<number>();
+    for (const concept of billingConcepts) {
+      if (billingConceptIds.has(concept.billingConceptId)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'No puede repetir el concepto de facturacion',
+          path: ['creditProductBillingConcepts'],
+        });
+        break;
+      }
+      billingConceptIds.add(concept.billingConceptId);
     }
 
     const policy = data.creditProductRefinancePolicy;

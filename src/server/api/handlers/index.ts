@@ -8,6 +8,7 @@ import { creditFund } from './credit-fund';
 import { accountingPeriod } from './accounting-period';
 import { auth } from './auth';
 import { bank } from './bank';
+import { billingConcept } from './billing-concept';
 import { billingCycleProfile } from './billing-cycle-profile';
 import { channel } from './channel';
 import { city } from './city';
@@ -28,6 +29,7 @@ import { loanApplication } from './loan-application';
 import { loanPayment } from './loan-payment';
 import { paymentFrequency } from './payment-frequency';
 import { paymentGuaranteeType } from './payment-guarantee-type';
+import { paymentAllocationPolicy } from './payment-allocation-policy';
 import { paymentReceiptType } from './payment-receipt-type';
 import { paymentTenderType } from './payment-tender-type';
 import { rejectionReason } from './rejection-reason';
@@ -35,12 +37,46 @@ import { repaymentMethod } from './repayment-method';
 import { thirdParty } from './third-party';
 import { thirdPartyType } from './third-party-type';
 
-export const handler = createNextHandler(
-  contract,
-  { accountingDistribution, accountingPeriod, affiliationOffice, agreement, agingProfile, auth, bank, billingCycleProfile, channel, city, coDebtor, costCenter, creditFund, creditProduct, creditSimulation, creditsSettings: creditsSettingsHandler, dashboard, documentType, glAccount, iamUser, identificationType, insuranceCompany, investmentType, loan, loanApplication, loanPayment, paymentFrequency, paymentGuaranteeType, paymentReceiptType, paymentTenderType, rejectionReason, repaymentMethod, thirdParty, thirdPartyType },
-  {
-    jsonQuery: true,
-    responseValidation: true,
-    handlerType: 'app-router',
-  }
-);
+export const handler = createNextHandler(contract, {
+  accountingDistribution,
+  accountingPeriod,
+  affiliationOffice,
+  agreement,
+  agingProfile,
+  auth,
+  bank,
+  billingConcept,
+  billingCycleProfile,
+  channel,
+  city,
+  coDebtor,
+  costCenter,
+  creditFund,
+  creditProduct,
+  creditSimulation,
+  creditsSettings: creditsSettingsHandler,
+  dashboard,
+  documentType,
+  glAccount,
+  iamUser,
+  identificationType,
+  insuranceCompany,
+  investmentType,
+  loan,
+  loanApplication,
+  loanPayment,
+  paymentAllocationPolicy,
+  paymentFrequency,
+  paymentGuaranteeType,
+  paymentReceiptType,
+  paymentTenderType,
+  rejectionReason,
+  repaymentMethod,
+  thirdParty,
+  thirdPartyType,
+},
+{
+  jsonQuery: true,
+  responseValidation: true,
+  handlerType: 'app-router',
+});

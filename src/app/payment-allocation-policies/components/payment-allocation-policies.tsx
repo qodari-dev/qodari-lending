@@ -14,16 +14,20 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  useCreditProducts,
-  useDeleteCreditProduct,
-} from '@/hooks/queries/use-credit-product-queries';
-import { CreditProduct, CreditProductInclude, CreditProductSortField } from '@/schemas/credit-product';
+  useDeletePaymentAllocationPolicy,
+  usePaymentAllocationPolicies,
+} from '@/hooks/queries/use-payment-allocation-policy-queries';
+import {
+  PaymentAllocationPolicy,
+  PaymentAllocationPolicyInclude,
+  PaymentAllocationPolicySortField,
+} from '@/schemas/payment-allocation-policy';
 import { RowData, TableMeta } from '@tanstack/react-table';
 import * as React from 'react';
-import { creditProductColumns } from './credit-product-columns';
-import { CreditProductForm } from './credit-product-form';
-import { CreditProductInfo } from './credit-product-info';
-import { CreditProductsToolbar } from './credit-product-toolbar';
+import { PaymentAllocationPolicyColumns } from './payment-allocation-policy-columns';
+import { PaymentAllocationPolicyForm } from './payment-allocation-policy-form';
+import { PaymentAllocationPolicyInfo } from './payment-allocation-policy-info';
+import { PaymentAllocationPolicyToolbar } from './payment-allocation-policy-toolbar';
 
 declare module '@tanstack/table-core' {
   interface TableMeta<TData extends RowData> {
@@ -33,8 +37,8 @@ declare module '@tanstack/table-core' {
   }
 }
 
-export function CreditProducts() {
-  const [creditProduct, setCreditProduct] = React.useState<CreditProduct>();
+export function PaymentAllocationPolicies() {
+  const [policy, setPolicy] = React.useState<PaymentAllocationPolicy>();
 
   const {
     pageIndex,
@@ -45,96 +49,72 @@ export function CreditProducts() {
     handlePaginationChange,
     handleSortingChange,
     handleSearchChange,
-  } = useDataTable<CreditProductSortField, CreditProductInclude>({
+  } = useDataTable<PaymentAllocationPolicySortField, PaymentAllocationPolicyInclude>({
     defaultPageSize: 20,
-    defaultIncludes: [
-      'creditFund',
-      'paymentAllocationPolicy',
-      'capitalDistribution',
-      'interestDistribution',
-      'lateInterestDistribution',
-      'costCenter',
-      'creditProductRefinancePolicy',
-      'creditProductCategories',
-      'creditProductLateInterestRules',
-      'creditProductRequiredDocuments',
-      'creditProductAccounts',
-      'creditProductBillingConcepts',
-    ],
+    defaultIncludes: ['paymentAllocationPolicyRules'],
     defaultSorting: [{ field: 'createdAt', order: 'desc' }],
   });
 
-  const { data, isLoading, isFetching, refetch } = useCreditProducts(queryParams);
-
-  const { mutateAsync: deleteCreditProduct, isPending: isDeleting } = useDeleteCreditProduct();
+  const { data, isLoading, isFetching, refetch } = usePaymentAllocationPolicies(queryParams);
+  const { mutateAsync: deletePolicy, isPending: isDeleting } = useDeletePaymentAllocationPolicy();
 
   const [openedInfoSheet, setOpenedInfoSheet] = React.useState(false);
-  const handleInfoSheetChange = React.useCallback(
-    (open: boolean) => {
-      if (!open) {
-        setCreditProduct(undefined);
-      }
-      setOpenedInfoSheet(open);
-    },
-    [setCreditProduct, setOpenedInfoSheet]
-  );
+  const handleInfoSheetChange = React.useCallback((open: boolean) => {
+    if (!open) setPolicy(undefined);
+    setOpenedInfoSheet(open);
+  }, []);
 
   const [openedFormSheet, setOpenedFormSheet] = React.useState(false);
-  const handleFormSheetChange = React.useCallback(
-    (open: boolean) => {
-      if (!open) {
-        setCreditProduct(undefined);
-      }
-      setOpenedFormSheet(open);
-    },
-    [setCreditProduct, setOpenedFormSheet]
-  );
+  const handleFormSheetChange = React.useCallback((open: boolean) => {
+    if (!open) setPolicy(undefined);
+    setOpenedFormSheet(open);
+  }, []);
 
   const [openedDeleteDialog, setOpenedDeleteDialog] = React.useState(false);
   const handleDelete = React.useCallback(async () => {
-    if (!creditProduct?.id) return;
-    await deleteCreditProduct({ params: { id: creditProduct.id } });
-    setCreditProduct(undefined);
+    if (!policy?.id) return;
+    await deletePolicy({ params: { id: policy.id } });
+    setPolicy(undefined);
     setOpenedDeleteDialog(false);
-  }, [creditProduct, setCreditProduct, setOpenedDeleteDialog, deleteCreditProduct]);
+  }, [deletePolicy, policy]);
 
-  const handleCreate = () => {
+  const handleCreate = React.useCallback(() => {
     handleFormSheetChange(true);
-  };
+  }, [handleFormSheetChange]);
 
-  const handleRowOpen = React.useCallback((row: CreditProduct) => {
-    setCreditProduct(row);
+  const handleRowOpen = React.useCallback((row: PaymentAllocationPolicy) => {
+    setPolicy(row);
     setOpenedInfoSheet(true);
   }, []);
 
-  const handleRowEdit = React.useCallback((row: CreditProduct) => {
-    setCreditProduct(row);
+  const handleRowEdit = React.useCallback((row: PaymentAllocationPolicy) => {
+    setPolicy(row);
     setOpenedFormSheet(true);
   }, []);
 
-  const handleRowDelete = React.useCallback((row: CreditProduct) => {
-    setCreditProduct(row);
+  const handleRowDelete = React.useCallback((row: PaymentAllocationPolicy) => {
+    setPolicy(row);
     setOpenedDeleteDialog(true);
   }, []);
 
-  const tableMeta = React.useMemo<TableMeta<CreditProduct>>(
+  const tableMeta = React.useMemo<TableMeta<PaymentAllocationPolicy>>(
     () => ({
       onRowView: handleRowOpen,
       onRowDelete: handleRowDelete,
       onRowEdit: handleRowEdit,
     }),
-    [handleRowOpen, handleRowDelete, handleRowEdit]
+    [handleRowDelete, handleRowEdit, handleRowOpen]
   );
 
   return (
     <>
       <PageHeader
-        title="Tipos de Creditos"
-        description="Administre lineas de credito, categorias, reglas de mora, documentos y cuentas."
+        title="Politicas de Aplicacion de Pagos"
+        description="Defina como se aplica un abono por prelacion de conceptos."
       />
       <PageContent>
         <DataTable
-          columns={creditProductColumns}
+          columns={PaymentAllocationPolicyColumns}
           data={data?.body?.data ?? []}
           pageCount={data?.body?.meta.totalPages ?? 0}
           pageIndex={pageIndex}
@@ -147,7 +127,7 @@ export function CreditProducts() {
           enableRowSelection
           pageSizeOptions={[10, 20, 30, 50]}
           toolbar={
-            <CreditProductsToolbar
+            <PaymentAllocationPolicyToolbar
               searchValue={searchValue}
               onSearchChange={handleSearchChange}
               onCreate={handleCreate}
@@ -160,13 +140,13 @@ export function CreditProducts() {
         />
       </PageContent>
 
-      <CreditProductInfo
-        creditProduct={creditProduct}
+      <PaymentAllocationPolicyInfo
+        paymentAllocationPolicy={policy}
         opened={openedInfoSheet}
         onOpened={handleInfoSheetChange}
       />
-      <CreditProductForm
-        creditProduct={creditProduct}
+      <PaymentAllocationPolicyForm
+        paymentAllocationPolicy={policy}
         opened={openedFormSheet}
         onOpened={handleFormSheetChange}
       />
@@ -176,12 +156,14 @@ export function CreditProducts() {
           <AlertDialogHeader>
             <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion no se puede deshacer. Esto eliminara permanentemente el tipo de credito
-              &quot;{creditProduct?.name}&quot; y su configuracion asociada.
+              Esta accion no se puede deshacer. Esto eliminara permanentemente la politica
+              &quot;{policy?.name}&quot; y sus reglas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setOpenedDeleteDialog(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setOpenedDeleteDialog(false)}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction disabled={isDeleting} onClick={handleDelete}>
               {isDeleting && <Spinner />}
               Eliminar

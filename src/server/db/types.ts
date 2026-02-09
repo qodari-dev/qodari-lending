@@ -355,10 +355,12 @@ export type CreditProducts = typeof creditProducts.$inferSelect & {
   interestDistribution?: AccountingDistributions;
   lateInterestDistribution?: AccountingDistributions;
   costCenter?: CostCenters | null;
+  creditProductRefinancePolicy?: CreditProductRefinancePolicies | null;
   creditProductCategories?: CreditProductCategories[];
   creditProductDocuments?: CreditProductDocuments[];
   creditProductAccounts?: CreditProductAccounts[];
   paymentAllocationPolicy?: PaymentAllocationPolicies;
+  creditProductLateInterestRules?: CreditProductLateInterestRules[];
 };
 export type NewCreditProducts = typeof creditProducts.$inferInsert;
 
@@ -367,7 +369,6 @@ export type NewCreditProducts = typeof creditProducts.$inferInsert;
 // ---------------------------------------------------------------------
 export type CreditProductCategories = typeof creditProductCategories.$inferSelect & {
   creditProduct?: CreditProducts;
-  creditProductLateInterestRules?: CreditProductLateInterestRules[];
 };
 export type NewCreditProductCategories = typeof creditProductCategories.$inferInsert;
 
@@ -667,7 +668,7 @@ export type NewLoanBillingConcepts = typeof loanBillingConcepts.$inferInsert;
 // Reglas de interés de mora por edad de mora (días)
 // ---------------------------------------------------------------------
 export type CreditProductLateInterestRules = typeof creditProductLateInterestRules.$inferSelect & {
-  creditProductCategory?: CreditProductCategories;
+  creditProduct?: CreditProducts;
 };
 export type NewCreditProductLateInterestRules = typeof creditProductLateInterestRules.$inferInsert;
 

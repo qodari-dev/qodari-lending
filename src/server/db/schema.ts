@@ -802,6 +802,11 @@ export const riskEvaluationModeEnum = pgEnum('risk_evaluation_mode', [
   'VALIDATE_ONLY', // consulta riesgo pero no bloquea aprobación
   'REQUIRED', // consulta riesgo y es obligatorio pasar
 ]);
+
+export const lateInterestAgeBasisEnum = pgEnum('late_interest_age_basis', [
+  'OLDEST_OVERDUE_INSTALLMENT', // la cuota vencida más antigua
+  'EACH_INSTALLMENT', // calcula por cada cuota vencida
+]);
 // ---------------------------------------------------------------------
 // Concr07 - Tipos / Líneas de crédito
 // Nota:
@@ -861,6 +866,7 @@ export const creditProducts = pgTable(
       precision: 12,
       scale: 5,
     }),
+    ageBasis: lateInterestAgeBasisEnum('age_basis').notNull().default('OLDEST_OVERDUE_INSTALLMENT'),
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
@@ -895,7 +901,6 @@ export const creditProductCategories = pgTable(
       precision: 12,
       scale: 9,
     }).notNull(),
-    lateFactor: decimal('late_factor', { precision: 12, scale: 9 }).notNull(),
     pledgeFactor: decimal('pledge_factor', { precision: 12, scale: 9 }),
     ...timestamps,
   },
@@ -1797,8 +1802,9 @@ export const loanRefinancingLinks = pgTable(
       .notNull()
       .references(() => loans.id, { onDelete: 'restrict' }),
 
-    payoffAmount: decimal('payoff_amount', { precision: 14, scale: 2 }),
-    createdByUserId: uuid('created_by_user_id'),
+    payoffAmount: decimal('payoff_amount', { precision: 14, scale: 2 }).notNull().default('0'),
+    createdByUserId: uuid('created_by_user_id').notNull(),
+    createdByUserName: varchar('created_by_user_name', { length: 255 }).notNull(),
 
     ...timestamps,
   },
@@ -2459,10 +2465,6 @@ export const loanBillingConcepts = pgTable(
   ]
 );
 
-export const lateInterestAgeBasisEnum = pgEnum('late_interest_age_basis', [
-  'OLDEST_OVERDUE_INSTALLMENT', // la cuota vencida más antigua
-  'EACH_INSTALLMENT', // calcula por cada cuota vencida
-]);
 // =====================================================================
 // Reglas de interés de mora por edad de mora (días)
 // Nota:
@@ -2475,18 +2477,15 @@ export const creditProductLateInterestRules = pgTable(
   {
     id: serial('id').primaryKey(),
 
-    creditProductCategoryId: integer('credit_product_category_id')
+    creditProductId: integer('credit_product_id')
       .notNull()
-      .references(() => creditProductCategories.id, { onDelete: 'cascade' }),
-
+      .references(() => creditProducts.id, { onDelete: 'restrict' }),
+    categoryCode: categoryCodeEnum('category_code').notNull(),
     // opcional: cómo medir “edad de mora”
-    ageBasis: lateInterestAgeBasisEnum('age_basis').notNull().default('OLDEST_OVERDUE_INSTALLMENT'),
 
     // rango de días de mora al que aplica la regla
     daysFrom: integer('days_from').notNull(), // ej: 1, 5, 11, 31...
     daysTo: integer('days_to'), // null = sin tope (ej: 31+)
-
-    // tasa/factor de mora (mismo “tipo” de dato que lateFactor)
     lateFactor: decimal('late_factor', { precision: 12, scale: 9 }).notNull(),
 
     // vigencia (por si cambian políticas en el tiempo)
@@ -2501,8 +2500,8 @@ export const creditProductLateInterestRules = pgTable(
     ...timestamps,
   },
   (t) => [
-    index('idx_late_rules_category').on(t.creditProductCategoryId),
-    index('idx_late_rules_active').on(t.creditProductCategoryId, t.isActive),
+    index('idx_late_rules_credit_product').on(t.creditProductId),
+    index('idx_late_rules_active').on(t.creditProductId, t.isActive),
 
     check('chk_late_rules_days_from_min', sql`${t.daysFrom} >= 0`),
     check('chk_late_rules_days_order', sql`${t.daysTo} IS NULL OR ${t.daysFrom} <= ${t.daysTo}`),
@@ -2791,12 +2790,11 @@ export const creditProductRefinancePolicies = pgTable(
     minPaidInstallments: integer('min_paid_installments').notNull().default(0),
     maxRefinanceCount: integer('max_refinance_count').notNull().default(99),
 
-    // tratamiento (si quieres dejarlo preparado)
+    // la mora/saldo vencido se suma al nuevo capital refinanciado.
     capitalizeArrears: boolean('capitalize_arrears').notNull().default(false),
 
     // control
     requireApproval: boolean('require_approval').notNull().default(false),
-    allowOverride: boolean('allow_override').notNull().default(true),
 
     isActive: boolean('is_active').notNull().default(true),
 

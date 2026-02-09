@@ -248,6 +248,78 @@ export function CreditProductInfo({
               </div>
             )}
           </div>
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Politica de refinanciacion</h3>
+            {creditProduct.creditProductRefinancePolicy ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Refinancia</TableHead>
+                    <TableHead>Consolida</TableHead>
+                    <TableHead>Max cons.</TableHead>
+                    <TableHead>Min edad</TableHead>
+                    <TableHead>Max mora</TableHead>
+                    <TableHead>Min pagadas</TableHead>
+                    <TableHead>Max refi.</TableHead>
+                    <TableHead>Cap mora</TableHead>
+                    <TableHead>Req aprob.</TableHead>
+                    <TableHead>Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>
+                      {creditProduct.creditProductRefinancePolicy.allowRefinance ? 'Si' : 'No'}
+                    </TableCell>
+                    <TableCell>
+                      {creditProduct.creditProductRefinancePolicy.allowConsolidation
+                        ? 'Si'
+                        : 'No'}
+                    </TableCell>
+                    <TableCell>
+                      {creditProduct.creditProductRefinancePolicy.maxLoansToConsolidate}
+                    </TableCell>
+                    <TableCell>
+                      {creditProduct.creditProductRefinancePolicy.minLoanAgeDays}
+                    </TableCell>
+                    <TableCell>
+                      {creditProduct.creditProductRefinancePolicy.maxDaysPastDue}
+                    </TableCell>
+                    <TableCell>
+                      {creditProduct.creditProductRefinancePolicy.minPaidInstallments}
+                    </TableCell>
+                    <TableCell>
+                      {creditProduct.creditProductRefinancePolicy.maxRefinanceCount}
+                    </TableCell>
+                    <TableCell>
+                      {creditProduct.creditProductRefinancePolicy.capitalizeArrears ? 'Si' : 'No'}
+                    </TableCell>
+                    <TableCell>
+                      {creditProduct.creditProductRefinancePolicy.requireApproval ? 'Si' : 'No'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          creditProduct.creditProductRefinancePolicy.isActive
+                            ? 'default'
+                            : 'outline'
+                        }
+                      >
+                        {creditProduct.creditProductRefinancePolicy.isActive
+                          ? 'Activo'
+                          : 'Inactivo'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                No hay politica configurada.
+              </div>
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

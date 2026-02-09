@@ -53,6 +53,7 @@ export function CreditProducts() {
       'interestDistribution',
       'lateInterestDistribution',
       'costCenter',
+      'creditProductRefinancePolicy',
       'creditProductCategories',
       'creditProductRequiredDocuments',
       'creditProductAccounts',

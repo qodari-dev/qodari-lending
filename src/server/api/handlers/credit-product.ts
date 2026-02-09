@@ -4,6 +4,7 @@ import {
   creditProductCategories,
   creditProductDocuments,
   creditProductAccounts,
+  creditProductRefinancePolicies,
 } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
@@ -71,6 +72,10 @@ const CREDIT_PRODUCT_INCLUDES = createIncludeMap<typeof db.query.creditProducts>
   },
   costCenter: {
     relation: 'costCenter',
+    config: true,
+  },
+  creditProductRefinancePolicy: {
+    relation: 'creditProductRefinancePolicy',
     config: true,
   },
   creditProductCategories: {
@@ -190,6 +195,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
       }
 
       const {
+        creditProductRefinancePolicy: refinancePolicyData,
         creditProductCategories: categoriesData,
         creditProductRequiredDocuments: requiredDocumentsData,
         creditProductAccounts: accountsData,
@@ -226,6 +232,13 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           );
         }
 
+        if (refinancePolicyData) {
+          await tx.insert(creditProductRefinancePolicies).values({
+            ...refinancePolicyData,
+            creditProductId: product.id,
+          });
+        }
+
         return [product];
       });
 
@@ -242,6 +255,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductCategories: categoriesData ?? [],
           _creditProductRequiredDocuments: requiredDocumentsData ?? [],
           _creditProductAccounts: accountsData ?? [],
+          _creditProductRefinancePolicy: refinancePolicyData ?? null,
         },
         ipAddress,
         userAgent,
@@ -298,7 +312,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         });
       }
 
-      const [existingCategories, existingDocuments, existingAccounts] = await Promise.all([
+      const [existingCategories, existingDocuments, existingAccounts, existingRefinancePolicy] = await Promise.all([
         db.query.creditProductCategories.findMany({
           where: eq(creditProductCategories.creditProductId, id),
         }),
@@ -308,9 +322,13 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         db.query.creditProductAccounts.findMany({
           where: eq(creditProductAccounts.creditProductId, id),
         }),
+        db.query.creditProductRefinancePolicies.findFirst({
+          where: eq(creditProductRefinancePolicies.creditProductId, id),
+        }),
       ]);
 
       const {
+        creditProductRefinancePolicy: refinancePolicyData,
         creditProductCategories: categoriesData,
         creditProductRequiredDocuments: requiredDocumentsData,
         creditProductAccounts: accountsData,
@@ -369,6 +387,19 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           }
         }
 
+        if (refinancePolicyData !== undefined) {
+          await tx
+            .delete(creditProductRefinancePolicies)
+            .where(eq(creditProductRefinancePolicies.creditProductId, id));
+
+          if (refinancePolicyData) {
+            await tx.insert(creditProductRefinancePolicies).values({
+              ...refinancePolicyData,
+              creditProductId: id,
+            });
+          }
+        }
+
         return [productUpdated];
       });
 
@@ -385,12 +416,17 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductCategories: existingCategories,
           _creditProductRequiredDocuments: existingDocuments,
           _creditProductAccounts: existingAccounts,
+          _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
         },
         afterValue: {
           ...updated,
           _creditProductCategories: categoriesData ?? existingCategories,
           _creditProductRequiredDocuments: requiredDocumentsData ?? existingDocuments,
           _creditProductAccounts: accountsData ?? existingAccounts,
+          _creditProductRefinancePolicy:
+            refinancePolicyData !== undefined
+              ? (refinancePolicyData ?? null)
+              : (existingRefinancePolicy ?? null),
         },
         ipAddress,
         userAgent,
@@ -448,7 +484,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         });
       }
 
-      const [existingCategories, existingDocuments, existingAccounts] = await Promise.all([
+      const [existingCategories, existingDocuments, existingAccounts, existingRefinancePolicy] = await Promise.all([
         db.query.creditProductCategories.findMany({
           where: eq(creditProductCategories.creditProductId, id),
         }),
@@ -457,6 +493,9 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         }),
         db.query.creditProductAccounts.findMany({
           where: eq(creditProductAccounts.creditProductId, id),
+        }),
+        db.query.creditProductRefinancePolicies.findFirst({
+          where: eq(creditProductRefinancePolicies.creditProductId, id),
         }),
       ]);
 
@@ -475,12 +514,14 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductCategories: existingCategories,
           _creditProductRequiredDocuments: existingDocuments,
           _creditProductAccounts: existingAccounts,
+          _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
         },
         afterValue: {
           ...deleted,
           _creditProductCategories: existingCategories,
           _creditProductRequiredDocuments: existingDocuments,
           _creditProductAccounts: existingAccounts,
+          _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
         },
         ipAddress,
         userAgent,

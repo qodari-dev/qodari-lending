@@ -87,6 +87,7 @@ const CREDIT_PRODUCT_INCLUDE_OPTIONS = [
   'interestDistribution',
   'lateInterestDistribution',
   'costCenter',
+  'creditProductRefinancePolicy',
   'creditProductCategories',
   'creditProductRequiredDocuments',
   'creditProductAccounts',
@@ -142,6 +143,23 @@ export const CreditProductAccountInputSchema = z.object({
 
 export type CreditProductAccountInput = z.infer<typeof CreditProductAccountInputSchema>;
 
+export const CreditProductRefinancePolicyInputSchema = z.object({
+  allowRefinance: z.boolean(),
+  allowConsolidation: z.boolean(),
+  maxLoansToConsolidate: z.number().int().min(1),
+  minLoanAgeDays: z.number().int().min(0),
+  maxDaysPastDue: z.number().int().min(0),
+  minPaidInstallments: z.number().int().min(0),
+  maxRefinanceCount: z.number().int().min(0),
+  capitalizeArrears: z.boolean(),
+  requireApproval: z.boolean(),
+  isActive: z.boolean(),
+});
+
+export type CreditProductRefinancePolicyInput = z.infer<
+  typeof CreditProductRefinancePolicyInputSchema
+>;
+
 const CreditProductBaseSchema = z.object({
   name: z.string().min(1).max(100),
   creditFundId: z.number().int().positive(),
@@ -159,6 +177,7 @@ const CreditProductBaseSchema = z.object({
   riskEvaluationMode: z.enum(RISK_EVALUATION_MODE_OPTIONS),
   riskMinScore: z.string().nullable().optional(),
   isActive: z.boolean(),
+  creditProductRefinancePolicy: CreditProductRefinancePolicyInputSchema.nullable().optional(),
   creditProductCategories: CreditProductCategoryInputSchema.array().optional(),
   creditProductRequiredDocuments: CreditProductRequiredDocumentInputSchema.array().optional(),
   creditProductAccounts: CreditProductAccountInputSchema.array().optional(),
@@ -167,6 +186,13 @@ const CreditProductBaseSchema = z.object({
 const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
   schema.superRefine((value, ctx) => {
     const data = value as {
+      creditProductRefinancePolicy?: {
+        allowRefinance: boolean;
+        allowConsolidation: boolean;
+        maxLoansToConsolidate: number;
+        maxRefinanceCount: number;
+        isActive: boolean;
+      } | null;
       creditProductCategories?: {
         categoryCode: string;
         installmentsFrom: number;
@@ -230,6 +256,33 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
         message: 'Solo se permite una configuracion de cuentas por producto',
         path: ['creditProductAccounts'],
       });
+    }
+
+    const policy = data.creditProductRefinancePolicy;
+    if (policy) {
+      if (!policy.allowConsolidation && policy.maxLoansToConsolidate > 1) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Si no permite consolidacion, maximo de creditos a consolidar debe ser 1',
+          path: ['creditProductRefinancePolicy'],
+        });
+      }
+
+      if (policy.allowRefinance && policy.maxRefinanceCount < 1) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Maximo refinanciaciones debe ser mayor a 0 cuando se permite refinanciar',
+          path: ['creditProductRefinancePolicy'],
+        });
+      }
+
+      if (policy.isActive && !policy.allowRefinance && !policy.allowConsolidation) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'La politica activa debe permitir refinanciacion o consolidacion',
+          path: ['creditProductRefinancePolicy'],
+        });
+      }
     }
   });
 

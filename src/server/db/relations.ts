@@ -443,24 +443,25 @@ export const creditProductsRelations = relations(creditProducts, ({ one, many })
     fields: [creditProducts.costCenterId],
     references: [costCenters.id],
   }),
+  creditProductRefinancePolicy: one(creditProductRefinancePolicies, {
+    fields: [creditProducts.id],
+    references: [creditProductRefinancePolicies.creditProductId],
+  }),
   creditProductCategories: many(creditProductCategories),
   creditProductDocuments: many(creditProductDocuments),
   creditProductAccounts: many(creditProductAccounts),
+  creditProductLateInterestRules: many(creditProductLateInterestRules),
 }));
 
 // ---------------------------------------------------------------------
 // Concr30 - Categorías por tipos de crédito (rangos de cuotas + factores)
 // ---------------------------------------------------------------------
-export const creditProductCategoriesRelations = relations(
-  creditProductCategories,
-  ({ one, many }) => ({
-    creditProduct: one(creditProducts, {
-      fields: [creditProductCategories.creditProductId],
-      references: [creditProducts.id],
-    }),
-    creditProductLateInterestRules: many(creditProductLateInterestRules),
-  })
-);
+export const creditProductCategoriesRelations = relations(creditProductCategories, ({ one }) => ({
+  creditProduct: one(creditProducts, {
+    fields: [creditProductCategories.creditProductId],
+    references: [creditProducts.id],
+  }),
+}));
 
 // ---------------------------------------------------------------------
 // Concr44 - Tipos de crédito vs Documentos requeridos (pivot)
@@ -1020,9 +1021,9 @@ export const loanBillingConceptsRelations = relations(loanBillingConcepts, ({ on
 export const creditProductLateInterestRulesRelations = relations(
   creditProductLateInterestRules,
   ({ one }) => ({
-    creditProductCategory: one(creditProductCategories, {
-      fields: [creditProductLateInterestRules.creditProductCategoryId],
-      references: [creditProductCategories.id],
+    creditProduct: one(creditProducts, {
+      fields: [creditProductLateInterestRules.creditProductId],
+      references: [creditProducts.id],
     }),
   })
 );

@@ -61,6 +61,7 @@ import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { CreditProductAccountsForm } from './credit-product-accounts-form';
 import { CreditProductCategoriesForm } from './credit-product-categories-form';
+import { CreditProductRefinancePolicyForm } from './credit-product-refinance-policy-form';
 import { CreditProductRequiredDocumentsForm } from './credit-product-required-documents-form';
 
 type FormValues = z.infer<typeof CreateCreditProductBodySchema>;
@@ -96,6 +97,18 @@ export function CreditProductForm({
       riskEvaluationMode: 'NONE',
       riskMinScore: null,
       isActive: true,
+      creditProductRefinancePolicy: {
+        allowRefinance: false,
+        allowConsolidation: false,
+        maxLoansToConsolidate: 1,
+        minLoanAgeDays: 0,
+        maxDaysPastDue: 99999,
+        minPaidInstallments: 0,
+        maxRefinanceCount: 0,
+        capitalizeArrears: false,
+        requireApproval: false,
+        isActive: false,
+      },
       creditProductCategories: [],
       creditProductRequiredDocuments: [],
       creditProductAccounts: [],
@@ -165,6 +178,32 @@ export function CreditProductForm({
         riskEvaluationMode: creditProduct?.riskEvaluationMode ?? 'NONE',
         riskMinScore: creditProduct?.riskMinScore ?? null,
         isActive: creditProduct?.isActive ?? true,
+        creditProductRefinancePolicy: creditProduct?.creditProductRefinancePolicy
+          ? {
+              allowRefinance: creditProduct.creditProductRefinancePolicy.allowRefinance,
+              allowConsolidation: creditProduct.creditProductRefinancePolicy.allowConsolidation,
+              maxLoansToConsolidate:
+                creditProduct.creditProductRefinancePolicy.maxLoansToConsolidate,
+              minLoanAgeDays: creditProduct.creditProductRefinancePolicy.minLoanAgeDays,
+              maxDaysPastDue: creditProduct.creditProductRefinancePolicy.maxDaysPastDue,
+              minPaidInstallments: creditProduct.creditProductRefinancePolicy.minPaidInstallments,
+              maxRefinanceCount: creditProduct.creditProductRefinancePolicy.maxRefinanceCount,
+              capitalizeArrears: creditProduct.creditProductRefinancePolicy.capitalizeArrears,
+              requireApproval: creditProduct.creditProductRefinancePolicy.requireApproval,
+              isActive: creditProduct.creditProductRefinancePolicy.isActive,
+            }
+          : {
+              allowRefinance: false,
+              allowConsolidation: false,
+              maxLoansToConsolidate: 1,
+              minLoanAgeDays: 0,
+              maxDaysPastDue: 99999,
+              minPaidInstallments: 0,
+              maxRefinanceCount: 0,
+              capitalizeArrears: false,
+              requireApproval: false,
+              isActive: false,
+            },
         creditProductCategories:
           creditProduct?.creditProductCategories?.map((category) => ({
             categoryCode: category.categoryCode,
@@ -222,6 +261,7 @@ export function CreditProductForm({
                 <TabsTrigger value="product">Producto</TabsTrigger>
                 <TabsTrigger value="categories">Categorias</TabsTrigger>
                 <TabsTrigger value="requiredDocuments">Documentos</TabsTrigger>
+                <TabsTrigger value="refinancePolicy">Refinanciacion</TabsTrigger>
                 <TabsTrigger value="accounts">Cuentas</TabsTrigger>
               </TabsList>
 
@@ -660,6 +700,10 @@ export function CreditProductForm({
 
               <TabsContent value="requiredDocuments" className="pt-2">
                 <CreditProductRequiredDocumentsForm />
+              </TabsContent>
+
+              <TabsContent value="refinancePolicy" className="pt-2">
+                <CreditProductRefinancePolicyForm />
               </TabsContent>
 
               <TabsContent value="accounts" className="pt-2">

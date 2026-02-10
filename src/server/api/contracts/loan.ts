@@ -1,4 +1,10 @@
-import { GetLoanQuerySchema, ListLoansQuerySchema } from '@/schemas/loan';
+import {
+  GetLoanQuerySchema,
+  GetLoanStatementQuerySchema,
+  LiquidateLoanBodySchema,
+  ListLoansQuerySchema,
+} from '@/schemas/loan';
+import type { LoanBalanceSummary, LoanStatement } from '@/schemas/loan';
 import { IdParamSchema } from '@/schemas/shared';
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
 import { Loans } from '@/server/db';
@@ -43,6 +49,69 @@ export const loan = c.router(
       } satisfies TsRestMetaData,
       responses: {
         200: c.type<Loans>(),
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    liquidate: {
+      method: 'POST',
+      path: '/:id/liquidate',
+      pathParams: IdParamSchema,
+      body: LiquidateLoanBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'liquidate',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: c.type<Loans>(),
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        409: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    getBalanceSummary: {
+      method: 'GET',
+      path: '/:id/balance-summary',
+      pathParams: IdParamSchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'read',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: c.type<LoanBalanceSummary>(),
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    getStatement: {
+      method: 'GET',
+      path: '/:id/statement',
+      pathParams: IdParamSchema,
+      query: GetLoanStatementQuerySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'read',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: c.type<LoanStatement>(),
         400: TsRestErrorSchema,
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,

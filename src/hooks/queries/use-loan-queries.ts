@@ -1,6 +1,8 @@
 import { api } from '@/clients/api';
 import type { ListLoansQuery } from '@/schemas/loan';
+import { getTsRestErrorMessage } from '@/utils/get-ts-rest-error-message';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 export const loansKeys = {
   all: ['loans'] as const,
@@ -10,6 +12,15 @@ export const loansKeys = {
 
   details: () => [...loansKeys.all, 'detail'] as const,
   detail: (id: number) => [...loansKeys.details(), id] as const,
+  balanceSummary: (id: number) => [...loansKeys.all, 'balance-summary', id] as const,
+  statement: (id: number, filters: { from?: Date; to?: Date } = {}) =>
+    [
+      ...loansKeys.all,
+      'statement',
+      id,
+      filters.from ? filters.from.toISOString().slice(0, 10) : null,
+      filters.to ? filters.to.toISOString().slice(0, 10) : null,
+    ] as const,
 };
 
 function defaultQuery(filters?: Partial<ListLoansQuery>) {
@@ -49,6 +60,52 @@ export function useLoan(
     queryData: {
       params: { id },
       query: { include: options?.include ?? defaultQuery().include },
+    },
+    enabled: options?.enabled ?? !!id,
+  });
+}
+
+export function useLiquidateLoan() {
+  const queryClient = api.useQueryClient();
+
+  return api.loan.liquidate.useMutation({
+    onSuccess: (_, variables) => {
+      const id = variables.params.id as number;
+      queryClient.invalidateQueries({ queryKey: loansKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loansKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: loansKeys.balanceSummary(id) });
+      queryClient.invalidateQueries({ queryKey: [...loansKeys.all, 'statement', id] });
+      toast.success('Credito liquidado');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
+export function useLoanBalanceSummary(id: number, options?: { enabled?: boolean }) {
+  return api.loan.getBalanceSummary.useQuery({
+    queryKey: loansKeys.balanceSummary(id),
+    queryData: {
+      params: { id },
+    },
+    enabled: options?.enabled ?? !!id,
+  });
+}
+
+export function useLoanStatement(
+  id: number,
+  filters: { from?: Date; to?: Date } = {},
+  options?: { enabled?: boolean }
+) {
+  return api.loan.getStatement.useQuery({
+    queryKey: loansKeys.statement(id, filters),
+    queryData: {
+      params: { id },
+      query: {
+        from: filters.from,
+        to: filters.to,
+      },
     },
     enabled: options?.enabled ?? !!id,
   });

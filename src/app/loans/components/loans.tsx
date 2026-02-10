@@ -2,7 +2,18 @@
 
 import { DataTable, useDataTable } from '@/components/data-table';
 import { PageContent, PageHeader } from '@/components/layout';
-import { useLoans } from '@/hooks/queries/use-loan-queries';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Spinner } from '@/components/ui/spinner';
+import { useLiquidateLoan, useLoans } from '@/hooks/queries/use-loan-queries';
 import { Loan, LoanInclude, LOAN_STATUS_OPTIONS, LoanSortField, LoanStatus } from '@/schemas/loan';
 import { RowData, TableMeta } from '@tanstack/react-table';
 import React from 'react';
@@ -13,11 +24,13 @@ import { LoansToolbar } from './loan-toolbar';
 declare module '@tanstack/table-core' {
   interface TableMeta<TData extends RowData> {
     onRowView?: (row: TData) => void;
+    onRowLiquidate?: (row: TData) => void;
   }
 }
 
 export function Loans() {
   const [loan, setLoan] = React.useState<Loan>();
+  const [loanToLiquidate, setLoanToLiquidate] = React.useState<Loan>();
 
   const {
     pageIndex,
@@ -79,11 +92,32 @@ export function Loans() {
     setOpenedInfoSheet(true);
   }, []);
 
+  const { mutateAsync: liquidateLoan, isPending: isLiquidating } = useLiquidateLoan();
+  const [openedLiquidateDialog, setOpenedLiquidateDialog] = React.useState(false);
+
+  const handleRowLiquidate = React.useCallback((row: Loan) => {
+    setLoanToLiquidate(row);
+    setOpenedLiquidateDialog(true);
+  }, []);
+
+  const submitLiquidate = React.useCallback(async () => {
+    if (!loanToLiquidate?.id) return;
+
+    await liquidateLoan({
+      params: { id: loanToLiquidate.id },
+      body: {},
+    });
+
+    setOpenedLiquidateDialog(false);
+    setLoanToLiquidate(undefined);
+  }, [liquidateLoan, loanToLiquidate]);
+
   const tableMeta = React.useMemo<TableMeta<Loan>>(
     () => ({
       onRowView: handleRowOpen,
+      onRowLiquidate: handleRowLiquidate,
     }),
-    [handleRowOpen]
+    [handleRowOpen, handleRowLiquidate]
   );
 
   return (
@@ -134,6 +168,33 @@ export function Loans() {
       </PageContent>
 
       <LoanInfo loan={loan} opened={openedInfoSheet} onOpened={handleInfoSheetChange} />
+
+      <AlertDialog
+        open={openedLiquidateDialog}
+        onOpenChange={(open) => {
+          setOpenedLiquidateDialog(open);
+          if (!open) {
+            setLoanToLiquidate(undefined);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Liquidar credito</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se generaran los movimientos contables y saldos iniciales del credito{' '}
+              <strong>{loanToLiquidate?.creditNumber ?? ''}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={isLiquidating} onClick={submitLiquidate}>
+              {isLiquidating && <Spinner />}
+              Liquidar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

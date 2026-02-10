@@ -32,6 +32,7 @@ import { paymentAllocationPolicy } from './payment-allocation-policy';
 import { paymentReceiptType } from './payment-receipt-type';
 import { paymentTenderType } from './payment-tender-type';
 import { rejectionReason } from './rejection-reason';
+import { reportCredit } from './report-credit';
 import { repaymentMethod } from './repayment-method';
 import { thirdParty } from './third-party';
 import { thirdPartyType } from './third-party-type';
@@ -73,6 +74,7 @@ export const contract = c.router(
     paymentReceiptType,
     paymentTenderType,
     rejectionReason,
+    reportCredit,
     repaymentMethod,
     thirdParty,
     thirdPartyType,

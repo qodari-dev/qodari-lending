@@ -1,16 +1,25 @@
 import {
+  accountingEntries,
   db,
   loanPaymentMethodAllocations,
   loanPayments,
+  loanStatusHistory,
   loans,
   paymentTenderTypes,
+  portfolioEntries,
   userPaymentReceiptTypes,
 } from '@/server/db';
 import { logAudit } from '@/server/utils/audit-logger';
 import { UnifiedAuthContext } from '@/server/utils/auth-context';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getClientIp } from '@/server/utils/get-client-ip';
+import {
+  buildPaymentDocumentCode,
+  buildPaymentVoidDocumentCode,
+  mapPaymentMovementTypeToProcessType,
+} from '@/server/utils/accounting-utils';
 import { buildTypedIncludes, createIncludeMap } from '@/server/utils/query/include-builder';
+import { applyPortfolioDeltas } from '@/server/utils/portfolio-utils';
 import {
   buildPaginationMeta,
   buildQuery,
@@ -19,9 +28,9 @@ import {
 } from '@/server/utils/query/query-builder';
 import { getRequiredUserContext } from '@/server/utils/required-user-context';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { formatDateOnly, toDecimalString } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 type LoanPaymentColumn = keyof typeof loanPayments.$inferSelect;
@@ -251,7 +260,13 @@ export const loanPayment = tsr.router(contract.loanPayment, {
 
       const existingLoan = await db.query.loans.findFirst({
         where: eq(loans.id, body.loanId),
-        columns: { id: true },
+        columns: {
+          id: true,
+          creditNumber: true,
+          thirdPartyId: true,
+          costCenterId: true,
+          status: true,
+        },
       });
 
       if (!existingLoan) {
@@ -259,6 +274,14 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           status: 404,
           message: `Credito con ID ${body.loanId} no encontrado`,
           code: 'NOT_FOUND',
+        });
+      }
+
+      if (!['ACTIVE', 'ACCOUNTED'].includes(existingLoan.status)) {
+        throwHttpError({
+          status: 400,
+          message: 'El credito debe estar activo para recibir abonos',
+          code: 'BAD_REQUEST',
         });
       }
 
@@ -327,6 +350,80 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         });
       }
 
+      const paymentDate = formatDateOnly(body.paymentDate);
+      const paymentAmount = roundMoney(toNumber(body.amount));
+      if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+        throwHttpError({
+          status: 400,
+          message: 'El valor del abono es invalido',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const openPortfolio = await db.query.portfolioEntries.findMany({
+        where: and(
+          eq(portfolioEntries.loanId, body.loanId),
+          eq(portfolioEntries.status, 'OPEN'),
+          sql`${portfolioEntries.balance} > 0`
+        ),
+        orderBy: [
+          asc(portfolioEntries.dueDate),
+          asc(portfolioEntries.installmentNumber),
+          asc(portfolioEntries.id),
+        ],
+      });
+
+      if (!openPortfolio.length) {
+        throwHttpError({
+          status: 400,
+          message: 'El credito no tiene saldo de cartera para aplicar abonos',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const totalOutstanding = roundMoney(
+        openPortfolio.reduce((acc, row) => acc + toNumber(row.balance), 0)
+      );
+      if (paymentAmount - totalOutstanding > 0.01) {
+        throwHttpError({
+          status: 400,
+          message: `El abono excede el saldo pendiente (${toDecimalString(totalOutstanding)})`,
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const portfolioApplications: Array<{
+        glAccountId: number;
+        installmentNumber: number;
+        dueDate: string;
+        amount: number;
+      }> = [];
+
+      let remainingAmount = paymentAmount;
+      for (const row of openPortfolio) {
+        if (remainingAmount <= 0.01) break;
+        const rowBalance = roundMoney(toNumber(row.balance));
+        if (rowBalance <= 0) continue;
+        const appliedAmount = roundMoney(Math.min(remainingAmount, rowBalance));
+        if (appliedAmount <= 0) continue;
+
+        portfolioApplications.push({
+          glAccountId: row.glAccountId,
+          installmentNumber: row.installmentNumber,
+          dueDate: row.dueDate,
+          amount: appliedAmount,
+        });
+        remainingAmount = roundMoney(remainingAmount - appliedAmount);
+      }
+
+      if (remainingAmount > 0.01) {
+        throwHttpError({
+          status: 400,
+          message: 'No fue posible aplicar completamente el valor del abono',
+          code: 'BAD_REQUEST',
+        });
+      }
+
       const paymentNumber = await ensureUniquePaymentNumber({
         receiptTypeId: body.receiptTypeId,
         prefix: receiptTypeCode,
@@ -340,11 +437,11 @@ export const loanPayment = tsr.router(contract.loanPayment, {
             receiptTypeId: body.receiptTypeId,
             paymentNumber,
             movementType: availableReceiptType.paymentReceiptType?.movementType,
-            paymentDate: formatDateOnly(body.paymentDate),
+            paymentDate,
             issuedDate: nowDate,
             loanId: body.loanId,
             description: body.description,
-            amount: toDecimalString(body.amount),
+            amount: toDecimalString(paymentAmount),
             status: 'PAID',
             statusDate: nowDate,
             createdByUserId: userId,
@@ -364,7 +461,148 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           }))
         );
 
-        return [createdLoanPayment];
+        const accountingDocumentCode = buildPaymentDocumentCode(createdLoanPayment.id);
+        const processType = mapPaymentMovementTypeToProcessType(
+          availableReceiptType.paymentReceiptType.movementType
+        );
+
+        let sequence = 1;
+        const accountingPayload: Array<typeof accountingEntries.$inferInsert> = [
+          {
+            processType,
+            documentCode: accountingDocumentCode,
+            sequence,
+            entryDate: paymentDate,
+            glAccountId: availableReceiptType.paymentReceiptType.glAccountId,
+            costCenterId: existingLoan.costCenterId ?? null,
+            thirdPartyId: existingLoan.thirdPartyId,
+            description: `Abono ${paymentNumber} credito ${existingLoan.creditNumber}`.slice(0, 255),
+            nature: 'DEBIT',
+            amount: toDecimalString(paymentAmount),
+            loanId: existingLoan.id,
+            status: 'DRAFT',
+            statusDate: nowDate,
+            sourceType: 'LOAN_PAYMENT',
+            sourceId: String(createdLoanPayment.id),
+          },
+        ];
+        sequence += 1;
+
+        for (const row of portfolioApplications) {
+          accountingPayload.push({
+            processType,
+            documentCode: accountingDocumentCode,
+            sequence,
+            entryDate: paymentDate,
+            glAccountId: row.glAccountId,
+            costCenterId: null,
+            thirdPartyId: existingLoan.thirdPartyId,
+            description: `Abono ${paymentNumber} credito ${existingLoan.creditNumber} cuota ${row.installmentNumber}`.slice(
+              0,
+              255
+            ),
+            nature: 'CREDIT',
+            amount: toDecimalString(row.amount),
+            loanId: existingLoan.id,
+            installmentNumber: row.installmentNumber,
+            dueDate: row.dueDate,
+            status: 'DRAFT',
+            statusDate: nowDate,
+            sourceType: 'LOAN_PAYMENT',
+            sourceId: String(createdLoanPayment.id),
+          });
+          sequence += 1;
+        }
+
+        const debitTotal = roundMoney(
+          accountingPayload
+            .filter((entry) => entry.nature === 'DEBIT')
+            .reduce((acc, entry) => acc + toNumber(entry.amount), 0)
+        );
+        const creditTotal = roundMoney(
+          accountingPayload
+            .filter((entry) => entry.nature === 'CREDIT')
+            .reduce((acc, entry) => acc + toNumber(entry.amount), 0)
+        );
+
+        if (Math.abs(debitTotal - creditTotal) > 0.01) {
+          throwHttpError({
+            status: 400,
+            message: 'El abono no cuadra contablemente',
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        await tx.insert(accountingEntries).values(accountingPayload);
+
+        await applyPortfolioDeltas(tx, {
+          movementDate: paymentDate,
+          deltas: portfolioApplications.map((row) => ({
+            glAccountId: row.glAccountId,
+            thirdPartyId: existingLoan.thirdPartyId,
+            loanId: existingLoan.id,
+            installmentNumber: row.installmentNumber,
+            dueDate: row.dueDate,
+            chargeDelta: 0,
+            paymentDelta: row.amount,
+          })),
+        });
+
+        await tx
+          .update(loans)
+          .set({
+            lastPaymentDate: paymentDate,
+          })
+          .where(eq(loans.id, existingLoan.id));
+
+        const remaining = await tx
+          .select({
+            balance: sql<string>`coalesce(sum(${portfolioEntries.balance}), 0)`,
+          })
+          .from(portfolioEntries)
+          .where(
+            and(
+              eq(portfolioEntries.loanId, existingLoan.id),
+              eq(portfolioEntries.status, 'OPEN'),
+              sql`${portfolioEntries.balance} > 0`
+            )
+          );
+
+        const remainingBalance = roundMoney(toNumber(remaining[0]?.balance ?? '0'));
+        if (remainingBalance <= 0.01 && existingLoan.status !== 'PAID') {
+          await tx
+            .update(loans)
+            .set({
+              status: 'PAID',
+              statusDate: nowDate,
+              statusChangedByUserId: userId,
+              statusChangedByUserName: userName || userId,
+            })
+            .where(eq(loans.id, existingLoan.id));
+
+          await tx.insert(loanStatusHistory).values({
+            loanId: existingLoan.id,
+            fromStatus: existingLoan.status,
+            toStatus: 'PAID',
+            changedByUserId: userId,
+            changedByUserName: userName || userId,
+            note: `Credito pagado con abono ${paymentNumber}`.slice(0, 255),
+            metadata: {
+              loanPaymentId: createdLoanPayment.id,
+              accountingDocumentCode,
+            },
+          });
+        }
+
+        const [updatedPayment] = await tx
+          .update(loanPayments)
+          .set({
+            accountingDocumentCode,
+          })
+          .where(eq(loanPayments.id, createdLoanPayment.id))
+          .returning();
+
+        return [updatedPayment];
       });
 
       await logAudit(session, {
@@ -447,17 +685,193 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         });
       }
 
-      const [updated] = await db
-        .update(loanPayments)
-        .set({
-          status: 'VOID',
-          statusDate: formatDateOnly(new Date()),
-          noteStatus: body.noteStatus.trim(),
-          updatedByUserId: userId,
-          updatedByUserName: userName,
-        })
-        .where(eq(loanPayments.id, id))
-        .returning();
+      const existingLoan = await db.query.loans.findFirst({
+        where: eq(loans.id, existing.loanId),
+        columns: {
+          id: true,
+          creditNumber: true,
+          thirdPartyId: true,
+          status: true,
+        },
+      });
+      if (!existingLoan) {
+        throwHttpError({
+          status: 404,
+          message: `Credito con ID ${existing.loanId} no encontrado`,
+          code: 'NOT_FOUND',
+        });
+      }
+
+      const originalEntries = await db.query.accountingEntries.findMany({
+        where: and(
+          eq(accountingEntries.sourceType, 'LOAN_PAYMENT'),
+          eq(accountingEntries.sourceId, String(existing.id)),
+          inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
+        ),
+        orderBy: [asc(accountingEntries.sequence)],
+      });
+      if (!originalEntries.length) {
+        throwHttpError({
+          status: 400,
+          message: 'El abono no tiene movimientos contables para reversar',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const originalCreditEntries = originalEntries.filter((entry) => entry.nature === 'CREDIT');
+      if (!originalCreditEntries.length) {
+        throwHttpError({
+          status: 400,
+          message: 'Los movimientos del abono no tienen creditos para reversar cartera',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const invalidCreditEntry = originalCreditEntries.find(
+        (entry) => entry.installmentNumber === null || entry.dueDate === null
+      );
+      if (invalidCreditEntry) {
+        throwHttpError({
+          status: 400,
+          message: 'Los movimientos del abono no tienen detalle de cuota para reversa',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const nowDate = formatDateOnly(new Date());
+      const reversalDocumentCode = buildPaymentVoidDocumentCode(existing.id);
+      const processType = originalEntries[0].processType;
+
+      let sequence = 1;
+      const reversalEntries: Array<typeof accountingEntries.$inferInsert> = originalEntries.map(
+        (entry) => {
+          const reversalNature = entry.nature === 'DEBIT' ? 'CREDIT' : 'DEBIT';
+          const description = `Reversa abono ${existing.paymentNumber}`.slice(0, 255);
+          const payload: typeof accountingEntries.$inferInsert = {
+            processType,
+            documentCode: reversalDocumentCode,
+            sequence,
+            entryDate: nowDate,
+            glAccountId: entry.glAccountId,
+            costCenterId: entry.costCenterId,
+            thirdPartyId: entry.thirdPartyId ?? existingLoan.thirdPartyId,
+            description,
+            nature: reversalNature,
+            amount: entry.amount,
+            loanId: entry.loanId,
+            installmentNumber: entry.installmentNumber,
+            dueDate: entry.dueDate,
+            status: 'DRAFT',
+            statusDate: nowDate,
+            sourceType: 'LOAN_PAYMENT_VOID',
+            sourceId: String(existing.id),
+            reversalOfEntryId: entry.id,
+          };
+          sequence += 1;
+          return payload;
+        }
+      );
+
+      const rollbackDeltas = originalCreditEntries.map((entry) => ({
+        glAccountId: entry.glAccountId,
+        thirdPartyId: entry.thirdPartyId ?? existingLoan.thirdPartyId,
+        loanId: entry.loanId ?? existingLoan.id,
+        installmentNumber: entry.installmentNumber ?? 0,
+        dueDate: entry.dueDate ?? nowDate,
+        chargeDelta: 0,
+        paymentDelta: -toNumber(entry.amount),
+      }));
+
+      const [updated] = await db.transaction(async (tx) => {
+        await tx.insert(accountingEntries).values(reversalEntries);
+
+        await tx
+          .update(accountingEntries)
+          .set({
+            status: 'VOIDED',
+            statusDate: nowDate,
+          })
+          .where(
+            inArray(
+              accountingEntries.id,
+              originalEntries.map((item) => item.id)
+            )
+          );
+
+        await applyPortfolioDeltas(tx, {
+          movementDate: nowDate,
+          deltas: rollbackDeltas,
+        });
+
+        const [voidedPayment] = await tx
+          .update(loanPayments)
+          .set({
+            status: 'VOID',
+            statusDate: nowDate,
+            noteStatus: body.noteStatus.trim(),
+            updatedByUserId: userId,
+            updatedByUserName: userName,
+            accountingDocumentCode: reversalDocumentCode,
+          })
+          .where(eq(loanPayments.id, id))
+          .returning();
+
+        const latestPaidPayment = await tx.query.loanPayments.findFirst({
+          where: and(eq(loanPayments.loanId, existing.loanId), eq(loanPayments.status, 'PAID')),
+          orderBy: [desc(loanPayments.paymentDate), desc(loanPayments.id)],
+          columns: {
+            paymentDate: true,
+          },
+        });
+
+        await tx
+          .update(loans)
+          .set({
+            lastPaymentDate: latestPaidPayment?.paymentDate ?? null,
+          })
+          .where(eq(loans.id, existingLoan.id));
+
+        const remaining = await tx
+          .select({
+            balance: sql<string>`coalesce(sum(${portfolioEntries.balance}), 0)`,
+          })
+          .from(portfolioEntries)
+          .where(
+            and(
+              eq(portfolioEntries.loanId, existingLoan.id),
+              eq(portfolioEntries.status, 'OPEN'),
+              sql`${portfolioEntries.balance} > 0`
+            )
+          );
+        const remainingBalance = roundMoney(toNumber(remaining[0]?.balance ?? '0'));
+
+        if (existingLoan.status === 'PAID' && remainingBalance > 0.01) {
+          await tx
+            .update(loans)
+            .set({
+              status: 'ACTIVE',
+              statusDate: nowDate,
+              statusChangedByUserId: userId,
+              statusChangedByUserName: userName || userId,
+            })
+            .where(eq(loans.id, existingLoan.id));
+
+          await tx.insert(loanStatusHistory).values({
+            loanId: existingLoan.id,
+            fromStatus: 'PAID',
+            toStatus: 'ACTIVE',
+            changedByUserId: userId,
+            changedByUserName: userName || userId,
+            note: `Reversa de abono ${existing.paymentNumber}`.slice(0, 255),
+            metadata: {
+              loanPaymentId: existing.id,
+              reversalAccountingDocumentCode: reversalDocumentCode,
+            },
+          });
+        }
+
+        return [voidedPayment];
+      });
 
       await logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -469,6 +883,10 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         status: 'success',
         beforeValue: existing,
         afterValue: updated,
+        metadata: {
+          reversalAccountingDocumentCode: reversalDocumentCode,
+          reversedEntries: originalEntries.length,
+        },
         ipAddress,
         userAgent,
       });

@@ -1,8 +1,10 @@
 import {
   agreements,
   affiliationOffices,
+  billingConceptRules,
   coDebtors,
   creditProductCategories,
+  creditProductBillingConcepts,
   creditProductDocuments,
   creditProducts,
   db,
@@ -13,6 +15,7 @@ import {
   loanApplicationPledges,
   loanApplications,
   loanAgreementHistory,
+  loanBillingConcepts,
   loanApplicationStatusHistory,
   loanInstallments,
   loans,
@@ -49,7 +52,7 @@ import {
   toRateString,
 } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 type LoanApplicationColumn = keyof typeof loanApplications.$inferSelect;
@@ -302,6 +305,52 @@ function generateCreditNumber(prefix: string): string {
   const rnd = Math.floor(Math.random() * 900 + 100);
   const normalizedPrefix = prefix.trim().toUpperCase().slice(0, 5);
   return `${normalizedPrefix}${yy}${mm}${dd}${hh}${mi}${ss}${rnd}`;
+}
+
+function pickApplicableBillingRule(args: {
+  rules: Array<{
+    id: number;
+    billingConceptId: number;
+    priority: number;
+    calcMethod: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'TIERED';
+    baseAmount: 'DISBURSED_AMOUNT' | 'PRINCIPAL' | 'OUTSTANDING_BALANCE' | 'INSTALLMENT_AMOUNT' | null;
+    rate: string | null;
+    amount: string | null;
+    valueFrom: string | null;
+    valueTo: string | null;
+    minAmount: string | null;
+    maxAmount: string | null;
+    roundingMode: 'NEAREST' | 'UP' | 'DOWN';
+    roundingDecimals: number;
+    effectiveFrom: string | Date | null;
+    effectiveTo: string | Date | null;
+  }>;
+  conceptId: number;
+  asOfDate: string;
+}) {
+  const toDateOnly = (value: string | Date | null) => {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    return formatDateOnly(value);
+  };
+
+  const applicable = args.rules.filter((rule) => {
+    if (rule.billingConceptId !== args.conceptId) return false;
+    const effectiveFrom = toDateOnly(rule.effectiveFrom);
+    const effectiveTo = toDateOnly(rule.effectiveTo);
+    if (effectiveFrom && effectiveFrom > args.asOfDate) return false;
+    if (effectiveTo && effectiveTo < args.asOfDate) return false;
+    return true;
+  });
+
+  if (!applicable.length) return null;
+
+  applicable.sort((a, b) => {
+    if (b.priority !== a.priority) return b.priority - a.priority;
+    return b.id - a.id;
+  });
+
+  return applicable[0] ?? null;
 }
 
 async function ensureUniqueCreditNumber(prefix: string) {
@@ -1359,6 +1408,82 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const { userId, userName } = getRequiredUserContext(session);
       const statusDate = formatDateOnly(new Date());
       const firstCollectionDate = formatDateOnly(body.firstCollectionDate);
+      const approvedDate = statusDate;
+
+      const productBillingConceptRows = await db.query.creditProductBillingConcepts.findMany({
+        where: and(
+          eq(creditProductBillingConcepts.creditProductId, existing.creditProductId),
+          eq(creditProductBillingConcepts.isEnabled, true)
+        ),
+        with: {
+          billingConcept: true,
+          overrideBillingConceptRule: true,
+        },
+      });
+
+      const activeProductBillingConceptRows = productBillingConceptRows.filter(
+        (item) => item.billingConcept?.isActive
+      );
+
+      const conceptIds = Array.from(
+        new Set(activeProductBillingConceptRows.map((item) => item.billingConceptId))
+      );
+
+      const activeRules =
+        conceptIds.length > 0
+          ? await db.query.billingConceptRules.findMany({
+              where: and(
+                inArray(billingConceptRules.billingConceptId, conceptIds),
+                eq(billingConceptRules.isActive, true)
+              ),
+            })
+          : [];
+
+      const loanBillingConceptSnapshots = activeProductBillingConceptRows.map((item) => {
+        const concept = item.billingConcept;
+        if (!concept) {
+          throwHttpError({
+            status: 400,
+            message: `Concepto de facturacion ${item.billingConceptId} no encontrado`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        const selectedRule =
+          item.overrideBillingConceptRule ??
+          pickApplicableBillingRule({
+            rules: activeRules,
+            conceptId: item.billingConceptId,
+            asOfDate: approvedDate,
+          });
+
+        if (!selectedRule) {
+          throwHttpError({
+            status: 400,
+            message: `El concepto ${concept.name} no tiene regla activa para la fecha de aprobacion`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        return {
+          billingConceptId: item.billingConceptId,
+          sourceCreditProductConceptId: item.id,
+          sourceRuleId: selectedRule.id,
+          frequency: item.overrideFrequency ?? concept.defaultFrequency,
+          financingMode: item.overrideFinancingMode ?? concept.defaultFinancingMode,
+          glAccountId: item.overrideGlAccountId ?? concept.defaultGlAccountId ?? null,
+          calcMethod: selectedRule.calcMethod,
+          baseAmount: selectedRule.baseAmount ?? null,
+          rate: selectedRule.rate ?? null,
+          amount: selectedRule.amount ?? null,
+          valueFrom: selectedRule.valueFrom ?? null,
+          valueTo: selectedRule.valueTo ?? null,
+          minAmount: selectedRule.minAmount ?? null,
+          maxAmount: selectedRule.maxAmount ?? null,
+          roundingMode: selectedRule.roundingMode,
+          roundingDecimals: selectedRule.roundingDecimals,
+        };
+      });
 
       const [updated] = await db.transaction(async (tx) => {
         const [application] = await tx
@@ -1450,6 +1575,15 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             remainingPrincipal: toDecimalString(installment.closingBalance),
           }))
         );
+
+        if (loanBillingConceptSnapshots.length) {
+          await tx.insert(loanBillingConcepts).values(
+            loanBillingConceptSnapshots.map((snapshot) => ({
+              loanId: loan.id,
+              ...snapshot,
+            }))
+          );
+        }
 
         await tx.insert(loanApplicationStatusHistory).values({
           loanApplicationId: id,

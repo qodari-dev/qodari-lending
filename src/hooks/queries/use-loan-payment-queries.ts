@@ -65,6 +65,7 @@ export function useCreateLoanPayment() {
   return api.loanPayment.create.useMutation({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: loanPaymentsKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ['loans'] });
       toast.success('Abono creado exitosamente');
     },
     onError: (error) => {
@@ -81,6 +82,7 @@ export function useVoidLoanPayment() {
       const id = variables.params.id as number;
       queryClient.invalidateQueries({ queryKey: loanPaymentsKeys.lists() });
       queryClient.invalidateQueries({ queryKey: loanPaymentsKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: ['loans'] });
       toast.success('Abono anulado');
     },
     onError: (error) => {

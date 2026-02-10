@@ -140,8 +140,72 @@ export const GetLoanQuerySchema = z.object({
   include: LoanIncludeSchema,
 });
 
+export const LiquidateLoanBodySchema = z.object({});
+export const GetLoanStatementQuerySchema = z.object({
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
+export type LoanBalanceByAccount = {
+  glAccountId: number;
+  glAccountCode: string | null;
+  glAccountName: string | null;
+  chargeAmount: string;
+  paymentAmount: string;
+  balance: string;
+};
+
+export type LoanBalanceSummary = {
+  asOfDate: string;
+  totalCharged: string;
+  totalPaid: string;
+  currentBalance: string;
+  overdueBalance: string;
+  currentDueBalance: string;
+  openInstallments: number;
+  nextDueDate: string | null;
+  byAccount: LoanBalanceByAccount[];
+};
+
+export type LoanStatementEntry = {
+  id: number;
+  entryDate: string;
+  processType: string;
+  documentCode: string;
+  sequence: number;
+  sourceType: string;
+  sourceLabel: string;
+  sourceId: string;
+  relatedPaymentNumber: string | null;
+  glAccountId: number;
+  glAccountCode: string | null;
+  glAccountName: string | null;
+  glAccountDetailType: 'RECEIVABLE' | 'PAYABLE' | 'NONE';
+  description: string;
+  nature: 'DEBIT' | 'CREDIT';
+  amount: string;
+  receivableDelta: string;
+  runningBalance: string;
+  installmentNumber: number | null;
+  dueDate: string | null;
+  status: 'DRAFT' | 'POSTED' | 'VOIDED';
+};
+
+export type LoanStatement = {
+  from: string | null;
+  to: string | null;
+  openingBalance: string;
+  closingBalance: string;
+  entries: LoanStatementEntry[];
+};
+
 export type LoanPaginated = ClientInferResponseBody<Contract['loan']['list'], 200>;
 export type Loan = LoanPaginated['data'][number];
+export type LoanBalanceSummaryResponse = ClientInferResponseBody<
+  Contract['loan']['getBalanceSummary'],
+  200
+>;
+export type LoanStatementResponse = ClientInferResponseBody<Contract['loan']['getStatement'], 200>;
 
 export type LoanSortField = (typeof LOAN_SORT_FIELDS)[number];
 export type LoanInclude = (typeof LOAN_INCLUDE_OPTIONS)[number];

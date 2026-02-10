@@ -14,7 +14,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useLoan } from '@/hooks/queries/use-loan-queries';
+import {
+  useLoan,
+  useLoanBalanceSummary,
+  useLoanStatement,
+} from '@/hooks/queries/use-loan-queries';
 import {
   installmentRecordStatusLabels,
   loanDisbursementStatusLabels,
@@ -84,8 +88,18 @@ export function LoanInfo({
     include: LOAN_DETAIL_INCLUDES,
     enabled: opened && Boolean(loanId),
   });
+  const { data: balanceData, isLoading: isLoadingBalance } = useLoanBalanceSummary(loanId, {
+    enabled: opened && Boolean(loanId),
+  });
+  const { data: statementData, isLoading: isLoadingStatement } = useLoanStatement(
+    loanId,
+    {},
+    { enabled: opened && Boolean(loanId) }
+  );
 
   const detail = detailData?.body ?? loan;
+  const balanceSummary = balanceData?.body;
+  const statement = statementData?.body;
 
   if (!loan) return null;
 
@@ -174,6 +188,7 @@ export function LoanInfo({
                 <TabsTrigger value="loan">Credito</TabsTrigger>
                 <TabsTrigger value="installments">Cuotas</TabsTrigger>
                 <TabsTrigger value="payments">Abonos</TabsTrigger>
+                <TabsTrigger value="statement">Extracto</TabsTrigger>
                 <TabsTrigger value="application">Solicitud</TabsTrigger>
               </TabsList>
 
@@ -246,6 +261,128 @@ export function LoanInfo({
                   <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
                     No hay abonos registrados.
                   </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="statement" className="space-y-4 pt-2">
+                {isLoadingBalance || isLoadingStatement ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Spinner />
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Saldo actual</div>
+                        <div className="text-base font-semibold">
+                          {formatCurrency(balanceSummary?.currentBalance ?? '0')}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Saldo vencido</div>
+                        <div className="text-base font-semibold">
+                          {formatCurrency(balanceSummary?.overdueBalance ?? '0')}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Cuotas abiertas</div>
+                        <div className="text-base font-semibold">{balanceSummary?.openInstallments ?? 0}</div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Total causado</div>
+                        <div className="text-base font-semibold">
+                          {formatCurrency(balanceSummary?.totalCharged ?? '0')}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Total pagado</div>
+                        <div className="text-base font-semibold">
+                          {formatCurrency(balanceSummary?.totalPaid ?? '0')}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Proximo vencimiento</div>
+                        <div className="text-base font-semibold">
+                          {formatDate(balanceSummary?.nextDueDate ?? null)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {balanceSummary?.byAccount?.length ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Auxiliar</TableHead>
+                            <TableHead>Cargos</TableHead>
+                            <TableHead>Pagos</TableHead>
+                            <TableHead>Saldo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {balanceSummary.byAccount.map((item) => (
+                            <TableRow key={item.glAccountId}>
+                              <TableCell>
+                                {[item.glAccountCode, item.glAccountName].filter(Boolean).join(' - ') || '-'}
+                              </TableCell>
+                              <TableCell>{formatCurrency(item.chargeAmount)}</TableCell>
+                              <TableCell>{formatCurrency(item.paymentAmount)}</TableCell>
+                              <TableCell>{formatCurrency(item.balance)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                        No hay saldo de cartera para este credito.
+                      </div>
+                    )}
+
+                    {statement?.entries?.length ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Fuente</TableHead>
+                            <TableHead>Documento</TableHead>
+                            <TableHead>Cuenta</TableHead>
+                            <TableHead>Naturaleza</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead>Delta cartera</TableHead>
+                            <TableHead>Saldo cartera</TableHead>
+                            <TableHead>Estado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {statement.entries.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{formatDate(item.entryDate)}</TableCell>
+                              <TableCell>
+                                {item.relatedPaymentNumber
+                                  ? `${item.sourceLabel} (${item.relatedPaymentNumber})`
+                                  : item.sourceLabel}
+                              </TableCell>
+                              <TableCell>{`${item.documentCode}-${item.sequence}`}</TableCell>
+                              <TableCell>
+                                {[item.glAccountCode, item.glAccountName].filter(Boolean).join(' - ') || '-'}
+                              </TableCell>
+                              <TableCell>{item.nature}</TableCell>
+                              <TableCell>{formatCurrency(item.amount)}</TableCell>
+                              <TableCell>{formatCurrency(item.receivableDelta)}</TableCell>
+                              <TableCell>{formatCurrency(item.runningBalance)}</TableCell>
+                              <TableCell>{item.status}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                        No hay movimientos para el rango seleccionado.
+                      </div>
+                    )}
+                  </>
                 )}
               </TabsContent>
 

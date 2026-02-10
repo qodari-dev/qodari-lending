@@ -1,5 +1,5 @@
 {
-  "id": "d782e986-ec4d-4c97-93b2-1fd39332e62c",
+  "id": "ccc528fa-61d5-401c-b455-ce5450ab53d3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -227,12 +227,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "voucher_number": {
-          "name": "voucher_number",
-          "type": "varchar(13)",
-          "primaryKey": false,
-          "notNull": true
-        },
         "entry_date": {
           "name": "entry_date",
           "type": "date",
@@ -294,29 +288,38 @@
           "primaryKey": false,
           "notNull": false
         },
-        "check_number": {
-          "name": "check_number",
-          "type": "varchar(7)",
+        "status": {
+          "name": "status",
+          "type": "accounting_entries_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'DRAFT'"
+        },
+        "status_date": {
+          "name": "status_date",
+          "type": "date",
           "primaryKey": false,
           "notNull": false
         },
-        "status_code": {
-          "name": "status_code",
-          "type": "varchar(1)",
+        "source_type": {
+          "name": "source_type",
+          "type": "accounting_entry_source_type",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
-        "transaction_type_code": {
-          "name": "transaction_type_code",
-          "type": "varchar(1)",
+        "source_id": {
+          "name": "source_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reversal_of_entry_id": {
+          "name": "reversal_of_entry_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
-        },
-        "transaction_document": {
-          "name": "transaction_document",
-          "type": "varchar(7)",
-          "primaryKey": false,
-          "notNull": true
         },
         "process_run_id": {
           "name": "process_run_id",
@@ -404,7 +407,7 @@
               "nulls": "last"
             },
             {
-              "expression": "status_code",
+              "expression": "status",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -431,7 +434,7 @@
               "nulls": "last"
             },
             {
-              "expression": "status_code",
+              "expression": "status",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -442,17 +445,32 @@
           "method": "btree",
           "with": {}
         },
-        "idx_entries_voucher": {
-          "name": "idx_entries_voucher",
+        "idx_accounting_entries_source": {
+          "name": "idx_accounting_entries_source",
           "columns": [
             {
-              "expression": "voucher_number",
+              "expression": "source_type",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "entry_date",
+              "expression": "source_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_accounting_entries_reversal": {
+          "name": "idx_accounting_entries_reversal",
+          "columns": [
+            {
+              "expression": "reversal_of_entry_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -529,6 +547,19 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
+        },
+        "fk_accounting_entries_reversal_of_entry": {
+          "name": "fk_accounting_entries_reversal_of_entry",
+          "tableFrom": "accounting_entries",
+          "tableTo": "accounting_entries",
+          "columnsFrom": [
+            "reversal_of_entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -575,6 +606,12 @@
         "closed_by_user_id": {
           "name": "closed_by_user_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_by_user_name": {
+          "name": "closed_by_user_name",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -633,9 +670,21 @@
           "primaryKey": true,
           "notNull": true
         },
+        "code": {
+          "name": "code",
+          "type": "varchar(5)",
+          "primaryKey": false,
+          "notNull": true
+        },
         "name": {
           "name": "name",
           "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "city_id": {
+          "name": "city_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -653,13 +702,13 @@
         },
         "representative_name": {
           "name": "representative_name",
-          "type": "varchar(40)",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
         "email": {
           "name": "email",
-          "type": "varchar(30)",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -692,6 +741,21 @@
         }
       },
       "indexes": {
+        "uniq_affiliation_offices_code": {
+          "name": "uniq_affiliation_offices_code",
+          "columns": [
+            {
+              "expression": "code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "uniq_affiliation_offices_name": {
           "name": "uniq_affiliation_offices_name",
           "columns": [
@@ -709,6 +773,19 @@
         }
       },
       "foreignKeys": {
+        "affiliation_offices_city_id_cities_id_fk": {
+          "name": "affiliation_offices_city_id_cities_id_fk",
+          "tableFrom": "affiliation_offices",
+          "tableTo": "cities",
+          "columnsFrom": [
+            "city_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
         "affiliation_offices_cost_center_id_cost_centers_id_fk": {
           "name": "affiliation_offices_cost_center_id_cost_centers_id_fk",
           "tableFrom": "affiliation_offices",
@@ -890,18 +967,6 @@
           "notNull": true,
           "default": true
         },
-        "effective_from": {
-          "name": "effective_from",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "effective_to": {
-          "name": "effective_to",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
         "note": {
           "name": "note",
           "type": "varchar(255)",
@@ -944,12 +1009,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "chk_aging_profiles_effective_order": {
-          "name": "chk_aging_profiles_effective_order",
-          "value": "\"aging_profiles\".\"effective_to\" IS NULL OR \"aging_profiles\".\"effective_from\" IS NULL OR \"aging_profiles\".\"effective_from\" <= \"aging_profiles\".\"effective_to\""
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.agreements": {
@@ -962,26 +1022,14 @@
           "primaryKey": true,
           "notNull": true
         },
-        "legacy_idecon": {
-          "name": "legacy_idecon",
-          "type": "varchar(7)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "type_code": {
-          "name": "type_code",
-          "type": "varchar(1)",
-          "primaryKey": false,
-          "notNull": true
-        },
         "agreement_code": {
           "name": "agreement_code",
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
         },
-        "nit": {
-          "name": "nit",
+        "document_number": {
+          "name": "document_number",
           "type": "varchar(17)",
           "primaryKey": false,
           "notNull": true
@@ -989,6 +1037,12 @@
         "business_name": {
           "name": "business_name",
           "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "city_id": {
+          "name": "city_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -1001,12 +1055,6 @@
         "phone": {
           "name": "phone",
           "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "zone_code": {
-          "name": "zone_code",
-          "type": "varchar(5)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1034,24 +1082,18 @@
           "primaryKey": false,
           "notNull": false
         },
-        "status_code": {
-          "name": "status_code",
-          "type": "varchar(1)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status_date": {
-          "name": "status_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
         "is_active": {
           "name": "is_active",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "status_date": {
+          "name": "status_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -1069,21 +1111,6 @@
         }
       },
       "indexes": {
-        "uniq_agreements_legacy_idecon": {
-          "name": "uniq_agreements_legacy_idecon",
-          "columns": [
-            {
-              "expression": "legacy_idecon",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "uniq_agreements_agreement_code": {
           "name": "uniq_agreements_agreement_code",
           "columns": [
@@ -1103,22 +1130,7 @@
           "name": "idx_agreements_nit",
           "columns": [
             {
-              "expression": "nit",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_agreements_status": {
-          "name": "idx_agreements_status",
-          "columns": [
-            {
-              "expression": "status_code",
+              "expression": "document_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1145,7 +1157,21 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "agreements_city_id_cities_id_fk": {
+          "name": "agreements_city_id_cities_id_fk",
+          "tableFrom": "agreements",
+          "tableTo": "cities",
+          "columnsFrom": [
+            "city_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -1390,6 +1416,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "uniq_billing_concept_rule_id_concept": {
+          "name": "uniq_billing_concept_rule_id_concept",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "billing_concept_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1418,6 +1465,30 @@
         "chk_billing_concept_rules_range_order": {
           "name": "chk_billing_concept_rules_range_order",
           "value": "\"billing_concept_rules\".\"value_from\" IS NULL OR \"billing_concept_rules\".\"value_to\" IS NULL OR \"billing_concept_rules\".\"value_from\" <= \"billing_concept_rules\".\"value_to\""
+        },
+        "chk_billing_rules_percentage_required": {
+          "name": "chk_billing_rules_percentage_required",
+          "value": "\"billing_concept_rules\".\"calc_method\" <> 'PERCENTAGE' OR (\"billing_concept_rules\".\"base_amount\" IS NOT NULL AND \"billing_concept_rules\".\"rate\" IS NOT NULL)"
+        },
+        "chk_billing_rules_percentage_no_amount": {
+          "name": "chk_billing_rules_percentage_no_amount",
+          "value": "\"billing_concept_rules\".\"calc_method\" <> 'PERCENTAGE' OR \"billing_concept_rules\".\"amount\" IS NULL"
+        },
+        "chk_billing_rules_fixed_amount_required": {
+          "name": "chk_billing_rules_fixed_amount_required",
+          "value": "\"billing_concept_rules\".\"calc_method\" <> 'FIXED_AMOUNT' OR \"billing_concept_rules\".\"amount\" IS NOT NULL"
+        },
+        "chk_billing_rules_fixed_amount_no_rate": {
+          "name": "chk_billing_rules_fixed_amount_no_rate",
+          "value": "\"billing_concept_rules\".\"calc_method\" <> 'FIXED_AMOUNT' OR (\"billing_concept_rules\".\"base_amount\" IS NULL AND \"billing_concept_rules\".\"rate\" IS NULL)"
+        },
+        "chk_billing_rules_tier_requires_value_source": {
+          "name": "chk_billing_rules_tier_requires_value_source",
+          "value": "\"billing_concept_rules\".\"calc_method\" <> 'TIERED' OR (\"billing_concept_rules\".\"amount\" IS NOT NULL OR (\"billing_concept_rules\".\"base_amount\" IS NOT NULL AND \"billing_concept_rules\".\"rate\" IS NOT NULL))"
+        },
+        "chk_billing_rules_effective_order": {
+          "name": "chk_billing_rules_effective_order",
+          "value": "\"billing_concept_rules\".\"effective_from\" IS NULL OR \"billing_concept_rules\".\"effective_to\" IS NULL OR \"billing_concept_rules\".\"effective_from\" <= \"billing_concept_rules\".\"effective_to\""
         }
       },
       "isRLSEnabled": false
@@ -1443,6 +1514,12 @@
           "type": "varchar(150)",
           "primaryKey": false,
           "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "is_system": {
           "name": "is_system",
@@ -1484,12 +1561,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -1725,18 +1796,6 @@
           "notNull": true,
           "default": "'NEXT_BUSINESS_DAY'"
         },
-        "effective_from": {
-          "name": "effective_from",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "effective_to": {
-          "name": "effective_to",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
         "is_active": {
           "name": "is_active",
           "type": "boolean",
@@ -1841,10 +1900,6 @@
         "chk_billing_cycle_profiles_cycles_per_month_min": {
           "name": "chk_billing_cycle_profiles_cycles_per_month_min",
           "value": "\"billing_cycle_profiles\".\"cycles_per_month\" >= 1"
-        },
-        "chk_billing_cycle_profiles_effective_order": {
-          "name": "chk_billing_cycle_profiles_effective_order",
-          "value": "\"billing_cycle_profiles\".\"effective_to\" IS NULL OR \"billing_cycle_profiles\".\"effective_from\" IS NULL OR \"billing_cycle_profiles\".\"effective_from\" <= \"billing_cycle_profiles\".\"effective_to\""
         }
       },
       "isRLSEnabled": false
@@ -1938,6 +1993,74 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.cities": {
+      "name": "cities",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(5)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uniq_cities_code": {
+          "name": "uniq_cities_code",
+          "columns": [
+            {
+              "expression": "code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.co_debtors": {
       "name": "co_debtors",
       "schema": "",
@@ -1948,9 +2071,9 @@
           "primaryKey": true,
           "notNull": true
         },
-        "document_type": {
-          "name": "document_type",
-          "type": "varchar(10)",
+        "identification_type_id": {
+          "name": "identification_type_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -1966,9 +2089,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "home_city_code": {
-          "name": "home_city_code",
-          "type": "varchar(20)",
+        "home_city_id": {
+          "name": "home_city_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -1990,9 +2113,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "work_city_code": {
-          "name": "work_city_code",
-          "type": "varchar(20)",
+        "work_city_id": {
+          "name": "work_city_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -2022,7 +2145,7 @@
           "name": "uniq_co_debtors_document_number",
           "columns": [
             {
-              "expression": "document_type",
+              "expression": "identification_type_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2040,7 +2163,47 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "co_debtors_identification_type_id_identification_types_id_fk": {
+          "name": "co_debtors_identification_type_id_identification_types_id_fk",
+          "tableFrom": "co_debtors",
+          "tableTo": "identification_types",
+          "columnsFrom": [
+            "identification_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "co_debtors_home_city_id_cities_id_fk": {
+          "name": "co_debtors_home_city_id_cities_id_fk",
+          "tableFrom": "co_debtors",
+          "tableTo": "cities",
+          "columnsFrom": [
+            "home_city_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "co_debtors_work_city_id_cities_id_fk": {
+          "name": "co_debtors_work_city_id_cities_id_fk",
+          "tableFrom": "co_debtors",
+          "tableTo": "cities",
+          "columnsFrom": [
+            "work_city_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -2065,7 +2228,7 @@
         },
         "name": {
           "name": "name",
-          "type": "varchar(40)",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
@@ -2451,13 +2614,6 @@
           "notNull": true,
           "default": true
         },
-        "is_mandatory": {
-          "name": "is_mandatory",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "override_frequency": {
           "name": "override_frequency",
           "type": "billing_concept_frequency",
@@ -2483,13 +2639,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
-        },
-        "charge_order": {
-          "name": "charge_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -2584,17 +2733,19 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "credit_product_billing_concepts_override_rule_id_billing_concept_rules_id_fk": {
-          "name": "credit_product_billing_concepts_override_rule_id_billing_concept_rules_id_fk",
+        "fk_credit_product_billing_concepts_override_rule_concept": {
+          "name": "fk_credit_product_billing_concepts_override_rule_concept",
           "tableFrom": "credit_product_billing_concepts",
           "tableTo": "billing_concept_rules",
           "columnsFrom": [
-            "override_rule_id"
+            "override_rule_id",
+            "billing_concept_id"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "billing_concept_id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -2622,7 +2773,8 @@
         },
         "category_code": {
           "name": "category_code",
-          "type": "varchar(1)",
+          "type": "category_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -2640,12 +2792,6 @@
         },
         "financing_factor": {
           "name": "financing_factor",
-          "type": "numeric(12, 9)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "late_factor": {
-          "name": "late_factor",
           "type": "numeric(12, 9)",
           "primaryKey": false,
           "notNull": true
@@ -2736,6 +2882,107 @@
       },
       "isRLSEnabled": false
     },
+    "public.credit_product_documents": {
+      "name": "credit_product_documents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "credit_product_id": {
+          "name": "credit_product_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_type_id": {
+          "name": "document_type_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_required": {
+          "name": "is_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uniq_credit_product_document": {
+          "name": "uniq_credit_product_document",
+          "columns": [
+            {
+              "expression": "credit_product_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "document_type_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "credit_product_documents_credit_product_id_credit_products_id_fk": {
+          "name": "credit_product_documents_credit_product_id_credit_products_id_fk",
+          "tableFrom": "credit_product_documents",
+          "tableTo": "credit_products",
+          "columnsFrom": [
+            "credit_product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "credit_product_documents_document_type_id_document_types_id_fk": {
+          "name": "credit_product_documents_document_type_id_document_types_id_fk",
+          "tableFrom": "credit_product_documents",
+          "tableTo": "document_types",
+          "columnsFrom": [
+            "document_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.credit_product_late_interest_rules": {
       "name": "credit_product_late_interest_rules",
       "schema": "",
@@ -2746,19 +2993,18 @@
           "primaryKey": true,
           "notNull": true
         },
-        "credit_product_category_id": {
-          "name": "credit_product_category_id",
+        "credit_product_id": {
+          "name": "credit_product_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "age_basis": {
-          "name": "age_basis",
-          "type": "late_interest_age_basis",
+        "category_code": {
+          "name": "category_code",
+          "type": "category_code",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'OLDEST_OVERDUE_INSTALLMENT'"
+          "notNull": true
         },
         "days_from": {
           "name": "days_from",
@@ -2820,11 +3066,11 @@
         }
       },
       "indexes": {
-        "idx_late_rules_category": {
-          "name": "idx_late_rules_category",
+        "idx_late_rules_credit_product": {
+          "name": "idx_late_rules_credit_product",
           "columns": [
             {
-              "expression": "credit_product_category_id",
+              "expression": "credit_product_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2839,7 +3085,7 @@
           "name": "idx_late_rules_active",
           "columns": [
             {
-              "expression": "credit_product_category_id",
+              "expression": "credit_product_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2858,17 +3104,17 @@
         }
       },
       "foreignKeys": {
-        "credit_product_late_interest_rules_credit_product_category_id_credit_product_categories_id_fk": {
-          "name": "credit_product_late_interest_rules_credit_product_category_id_credit_product_categories_id_fk",
+        "credit_product_late_interest_rules_credit_product_id_credit_products_id_fk": {
+          "name": "credit_product_late_interest_rules_credit_product_id_credit_products_id_fk",
           "tableFrom": "credit_product_late_interest_rules",
-          "tableTo": "credit_product_categories",
+          "tableTo": "credit_products",
           "columnsFrom": [
-            "credit_product_category_id"
+            "credit_product_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -2966,13 +3212,6 @@
           "notNull": true,
           "default": false
         },
-        "allow_override": {
-          "name": "allow_override",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "is_active": {
           "name": "is_active",
           "type": "boolean",
@@ -3069,107 +3308,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.credit_product_required_documents": {
-      "name": "credit_product_required_documents",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "credit_product_id": {
-          "name": "credit_product_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "required_document_type_id": {
-          "name": "required_document_type_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_required": {
-          "name": "is_required",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "uniq_credit_product_required_document": {
-          "name": "uniq_credit_product_required_document",
-          "columns": [
-            {
-              "expression": "credit_product_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "required_document_type_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "credit_product_required_documents_credit_product_id_credit_products_id_fk": {
-          "name": "credit_product_required_documents_credit_product_id_credit_products_id_fk",
-          "tableFrom": "credit_product_required_documents",
-          "tableTo": "credit_products",
-          "columnsFrom": [
-            "credit_product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "credit_product_required_documents_required_document_type_id_document_types_id_fk": {
-          "name": "credit_product_required_documents_required_document_type_id_document_types_id_fk",
-          "tableFrom": "credit_product_required_documents",
-          "tableTo": "document_types",
-          "columnsFrom": [
-            "required_document_type_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.credit_products": {
       "name": "credit_products",
       "schema": "",
@@ -3218,6 +3356,14 @@
           "notNull": true,
           "default": false
         },
+        "insurance_range_metric": {
+          "name": "insurance_range_metric",
+          "type": "insurance_rate_range_metric",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'CREDIT_AMOUNT'"
+        },
         "capital_distribution_id": {
           "name": "capital_distribution_id",
           "type": "integer",
@@ -3249,18 +3395,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "study_fee_amount": {
-          "name": "study_fee_amount",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "study_gl_account_id": {
-          "name": "study_gl_account_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "cost_center_id": {
           "name": "cost_center_id",
           "type": "integer",
@@ -3280,6 +3414,14 @@
           "type": "numeric(12, 5)",
           "primaryKey": false,
           "notNull": false
+        },
+        "age_basis": {
+          "name": "age_basis",
+          "type": "late_interest_age_basis",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'OLDEST_OVERDUE_INSTALLMENT'"
         },
         "is_active": {
           "name": "is_active",
@@ -3401,19 +3543,6 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "credit_products_study_gl_account_id_gl_accounts_id_fk": {
-          "name": "credit_products_study_gl_account_id_gl_accounts_id_fk",
-          "tableFrom": "credit_products",
-          "tableTo": "gl_accounts",
-          "columnsFrom": [
-            "study_gl_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
         "credit_products_cost_center_id_cost_centers_id_fk": {
           "name": "credit_products_cost_center_id_cost_centers_id_fk",
           "tableFrom": "credit_products",
@@ -3444,18 +3573,11 @@
           "primaryKey": true,
           "notNull": true
         },
-        "code": {
-          "name": "code",
-          "type": "varchar(2)",
+        "app_slug": {
+          "name": "app_slug",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
-        },
-        "control_enabled": {
-          "name": "control_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         },
         "audit_transactions_enabled": {
           "name": "audit_transactions_enabled",
@@ -3475,7 +3597,7 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": false
         },
         "subsidy_enabled": {
           "name": "subsidy_enabled",
@@ -3521,21 +3643,9 @@
           "primaryKey": false,
           "notNull": false
         },
-        "default_collection_method_id": {
-          "name": "default_collection_method_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
         "default_cost_center_id": {
           "name": "default_cost_center_id",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "treasury_document_number": {
-          "name": "treasury_document_number",
-          "type": "varchar(13)",
           "primaryKey": false,
           "notNull": false
         },
@@ -3596,78 +3706,6 @@
         "finance_manager_title": {
           "name": "finance_manager_title",
           "type": "varchar(80)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "default_repayment_method_id": {
-          "name": "default_repayment_method_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "default_guarantee_type_id": {
-          "name": "default_guarantee_type_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "legacy_default_subsidy_mark": {
-          "name": "legacy_default_subsidy_mark",
-          "type": "varchar(2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "software_license_number": {
-          "name": "software_license_number",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "max_amount": {
-          "name": "max_amount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "max_installments": {
-          "name": "max_installments",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "default_insurance_value": {
-          "name": "default_insurance_value",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "next_consecutive": {
-          "name": "next_consecutive",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fund_register_tax_id": {
-          "name": "fund_register_tax_id",
-          "type": "varchar(17)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fund_register_factor": {
-          "name": "fund_register_factor",
-          "type": "numeric(5, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fund_register_gl_account_id": {
-          "name": "fund_register_gl_account_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bank_account_number": {
-          "name": "bank_account_number",
-          "type": "varchar(25)",
           "primaryKey": false,
           "notNull": false
         },
@@ -3753,19 +3791,6 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "credits_settings_default_collection_method_id_payment_tender_types_id_fk": {
-          "name": "credits_settings_default_collection_method_id_payment_tender_types_id_fk",
-          "tableFrom": "credits_settings",
-          "tableTo": "payment_tender_types",
-          "columnsFrom": [
-            "default_collection_method_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
         "credits_settings_default_cost_center_id_cost_centers_id_fk": {
           "name": "credits_settings_default_cost_center_id_cost_centers_id_fk",
           "tableFrom": "credits_settings",
@@ -3778,54 +3803,15 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
-        },
-        "credits_settings_default_repayment_method_id_repayment_methods_id_fk": {
-          "name": "credits_settings_default_repayment_method_id_repayment_methods_id_fk",
-          "tableFrom": "credits_settings",
-          "tableTo": "repayment_methods",
-          "columnsFrom": [
-            "default_repayment_method_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "credits_settings_default_guarantee_type_id_payment_guarantee_types_id_fk": {
-          "name": "credits_settings_default_guarantee_type_id_payment_guarantee_types_id_fk",
-          "tableFrom": "credits_settings",
-          "tableTo": "payment_guarantee_types",
-          "columnsFrom": [
-            "default_guarantee_type_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "credits_settings_fund_register_gl_account_id_gl_accounts_id_fk": {
-          "name": "credits_settings_fund_register_gl_account_id_gl_accounts_id_fk",
-          "tableFrom": "credits_settings",
-          "tableTo": "gl_accounts",
-          "columnsFrom": [
-            "fund_register_gl_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "credits_settings_code_unique": {
-          "name": "credits_settings_code_unique",
+        "credits_settings_app_slug_unique": {
+          "name": "credits_settings_app_slug_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "code"
+            "app_slug"
           ]
         }
       },
@@ -4023,6 +4009,74 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.identification_types": {
+      "name": "identification_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(5)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uniq_identification_types_name": {
+          "name": "uniq_identification_types_name",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.insurance_companies": {
       "name": "insurance_companies",
       "schema": "",
@@ -4033,9 +4087,15 @@
           "primaryKey": true,
           "notNull": true
         },
-        "tax_id": {
-          "name": "tax_id",
-          "type": "varchar(17)",
+        "identification_type_id": {
+          "name": "identification_type_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_number": {
+          "name": "document_number",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
         },
@@ -4048,6 +4108,12 @@
         "business_name": {
           "name": "business_name",
           "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "city_id": {
+          "name": "city_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -4128,11 +4194,17 @@
         }
       },
       "indexes": {
-        "uniq_insurance_companies_tax_id": {
-          "name": "uniq_insurance_companies_tax_id",
+        "uniq_insurance_companies_document_number_id": {
+          "name": "uniq_insurance_companies_document_number_id",
           "columns": [
             {
-              "expression": "tax_id",
+              "expression": "identification_type_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "document_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4145,6 +4217,32 @@
         }
       },
       "foreignKeys": {
+        "insurance_companies_identification_type_id_identification_types_id_fk": {
+          "name": "insurance_companies_identification_type_id_identification_types_id_fk",
+          "tableFrom": "insurance_companies",
+          "tableTo": "identification_types",
+          "columnsFrom": [
+            "identification_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "insurance_companies_city_id_cities_id_fk": {
+          "name": "insurance_companies_city_id_cities_id_fk",
+          "tableFrom": "insurance_companies",
+          "tableTo": "cities",
+          "columnsFrom": [
+            "city_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
         "insurance_companies_total_charge_distribution_id_accounting_distributions_id_fk": {
           "name": "insurance_companies_total_charge_distribution_id_accounting_distributions_id_fk",
           "tableFrom": "insurance_companies",
@@ -4194,6 +4292,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "range_metric": {
+          "name": "range_metric",
+          "type": "insurance_rate_range_metric",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
         "value_from": {
           "name": "value_from",
           "type": "integer",
@@ -4233,6 +4338,12 @@
           "columns": [
             {
               "expression": "insurance_company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "range_metric",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4344,6 +4455,161 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.loan_agreement_history": {
+      "name": "loan_agreement_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "loan_id": {
+          "name": "loan_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agreement_id": {
+          "name": "agreement_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "effective_date": {
+          "name": "effective_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changed_at": {
+          "name": "changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "changed_by_user_id": {
+          "name": "changed_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "changed_by_user_name": {
+          "name": "changed_by_user_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_loan_agreement_history_loan": {
+          "name": "idx_loan_agreement_history_loan",
+          "columns": [
+            {
+              "expression": "loan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_loan_agreement_history_changed_at": {
+          "name": "idx_loan_agreement_history_changed_at",
+          "columns": [
+            {
+              "expression": "changed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_loan_agreement_history_agreement": {
+          "name": "idx_loan_agreement_history_agreement",
+          "columns": [
+            {
+              "expression": "agreement_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "loan_agreement_history_loan_id_loans_id_fk": {
+          "name": "loan_agreement_history_loan_id_loans_id_fk",
+          "tableFrom": "loan_agreement_history",
+          "tableTo": "loans",
+          "columnsFrom": [
+            "loan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "loan_agreement_history_agreement_id_agreements_id_fk": {
+          "name": "loan_agreement_history_agreement_id_agreements_id_fk",
+          "tableFrom": "loan_agreement_history",
+          "tableTo": "agreements",
+          "columnsFrom": [
+            "agreement_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.loan_application_act_numbers": {
       "name": "loan_application_act_numbers",
       "schema": "",
@@ -4371,12 +4637,6 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
-        },
-        "generated_by_user_id": {
-          "name": "generated_by_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -4607,8 +4867,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "required_document_type_id": {
-          "name": "required_document_type_id",
+        "document_type_id": {
+          "name": "document_type_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -4628,6 +4888,12 @@
         },
         "uploaded_by_user_id": {
           "name": "uploaded_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uploaded_by_user_name": {
+          "name": "uploaded_by_user_name",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -4658,7 +4924,7 @@
               "nulls": "last"
             },
             {
-              "expression": "required_document_type_id",
+              "expression": "document_type_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4684,12 +4950,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "loan_application_documents_required_document_type_id_document_types_id_fk": {
-          "name": "loan_application_documents_required_document_type_id_document_types_id_fk",
+        "loan_application_documents_document_type_id_document_types_id_fk": {
+          "name": "loan_application_documents_document_type_id_document_types_id_fk",
           "tableFrom": "loan_application_documents",
           "tableTo": "document_types",
           "columnsFrom": [
-            "required_document_type_id"
+            "document_type_id"
           ],
           "columnsTo": [
             "id"
@@ -4914,14 +5180,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "agreement_code": {
-          "name": "agreement_code",
+        "pledge_code": {
+          "name": "pledge_code",
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
         },
-        "spouse_document_number": {
-          "name": "spouse_document_number",
+        "document_number": {
+          "name": "document_number",
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false
@@ -4970,7 +5236,7 @@
               "nulls": "last"
             },
             {
-              "expression": "agreement_code",
+              "expression": "pledge_code",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5002,11 +5268,11 @@
           "method": "btree",
           "with": {}
         },
-        "idx_pledges_agreement": {
-          "name": "idx_pledges_agreement",
+        "idx_pledges_pledge_code": {
+          "name": "idx_pledges_pledge_code",
           "columns": [
             {
-              "expression": "agreement_code",
+              "expression": "pledge_code",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5057,7 +5323,7 @@
         },
         "executed_by_user_id": {
           "name": "executed_by_user_id",
-          "type": "integer",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
@@ -5214,7 +5480,13 @@
           "name": "changed_by_user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "changed_by_user_name": {
+          "name": "changed_by_user_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
         },
         "note": {
           "name": "note",
@@ -5306,14 +5578,20 @@
           "primaryKey": true,
           "notNull": true
         },
-        "code": {
-          "name": "code",
+        "credit_number": {
+          "name": "credit_number",
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
         },
         "credit_fund_id": {
           "name": "credit_fund_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -5336,6 +5614,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "created_by_user_name": {
+          "name": "created_by_user_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
         "third_party_id": {
           "name": "third_party_id",
           "type": "integer",
@@ -5351,7 +5635,8 @@
         },
         "category_code": {
           "name": "category_code",
-          "type": "varchar(1)",
+          "type": "category_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -5359,7 +5644,13 @@
           "name": "repayment_method_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "payment_guarantee_type_id": {
+          "name": "payment_guarantee_type_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "pledges_subsidy": {
           "name": "pledges_subsidy",
@@ -5460,13 +5751,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "approval_type": {
-          "name": "approval_type",
-          "type": "loan_approval_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
         "investment_type_id": {
           "name": "investment_type_id",
           "type": "integer",
@@ -5480,12 +5764,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'PENDING'"
-        },
-        "received_date": {
-          "name": "received_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
         },
         "status_changed_by_user_id": {
           "name": "status_changed_by_user_id",
@@ -5513,7 +5791,13 @@
         },
         "note": {
           "name": "note",
-          "type": "varchar(255)",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_note": {
+          "name": "status_note",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -5568,12 +5852,6 @@
         "risk_note": {
           "name": "risk_note",
           "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "channel_id": {
-          "name": "channel_id",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false
         }
@@ -5675,6 +5953,19 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
+        "loan_applications_channel_id_channels_id_fk": {
+          "name": "loan_applications_channel_id_channels_id_fk",
+          "tableFrom": "loan_applications",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "loan_applications_affiliation_office_id_affiliation_offices_id_fk": {
           "name": "loan_applications_affiliation_office_id_affiliation_offices_id_fk",
           "tableFrom": "loan_applications",
@@ -5707,6 +5998,19 @@
           "tableTo": "repayment_methods",
           "columnsFrom": [
             "repayment_method_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "loan_applications_payment_guarantee_type_id_payment_guarantee_types_id_fk": {
+          "name": "loan_applications_payment_guarantee_type_id_payment_guarantee_types_id_fk",
+          "tableFrom": "loan_applications",
+          "tableTo": "payment_guarantee_types",
+          "columnsFrom": [
+            "payment_guarantee_type_id"
           ],
           "columnsTo": [
             "id"
@@ -5791,28 +6095,15 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
-        },
-        "loan_applications_channel_id_channels_id_fk": {
-          "name": "loan_applications_channel_id_channels_id_fk",
-          "tableFrom": "loan_applications",
-          "tableTo": "channels",
-          "columnsFrom": [
-            "channel_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "loan_applications_code_unique": {
-          "name": "loan_applications_code_unique",
+        "loan_applications_credit_number_unique": {
+          "name": "loan_applications_credit_number_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "code"
+            "credit_number"
           ]
         }
       },
@@ -5938,25 +6229,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": 2
-        },
-        "start_date": {
-          "name": "start_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "end_date": {
-          "name": "end_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         },
         "created_at": {
           "name": "created_at",
@@ -6441,14 +6713,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "code": {
-          "name": "code",
-          "type": "varchar(7)",
+        "payment_number": {
+          "name": "payment_number",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
         },
-        "movement_type_snapshot": {
-          "name": "movement_type_snapshot",
+        "movement_type": {
+          "name": "movement_type",
           "type": "payment_receipt_movement_type",
           "typeSchema": "public",
           "primaryKey": false,
@@ -6474,7 +6746,7 @@
         },
         "description": {
           "name": "description",
-          "type": "varchar(150)",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -6516,8 +6788,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "payroll_payer_tax_id": {
-          "name": "payroll_payer_tax_id",
+        "payroll_payer_document_number": {
+          "name": "payroll_payer_document_number",
           "type": "varchar(15)",
           "primaryKey": false,
           "notNull": false
@@ -6528,38 +6800,38 @@
           "primaryKey": false,
           "notNull": true
         },
-        "cash_amount": {
-          "name": "cash_amount",
-          "type": "numeric(14, 2)",
+        "created_by_user_name": {
+          "name": "created_by_user_name",
+          "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": false
-        },
-        "check_amount": {
-          "name": "check_amount",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "credit_amount": {
-          "name": "credit_amount",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "returned_amount": {
-          "name": "returned_amount",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "note": {
           "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note_status": {
+          "name": "note_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by_user_id": {
+          "name": "updated_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by_user_name": {
+          "name": "updated_by_user_name",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
-        "legacy_valmay": {
-          "name": "legacy_valmay",
+        "over_paid_amount": {
+          "name": "over_paid_amount",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -6570,21 +6842,14 @@
           "primaryKey": false,
           "notNull": false
         },
-        "is_interfaced": {
-          "name": "is_interfaced",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "legacy_sub43_mark": {
-          "name": "legacy_sub43_mark",
+        "subsi_code": {
+          "name": "subsi_code",
           "type": "varchar(2)",
           "primaryKey": false,
           "notNull": false
         },
-        "legacy_sub43_document": {
-          "name": "legacy_sub43_document",
+        "subsi_document": {
+          "name": "subsi_document",
           "type": "varchar(8)",
           "primaryKey": false,
           "notNull": false
@@ -6615,7 +6880,7 @@
               "nulls": "last"
             },
             {
-              "expression": "code",
+              "expression": "payment_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -6807,7 +7072,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -6851,13 +7116,20 @@
           "name": "payoff_amount",
           "type": "numeric(14, 2)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'0'"
         },
         "created_by_user_id": {
           "name": "created_by_user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
+        },
+        "created_by_user_name": {
+          "name": "created_by_user_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -6943,6 +7215,140 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
+      "checkConstraints": {
+        "chk_loan_ref_link_not_self": {
+          "name": "chk_loan_ref_link_not_self",
+          "value": "\"loan_refinancing_links\".\"loan_id\" <> \"loan_refinancing_links\".\"reference_loan_id\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.loan_status_history": {
+      "name": "loan_status_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "loan_id": {
+          "name": "loan_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_status": {
+          "name": "from_status",
+          "type": "loan_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "to_status": {
+          "name": "to_status",
+          "type": "loan_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changed_at": {
+          "name": "changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "changed_by_user_id": {
+          "name": "changed_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "changed_by_user_name": {
+          "name": "changed_by_user_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_loan_status_history_loan": {
+          "name": "idx_loan_status_history_loan",
+          "columns": [
+            {
+              "expression": "loan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_loan_status_history_changed_at": {
+          "name": "idx_loan_status_history_changed_at",
+          "columns": [
+            {
+              "expression": "changed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "loan_status_history_loan_id_loans_id_fk": {
+          "name": "loan_status_history_loan_id_loans_id_fk",
+          "tableFrom": "loan_status_history",
+          "tableTo": "loans",
+          "columnsFrom": [
+            "loan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
     },
@@ -6956,8 +7362,8 @@
           "primaryKey": true,
           "notNull": true
         },
-        "code": {
-          "name": "code",
+        "credit_number": {
+          "name": "credit_number",
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
@@ -6974,6 +7380,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "created_by_user_name": {
+          "name": "created_by_user_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
         "record_date": {
           "name": "record_date",
           "type": "date",
@@ -6985,6 +7397,12 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
+        },
+        "agreement_id": {
+          "name": "agreement_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "third_party_id": {
           "name": "third_party_id",
@@ -7046,18 +7464,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "fund_register_tax_id": {
-          "name": "fund_register_tax_id",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fund_register_value": {
-          "name": "fund_register_value",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "discount_study_credit": {
           "name": "discount_study_credit",
           "type": "boolean",
@@ -7115,15 +7521,15 @@
           "primaryKey": false,
           "notNull": false
         },
-        "note": {
-          "name": "note",
+        "status_changed_by_user_name": {
+          "name": "status_changed_by_user_name",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
-        "voucher_number": {
-          "name": "voucher_number",
-          "type": "varchar(30)",
+        "note": {
+          "name": "note",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -7219,6 +7625,12 @@
           "notNull": true,
           "default": 0
         },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7235,11 +7647,11 @@
         }
       },
       "indexes": {
-        "uniq_loans_code": {
-          "name": "uniq_loans_code",
+        "uniq_loans_credit_number": {
+          "name": "uniq_loans_credit_number",
           "columns": [
             {
-              "expression": "code",
+              "expression": "credit_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7255,6 +7667,21 @@
           "columns": [
             {
               "expression": "loan_application_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_loans_agreement": {
+          "name": "idx_loans_agreement",
+          "columns": [
+            {
+              "expression": "agreement_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7389,6 +7816,19 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
+        "loans_agreement_id_agreements_id_fk": {
+          "name": "loans_agreement_id_agreements_id_fk",
+          "tableFrom": "loans",
+          "tableTo": "agreements",
+          "columnsFrom": [
+            "agreement_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "loans_third_party_id_third_parties_id_fk": {
           "name": "loans_third_party_id_third_parties_id_fk",
           "tableFrom": "loans",
@@ -7492,15 +7932,28 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
+        },
+        "loans_channel_id_channels_id_fk": {
+          "name": "loans_channel_id_channels_id_fk",
+          "tableFrom": "loans",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "loans_code_unique": {
-          "name": "loans_code_unique",
+        "loans_credit_number_unique": {
+          "name": "loans_credit_number_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "code"
+            "credit_number"
           ]
         }
       },
@@ -7516,12 +7969,6 @@
           "name": "id",
           "type": "serial",
           "primaryKey": true,
-          "notNull": true
-        },
-        "code": {
-          "name": "code",
-          "type": "varchar(40)",
-          "primaryKey": false,
           "notNull": true
         },
         "name": {
@@ -7567,11 +8014,11 @@
         }
       },
       "indexes": {
-        "uniq_payment_allocation_policies_code": {
-          "name": "uniq_payment_allocation_policies_code",
+        "uniq_payment_allocation_policies_name": {
+          "name": "uniq_payment_allocation_policies_name",
           "columns": [
             {
-              "expression": "code",
+              "expression": "name",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7615,8 +8062,8 @@
           "primaryKey": true,
           "notNull": true
         },
-        "policy_id": {
-          "name": "policy_id",
+        "payment_allocation_policy_id": {
+          "name": "payment_allocation_policy_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -7649,19 +8096,6 @@
           "notNull": true,
           "default": "'DUE_DATE_ASC'"
         },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "note": {
-          "name": "note",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7682,7 +8116,7 @@
           "name": "uniq_payment_alloc_rule_order",
           "columns": [
             {
-              "expression": "policy_id",
+              "expression": "payment_allocation_policy_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7699,11 +8133,32 @@
           "method": "btree",
           "with": {}
         },
+        "uniq_payment_alloc_rule_concept": {
+          "name": "uniq_payment_alloc_rule_concept",
+          "columns": [
+            {
+              "expression": "payment_allocation_policy_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "billing_concept_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "idx_payment_alloc_rules_policy": {
           "name": "idx_payment_alloc_rules_policy",
           "columns": [
             {
-              "expression": "policy_id",
+              "expression": "payment_allocation_policy_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7731,17 +8186,17 @@
         }
       },
       "foreignKeys": {
-        "payment_allocation_policy_rules_policy_id_payment_allocation_policies_id_fk": {
-          "name": "payment_allocation_policy_rules_policy_id_payment_allocation_policies_id_fk",
+        "payment_allocation_policy_rules_payment_allocation_policy_id_payment_allocation_policies_id_fk": {
+          "name": "payment_allocation_policy_rules_payment_allocation_policy_id_payment_allocation_policies_id_fk",
           "tableFrom": "payment_allocation_policy_rules",
           "tableTo": "payment_allocation_policies",
           "columnsFrom": [
-            "policy_id"
+            "payment_allocation_policy_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "payment_allocation_policy_rules_billing_concept_id_billing_concepts_id_fk": {
@@ -7909,6 +8364,12 @@
           "primaryKey": true,
           "notNull": true
         },
+        "code": {
+          "name": "code",
+          "type": "varchar(5)",
+          "primaryKey": false,
+          "notNull": true
+        },
         "name": {
           "name": "name",
           "type": "varchar(255)",
@@ -7919,6 +8380,12 @@
           "name": "movement_type",
           "type": "payment_receipt_movement_type",
           "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gl_account_id": {
+          "name": "gl_account_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -7945,6 +8412,21 @@
         }
       },
       "indexes": {
+        "uniq_payment_receipt_types_code": {
+          "name": "uniq_payment_receipt_types_code",
+          "columns": [
+            {
+              "expression": "code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "uniq_payment_receipt_types_name": {
           "name": "uniq_payment_receipt_types_name",
           "columns": [
@@ -7961,7 +8443,21 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "payment_receipt_types_gl_account_id_gl_accounts_id_fk": {
+          "name": "payment_receipt_types_gl_account_id_gl_accounts_id_fk",
+          "tableFrom": "payment_receipt_types",
+          "tableTo": "gl_accounts",
+          "columnsFrom": [
+            "gl_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -8231,7 +8727,7 @@
           "name": "aging_profile_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "generated_at": {
           "name": "generated_at",
@@ -8278,7 +8774,8 @@
         },
         "category_code": {
           "name": "category_code",
-          "type": "varchar(1)",
+          "type": "category_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": false
         },
@@ -8346,6 +8843,12 @@
           "columns": [
             {
               "expression": "accounting_period_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "aging_profile_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -8656,12 +9159,6 @@
           "notNull": true,
           "default": "'OPEN'"
         },
-        "legacy_status_code": {
-          "name": "legacy_status_code",
-          "type": "varchar(1)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -8822,7 +9319,24 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chk_portfolio_entry_charge_nonneg": {
+          "name": "chk_portfolio_entry_charge_nonneg",
+          "value": "\"portfolio_entries\".\"charge_amount\" >= 0"
+        },
+        "chk_portfolio_entry_payment_nonneg": {
+          "name": "chk_portfolio_entry_payment_nonneg",
+          "value": "\"portfolio_entries\".\"payment_amount\" >= 0"
+        },
+        "chk_portfolio_entry_balance_formula": {
+          "name": "chk_portfolio_entry_balance_formula",
+          "value": "\"portfolio_entries\".\"balance\" = \"portfolio_entries\".\"charge_amount\" - \"portfolio_entries\".\"payment_amount\""
+        },
+        "chk_portfolio_entry_balance_nonneg": {
+          "name": "chk_portfolio_entry_balance_nonneg",
+          "value": "\"portfolio_entries\".\"balance\" >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.portfolio_provision_snapshot_details": {
@@ -9221,7 +9735,13 @@
         },
         "executed_by_user_id": {
           "name": "executed_by_user_id",
-          "type": "integer",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "executed_by_user_name": {
+          "name": "executed_by_user_name",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
@@ -9474,9 +9994,9 @@
           "primaryKey": true,
           "notNull": true
         },
-        "document_type": {
-          "name": "document_type",
-          "type": "varchar(10)",
+        "identification_type_id": {
+          "name": "identification_type_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -9544,15 +10064,22 @@
         },
         "category_code": {
           "name": "category_code",
-          "type": "varchar(1)",
+          "type": "category_code",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "address": {
           "name": "address",
           "type": "varchar(80)",
           "primaryKey": false,
           "notNull": false
+        },
+        "city_id": {
+          "name": "city_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
         },
         "phone": {
           "name": "phone",
@@ -9630,7 +10157,7 @@
           "name": "uniq_third_party_identity",
           "columns": [
             {
-              "expression": "document_type",
+              "expression": "identification_type_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -9679,6 +10206,32 @@
         }
       },
       "foreignKeys": {
+        "third_parties_identification_type_id_identification_types_id_fk": {
+          "name": "third_parties_identification_type_id_identification_types_id_fk",
+          "tableFrom": "third_parties",
+          "tableTo": "identification_types",
+          "columnsFrom": [
+            "identification_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "third_parties_city_id_cities_id_fk": {
+          "name": "third_parties_city_id_cities_id_fk",
+          "tableFrom": "third_parties",
+          "tableTo": "cities",
+          "columnsFrom": [
+            "city_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
         "third_parties_third_party_type_id_third_party_types_id_fk": {
           "name": "third_parties_third_party_type_id_third_party_types_id_fk",
           "tableFrom": "third_parties",
@@ -9779,6 +10332,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "user_name": {
+          "name": "user_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
         "affiliation_office_id": {
           "name": "affiliation_office_id",
           "type": "integer",
@@ -9861,15 +10420,21 @@
           "primaryKey": true,
           "notNull": true
         },
+        "payment_receipt_type_id": {
+          "name": "payment_receipt_type_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
         "user_id": {
           "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "payment_receipt_type_id": {
-          "name": "payment_receipt_type_id",
-          "type": "integer",
+        "user_name": {
+          "name": "user_name",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
@@ -9948,6 +10513,27 @@
         "RECEIVABLE",
         "PAYABLE",
         "NONE"
+      ]
+    },
+    "public.accounting_entries_status": {
+      "name": "accounting_entries_status",
+      "schema": "public",
+      "values": [
+        "DRAFT",
+        "POSTED",
+        "VOIDED"
+      ]
+    },
+    "public.accounting_entry_source_type": {
+      "name": "accounting_entry_source_type",
+      "schema": "public",
+      "values": [
+        "LOAN_APPROVAL",
+        "LOAN_PAYMENT",
+        "LOAN_PAYMENT_VOID",
+        "PROCESS_RUN",
+        "MANUAL_ADJUSTMENT",
+        "REFINANCE"
       ]
     },
     "public.allocation_scope": {
@@ -10032,10 +10618,20 @@
         "PRINCIPAL",
         "INTEREST",
         "LATE_INTEREST",
-        "FEE",
         "INSURANCE",
+        "FEE",
         "GUARANTEE",
         "OTHER"
+      ]
+    },
+    "public.category_code": {
+      "name": "category_code",
+      "schema": "public",
+      "values": [
+        "A",
+        "B",
+        "C",
+        "D"
       ]
     },
     "public.entry_nature": {
@@ -10065,6 +10661,14 @@
         "INACTIVE"
       ]
     },
+    "public.insurance_rate_range_metric": {
+      "name": "insurance_rate_range_metric",
+      "schema": "public",
+      "values": [
+        "INSTALLMENT_COUNT",
+        "CREDIT_AMOUNT"
+      ]
+    },
     "public.late_interest_age_basis": {
       "name": "late_interest_age_basis",
       "schema": "public",
@@ -10081,14 +10685,6 @@
         "APPROVED",
         "REJECTED",
         "CANCELED"
-      ]
-    },
-    "public.loan_approval_type": {
-      "name": "loan_approval_type",
-      "schema": "public",
-      "values": [
-        "IMMEDIATE",
-        "NON_IMMEDIATE"
       ]
     },
     "public.loan_disbursement_status": {

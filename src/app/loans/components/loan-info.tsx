@@ -1,8 +1,15 @@
 'use client';
 
+import { useCallback, useState } from 'react';
+import { format } from 'date-fns';
+import { CalendarIcon, FileDown } from 'lucide-react';
+import { toast } from 'sonner';
 import { DescriptionList, DescriptionSection } from '@/components/description-list';
 import { LoanApplicationDetails } from '@/app/loan-applications/components/loan-application-details';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
 import {
@@ -28,7 +35,30 @@ import {
   Loan,
   LoanStatus,
 } from '@/schemas/loan';
+import { cn } from '@/lib/utils';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+
+const LOAN_DOCUMENT_TYPES = [
+  'plan-de-pagos',
+  'pignoracion',
+  'pagare',
+  'carta-instrucciones',
+  'liquidacion',
+  'aceptacion',
+  'libranza',
+] as const;
+
+type LoanDocumentType = (typeof LOAN_DOCUMENT_TYPES)[number];
+
+const loanDocumentLabels: Record<LoanDocumentType, string> = {
+  'plan-de-pagos': 'Plan de pagos',
+  pignoracion: 'Pignoración',
+  pagare: 'Pagaré',
+  'carta-instrucciones': 'Carta de instrucciones',
+  liquidacion: 'Liquidación del crédito',
+  aceptacion: 'Aceptación del crédito',
+  libranza: 'Libranza',
+};
 
 function getPartyLabel(party: {
   personType: 'NATURAL' | 'LEGAL';
@@ -54,6 +84,96 @@ function getPartyLabel(party: {
 
 function StatusBadge({ status }: { status: LoanStatus }) {
   return <Badge variant={status === 'ACTIVE' ? 'default' : 'outline'}>{loanStatusLabels[status]}</Badge>;
+}
+
+function LoanDocumentsTab({ loanId, creditNumber }: { loanId: number; creditNumber: string }) {
+  const [printDate, setPrintDate] = useState<Date>(new Date());
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const handleDownload = useCallback(
+    async (docType: LoanDocumentType) => {
+      try {
+        setDownloading(docType);
+        const dateStr = format(printDate, 'yyyy-MM-dd');
+        const response = await fetch(
+          `/api/v1/loans/${loanId}/documents/${docType}/pdf?printDate=${dateStr}`,
+          { method: 'GET', credentials: 'include' },
+        );
+
+        if (!response.ok) {
+          let message = 'No fue posible generar el PDF';
+          try {
+            const body = (await response.json()) as { message?: string };
+            if (body?.message) message = body.message;
+          } catch {
+            // keep fallback message
+          }
+          toast.error(message);
+          return;
+        }
+
+        const blob = await response.blob();
+        const objectUrl = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = `${docType}-${creditNumber}.pdf`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.URL.revokeObjectURL(objectUrl);
+      } catch {
+        toast.error('No fue posible descargar el PDF');
+      } finally {
+        setDownloading(null);
+      }
+    },
+    [loanId, creditNumber, printDate],
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end gap-3">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Fecha de impresion</label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className={cn('w-[220px] justify-start text-left font-normal')}
+              >
+                <CalendarIcon className="mr-2 size-4" />
+                {format(printDate, 'PPP')}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={printDate}
+                onSelect={(value) => setPrintDate(value ?? new Date())}
+                captionLayout="dropdown"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {LOAN_DOCUMENT_TYPES.map((docType) => (
+          <Button
+            key={docType}
+            variant="outline"
+            className="justify-start"
+            disabled={downloading !== null}
+            onClick={() => handleDownload(docType)}
+          >
+            {downloading === docType ? <Spinner className="mr-2" /> : <FileDown className="mr-2 size-4" />}
+            {loanDocumentLabels[docType]}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 const LOAN_DETAIL_INCLUDES: LoanInclude[] = [
@@ -190,6 +310,7 @@ export function LoanInfo({
                 <TabsTrigger value="payments">Abonos</TabsTrigger>
                 <TabsTrigger value="statement">Extracto</TabsTrigger>
                 <TabsTrigger value="application">Solicitud</TabsTrigger>
+                <TabsTrigger value="documents">Impresiones</TabsTrigger>
               </TabsList>
 
               <TabsContent value="loan" className="pt-2">
@@ -394,6 +515,10 @@ export function LoanInfo({
                     No se encontro la solicitud asociada.
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="documents" className="pt-2">
+                <LoanDocumentsTab loanId={detail.id} creditNumber={detail.creditNumber} />
               </TabsContent>
             </Tabs>
           </div>

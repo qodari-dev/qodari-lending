@@ -4,15 +4,19 @@ import * as React from 'react';
 import { PageContent, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+  ComboboxValue,
+} from '@/components/ui/combobox';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,10 +26,13 @@ import {
 } from '@/hooks/queries/use-credits-settings-queries';
 import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
 import { useCostCenters } from '@/hooks/queries/use-cost-center-queries';
+import type { CostCenter } from '@/schemas/cost-center';
 import { UpdateCreditsSettingsBodySchema } from '@/schemas/credits-settings';
+import type { GlAccount } from '@/schemas/gl-account';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ChevronDownIcon } from 'lucide-react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -57,9 +64,17 @@ export function CreditsSettingsPage() {
   const { data: glAccountsData, isLoading: isLoadingGlAccounts } = useGlAccounts({ limit: 500 });
   const { data: costCentersData, isLoading: isLoadingCostCenters } = useCostCenters({ limit: 500 });
 
-  const glAccounts = glAccountsData?.body?.data ?? [];
-  const costCenters = costCentersData?.body?.data ?? [];
+  const glAccounts = React.useMemo(() => glAccountsData?.body?.data ?? [], [glAccountsData]);
+  const costCenters = React.useMemo(() => costCentersData?.body?.data ?? [], [costCentersData]);
   const settings = settingsData?.body;
+  const findGlAccount = React.useCallback(
+    (id: number | null | undefined) => glAccounts.find((item) => item.id === id) ?? null,
+    [glAccounts]
+  );
+  const findCostCenter = React.useCallback(
+    (id: number | null | undefined) => costCenters.find((item) => item.id === id) ?? null,
+    [costCenters]
+  );
 
   const isLoadingSelects = isLoadingGlAccounts || isLoadingCostCenters;
   const [isFormReady, setIsFormReady] = React.useState(false);
@@ -191,22 +206,46 @@ export function CreditsSettingsPage() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel>Centro de Costo por Defecto</FieldLabel>
-                          <Select
-                            onValueChange={(val) => field.onChange(val ? Number(val) : null)}
-                            value={field.value != null ? String(field.value) : undefined}
-                            disabled={!canUpdate}
+                          <Combobox
+                            items={costCenters}
+                            value={findCostCenter(field.value)}
+                            onValueChange={(value: CostCenter | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: CostCenter) => String(item.id)}
+                            itemToStringLabel={(item: CostCenter) => `${item.code} - ${item.name}`}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {costCenters.map((cc) => (
-                                <SelectItem key={cc.id} value={String(cc.id)}>
-                                  {cc.code} - {cc.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar centro..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron centros</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: CostCenter) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -300,22 +339,46 @@ export function CreditsSettingsPage() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel>Cuenta Caja</FieldLabel>
-                          <Select
-                            onValueChange={(val) => field.onChange(val ? Number(val) : null)}
-                            value={field.value != null ? String(field.value) : undefined}
-                            disabled={!canUpdate}
+                          <Combobox
+                            items={glAccounts}
+                            value={findGlAccount(field.value)}
+                            onValueChange={(value: GlAccount | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: GlAccount) => String(item.id)}
+                            itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {glAccounts.map((acc) => (
-                                <SelectItem key={acc.id} value={String(acc.id)}>
-                                  {acc.code} - {acc.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar cuenta..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -326,22 +389,46 @@ export function CreditsSettingsPage() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel>Cuenta Mayor</FieldLabel>
-                          <Select
-                            onValueChange={(val) => field.onChange(val ? Number(val) : null)}
-                            value={field.value != null ? String(field.value) : undefined}
-                            disabled={!canUpdate}
+                          <Combobox
+                            items={glAccounts}
+                            value={findGlAccount(field.value)}
+                            onValueChange={(value: GlAccount | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: GlAccount) => String(item.id)}
+                            itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {glAccounts.map((acc) => (
-                                <SelectItem key={acc.id} value={String(acc.id)}>
-                                  {acc.code} - {acc.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar cuenta..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -352,22 +439,46 @@ export function CreditsSettingsPage() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel>Cuenta Exceso</FieldLabel>
-                          <Select
-                            onValueChange={(val) => field.onChange(val ? Number(val) : null)}
-                            value={field.value != null ? String(field.value) : undefined}
-                            disabled={!canUpdate}
+                          <Combobox
+                            items={glAccounts}
+                            value={findGlAccount(field.value)}
+                            onValueChange={(value: GlAccount | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: GlAccount) => String(item.id)}
+                            itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {glAccounts.map((acc) => (
-                                <SelectItem key={acc.id} value={String(acc.id)}>
-                                  {acc.code} - {acc.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar cuenta..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -378,22 +489,46 @@ export function CreditsSettingsPage() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel>Cuenta Subsidio Pignoración</FieldLabel>
-                          <Select
-                            onValueChange={(val) => field.onChange(val ? Number(val) : null)}
-                            value={field.value != null ? String(field.value) : undefined}
-                            disabled={!canUpdate}
+                          <Combobox
+                            items={glAccounts}
+                            value={findGlAccount(field.value)}
+                            onValueChange={(value: GlAccount | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: GlAccount) => String(item.id)}
+                            itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {glAccounts.map((acc) => (
-                                <SelectItem key={acc.id} value={String(acc.id)}>
-                                  {acc.code} - {acc.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar cuenta..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -404,22 +539,46 @@ export function CreditsSettingsPage() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel>Cuenta Castigo Cartera</FieldLabel>
-                          <Select
-                            onValueChange={(val) => field.onChange(val ? Number(val) : null)}
-                            value={field.value != null ? String(field.value) : undefined}
-                            disabled={!canUpdate}
+                          <Combobox
+                            items={glAccounts}
+                            value={findGlAccount(field.value)}
+                            onValueChange={(value: GlAccount | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: GlAccount) => String(item.id)}
+                            itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {glAccounts.map((acc) => (
-                                <SelectItem key={acc.id} value={String(acc.id)}>
-                                  {acc.code} - {acc.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar cuenta..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}

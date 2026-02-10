@@ -1,3 +1,0 @@
-ALTER TABLE "accounting_periods" ADD COLUMN "closed_by_user_name" uuid;--> statement-breakpoint
-ALTER TABLE "payment_receipt_types" ADD COLUMN "gl_account_id" integer NOT NULL;--> statement-breakpoint
-ALTER TABLE "payment_receipt_types" ADD CONSTRAINT "payment_receipt_types_gl_account_id_gl_accounts_id_fk" FOREIGN KEY ("gl_account_id") REFERENCES "public"."gl_accounts"("id") ON DELETE restrict ON UPDATE no action;

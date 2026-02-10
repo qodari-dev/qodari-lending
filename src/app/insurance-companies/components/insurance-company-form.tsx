@@ -27,12 +27,14 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAccountingDistributions } from '@/hooks/queries/use-accounting-distribution-queries';
 import { useCities } from '@/hooks/queries/use-city-queries';
 import { useIdentificationTypes } from '@/hooks/queries/use-identification-type-queries';
 import {
   useCreateInsuranceCompany,
   useUpdateInsuranceCompany,
 } from '@/hooks/queries/use-insurance-company-queries';
+import { AccountingDistribution } from '@/schemas/accounting-distribution';
 import { City } from '@/schemas/city';
 import { IdentificationType } from '@/schemas/identification-type';
 import { CreateInsuranceCompanyBodySchema, InsuranceCompany } from '@/schemas/insurance-company';
@@ -99,6 +101,17 @@ export function InsuranceCompanyForm({
   });
   const cities = useMemo(() => citiesData?.body?.data ?? [], [citiesData]);
 
+  // Fetch accounting distributions
+  const { data: accountingDistributionsData } = useAccountingDistributions({
+    limit: 1000,
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'name', order: 'asc' }],
+  });
+  const accountingDistributions = useMemo(
+    () => accountingDistributionsData?.body?.data ?? [],
+    [accountingDistributionsData]
+  );
+
   // Helpers para encontrar objetos por ID
   const findIdentificationType = useCallback(
     (id: number | undefined) => identificationTypes.find((t) => t.id === id) ?? null,
@@ -107,6 +120,11 @@ export function InsuranceCompanyForm({
   const findCity = useCallback(
     (id: number | undefined) => cities.find((c) => c.id === id) ?? null,
     [cities]
+  );
+  const findAccountingDistribution = useCallback(
+    (id: number | null | undefined) =>
+      accountingDistributions.find((distribution) => distribution.id === id) ?? null,
+    [accountingDistributions]
   );
 
   useEffect(() => {
@@ -442,15 +460,45 @@ export function InsuranceCompanyForm({
                           <FieldLabel htmlFor="totalChargeDistributionId">
                             Distribución Cobro Total
                           </FieldLabel>
-                          <Input
-                            type="number"
-                            {...field}
-                            value={field.value ?? ''}
-                            onChange={(e) =>
-                              field.onChange(e.target.value ? Number(e.target.value) : null)
+                          <Combobox
+                            items={accountingDistributions}
+                            value={findAccountingDistribution(field.value)}
+                            onValueChange={(value: AccountingDistribution | null) =>
+                              field.onChange(value?.id ?? null)
                             }
-                            aria-invalid={fieldState.invalid}
-                          />
+                            itemToStringValue={(item: AccountingDistribution) => String(item.id)}
+                            itemToStringLabel={(item: AccountingDistribution) => item.name}
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent portalContainer={sheetContentRef}>
+                              <ComboboxInput
+                                placeholder="Buscar distribucion..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron distribuciones</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: AccountingDistribution) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -463,15 +511,45 @@ export function InsuranceCompanyForm({
                           <FieldLabel htmlFor="monthlyDistributionId">
                             Distribución Mensual
                           </FieldLabel>
-                          <Input
-                            type="number"
-                            {...field}
-                            value={field.value ?? ''}
-                            onChange={(e) =>
-                              field.onChange(e.target.value ? Number(e.target.value) : undefined)
+                          <Combobox
+                            items={accountingDistributions}
+                            value={findAccountingDistribution(field.value)}
+                            onValueChange={(value: AccountingDistribution | null) =>
+                              field.onChange(value?.id ?? undefined)
                             }
-                            aria-invalid={fieldState.invalid}
-                          />
+                            itemToStringValue={(item: AccountingDistribution) => String(item.id)}
+                            itemToStringLabel={(item: AccountingDistribution) => item.name}
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent portalContainer={sheetContentRef}>
+                              <ComboboxInput
+                                placeholder="Buscar distribucion..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron distribuciones</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: AccountingDistribution) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}

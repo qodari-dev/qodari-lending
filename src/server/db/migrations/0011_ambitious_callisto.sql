@@ -1,1 +1,0 @@
-ALTER TABLE "loan_payments" ALTER COLUMN "payment_number" SET DATA TYPE varchar(50);

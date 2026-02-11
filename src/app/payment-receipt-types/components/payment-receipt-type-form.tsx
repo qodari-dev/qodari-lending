@@ -66,6 +66,7 @@ export function PaymentReceiptTypeForm({
       code: '',
       name: '',
       movementType: 'RECEIPT',
+      postAccountingOnline: false,
       glAccountId: undefined,
       isActive: true,
       userPaymentReceiptTypes: [],
@@ -89,6 +90,7 @@ export function PaymentReceiptTypeForm({
         code: paymentReceiptType?.code ?? '',
         name: paymentReceiptType?.name ?? '',
         movementType: paymentReceiptType?.movementType ?? 'RECEIPT',
+        postAccountingOnline: paymentReceiptType?.postAccountingOnline ?? false,
         glAccountId: paymentReceiptType?.glAccountId ?? undefined,
         isActive: paymentReceiptType?.isActive ?? true,
         userPaymentReceiptTypes:
@@ -188,6 +190,26 @@ export function PaymentReceiptTypeForm({
                             </option>
                           ))}
                         </select>
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+
+                  <Controller
+                    name="postAccountingOnline"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid}>
+                        <FieldLabel htmlFor="postAccountingOnline">
+                          Post contabilización en línea
+                        </FieldLabel>
+                        <div>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            aria-invalid={fieldState.invalid}
+                          />
+                        </div>
                         {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                       </Field>
                     )}

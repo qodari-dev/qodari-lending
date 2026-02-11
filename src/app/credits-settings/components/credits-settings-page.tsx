@@ -94,6 +94,7 @@ export function CreditsSettingsPage() {
         accountingEnabled: settings.accountingEnabled ?? true,
         cashGlAccountId: settings.cashGlAccountId ?? undefined,
         majorGlAccountId: settings.majorGlAccountId ?? undefined,
+        minimumMajorPaidAmount: settings.minimumMajorPaidAmount ?? null,
         excessGlAccountId: settings.excessGlAccountId ?? undefined,
         pledgeSubsidyGlAccountId: settings.pledgeSubsidyGlAccountId ?? undefined,
         writeOffGlAccountId: settings.writeOffGlAccountId ?? undefined,
@@ -429,6 +430,26 @@ export function CreditsSettingsPage() {
                               </ComboboxList>
                             </ComboboxContent>
                           </Combobox>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="minimumMajorPaidAmount"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Mínimo Valor Mayor Pagado</FieldLabel>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={field.value ?? ''}
+                            onChange={(event) =>
+                              field.onChange(event.target.value ? event.target.value : null)
+                            }
+                            disabled={!canUpdate}
+                          />
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}

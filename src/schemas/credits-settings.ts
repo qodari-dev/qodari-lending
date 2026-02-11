@@ -30,6 +30,18 @@ export const GetCreditsSettingsQuerySchema = z.object({
 // MUTATIONS
 // ============================================
 
+const optionalNonNegativeDecimalString = z
+  .string()
+  .trim()
+  .refine((value) => value.length > 0 && Number.isFinite(Number(value)), {
+    message: 'Valor numerico invalido',
+  })
+  .refine((value) => Number(value) >= 0, {
+    message: 'El valor debe ser mayor o igual a cero',
+  })
+  .nullable()
+  .optional();
+
 export const UpdateCreditsSettingsBodySchema = z.object({
   auditTransactionsEnabled: z.boolean().optional(),
   accountingSystemCode: z.string().max(2).optional(),
@@ -40,6 +52,7 @@ export const UpdateCreditsSettingsBodySchema = z.object({
   // GL Accounts
   cashGlAccountId: z.number().nullable().optional(),
   majorGlAccountId: z.number().nullable().optional(),
+  minimumMajorPaidAmount: optionalNonNegativeDecimalString,
   excessGlAccountId: z.number().nullable().optional(),
   pledgeSubsidyGlAccountId: z.number().nullable().optional(),
   writeOffGlAccountId: z.number().nullable().optional(),

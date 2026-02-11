@@ -76,7 +76,7 @@ export function AccountingDistributionLinesForm() {
     resolver: zodResolver(AccountingDistributionLineInputSchema),
     defaultValues: {
       glAccountId: undefined,
-      costCenterId: undefined,
+      costCenterId: null,
       percentage: '',
       nature: 'DEBIT',
     },
@@ -102,7 +102,7 @@ export function AccountingDistributionLinesForm() {
     [glAccounts]
   );
   const findCostCenter = useCallback(
-    (id: number | undefined) => costCenters.find((center) => center.id === id) ?? null,
+    (id: number | null | undefined) => costCenters.find((center) => center.id === id) ?? null,
     [costCenters]
   );
 
@@ -135,7 +135,7 @@ export function AccountingDistributionLinesForm() {
   const handleAddClick = () => {
     dialogForm.reset({
       glAccountId: undefined,
-      costCenterId: undefined,
+      costCenterId: null,
       percentage: '',
       nature: 'DEBIT',
     });
@@ -147,7 +147,7 @@ export function AccountingDistributionLinesForm() {
     const current = fields[index];
     dialogForm.reset({
       glAccountId: current?.glAccountId ?? undefined,
-      costCenterId: current?.costCenterId ?? undefined,
+      costCenterId: current?.costCenterId ?? null,
       percentage: current?.percentage ?? '',
       nature: current?.nature ?? 'DEBIT',
     });
@@ -159,7 +159,7 @@ export function AccountingDistributionLinesForm() {
     const isDuplicate = fields.some(
       (f, idx) =>
         f.glAccountId === values.glAccountId &&
-        f.costCenterId === values.costCenterId &&
+        (f.costCenterId ?? null) === (values.costCenterId ?? null) &&
         idx !== editingIndex
     );
 
@@ -181,7 +181,7 @@ export function AccountingDistributionLinesForm() {
     return glAccountLabelMap.get(id) ?? String(id);
   };
 
-  const getCostCenterLabel = (id: number | undefined) => {
+  const getCostCenterLabel = (id: number | null | undefined) => {
     if (!id) return '-';
     return costCenterLabelMap.get(id) ?? String(id);
   };
@@ -261,12 +261,12 @@ export function AccountingDistributionLinesForm() {
                 control={dialogForm.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="costCenterId">Centro de costo</FieldLabel>
+                    <FieldLabel htmlFor="costCenterId">Centro de costo (opcional)</FieldLabel>
                     <Combobox
                       items={costCenters}
                       value={findCostCenter(field.value)}
                       onValueChange={(val: CostCenter | null) =>
-                        field.onChange(val?.id ?? undefined)
+                        field.onChange(val?.id ?? null)
                       }
                       itemToStringValue={(item: CostCenter) => String(item.id)}
                       itemToStringLabel={(item: CostCenter) => `${item.code} - ${item.name}`}

@@ -59,6 +59,15 @@ export const paymentReceiptTypeColumns: ColumnDef<PaymentReceiptType>[] = [
     },
   },
   {
+    accessorKey: 'postAccountingOnline',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Post en línea" />,
+    cell: ({ row }) => (
+      <Badge variant={row.original.postAccountingOnline ? 'default' : 'outline'}>
+        {row.original.postAccountingOnline ? 'Si' : 'No'}
+      </Badge>
+    ),
+  },
+  {
     id: 'usersCount',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Usuarios" />,
     cell: ({ row }) => <Badge variant="outline">{row.original.userPaymentReceiptTypes?.length ?? 0}</Badge>,

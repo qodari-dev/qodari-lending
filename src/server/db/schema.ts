@@ -355,9 +355,9 @@ export const accountingDistributionLines = pgTable(
     glAccountId: integer('gl_account_id')
       .notNull()
       .references(() => glAccounts.id, { onDelete: 'restrict' }),
-    costCenterId: integer('cost_center_id')
-      .notNull()
-      .references(() => costCenters.id, { onDelete: 'restrict' }),
+    costCenterId: integer('cost_center_id').references(() => costCenters.id, {
+      onDelete: 'restrict',
+    }),
     percentage: decimal('percentage', { precision: 5, scale: 2 }).notNull(),
     nature: entryNatureEnum('nature').notNull(),
     ...timestamps,
@@ -394,6 +394,8 @@ export const paymentReceiptTypes = pgTable(
     code: varchar('code', { length: 5 }).notNull(),
     name: varchar('name', { length: 255 }).notNull(),
     movementType: paymentReceiptMovementTypeEnum('movement_type').notNull(),
+    // online S/N (legacy): define si contabiliza en linea inmediatamente
+    postAccountingOnline: boolean('post_accounting_online').notNull().default(false),
     glAccountId: integer('gl_account_id')
       .notNull()
       .references(() => glAccounts.id, { onDelete: 'restrict' }),
@@ -2281,6 +2283,11 @@ export const creditsSettings = pgTable('credits_settings', {
   }),
   majorGlAccountId: integer('major_gl_account_id').references(() => glAccounts.id, {
     onDelete: 'restrict',
+  }),
+  // Umbral mínimo de valor mayor pagado para usar la cuenta mayor
+  minimumMajorPaidAmount: decimal('minimum_major_paid_amount', {
+    precision: 14,
+    scale: 2,
   }),
   excessGlAccountId: integer('excess_gl_account_id').references(() => glAccounts.id, {
     onDelete: 'restrict',

@@ -95,7 +95,7 @@ export function AccountingDistributionInfo({
                       <TableCell>
                         {line.costCenter
                           ? `${line.costCenter.code} - ${line.costCenter.name}`
-                          : line.costCenterId}
+                          : (line.costCenterId ?? '-')}
                       </TableCell>
                       <TableCell>
                         {entryNatureLabels[line.nature as EntryNature] ?? line.nature}

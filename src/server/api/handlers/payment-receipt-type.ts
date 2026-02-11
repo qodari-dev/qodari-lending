@@ -27,6 +27,7 @@ const PAYMENT_RECEIPT_TYPE_FIELDS: FieldMap = {
   code: paymentReceiptTypes.code,
   name: paymentReceiptTypes.name,
   movementType: paymentReceiptTypes.movementType,
+  postAccountingOnline: paymentReceiptTypes.postAccountingOnline,
   glAccountId: paymentReceiptTypes.glAccountId,
   isActive: paymentReceiptTypes.isActive,
   createdAt: paymentReceiptTypes.createdAt,

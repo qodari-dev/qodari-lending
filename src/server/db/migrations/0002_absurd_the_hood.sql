@@ -1,0 +1,1 @@
+ALTER TABLE "payment_receipt_types" ADD COLUMN "post_accounting_online" boolean DEFAULT false NOT NULL;

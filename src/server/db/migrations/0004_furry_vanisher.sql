@@ -1,0 +1,1 @@
+ALTER TABLE "credits_settings" ADD COLUMN "minimum_major_paid_amount" numeric(14, 2);

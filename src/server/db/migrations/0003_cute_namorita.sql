@@ -1,0 +1,1 @@
+ALTER TABLE "accounting_distribution_lines" ALTER COLUMN "cost_center_id" DROP NOT NULL;

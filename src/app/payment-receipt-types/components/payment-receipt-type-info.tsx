@@ -43,6 +43,14 @@ export function PaymentReceiptTypeInfo({
             : paymentReceiptType.glAccountId,
         },
         {
+          label: 'Post contabilidad en línea',
+          value: (
+            <Badge variant={paymentReceiptType.postAccountingOnline ? 'default' : 'outline'}>
+              {paymentReceiptType.postAccountingOnline ? 'Si' : 'No'}
+            </Badge>
+          ),
+        },
+        {
           label: 'Estado',
           value: (
             <Badge variant={paymentReceiptType.isActive ? 'default' : 'outline'}>

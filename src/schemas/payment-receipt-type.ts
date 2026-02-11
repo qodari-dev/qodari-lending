@@ -44,6 +44,7 @@ const PaymentReceiptTypeWhereFieldsSchema = z
     movementType: z
       .union([z.enum(PAYMENT_RECEIPT_MOVEMENT_TYPE_OPTIONS), StringOperatorsSchema])
       .optional(),
+    postAccountingOnline: z.union([z.boolean(), BooleanOperatorsSchema]).optional(),
     glAccountId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     isActive: z.union([z.boolean(), BooleanOperatorsSchema]).optional(),
     createdAt: z.union([z.coerce.date(), DateOperatorsSchema]).optional(),
@@ -60,6 +61,7 @@ const PAYMENT_RECEIPT_TYPE_SORT_FIELDS = [
   'code',
   'name',
   'movementType',
+  'postAccountingOnline',
   'glAccountId',
   'isActive',
   'createdAt',
@@ -115,6 +117,7 @@ const PaymentReceiptTypeBaseSchema = z.object({
   code: PaymentReceiptTypeCodeSchema,
   name: z.string().min(1).max(255),
   movementType: z.enum(PAYMENT_RECEIPT_MOVEMENT_TYPE_OPTIONS),
+  postAccountingOnline: z.boolean(),
   glAccountId: z.number().int().positive(),
   isActive: z.boolean(),
   userPaymentReceiptTypes: UserPaymentReceiptTypeInputSchema.array().optional(),

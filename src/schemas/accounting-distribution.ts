@@ -82,7 +82,7 @@ export const GetAccountingDistributionQuerySchema = z.object({
 
 export const AccountingDistributionLineInputSchema = z.object({
   glAccountId: z.number().int().positive(),
-  costCenterId: z.number().int().positive(),
+  costCenterId: z.number().int().positive().nullable().optional(),
   percentage: z.string().min(1, 'Porcentaje es requerido'),
   nature: z.enum(ENTRY_NATURE_OPTIONS),
 });

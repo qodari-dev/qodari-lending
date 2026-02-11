@@ -132,7 +132,7 @@ export function AgingProfiles() {
   return (
     <>
       <PageHeader
-        title="Perfiles de Aging"
+        title="Edades de cartera"
         description="Administre los perfiles de aging y sus buckets."
       />
       <PageContent>
@@ -200,8 +200,8 @@ export function AgingProfiles() {
           <AlertDialogHeader>
             <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion inactivara el perfil de aging &quot;{agingProfile?.name}&quot;.
-              Para activar otro, crea uno nuevo con estado activo.
+              Esta accion inactivara el perfil de aging &quot;{agingProfile?.name}&quot;. Para
+              activar otro, crea uno nuevo con estado activo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

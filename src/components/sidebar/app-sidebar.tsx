@@ -115,7 +115,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Tipos de inversión', url: `/investment-types` },
                   { title: 'Medios de pago', url: `/payment-tender-types` },
                   { title: 'Bancos', url: `/banks` },
-                  { title: 'Caneles de creacion', url: `/channels` },
+                  { title: 'Canales de creacion', url: `/channels` },
                   { title: 'Edades de cartera', url: `/aging-profiles` },
                 ],
               },

@@ -91,7 +91,7 @@ export function AgingProfileForm({
       <SheetContent className="overflow-y-scroll sm:max-w-3xl">
         <SheetHeader>
           <SheetTitle>
-            {agingProfile ? 'Editar Perfil de Aging' : 'Nuevo Perfil de Aging'}
+            {agingProfile ? 'Editar Edades de Cartera' : 'Nuevo Edades de Cartera'}
           </SheetTitle>
           <SheetDescription>
             Define los parametros del perfil de aging y sus buckets.

@@ -1,8 +1,14 @@
-import { db, agingProfiles, agingBuckets } from '@/server/db';
+import {
+  db,
+  agingProfiles,
+  agingBuckets,
+  portfolioAgingSnapshots,
+  portfolioProvisionSnapshots,
+} from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { tsr } from '@ts-rest/serverless/next';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 import { logAudit } from '@/server/utils/audit-logger';
@@ -15,6 +21,29 @@ import {
   FieldMap,
   QueryConfig,
 } from '@/server/utils/query/query-builder';
+
+const ACTIVE_PROFILE_CONFLICT_MESSAGE =
+  'Ya existe un perfil de aging activo. Inactive el perfil vigente antes de crear uno nuevo activo.';
+const UPDATE_BLOCKED_MESSAGE = 'No se puede editar el perfil porque ya tiene procesos ejecutados.';
+const DELETE_BLOCKED_MESSAGE =
+  'No se puede eliminar el perfil porque ya tiene procesos ejecutados.';
+
+async function hasProcessedSnapshots(agingProfileId: number) {
+  const [agingSnapshot, provisionSnapshot] = await Promise.all([
+    db
+      .select({ id: portfolioAgingSnapshots.id })
+      .from(portfolioAgingSnapshots)
+      .where(eq(portfolioAgingSnapshots.agingProfileId, agingProfileId))
+      .limit(1),
+    db
+      .select({ id: portfolioProvisionSnapshots.id })
+      .from(portfolioProvisionSnapshots)
+      .where(eq(portfolioProvisionSnapshots.agingProfileId, agingProfileId))
+      .limit(1),
+  ]);
+
+  return agingSnapshot.length > 0 || provisionSnapshot.length > 0;
+}
 
 // ============================================
 // CONFIG
@@ -137,6 +166,19 @@ export const agingProfile = tsr.router(contract.agingProfile, {
 
       const { agingBuckets: bucketsData, ...profileData } = body;
 
+      if (profileData.isActive) {
+        const activeProfile = await db.query.agingProfiles.findFirst({
+          where: eq(agingProfiles.isActive, true),
+        });
+        if (activeProfile) {
+          throwHttpError({
+            status: 409,
+            message: ACTIVE_PROFILE_CONFLICT_MESSAGE,
+            code: 'CONFLICT',
+          });
+        }
+      }
+
       const [created] = await db.transaction(async (tx) => {
         const [profile] = await tx.insert(agingProfiles).values(profileData).returning();
 
@@ -219,11 +261,33 @@ export const agingProfile = tsr.router(contract.agingProfile, {
         });
       }
 
+      const usedInProcess = await hasProcessedSnapshots(id);
+      if (usedInProcess) {
+        throwHttpError({
+          status: 409,
+          message: UPDATE_BLOCKED_MESSAGE,
+          code: 'CONFLICT',
+        });
+      }
+
       const existingBuckets = await db.query.agingBuckets.findMany({
         where: eq(agingBuckets.agingProfileId, id),
       });
 
       const { agingBuckets: bucketsData, ...profileData } = body;
+
+      if (profileData.isActive === true) {
+        const activeProfile = await db.query.agingProfiles.findFirst({
+          where: and(eq(agingProfiles.isActive, true), ne(agingProfiles.id, id)),
+        });
+        if (activeProfile) {
+          throwHttpError({
+            status: 409,
+            message: ACTIVE_PROFILE_CONFLICT_MESSAGE,
+            code: 'CONFLICT',
+          });
+        }
+      }
 
       const [updated] = await db.transaction(async (tx) => {
         const [profileUpdated] = await tx
@@ -292,6 +356,79 @@ export const agingProfile = tsr.router(contract.agingProfile, {
   },
 
   // ==========================================
+  // DEACTIVATE - POST /aging-profiles/:id/deactivate
+  // ==========================================
+  deactivate: async ({ params: { id } }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const existing = await db.query.agingProfiles.findFirst({
+        where: eq(agingProfiles.id, id),
+      });
+
+      if (!existing) {
+        throwHttpError({
+          status: 404,
+          message: `Perfil de aging con ID ${id} no encontrado`,
+          code: 'NOT_FOUND',
+        });
+      }
+
+      if (!existing.isActive) {
+        return { status: 200, body: existing };
+      }
+
+      const [updated] = await db
+        .update(agingProfiles)
+        .set({ isActive: false })
+        .where(eq(agingProfiles.id, id))
+        .returning();
+
+      logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'deactivate',
+        resourceId: existing.id.toString(),
+        resourceLabel: existing.name,
+        status: 'success',
+        beforeValue: existing,
+        afterValue: updated,
+        ipAddress,
+        userAgent,
+      });
+
+      return { status: 200, body: updated };
+    } catch (e) {
+      const error = genericTsRestErrorResponse(e, {
+        genericMsg: `Error al inactivar perfil de aging ${id}`,
+      });
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'deactivate',
+        resourceId: id.toString(),
+        status: 'failure',
+        errorMessage: error?.body.message,
+        ipAddress,
+        userAgent,
+      });
+      return error;
+    }
+  },
+
+  // ==========================================
   // DELETE - DELETE /aging-profiles/:id
   // ==========================================
   delete: async ({ params: { id } }, { request, appRoute, nextRequest }) => {
@@ -317,6 +454,15 @@ export const agingProfile = tsr.router(contract.agingProfile, {
           status: 404,
           message: `Perfil de aging con ID ${id} no encontrado`,
           code: 'NOT_FOUND',
+        });
+      }
+
+      const usedInProcess = await hasProcessedSnapshots(id);
+      if (usedInProcess) {
+        throwHttpError({
+          status: 409,
+          message: DELETE_BLOCKED_MESSAGE,
+          code: 'CONFLICT',
         });
       }
 
@@ -368,4 +514,5 @@ export const agingProfile = tsr.router(contract.agingProfile, {
       return error;
     }
   },
+
 });

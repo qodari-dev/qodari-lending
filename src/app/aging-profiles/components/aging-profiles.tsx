@@ -17,6 +17,7 @@ import { PageContent, PageHeader } from '@/components/layout';
 import { Spinner } from '@/components/ui/spinner';
 import {
   useAgingProfiles,
+  useDeactivateAgingProfile,
   useDeleteAgingProfile,
 } from '@/hooks/queries/use-aging-profile-queries';
 import { AgingProfile, AgingProfileInclude, AgingProfileSortField } from '@/schemas/aging-profile';
@@ -31,6 +32,7 @@ declare module '@tanstack/table-core' {
     onRowView?: (row: TData) => void;
     onRowEdit?: (row: TData) => void;
     onRowDelete?: (row: TData) => void;
+    onRowDeactivate?: (row: TData) => void;
   }
 }
 
@@ -55,6 +57,8 @@ export function AgingProfiles() {
   const { data, isLoading, isFetching, refetch } = useAgingProfiles(queryParams);
 
   const { mutateAsync: deleteAgingProfile, isPending: isDeleting } = useDeleteAgingProfile();
+  const { mutateAsync: deactivateAgingProfile, isPending: isDeactivating } =
+    useDeactivateAgingProfile();
 
   // ---- Handlers ----
   const [openedInfoSheet, setOpenedInfoSheet] = React.useState(false);
@@ -87,6 +91,14 @@ export function AgingProfiles() {
     setOpenedDeleteDialog(false);
   }, [agingProfile, setAgingProfile, setOpenedDeleteDialog, deleteAgingProfile]);
 
+  const [openedDeactivateDialog, setOpenedDeactivateDialog] = React.useState(false);
+  const handleDeactivate = React.useCallback(async () => {
+    if (!agingProfile?.id) return;
+    await deactivateAgingProfile({ params: { id: agingProfile.id } });
+    setAgingProfile(undefined);
+    setOpenedDeactivateDialog(false);
+  }, [agingProfile, setAgingProfile, setOpenedDeactivateDialog, deactivateAgingProfile]);
+
   const handleCreate = () => {
     handleFormSheetChange(true);
   };
@@ -102,14 +114,19 @@ export function AgingProfiles() {
     setAgingProfile(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const handleRowDeactivate = React.useCallback((row: AgingProfile) => {
+    setAgingProfile(row);
+    setOpenedDeactivateDialog(true);
+  }, []);
 
   const tableMeta = React.useMemo<TableMeta<AgingProfile>>(
     () => ({
       onRowView: handleRowOpen,
       onRowDelete: handleRowDelete,
       onRowEdit: handleRowEdit,
+      onRowDeactivate: handleRowDeactivate,
     }),
-    [handleRowOpen, handleRowDelete, handleRowEdit]
+    [handleRowOpen, handleRowDelete, handleRowEdit, handleRowDeactivate]
   );
 
   return (
@@ -173,6 +190,27 @@ export function AgingProfiles() {
             <AlertDialogAction disabled={isDeleting} onClick={handleDelete}>
               {isDeleting && <Spinner />}
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={openedDeactivateDialog} onOpenChange={setOpenedDeactivateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta accion inactivara el perfil de aging &quot;{agingProfile?.name}&quot;.
+              Para activar otro, crea uno nuevo con estado activo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setOpenedDeactivateDialog(false)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction disabled={isDeactivating} onClick={handleDeactivate}>
+              {isDeactivating && <Spinner />}
+              Inactivar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

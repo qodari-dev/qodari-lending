@@ -4,7 +4,7 @@ import { DataTableRowActions, type RowAction, type RowActionGroup } from '@/comp
 import { AgingProfile } from '@/schemas/aging-profile';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { Row, Table } from '@tanstack/react-table';
-import { Eye, Pencil, Trash } from 'lucide-react';
+import { Eye, Pencil, Power, Trash } from 'lucide-react';
 
 // ============================================================================
 // Props Interface
@@ -43,6 +43,12 @@ export function AgingProfileRowActions({ row, table }: AgingProfileRowActionsPro
       onClick: meta?.onRowDelete,
       variant: 'destructive',
       hidden: !canDelete,
+    },
+    {
+      label: 'Inactivar',
+      icon: Power,
+      onClick: meta?.onRowDeactivate,
+      hidden: !canUpdate || !agingProfile.isActive,
     },
   ];
 

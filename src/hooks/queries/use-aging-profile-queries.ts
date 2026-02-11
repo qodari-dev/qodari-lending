@@ -96,6 +96,22 @@ export function useDeleteAgingProfile() {
   });
 }
 
+export function useDeactivateAgingProfile() {
+  const queryClient = api.useQueryClient();
+
+  return api.agingProfile.deactivate.useMutation({
+    onSuccess: (_, variables) => {
+      const id = variables.params.id as number;
+      queryClient.invalidateQueries({ queryKey: agingProfilesKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: agingProfilesKeys.detail(id) });
+      toast.success('Perfil de aging inactivado');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
 export async function prefetchAgingProfiles(
   queryClient: ReturnType<typeof useQueryClient>,
   filters: Partial<ListAgingProfilesQuery> = {}

@@ -31,13 +31,14 @@ import { cn } from '@/lib/utils';
 import {
   CreateInsuranceCompanyBodySchema,
   INSURANCE_RATE_RANGE_METRIC_LABELS,
+  INSURANCE_RATE_TYPE_LABELS,
   InsuranceRateRangeInput,
   InsuranceRateRangeInputSchema,
 } from '@/schemas/insurance-company';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Controller, useFieldArray, useForm, useFormContext } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { Controller, useFieldArray, useForm, useFormContext, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -60,9 +61,24 @@ export function InsuranceCompanyRateRangesForm() {
       rangeMetric: 'INSTALLMENT_COUNT',
       valueFrom: 0,
       valueTo: 0,
+      rateType: 'PERCENTAGE',
       rateValue: '',
+      fixedAmount: null,
     },
   });
+
+  const selectedRateType = useWatch({
+    control: dialogForm.control,
+    name: 'rateType',
+  });
+
+  useEffect(() => {
+    if (selectedRateType === 'PERCENTAGE') {
+      dialogForm.setValue('fixedAmount', null);
+      return;
+    }
+    dialogForm.setValue('rateValue', null);
+  }, [selectedRateType, dialogForm]);
 
   const hasRanges = useMemo(() => fields.length > 0, [fields.length]);
 
@@ -79,7 +95,9 @@ export function InsuranceCompanyRateRangesForm() {
       rangeMetric: 'INSTALLMENT_COUNT',
       valueFrom: 0,
       valueTo: 0,
+      rateType: 'PERCENTAGE',
       rateValue: '',
+      fixedAmount: null,
     });
     setEditingIndex(null);
     setIsDialogOpen(true);
@@ -91,7 +109,9 @@ export function InsuranceCompanyRateRangesForm() {
       rangeMetric: current?.rangeMetric ?? 'INSTALLMENT_COUNT',
       valueFrom: current?.valueFrom ?? 0,
       valueTo: current?.valueTo ?? 0,
-      rateValue: current?.rateValue ?? '',
+      rateType: current?.rateType ?? 'PERCENTAGE',
+      rateValue: current?.rateValue ?? null,
+      fixedAmount: current?.fixedAmount ?? null,
     });
     setEditingIndex(index);
     setIsDialogOpen(true);
@@ -199,16 +219,59 @@ export function InsuranceCompanyRateRangesForm() {
                 )}
               />
               <Controller
-                name="rateValue"
+                name="rateType"
                 control={dialogForm.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="rateValue">Tasa / Valor</FieldLabel>
-                    <Input id="rateValue" {...field} aria-invalid={fieldState.invalid} />
+                    <FieldLabel htmlFor="rateType">Tipo de valor</FieldLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PERCENTAGE">Porcentaje</SelectItem>
+                        <SelectItem value="FIXED_AMOUNT">Valor fijo</SelectItem>
+                      </SelectContent>
+                    </Select>
                     {fieldState.error && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
               />
+              {selectedRateType === 'PERCENTAGE' ? (
+                <Controller
+                  name="rateValue"
+                  control={dialogForm.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="rateValue">Tasa (%)</FieldLabel>
+                      <Input
+                        id="rateValue"
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+              ) : (
+                <Controller
+                  name="fixedAmount"
+                  control={dialogForm.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="fixedAmount">Valor fijo</FieldLabel>
+                      <Input
+                        id="fixedAmount"
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+              )}
             </div>
             <DialogFooter>
               <DialogClose asChild>
@@ -231,7 +294,8 @@ export function InsuranceCompanyRateRangesForm() {
               <TableHead>Métrica</TableHead>
               <TableHead>Desde</TableHead>
               <TableHead>Hasta</TableHead>
-              <TableHead>Tasa</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Valor</TableHead>
               <TableHead className="w-30 text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -246,7 +310,10 @@ export function InsuranceCompanyRateRangesForm() {
                   {field.valueTo}
                 </TableCell>
                 <TableCell className="text-muted-foreground font-mono text-xs">
-                  {field.rateValue}
+                  {INSURANCE_RATE_TYPE_LABELS[field.rateType]}
+                </TableCell>
+                <TableCell className="text-muted-foreground font-mono text-xs">
+                  {field.rateType === 'FIXED_AMOUNT' ? (field.fixedAmount ?? '-') : `${field.rateValue ?? '-'}%`}
                 </TableCell>
                 <TableCell className="flex justify-end gap-2">
                   <Button

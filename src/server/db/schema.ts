@@ -760,6 +760,7 @@ export const insuranceRateRangeMetricEnum = pgEnum('insurance_rate_range_metric'
   'INSTALLMENT_COUNT', // # de cuotas
   'CREDIT_AMOUNT', // monto del credito
 ]);
+export const insuranceRateTypeEnum = pgEnum('insurance_rate_type', ['PERCENTAGE', 'FIXED_AMOUNT']);
 // ---------------------------------------------------------------------
 // Concr34 - Valores de seguros (rangos)
 // Nota (ES):
@@ -778,7 +779,9 @@ export const insuranceRateRanges = pgTable(
     rangeMetric: insuranceRateRangeMetricEnum('range_metric').notNull(),
     valueFrom: integer('value_from').notNull(),
     valueTo: integer('value_to').notNull(),
-    rateValue: decimal('rate_value', { precision: 12, scale: 5 }).notNull(),
+    rateType: insuranceRateTypeEnum('rate_type').notNull().default('PERCENTAGE'),
+    rateValue: decimal('rate_value', { precision: 12, scale: 5 }),
+    fixedAmount: decimal('fixed_amount', { precision: 14, scale: 2 }),
     ...timestamps,
   },
   (t) => [
@@ -789,6 +792,14 @@ export const insuranceRateRanges = pgTable(
       t.valueTo
     ),
     check('chk_insurance_rate_range_order', sql`${t.valueFrom} <= ${t.valueTo}`),
+    check(
+      'chk_insurance_ranges_percentage_fields',
+      sql`${t.rateType} <> 'PERCENTAGE' OR (${t.rateValue} IS NOT NULL AND ${t.fixedAmount} IS NULL)`
+    ),
+    check(
+      'chk_insurance_ranges_fixed_fields',
+      sql`${t.rateType} <> 'FIXED_AMOUNT' OR (${t.fixedAmount} IS NOT NULL AND ${t.rateValue} IS NULL)`
+    ),
   ]
 );
 
@@ -808,6 +819,39 @@ export const lateInterestAgeBasisEnum = pgEnum('late_interest_age_basis', [
   'OLDEST_OVERDUE_INSTALLMENT', // la cuota vencida más antigua
   'EACH_INSTALLMENT', // calcula por cada cuota vencida
 ]);
+
+export const interestRateTypeEnum = pgEnum('interest_rate_type', [
+  'EFFECTIVE_ANNUAL', // E.A.
+  'NOMINAL_MONTHLY', // N.M.V.
+  'NOMINAL_ANNUAL', // N.A.
+  'MONTHLY_FLAT', // tasa mensual plana
+]);
+
+export const interestAccrualMethodEnum = pgEnum('interest_accrual_method', [
+  'DAILY', // causa diaria (más preciso)
+  'MONTHLY', // causa mensual al corte
+]);
+
+export const dayCountConventionEnum = pgEnum('day_count_convention', [
+  '30_360', // meses de 30, año de 360
+  'ACTUAL_360', // días reales, año de 360
+  'ACTUAL_365', // días reales, año de 365
+  'ACTUAL_ACTUAL', // días reales, año real
+]);
+
+// Seguro
+export const insuranceAccrualMethodEnum = pgEnum('insurance_accrual_method', [
+  'ONE_TIME',
+  'PER_INSTALLMENT',
+  'DAILY',
+  'MONTHLY',
+]);
+
+export const insuranceBaseAmountEnum = pgEnum('insurance_base_amount', [
+  'OUTSTANDING_BALANCE',
+  'DISBURSED_AMOUNT',
+]);
+
 // ---------------------------------------------------------------------
 // Concr07 - Tipos / Líneas de crédito
 // Nota:
@@ -868,12 +912,53 @@ export const creditProducts = pgTable(
       scale: 5,
     }),
     ageBasis: lateInterestAgeBasisEnum('age_basis').notNull().default('OLDEST_OVERDUE_INSTALLMENT'),
+
+    //interest
+    // ¿Cómo se expresa la tasa?
+    interestRateType: interestRateTypeEnum('interest_rate_type')
+      .notNull()
+      .default('EFFECTIVE_ANNUAL'),
+    // ¿Cómo se causa el interés?
+    interestAccrualMethod: interestAccrualMethodEnum('interest_accrual_method')
+      .notNull()
+      .default('DAILY'),
+    // ¿Base de días?
+    interestDayCountConvention: dayCountConventionEnum('interest_day_count_convention')
+      .notNull()
+      .default('ACTUAL_360'),
+    lateInterestRateType: interestRateTypeEnum('late_interest_rate_type')
+      .notNull()
+      .default('EFFECTIVE_ANNUAL'),
+    // ¿Cómo se causa el interés?
+    lateInterestAccrualMethod: interestAccrualMethodEnum('late_interest_accrual_method')
+      .notNull()
+      .default('DAILY'),
+    // ¿Base de días?
+    lateInterestDayCountConvention: dayCountConventionEnum('late_interest_day_count_convention')
+      .notNull()
+      .default('ACTUAL_360'),
+
+    insuranceAccrualMethod: insuranceAccrualMethodEnum('insurance_accrual_method')
+      .notNull()
+      .default('PER_INSTALLMENT'),
+    insuranceBaseAmount: insuranceBaseAmountEnum('insurance_base_amount')
+      .notNull()
+      .default('OUTSTANDING_BALANCE'),
+    insuranceDayCountConvention: dayCountConventionEnum('insurance_day_count_convention'),
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
   (t) => [
     index('idx_credit_products_fund').on(t.creditFundId),
     index('idx_credit_products_cost_center').on(t.costCenterId),
+    check(
+      'chk_credit_products_ins_day_count_required_when_daily',
+      sql`${t.insuranceAccrualMethod} <> 'DAILY' OR ${t.insuranceDayCountConvention} IS NOT NULL`
+    ),
+    check(
+      'chk_credit_products_ins_day_count_only_for_daily',
+      sql`${t.insuranceAccrualMethod} = 'DAILY' OR ${t.insuranceDayCountConvention} IS NULL`
+    ),
   ]
 );
 
@@ -2232,15 +2317,16 @@ export const creditsSettings = pgTable('credits_settings', {
 
 // ------------------------------------------------------------
 // Parametrización de conceptos de facturación (FGA, cuota manejo, etc.)
+// Clasifica qué tipo de cobro
 // ------------------------------------------------------------
 export const billingConceptTypeEnum = pgEnum('billing_concept_type', [
-  'PRINCIPAL',
-  'INTEREST',
-  'LATE_INTEREST',
+  'PRINCIPAL', //El capital prestado
+  'INTEREST', //Intereses corrientes
+  'LATE_INTEREST', //Intereses de mora
   'INSURANCE', // seguro
 
-  'FEE', // cuota de manejo, estudio, etc.
-  'GUARANTEE', // FGA u otras garantías
+  'FEE', // Comisiones/cargos (cuota de manejo, estudio de crédito).
+  'GUARANTEE', // Garantías como el FGA
   'OTHER',
 ]);
 
@@ -2285,7 +2371,7 @@ export const billingConcepts = pgTable(
     id: serial('id').primaryKey(),
 
     // Ej: "FGA", "CUOTA_MANEJO", "ESTUDIO_CREDITO", "SEGURO"
-    code: varchar('code', { length: 50 }).notNull(),
+    code: varchar('code', { length: 50 }).notNull(), // identificador unico
     name: varchar('name', { length: 150 }).notNull(),
     description: text('description'),
     isSystem: boolean('is_system').notNull().default(false),
@@ -3006,9 +3092,9 @@ export const portfolioProvisionSnapshotDetails = pgTable(
  */
 
 export const overpaymentHandlingEnum = pgEnum('overpayment_handling', [
-  'EXCESS_BALANCE', // saldo a favor / excedente
-  'APPLY_TO_PRINCIPAL',
-  'APPLY_TO_FUTURE_INSTALLMENTS',
+  'EXCESS_BALANCE', // Queda como saldo a favor para la próxima cuota
+  'APPLY_TO_PRINCIPAL', //Se abona directo al capital (reduce deuda)
+  'APPLY_TO_FUTURE_INSTALLMENTS', //Se usa para adelantar cuotas futuras
 ]);
 
 export const allocationScopeEnum = pgEnum('allocation_scope', [

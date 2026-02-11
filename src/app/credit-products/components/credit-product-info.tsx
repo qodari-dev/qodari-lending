@@ -13,8 +13,13 @@ import {
 import { categoryCodeLabels } from '@/schemas/category';
 import {
   CreditProduct,
+  dayCountConventionLabels,
   financingTypeLabels,
+  insuranceAccrualMethodLabels,
+  insuranceBaseAmountLabels,
   insuranceRangeMetricLabels,
+  interestAccrualMethodLabels,
+  interestRateTypeLabels,
   riskEvaluationModeLabels,
 } from '@/schemas/credit-product';
 import {
@@ -76,9 +81,16 @@ export function CreditProductInfo({
   const billingConcepts = ((creditProduct as unknown as { creditProductBillingConcepts?: unknown[] })
     .creditProductBillingConcepts ?? []) as BillingConceptView[];
 
+  const insuranceDayCountValue =
+    creditProduct.paysInsurance && creditProduct.insuranceAccrualMethod === 'DAILY'
+      ? (creditProduct.insuranceDayCountConvention
+          ? dayCountConventionLabels[creditProduct.insuranceDayCountConvention]
+          : '-') ?? creditProduct.insuranceDayCountConvention
+      : '-';
+
   const sections: DescriptionSection[] = [
     {
-      title: 'Informacion basica',
+      title: 'General',
       columns: 2,
       items: [
         { label: 'Nombre', value: creditProduct.name },
@@ -92,12 +104,99 @@ export function CreditProductInfo({
           label: 'Tipo financiacion',
           value: financingTypeLabels[creditProduct.financingType] ?? creditProduct.financingType,
         },
+      ],
+    },
+    {
+      title: 'Interes corriente',
+      columns: 2,
+      items: [
+        {
+          label: 'Tipo de tasa',
+          value:
+            interestRateTypeLabels[creditProduct.interestRateType] ??
+            creditProduct.interestRateType,
+        },
+        {
+          label: 'Causacion',
+          value:
+            interestAccrualMethodLabels[creditProduct.interestAccrualMethod] ??
+            creditProduct.interestAccrualMethod,
+        },
+        {
+          label: 'Convencion de dias',
+          value:
+            dayCountConventionLabels[creditProduct.interestDayCountConvention] ??
+            creditProduct.interestDayCountConvention,
+        },
+      ],
+    },
+    {
+      title: 'Mora',
+      columns: 2,
+      items: [
+        {
+          label: 'Tipo de tasa mora',
+          value:
+            interestRateTypeLabels[creditProduct.lateInterestRateType] ??
+            creditProduct.lateInterestRateType,
+        },
+        {
+          label: 'Causacion mora',
+          value:
+            interestAccrualMethodLabels[creditProduct.lateInterestAccrualMethod] ??
+            creditProduct.lateInterestAccrualMethod,
+        },
+        {
+          label: 'Convencion de dias mora',
+          value:
+            dayCountConventionLabels[creditProduct.lateInterestDayCountConvention] ??
+            creditProduct.lateInterestDayCountConvention,
+        },
+      ],
+    },
+    {
+      title: 'Seguro',
+      columns: 2,
+      items: [
+        {
+          label: 'Paga seguro',
+          value: (
+            <Badge variant={creditProduct.paysInsurance ? 'default' : 'outline'}>
+              {creditProduct.paysInsurance ? 'Si' : 'No'}
+            </Badge>
+          ),
+        },
         {
           label: 'Metrica seguro',
-          value:
-            insuranceRangeMetricLabels[creditProduct.insuranceRangeMetric] ??
-            creditProduct.insuranceRangeMetric,
+          value: creditProduct.paysInsurance
+            ? (insuranceRangeMetricLabels[creditProduct.insuranceRangeMetric] ??
+              creditProduct.insuranceRangeMetric)
+            : '-',
         },
+        {
+          label: 'Causacion seguro',
+          value: creditProduct.paysInsurance
+            ? (insuranceAccrualMethodLabels[creditProduct.insuranceAccrualMethod] ??
+              creditProduct.insuranceAccrualMethod)
+            : '-',
+        },
+        {
+          label: 'Base seguro',
+          value: creditProduct.paysInsurance
+            ? (insuranceBaseAmountLabels[creditProduct.insuranceBaseAmount] ??
+              creditProduct.insuranceBaseAmount)
+            : '-',
+        },
+        {
+          label: 'Convencion dias seguro',
+          value: insuranceDayCountValue,
+        },
+      ],
+    },
+    {
+      title: 'Distribuciones contables',
+      columns: 2,
+      items: [
         {
           label: 'Distribucion capital',
           value:
@@ -113,6 +212,12 @@ export function CreditProductInfo({
           value:
             creditProduct.lateInterestDistribution?.name ?? creditProduct.lateInterestDistributionId,
         },
+      ],
+    },
+    {
+      title: 'Parametros operativos y riesgo',
+      columns: 2,
+      items: [
         { label: 'Maximo cuotas', value: creditProduct.maxInstallments ?? '-' },
         {
           label: 'Centro costo',
@@ -128,10 +233,12 @@ export function CreditProductInfo({
             creditProduct.riskEvaluationMode,
         },
         { label: 'Score minimo riesgo', value: creditProduct.riskMinScore ?? '-' },
-        {
-          label: 'Paga seguro',
-          value: <Badge variant={creditProduct.paysInsurance ? 'default' : 'outline'}>{creditProduct.paysInsurance ? 'Si' : 'No'}</Badge>,
-        },
+      ],
+    },
+    {
+      title: 'Estado y reportes',
+      columns: 2,
+      items: [
         {
           label: 'Reporta centrales',
           value: (

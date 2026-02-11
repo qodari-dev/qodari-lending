@@ -150,7 +150,9 @@ export function InsuranceCompanyForm({
             rangeMetric: r.rangeMetric,
             valueFrom: r.valueFrom,
             valueTo: r.valueTo,
+            rateType: r.rateType,
             rateValue: r.rateValue,
+            fixedAmount: r.fixedAmount,
           })) ?? [],
       });
     }

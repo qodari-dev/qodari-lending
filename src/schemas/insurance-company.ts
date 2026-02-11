@@ -77,6 +77,14 @@ export const INSURANCE_RATE_RANGE_METRIC_LABELS: Record<string, string> = {
   CREDIT_AMOUNT: 'Monto',
 };
 
+export const INSURANCE_RATE_TYPE_OPTIONS = ['PERCENTAGE', 'FIXED_AMOUNT'] as const;
+export type InsuranceRateType = (typeof INSURANCE_RATE_TYPE_OPTIONS)[number];
+
+export const INSURANCE_RATE_TYPE_LABELS: Record<InsuranceRateType, string> = {
+  PERCENTAGE: 'Porcentaje',
+  FIXED_AMOUNT: 'Valor fijo',
+};
+
 // ============================================
 // MUTATIONS
 // ============================================
@@ -85,7 +93,48 @@ export const InsuranceRateRangeInputSchema = z.object({
   rangeMetric: z.enum(['INSTALLMENT_COUNT', 'CREDIT_AMOUNT']),
   valueFrom: z.number().int().min(0),
   valueTo: z.number().int().min(0),
-  rateValue: z.string().min(1, 'Tasa es requerida'),
+  rateType: z.enum(INSURANCE_RATE_TYPE_OPTIONS),
+  rateValue: z.string().nullable().optional(),
+  fixedAmount: z.string().nullable().optional(),
+}).superRefine((value, ctx) => {
+  const rateValue = value.rateValue?.trim() ?? '';
+  const fixedAmount = value.fixedAmount?.trim() ?? '';
+
+  if (value.rateType === 'PERCENTAGE') {
+    if (!rateValue) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Tasa es requerida',
+        path: ['rateValue'],
+      });
+    }
+
+    if (fixedAmount) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'No debe enviar valor fijo cuando el tipo es porcentaje',
+        path: ['fixedAmount'],
+      });
+    }
+  }
+
+  if (value.rateType === 'FIXED_AMOUNT') {
+    if (!fixedAmount) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Valor fijo es requerido',
+        path: ['fixedAmount'],
+      });
+    }
+
+    if (rateValue) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'No debe enviar tasa cuando el tipo es valor fijo',
+        path: ['rateValue'],
+      });
+    }
+  }
 });
 
 export type InsuranceRateRangeInput = z.infer<typeof InsuranceRateRangeInputSchema>;

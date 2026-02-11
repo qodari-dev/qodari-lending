@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
   INSURANCE_RATE_RANGE_METRIC_LABELS,
+  INSURANCE_RATE_TYPE_LABELS,
   InsuranceCompany,
 } from '@/schemas/insurance-company';
 import { formatDate } from '@/utils/formatters';
@@ -109,7 +110,8 @@ export function InsuranceCompanyInfo({
                     <TableHead>Métrica</TableHead>
                     <TableHead>Desde</TableHead>
                     <TableHead>Hasta</TableHead>
-                    <TableHead>Tasa</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Valor</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -125,7 +127,12 @@ export function InsuranceCompanyInfo({
                         {range.valueTo}
                       </TableCell>
                       <TableCell className="text-muted-foreground font-mono text-xs">
-                        {range.rateValue}
+                        {INSURANCE_RATE_TYPE_LABELS[range.rateType]}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-xs">
+                        {range.rateType === 'FIXED_AMOUNT'
+                          ? (range.fixedAmount ?? '-')
+                          : `${range.rateValue ?? '-'}%`}
                       </TableCell>
                     </TableRow>
                   ))}

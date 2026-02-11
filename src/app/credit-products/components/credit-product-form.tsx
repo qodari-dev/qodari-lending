@@ -48,10 +48,20 @@ import { PaymentAllocationPolicy } from '@/schemas/payment-allocation-policy';
 import {
   CreateCreditProductBodySchema,
   CreditProduct,
+  DAY_COUNT_CONVENTION_OPTIONS,
+  dayCountConventionLabels,
   FINANCING_TYPE_OPTIONS,
   financingTypeLabels,
+  INSURANCE_ACCRUAL_METHOD_OPTIONS,
+  insuranceAccrualMethodLabels,
+  INSURANCE_BASE_AMOUNT_OPTIONS,
+  insuranceBaseAmountLabels,
   INSURANCE_RANGE_METRIC_OPTIONS,
   insuranceRangeMetricLabels,
+  INTEREST_ACCRUAL_METHOD_OPTIONS,
+  interestAccrualMethodLabels,
+  INTEREST_RATE_TYPE_OPTIONS,
+  interestRateTypeLabels,
   RISK_EVALUATION_MODE_OPTIONS,
   riskEvaluationModeLabels,
 } from '@/schemas/credit-product';
@@ -59,7 +69,7 @@ import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
-import { Controller, FormProvider, useForm } from 'react-hook-form';
+import { Controller, FormProvider, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { CreditProductAccountsForm } from './credit-product-accounts-form';
 import { CreditProductBillingConceptsForm } from './credit-product-billing-concepts-form';
@@ -100,6 +110,15 @@ export function CreditProductForm({
       costCenterId: null,
       riskEvaluationMode: 'NONE',
       riskMinScore: null,
+      interestRateType: 'EFFECTIVE_ANNUAL',
+      interestAccrualMethod: 'DAILY',
+      interestDayCountConvention: 'ACTUAL_360',
+      lateInterestRateType: 'EFFECTIVE_ANNUAL',
+      lateInterestAccrualMethod: 'DAILY',
+      lateInterestDayCountConvention: 'ACTUAL_360',
+      insuranceAccrualMethod: 'PER_INSTALLMENT',
+      insuranceBaseAmount: 'OUTSTANDING_BALANCE',
+      insuranceDayCountConvention: null,
       isActive: true,
       creditProductRefinancePolicy: {
         allowRefinance: false,
@@ -119,6 +138,16 @@ export function CreditProductForm({
       creditProductAccounts: [],
       creditProductBillingConcepts: [],
     },
+  });
+
+  const paysInsurance = useWatch({
+    control: form.control,
+    name: 'paysInsurance',
+  });
+
+  const insuranceAccrualMethod = useWatch({
+    control: form.control,
+    name: 'insuranceAccrualMethod',
   });
 
   const { data: creditFundsData } = useCreditFunds({
@@ -175,6 +204,17 @@ export function CreditProductForm({
   );
 
   useEffect(() => {
+    if (!paysInsurance || insuranceAccrualMethod !== 'DAILY') {
+      form.setValue('insuranceDayCountConvention', null);
+      return;
+    }
+
+    if (!form.getValues('insuranceDayCountConvention')) {
+      form.setValue('insuranceDayCountConvention', 'ACTUAL_360');
+    }
+  }, [paysInsurance, insuranceAccrualMethod, form]);
+
+  useEffect(() => {
     if (opened) {
       const currentDocuments =
         (creditProduct as CreditProduct & {
@@ -197,6 +237,15 @@ export function CreditProductForm({
         costCenterId: creditProduct?.costCenterId ?? null,
         riskEvaluationMode: creditProduct?.riskEvaluationMode ?? 'NONE',
         riskMinScore: creditProduct?.riskMinScore ?? null,
+        interestRateType: creditProduct?.interestRateType ?? 'EFFECTIVE_ANNUAL',
+        interestAccrualMethod: creditProduct?.interestAccrualMethod ?? 'DAILY',
+        interestDayCountConvention: creditProduct?.interestDayCountConvention ?? 'ACTUAL_360',
+        lateInterestRateType: creditProduct?.lateInterestRateType ?? 'EFFECTIVE_ANNUAL',
+        lateInterestAccrualMethod: creditProduct?.lateInterestAccrualMethod ?? 'DAILY',
+        lateInterestDayCountConvention: creditProduct?.lateInterestDayCountConvention ?? 'ACTUAL_360',
+        insuranceAccrualMethod: creditProduct?.insuranceAccrualMethod ?? 'PER_INSTALLMENT',
+        insuranceBaseAmount: creditProduct?.insuranceBaseAmount ?? 'OUTSTANDING_BALANCE',
+        insuranceDayCountConvention: creditProduct?.insuranceDayCountConvention ?? null,
         isActive: creditProduct?.isActive ?? true,
         creditProductRefinancePolicy: creditProduct?.creditProductRefinancePolicy
           ? {
@@ -306,6 +355,9 @@ export function CreditProductForm({
               <TabsContent value="product" className="space-y-4 pt-2">
                 <FieldGroup>
                   <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2 pt-1">
+                      <p className="text-sm font-semibold">General</p>
+                    </div>
                     <Controller
                       name="name"
                       control={form.control}
@@ -455,13 +507,189 @@ export function CreditProductForm({
                       )}
                     />
 
+                    <div className="col-span-2 pt-2">
+                      <p className="text-sm font-semibold">Interes y mora</p>
+                    </div>
+
+                    <Controller
+                      name="interestRateType"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="interestRateType">Tipo tasa interes</FieldLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INTEREST_RATE_TYPE_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {interestRateTypeLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="interestAccrualMethod"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="interestAccrualMethod">
+                            Causacion interes
+                          </FieldLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INTEREST_ACCRUAL_METHOD_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {interestAccrualMethodLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="interestDayCountConvention"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="interestDayCountConvention">
+                            Convencion dias interes
+                          </FieldLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DAY_COUNT_CONVENTION_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {dayCountConventionLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="lateInterestRateType"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="lateInterestRateType">Tipo tasa mora</FieldLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INTEREST_RATE_TYPE_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {interestRateTypeLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="lateInterestAccrualMethod"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="lateInterestAccrualMethod">
+                            Causacion mora
+                          </FieldLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INTEREST_ACCRUAL_METHOD_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {interestAccrualMethodLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="lateInterestDayCountConvention"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="lateInterestDayCountConvention">
+                            Convencion dias mora
+                          </FieldLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DAY_COUNT_CONVENTION_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {dayCountConventionLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <div className="col-span-2 pt-2">
+                      <p className="text-sm font-semibold">Seguro</p>
+                    </div>
+
+                    <Controller
+                      name="paysInsurance"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="paysInsurance">Paga seguro?</FieldLabel>
+                          <div>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              aria-invalid={fieldState.invalid}
+                            />
+                          </div>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
                     <Controller
                       name="insuranceRangeMetric"
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel htmlFor="insuranceRangeMetric">Metrica seguro</FieldLabel>
-                          <Select value={field.value} onValueChange={field.onChange}>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={!paysInsurance}
+                          >
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione..." />
                             </SelectTrigger>
@@ -477,6 +705,95 @@ export function CreditProductForm({
                         </Field>
                       )}
                     />
+
+                    <Controller
+                      name="insuranceAccrualMethod"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="insuranceAccrualMethod">
+                            Causacion seguro
+                          </FieldLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={!paysInsurance}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INSURANCE_ACCRUAL_METHOD_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {insuranceAccrualMethodLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="insuranceBaseAmount"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="insuranceBaseAmount">Base seguro</FieldLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={!paysInsurance}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INSURANCE_BASE_AMOUNT_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {insuranceBaseAmountLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="insuranceDayCountConvention"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="insuranceDayCountConvention">
+                            Convencion dias seguro
+                          </FieldLabel>
+                          <Select
+                            value={field.value ?? undefined}
+                            onValueChange={field.onChange}
+                            disabled={!paysInsurance || insuranceAccrualMethod !== 'DAILY'}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DAY_COUNT_CONVENTION_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {dayCountConventionLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <div className="col-span-2 pt-2">
+                      <p className="text-sm font-semibold">Distribuciones contables</p>
+                    </div>
 
                     <Controller
                       name="capitalDistributionId"
@@ -604,6 +921,10 @@ export function CreditProductForm({
                       )}
                     />
 
+                    <div className="col-span-2 pt-2">
+                      <p className="text-sm font-semibold">Parametros operativos</p>
+                    </div>
+
                     <Controller
                       name="maxInstallments"
                       control={form.control}
@@ -665,6 +986,10 @@ export function CreditProductForm({
                       )}
                     />
 
+                    <div className="col-span-2 pt-2">
+                      <p className="text-sm font-semibold">Riesgo</p>
+                    </div>
+
                     <Controller
                       name="riskEvaluationMode"
                       control={form.control}
@@ -706,25 +1031,11 @@ export function CreditProductForm({
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <Controller
-                      name="paysInsurance"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="paysInsurance">Paga seguro?</FieldLabel>
-                          <div>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              aria-invalid={fieldState.invalid}
-                            />
-                          </div>
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
+                  <div className="pt-2">
+                    <p className="text-sm font-semibold">Estado y reportes</p>
+                  </div>
 
+                  <div className="grid grid-cols-2 gap-4">
                     <Controller
                       name="reportsToCreditBureau"
                       control={form.control}

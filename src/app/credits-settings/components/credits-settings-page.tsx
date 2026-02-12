@@ -389,7 +389,7 @@ export function CreditsSettingsPage() {
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel>Cuenta Mayor</FieldLabel>
+                          <FieldLabel>Cuenta Valor Mayor Pagado</FieldLabel>
                           <Combobox
                             items={glAccounts}
                             value={findGlAccount(field.value)}
@@ -459,7 +459,7 @@ export function CreditsSettingsPage() {
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel>Cuenta Exceso</FieldLabel>
+                          <FieldLabel>Cuenta Excedente</FieldLabel>
                           <Combobox
                             items={glAccounts}
                             value={findGlAccount(field.value)}

@@ -846,13 +846,6 @@ export const dayCountConventionEnum = pgEnum('day_count_convention', [
 export const insuranceAccrualMethodEnum = pgEnum('insurance_accrual_method', [
   'ONE_TIME',
   'PER_INSTALLMENT',
-  'DAILY',
-  'MONTHLY',
-]);
-
-export const insuranceBaseAmountEnum = pgEnum('insurance_base_amount', [
-  'OUTSTANDING_BALANCE',
-  'DISBURSED_AMOUNT',
 ]);
 
 // ---------------------------------------------------------------------
@@ -944,24 +937,12 @@ export const creditProducts = pgTable(
     insuranceAccrualMethod: insuranceAccrualMethodEnum('insurance_accrual_method')
       .notNull()
       .default('PER_INSTALLMENT'),
-    insuranceBaseAmount: insuranceBaseAmountEnum('insurance_base_amount')
-      .notNull()
-      .default('OUTSTANDING_BALANCE'),
-    insuranceDayCountConvention: dayCountConventionEnum('insurance_day_count_convention'),
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
   (t) => [
     index('idx_credit_products_fund').on(t.creditFundId),
     index('idx_credit_products_cost_center').on(t.costCenterId),
-    check(
-      'chk_credit_products_ins_day_count_required_when_daily',
-      sql`${t.insuranceAccrualMethod} <> 'DAILY' OR ${t.insuranceDayCountConvention} IS NOT NULL`
-    ),
-    check(
-      'chk_credit_products_ins_day_count_only_for_daily',
-      sql`${t.insuranceAccrualMethod} = 'DAILY' OR ${t.insuranceDayCountConvention} IS NULL`
-    ),
   ]
 );
 

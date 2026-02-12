@@ -138,8 +138,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Fondos de créditos', url: `/credit-funds` },
                   { title: 'Conceptos de facturacion', url: `/billing-concepts` },
                   { title: 'Politicas de aplicacion', url: `/payment-allocation-policies` },
-                  { title: 'Perfiles de facturacion', url: `/billing-cycle-profiles` },
                   { title: 'Tipos de créditos', url: `/credit-products` },
+                  { title: 'Convenios', url: `/agreements` },
+                  { title: 'Perfiles de facturacion', url: `/billing-cycle-profiles` },
                 ],
               },
               {
@@ -149,7 +150,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Tipos de terceros', url: `/third-party-types` },
                   { title: 'Terceros', url: `/third-parties` },
                   { title: 'Empresas de seguros', url: `/insurance-companies` },
-                  { title: 'Convenios', url: `/agreements` },
                 ],
               },
             ],

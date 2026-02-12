@@ -13,13 +13,12 @@ import {
 import { categoryCodeLabels } from '@/schemas/category';
 import {
   CreditProduct,
-  dayCountConventionLabels,
   financingTypeLabels,
   insuranceAccrualMethodLabels,
-  insuranceBaseAmountLabels,
   insuranceRangeMetricLabels,
   interestAccrualMethodLabels,
   interestRateTypeLabels,
+  dayCountConventionLabels,
   riskEvaluationModeLabels,
 } from '@/schemas/credit-product';
 import {
@@ -80,13 +79,6 @@ export function CreditProductInfo({
 
   const billingConcepts = ((creditProduct as unknown as { creditProductBillingConcepts?: unknown[] })
     .creditProductBillingConcepts ?? []) as BillingConceptView[];
-
-  const insuranceDayCountValue =
-    creditProduct.paysInsurance && creditProduct.insuranceAccrualMethod === 'DAILY'
-      ? (creditProduct.insuranceDayCountConvention
-          ? dayCountConventionLabels[creditProduct.insuranceDayCountConvention]
-          : '-') ?? creditProduct.insuranceDayCountConvention
-      : '-';
 
   const sections: DescriptionSection[] = [
     {
@@ -179,17 +171,6 @@ export function CreditProductInfo({
             ? (insuranceAccrualMethodLabels[creditProduct.insuranceAccrualMethod] ??
               creditProduct.insuranceAccrualMethod)
             : '-',
-        },
-        {
-          label: 'Base seguro',
-          value: creditProduct.paysInsurance
-            ? (insuranceBaseAmountLabels[creditProduct.insuranceBaseAmount] ??
-              creditProduct.insuranceBaseAmount)
-            : '-',
-        },
-        {
-          label: 'Convencion dias seguro',
-          value: insuranceDayCountValue,
         },
       ],
     },

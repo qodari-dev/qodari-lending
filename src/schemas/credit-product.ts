@@ -46,16 +46,8 @@ export type DayCountConvention = (typeof DAY_COUNT_CONVENTION_OPTIONS)[number];
 export const INSURANCE_ACCRUAL_METHOD_OPTIONS = [
   'ONE_TIME',
   'PER_INSTALLMENT',
-  'DAILY',
-  'MONTHLY',
 ] as const;
 export type InsuranceAccrualMethod = (typeof INSURANCE_ACCRUAL_METHOD_OPTIONS)[number];
-
-export const INSURANCE_BASE_AMOUNT_OPTIONS = [
-  'OUTSTANDING_BALANCE',
-  'DISBURSED_AMOUNT',
-] as const;
-export type InsuranceBaseAmount = (typeof INSURANCE_BASE_AMOUNT_OPTIONS)[number];
 
 export const financingTypeLabels: Record<FinancingType, string> = {
   FIXED_AMOUNT: 'Valor fijo',
@@ -95,13 +87,6 @@ export const dayCountConventionLabels: Record<DayCountConvention, string> = {
 export const insuranceAccrualMethodLabels: Record<InsuranceAccrualMethod, string> = {
   ONE_TIME: 'Una vez',
   PER_INSTALLMENT: 'Por cuota',
-  DAILY: 'Diaria',
-  MONTHLY: 'Mensual',
-};
-
-export const insuranceBaseAmountLabels: Record<InsuranceBaseAmount, string> = {
-  OUTSTANDING_BALANCE: 'Saldo pendiente',
-  DISBURSED_AMOUNT: 'Monto desembolsado',
 };
 
 export { categoryCodeLabels };
@@ -279,8 +264,6 @@ const CreditProductBaseSchema = z.object({
   lateInterestAccrualMethod: z.enum(INTEREST_ACCRUAL_METHOD_OPTIONS),
   lateInterestDayCountConvention: z.enum(DAY_COUNT_CONVENTION_OPTIONS),
   insuranceAccrualMethod: z.enum(INSURANCE_ACCRUAL_METHOD_OPTIONS),
-  insuranceBaseAmount: z.enum(INSURANCE_BASE_AMOUNT_OPTIONS),
-  insuranceDayCountConvention: z.enum(DAY_COUNT_CONVENTION_OPTIONS).nullable().optional(),
   isActive: z.boolean(),
   creditProductRefinancePolicy: CreditProductRefinancePolicyInputSchema.nullable().optional(),
   creditProductCategories: CreditProductCategoryInputSchema.array().optional(),
@@ -317,26 +300,7 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
       creditProductBillingConcepts?: {
         billingConceptId: number;
       }[];
-      paysInsurance?: boolean;
-      insuranceAccrualMethod?: InsuranceAccrualMethod;
-      insuranceDayCountConvention?: DayCountConvention | null;
     };
-
-    if (data.insuranceAccrualMethod === 'DAILY' && !data.insuranceDayCountConvention) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Convencion de dias del seguro es requerida cuando la causacion es diaria',
-        path: ['insuranceDayCountConvention'],
-      });
-    }
-
-    if (data.insuranceAccrualMethod !== 'DAILY' && data.insuranceDayCountConvention) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Convencion de dias del seguro solo aplica cuando la causacion es diaria',
-        path: ['insuranceDayCountConvention'],
-      });
-    }
 
     const categories = data.creditProductCategories ?? [];
     for (const category of categories) {

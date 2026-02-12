@@ -89,7 +89,7 @@ export function BillingConceptForm({
 
   const { data: glAccountsData } = useGlAccounts({
     limit: 1000,
-    where: { and: [{ isActive: true }] },
+    where: { and: [{ detailType: 'RECEIVABLE', isActive: true }] },
     sort: [{ field: 'code', order: 'asc' }],
   });
   const glAccounts = useMemo(() => glAccountsData?.body?.data ?? [], [glAccountsData]);
@@ -259,7 +259,9 @@ export function BillingConceptForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="defaultFinancingMode">Modo financiacion default</FieldLabel>
+                          <FieldLabel htmlFor="defaultFinancingMode">
+                            Modo financiacion default
+                          </FieldLabel>
                           <Select value={field.value} onValueChange={field.onChange}>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione..." />
@@ -287,7 +289,9 @@ export function BillingConceptForm({
                             <Combobox
                               items={glAccounts}
                               value={findGlAccount(field.value)}
-                              onValueChange={(value: GlAccount | null) => field.onChange(value?.id ?? null)}
+                              onValueChange={(value: GlAccount | null) =>
+                                field.onChange(value?.id ?? null)
+                              }
                               itemToStringValue={(item: GlAccount) => String(item.id)}
                               itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
                             >
@@ -304,7 +308,11 @@ export function BillingConceptForm({
                                 }
                               />
                               <ComboboxContent portalContainer={sheetContentRef}>
-                                <ComboboxInput placeholder="Buscar cuenta..." showClear showTrigger={false} />
+                                <ComboboxInput
+                                  placeholder="Buscar cuenta..."
+                                  showClear
+                                  showTrigger={false}
+                                />
                                 <ComboboxList>
                                   <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
                                   <ComboboxCollection>

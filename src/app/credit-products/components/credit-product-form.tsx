@@ -54,8 +54,6 @@ import {
   financingTypeLabels,
   INSURANCE_ACCRUAL_METHOD_OPTIONS,
   insuranceAccrualMethodLabels,
-  INSURANCE_BASE_AMOUNT_OPTIONS,
-  insuranceBaseAmountLabels,
   INSURANCE_RANGE_METRIC_OPTIONS,
   insuranceRangeMetricLabels,
   INTEREST_ACCRUAL_METHOD_OPTIONS,
@@ -117,8 +115,6 @@ export function CreditProductForm({
       lateInterestAccrualMethod: 'DAILY',
       lateInterestDayCountConvention: 'ACTUAL_360',
       insuranceAccrualMethod: 'PER_INSTALLMENT',
-      insuranceBaseAmount: 'OUTSTANDING_BALANCE',
-      insuranceDayCountConvention: null,
       isActive: true,
       creditProductRefinancePolicy: {
         allowRefinance: false,
@@ -143,11 +139,6 @@ export function CreditProductForm({
   const paysInsurance = useWatch({
     control: form.control,
     name: 'paysInsurance',
-  });
-
-  const insuranceAccrualMethod = useWatch({
-    control: form.control,
-    name: 'insuranceAccrualMethod',
   });
 
   const { data: creditFundsData } = useCreditFunds({
@@ -204,17 +195,6 @@ export function CreditProductForm({
   );
 
   useEffect(() => {
-    if (!paysInsurance || insuranceAccrualMethod !== 'DAILY') {
-      form.setValue('insuranceDayCountConvention', null);
-      return;
-    }
-
-    if (!form.getValues('insuranceDayCountConvention')) {
-      form.setValue('insuranceDayCountConvention', 'ACTUAL_360');
-    }
-  }, [paysInsurance, insuranceAccrualMethod, form]);
-
-  useEffect(() => {
     if (opened) {
       const currentDocuments =
         (creditProduct as CreditProduct & {
@@ -244,8 +224,6 @@ export function CreditProductForm({
         lateInterestAccrualMethod: creditProduct?.lateInterestAccrualMethod ?? 'DAILY',
         lateInterestDayCountConvention: creditProduct?.lateInterestDayCountConvention ?? 'ACTUAL_360',
         insuranceAccrualMethod: creditProduct?.insuranceAccrualMethod ?? 'PER_INSTALLMENT',
-        insuranceBaseAmount: creditProduct?.insuranceBaseAmount ?? 'OUTSTANDING_BALANCE',
-        insuranceDayCountConvention: creditProduct?.insuranceDayCountConvention ?? null,
         isActive: creditProduct?.isActive ?? true,
         creditProductRefinancePolicy: creditProduct?.creditProductRefinancePolicy
           ? {
@@ -726,62 +704,6 @@ export function CreditProductForm({
                               {INSURANCE_ACCRUAL_METHOD_OPTIONS.map((option) => (
                                 <SelectItem key={option} value={option}>
                                   {insuranceAccrualMethodLabels[option]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-
-                    <Controller
-                      name="insuranceBaseAmount"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="insuranceBaseAmount">Base seguro</FieldLabel>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                            disabled={!paysInsurance}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {INSURANCE_BASE_AMOUNT_OPTIONS.map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {insuranceBaseAmountLabels[option]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-
-                    <Controller
-                      name="insuranceDayCountConvention"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="insuranceDayCountConvention">
-                            Convencion dias seguro
-                          </FieldLabel>
-                          <Select
-                            value={field.value ?? undefined}
-                            onValueChange={field.onChange}
-                            disabled={!paysInsurance || insuranceAccrualMethod !== 'DAILY'}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {DAY_COUNT_CONVENTION_OPTIONS.map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {dayCountConventionLabels[option]}
                                 </SelectItem>
                               ))}
                             </SelectContent>

@@ -59,11 +59,6 @@ export const insuranceCompanyColumns: ColumnDef<InsuranceCompany>[] = [
     },
   },
   {
-    accessorKey: 'factor',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Factor" />,
-    cell: ({ row }) => <span>{row.original.factor}</span>,
-  },
-  {
     accessorKey: 'isActive',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
     cell: ({ row }) => <StatusBadge isActive={row.getValue('isActive')} />,

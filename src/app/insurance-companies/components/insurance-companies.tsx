@@ -54,7 +54,7 @@ export function InsuranceCompanies() {
     handleSearchChange,
   } = useDataTable<InsuranceCompanySortField, InsuranceCompanyInclude>({
     defaultPageSize: 20,
-    defaultIncludes: ['insuranceRateRanges'],
+    defaultIncludes: ['insuranceRateRanges', 'distribution'],
     defaultSorting: [{ field: 'createdAt', order: 'desc' }],
   });
 

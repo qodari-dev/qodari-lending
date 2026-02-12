@@ -222,12 +222,9 @@ export const accountingDistributionsRelations = relations(accountingDistribution
     relationName: 'lateInterestDistribution',
   }),
 
-  // Concr25 (aseguradoras) -> 2 referencias
-  insuranceCompaniesAsTotalChargeDistribution: many(insuranceCompanies, {
-    relationName: 'totalChargeDistribution',
-  }),
-  insuranceCompaniesAsMonthlyDistribution: many(insuranceCompanies, {
-    relationName: 'monthlyDistribution',
+  // Concr25 (aseguradoras) -> 1 referencia
+  insuranceCompaniesAsDistribution: many(insuranceCompanies, {
+    relationName: 'distribution',
   }),
 }));
 
@@ -392,15 +389,9 @@ export const insuranceCompaniesRelations = relations(insuranceCompanies, ({ many
     references: [cities.id],
   }),
 
-  // Concr05 - dos FKs => relationName para evitar ambigüedad
-  totalChargeDistribution: one(accountingDistributions, {
-    relationName: 'totalChargeDistribution',
-    fields: [insuranceCompanies.totalChargeDistributionId],
-    references: [accountingDistributions.id],
-  }),
-  monthlyDistribution: one(accountingDistributions, {
-    relationName: 'monthlyDistribution',
-    fields: [insuranceCompanies.monthlyDistributionId],
+  distribution: one(accountingDistributions, {
+    relationName: 'distribution',
+    fields: [insuranceCompanies.distributionId],
     references: [accountingDistributions.id],
   }),
 }));

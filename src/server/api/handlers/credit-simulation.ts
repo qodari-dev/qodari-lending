@@ -111,7 +111,15 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
             metricValue <= range.valueTo
         );
 
-        insuranceFactor = insuranceRange ? toNumber(insuranceRange.rateValue) : toNumber(insurer.factor);
+        if (!insuranceRange) {
+          throwHttpError({
+            status: 400,
+            message: 'La aseguradora no tiene un rango de tasa aplicable para esta simulacion',
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        insuranceFactor = toNumber(insuranceRange.rateValue);
       }
 
       const financingFactor = toNumber(category.financingFactor);

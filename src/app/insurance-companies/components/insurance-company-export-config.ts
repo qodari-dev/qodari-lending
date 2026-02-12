@@ -8,7 +8,6 @@ export const insuranceCompanyExportConfig: ExportConfig<InsuranceCompany> = {
   columns: [
     { header: 'Razon Social', accessorKey: 'businessName' },
     { header: 'NIT', accessorKey: 'documentNumber' },
-    { header: 'Factor', accessorKey: 'factor' },
     {
       header: 'Estado',
       accessorKey: 'isActive',

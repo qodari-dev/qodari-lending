@@ -46,8 +46,7 @@ const INSURANCE_COMPANY_INCLUDE_OPTIONS = [
   'insuranceRateRanges',
   'identificationType',
   'city',
-  'totalChargeDistribution',
-  'monthlyDistribution',
+  'distribution',
 ] as const;
 const InsuranceCompanyIncludeSchema = createIncludeSchema(INSURANCE_COMPANY_INCLUDE_OPTIONS);
 
@@ -149,13 +148,14 @@ export const CreateInsuranceCompanyBodySchema = z.object({
   phone: z.string().max(20).nullable().optional(),
   mobileNumber: z.string().max(20).nullable().optional(),
   email: z.email().max(60).nullable().optional(),
-  factor: z.string().min(1, 'Factor es requerido'),
   minimumValue: z.string().nullable().optional(),
-  totalChargeDistributionId: z.number().int().positive().nullable().optional(),
-  monthlyDistributionId: z.number().int().positive(),
+  distributionId: z.number().int().positive(),
   note: z.string().max(70).nullable().optional(),
   isActive: z.boolean(),
-  insuranceRateRanges: InsuranceRateRangeInputSchema.array().optional(),
+  insuranceRateRanges: InsuranceRateRangeInputSchema.array().min(
+    1,
+    'Debe configurar al menos un rango de tasa'
+  ),
 });
 
 export const UpdateInsuranceCompanyBodySchema = CreateInsuranceCompanyBodySchema.partial();

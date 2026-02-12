@@ -46,6 +46,11 @@ type FormValues = z.infer<typeof CreateInsuranceCompanyBodySchema>;
 
 export function InsuranceCompanyRateRangesForm() {
   const form = useFormContext<FormValues>();
+  const insuranceRateRangesError = form.formState.errors.insuranceRateRanges as
+    | { message?: string; root?: { message?: string } }
+    | undefined;
+  const insuranceRateRangesErrorMessage =
+    insuranceRateRangesError?.message ?? insuranceRateRangesError?.root?.message;
 
   const { fields, append, update, remove } = useFieldArray({
     control: form.control,
@@ -346,6 +351,9 @@ export function InsuranceCompanyRateRangesForm() {
           No hay rangos de tasas agregados.
         </div>
       )}
+      {insuranceRateRangesErrorMessage ? (
+        <FieldError errors={[{ message: insuranceRateRangesErrorMessage }]} />
+      ) : null}
     </div>
   );
 }

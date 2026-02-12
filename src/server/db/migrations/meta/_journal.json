@@ -71,6 +71,13 @@
       "when": 1770922826526,
       "tag": "0009_high_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1770923336030,
+      "tag": "0010_minor_tiger_shark",
+      "breakpoints": true
     }
   ]
 }

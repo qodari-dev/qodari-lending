@@ -710,8 +710,8 @@ export const thirdParties = pgTable(
 // Catálogo de aseguradoras y su parametrización contable para el cobro del seguro.
 // Campos clave:
 // - taxId: NIT de la aseguradora (único) + verificationDigit.
-// - factor / minimumValue: parámetros de cálculo del seguro.
-// - paymentDistributionId / monthDistributionId: distribuciones contables asociadas (Concr05).
+// - minimumValue: valor mínimo del seguro.
+// - distributionId: distribución contable asociada (Concr05).
 // ---------------------------------------------------------------------
 export const insuranceCompanies = pgTable(
   'insurance_companies',
@@ -734,15 +734,9 @@ export const insuranceCompanies = pgTable(
     mobileNumber: varchar('mobile_number', { length: 20 }),
     email: varchar('email', { length: 60 }),
 
-    factor: decimal('factor', { precision: 12, scale: 4 }).notNull(),
     minimumValue: decimal('minimum_value', { precision: 12, scale: 2 }),
 
-    totalChargeDistributionId: integer('total_charge_distribution_id').references(
-      () => accountingDistributions.id,
-      { onDelete: 'restrict' }
-    ),
-
-    monthlyDistributionId: integer('monthly_distribution_id')
+    distributionId: integer('distribution_id')
       .notNull()
       .references(() => accountingDistributions.id, { onDelete: 'restrict' }),
 

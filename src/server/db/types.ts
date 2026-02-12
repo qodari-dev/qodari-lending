@@ -210,8 +210,7 @@ export type AccountingDistributions = typeof accountingDistributions.$inferSelec
   creditProductsAsInterestDistribution?: CreditProducts[];
   creditProductsAsLateInterestDistribution?: CreditProducts[];
 
-  insuranceCompaniesAsPaymentDistribution?: InsuranceCompanies[];
-  insuranceCompaniesAsMonthlyDistribution?: InsuranceCompanies[];
+  insuranceCompaniesAsDistribution?: InsuranceCompanies[];
 };
 export type NewAccountingDistributions = typeof accountingDistributions.$inferInsert;
 
@@ -332,8 +331,7 @@ export type InsuranceCompanies = typeof insuranceCompanies.$inferSelect & {
   identificationType?: IdentificationTypes;
   city?: Cities;
   insuranceRateRanges?: InsuranceRateRanges[];
-  totalChargeDistribution?: AccountingDistributions;
-  monthlyDistribution?: AccountingDistributions;
+  distribution?: AccountingDistributions;
 };
 export type NewInsuranceCompanies = typeof insuranceCompanies.$inferInsert;
 

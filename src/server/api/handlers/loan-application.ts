@@ -248,9 +248,15 @@ async function resolveInsuranceFactor(args: {
       metricValue <= range.valueTo
   );
 
-  const insuranceFactor = insuranceRange
-    ? toNumber(insuranceRange.rateValue)
-    : toNumber(insurer.factor);
+  if (!insuranceRange) {
+    throwHttpError({
+      status: 400,
+      message: 'La aseguradora no tiene un rango de tasa aplicable para esta solicitud',
+      code: 'BAD_REQUEST',
+    });
+  }
+
+  const insuranceFactor = toNumber(insuranceRange.rateValue);
 
   return {
     product,

@@ -56,8 +56,11 @@ export function InsuranceCompanyInfo({
       title: 'Parámetros de Seguro',
       columns: 2,
       items: [
-        { label: 'Factor', value: insuranceCompany.factor },
         { label: 'Valor Mínimo', value: insuranceCompany.minimumValue ?? '-' },
+        {
+          label: 'Distribución',
+          value: insuranceCompany.distribution?.name ?? insuranceCompany.distributionId ?? '-',
+        },
       ],
     },
     {

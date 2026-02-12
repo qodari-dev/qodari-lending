@@ -72,10 +72,8 @@ export function InsuranceCompanyForm({
       phone: null,
       mobileNumber: null,
       email: null,
-      factor: '',
       minimumValue: null,
-      totalChargeDistributionId: null,
-      monthlyDistributionId: undefined,
+      distributionId: undefined,
       note: null,
       isActive: true,
       insuranceRateRanges: [],
@@ -122,7 +120,7 @@ export function InsuranceCompanyForm({
     [cities]
   );
   const findAccountingDistribution = useCallback(
-    (id: number | null | undefined) =>
+    (id: number | undefined) =>
       accountingDistributions.find((distribution) => distribution.id === id) ?? null,
     [accountingDistributions]
   );
@@ -139,10 +137,8 @@ export function InsuranceCompanyForm({
         phone: insuranceCompany?.phone ?? null,
         mobileNumber: insuranceCompany?.mobileNumber ?? null,
         email: insuranceCompany?.email ?? null,
-        factor: insuranceCompany?.factor ?? '',
         minimumValue: insuranceCompany?.minimumValue ?? null,
-        totalChargeDistributionId: insuranceCompany?.totalChargeDistributionId ?? null,
-        monthlyDistributionId: insuranceCompany?.monthlyDistributionId ?? undefined,
+        distributionId: insuranceCompany?.distributionId ?? undefined,
         note: insuranceCompany?.note ?? null,
         isActive: insuranceCompany?.isActive ?? true,
         insuranceRateRanges:
@@ -419,17 +415,6 @@ export function InsuranceCompanyForm({
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <Controller
-                      name="factor"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="factor">Factor</FieldLabel>
-                          <Input {...field} aria-invalid={fieldState.invalid} />
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-                    <Controller
                       name="minimumValue"
                       control={form.control}
                       render={({ field, fieldState }) => (
@@ -455,63 +440,12 @@ export function InsuranceCompanyForm({
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <Controller
-                      name="totalChargeDistributionId"
+                      name="distributionId"
                       control={form.control}
                       render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="totalChargeDistributionId">
-                            Distribución Cobro Total
-                          </FieldLabel>
-                          <Combobox
-                            items={accountingDistributions}
-                            value={findAccountingDistribution(field.value)}
-                            onValueChange={(value: AccountingDistribution | null) =>
-                              field.onChange(value?.id ?? null)
-                            }
-                            itemToStringValue={(item: AccountingDistribution) => String(item.id)}
-                            itemToStringLabel={(item: AccountingDistribution) => item.name}
-                          >
-                            <ComboboxTrigger
-                              render={
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="w-full justify-between font-normal"
-                                >
-                                  <ComboboxValue placeholder="Seleccione..." />
-                                  <ChevronDownIcon className="text-muted-foreground size-4" />
-                                </Button>
-                              }
-                            />
-                            <ComboboxContent portalContainer={sheetContentRef}>
-                              <ComboboxInput
-                                placeholder="Buscar distribucion..."
-                                showClear
-                                showTrigger={false}
-                              />
-                              <ComboboxList>
-                                <ComboboxEmpty>No se encontraron distribuciones</ComboboxEmpty>
-                                <ComboboxCollection>
-                                  {(item: AccountingDistribution) => (
-                                    <ComboboxItem key={item.id} value={item}>
-                                      {item.name}
-                                    </ComboboxItem>
-                                  )}
-                                </ComboboxCollection>
-                              </ComboboxList>
-                            </ComboboxContent>
-                          </Combobox>
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-                    <Controller
-                      name="monthlyDistributionId"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="monthlyDistributionId">
-                            Distribución Mensual
+                        <Field data-invalid={fieldState.invalid} className="col-span-2">
+                          <FieldLabel htmlFor="distributionId">
+                            Distribución
                           </FieldLabel>
                           <Combobox
                             items={accountingDistributions}

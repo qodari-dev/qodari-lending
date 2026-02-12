@@ -52,12 +52,8 @@ const INSURANCE_COMPANY_INCLUDES = createIncludeMap<typeof db.query.insuranceCom
     relation: 'city',
     config: true,
   },
-  totalChargeDistribution: {
-    relation: 'totalChargeDistribution',
-    config: true,
-  },
-  monthlyDistribution: {
-    relation: 'monthlyDistribution',
+  distribution: {
+    relation: 'distribution',
     config: true,
   },
 });

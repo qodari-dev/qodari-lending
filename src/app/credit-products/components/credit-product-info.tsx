@@ -279,7 +279,6 @@ export function CreditProductInfo({
                       <TableHead>Categoria</TableHead>
                       <TableHead>Rango cuotas</TableHead>
                       <TableHead>Factor fin.</TableHead>
-                      <TableHead>Factor pign.</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -290,7 +289,6 @@ export function CreditProductInfo({
                           {item.installmentsFrom} - {item.installmentsTo}
                         </TableCell>
                         <TableCell className="font-mono text-xs">{item.financingFactor}</TableCell>
-                        <TableCell className="font-mono text-xs">{item.pledgeFactor ?? '-'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

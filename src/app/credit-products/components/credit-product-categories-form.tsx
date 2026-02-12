@@ -61,7 +61,6 @@ export function CreditProductCategoriesForm() {
       installmentsFrom: 1,
       installmentsTo: 1,
       financingFactor: '',
-      pledgeFactor: null,
     },
   });
 
@@ -81,7 +80,6 @@ export function CreditProductCategoriesForm() {
       installmentsFrom: 1,
       installmentsTo: 1,
       financingFactor: '',
-      pledgeFactor: null,
     });
     setEditingIndex(null);
     setIsDialogOpen(true);
@@ -94,7 +92,6 @@ export function CreditProductCategoriesForm() {
       installmentsFrom: current?.installmentsFrom ?? 1,
       installmentsTo: current?.installmentsTo ?? 1,
       financingFactor: current?.financingFactor ?? '',
-      pledgeFactor: current?.pledgeFactor ?? null,
     });
     setEditingIndex(index);
     setIsDialogOpen(true);
@@ -222,22 +219,6 @@ export function CreditProductCategoriesForm() {
                 )}
               />
 
-              <Controller
-                name="pledgeFactor"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="pledgeFactor">Factor pignoracion</FieldLabel>
-                    <Input
-                      id="pledgeFactor"
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value || null)}
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
             </div>
             <DialogFooter>
               <DialogClose asChild>
@@ -260,7 +241,6 @@ export function CreditProductCategoriesForm() {
               <TableHead>Categoria</TableHead>
               <TableHead>Rango cuotas</TableHead>
               <TableHead>Factor fin.</TableHead>
-              <TableHead>Factor pign.</TableHead>
               <TableHead className="w-30 text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -274,7 +254,6 @@ export function CreditProductCategoriesForm() {
                     {field.installmentsFrom} - {field.installmentsTo}
                   </TableCell>
                   <TableCell className="font-mono text-xs">{field.financingFactor}</TableCell>
-                  <TableCell className="font-mono text-xs">{field.pledgeFactor ?? '-'}</TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-2">
                       <Button

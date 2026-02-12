@@ -64,6 +64,13 @@
       "when": 1770922371779,
       "tag": "0008_breezy_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1770922826526,
+      "tag": "0009_high_swordsman",
+      "breakpoints": true
     }
   ]
 }

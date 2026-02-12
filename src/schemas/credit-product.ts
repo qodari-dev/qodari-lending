@@ -171,7 +171,6 @@ export const CreditProductCategoryInputSchema = z.object({
   installmentsFrom: z.number().int().positive(),
   installmentsTo: z.number().int().positive(),
   financingFactor: z.string().min(1, 'Factor financiacion es requerido'),
-  pledgeFactor: z.string().nullable().optional(),
 });
 
 export type CreditProductCategoryInput = z.infer<typeof CreditProductCategoryInputSchema>;

@@ -1,0 +1,1 @@
+ALTER TABLE "credit_product_categories" DROP COLUMN "pledge_factor";

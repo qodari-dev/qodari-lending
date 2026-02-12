@@ -954,7 +954,6 @@ export const creditProducts = pgTable(
 // - categoryCode: categoría del afiliado/cliente (según reglas del cliente).
 // - installmentsFrom/To: rango de cuotas al que aplica.
 // - financingFactor: factor para cálculo financiero.
-// - pledgeFactor: factor para pignoración (si aplica).
 // =====================================================================
 export const creditProductCategories = pgTable(
   'credit_product_categories',
@@ -970,7 +969,6 @@ export const creditProductCategories = pgTable(
       precision: 12,
       scale: 9,
     }).notNull(),
-    pledgeFactor: decimal('pledge_factor', { precision: 12, scale: 9 }),
     ...timestamps,
   },
   (t) => [

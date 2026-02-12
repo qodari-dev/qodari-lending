@@ -257,7 +257,6 @@ export function CreditProductForm({
             installmentsFrom: category.installmentsFrom,
             installmentsTo: category.installmentsTo,
             financingFactor: category.financingFactor,
-            pledgeFactor: category.pledgeFactor ?? null,
           })) ?? [],
         creditProductLateInterestRules:
           creditProduct?.creditProductLateInterestRules?.map((rule) => ({

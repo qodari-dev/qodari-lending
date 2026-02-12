@@ -34,7 +34,7 @@ export function CreditProductAccountsForm() {
 
   const { data: glAccountsData } = useGlAccounts({
     limit: 1000,
-    where: { and: [{ isActive: true }] },
+    where: { and: [{ detailType: 'RECEIVABLE', isActive: true }] },
     sort: [{ field: 'code', order: 'asc' }],
   });
   const glAccounts = useMemo(() => glAccountsData?.body?.data ?? [], [glAccountsData]);
@@ -94,13 +94,19 @@ export function CreditProductAccountsForm() {
           <Combobox
             items={glAccounts}
             value={findGlAccount(account.capitalGlAccountId)}
-            onValueChange={(value: GlAccount | null) => setAccountField('capitalGlAccountId', value)}
+            onValueChange={(value: GlAccount | null) =>
+              setAccountField('capitalGlAccountId', value)
+            }
             itemToStringValue={(item: GlAccount) => String(item.id)}
             itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
           >
             <ComboboxTrigger
               render={
-                <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between font-normal"
+                >
                   <ComboboxValue placeholder="Seleccione..." />
                   <ChevronDownIcon className="text-muted-foreground size-4" />
                 </Button>
@@ -130,13 +136,19 @@ export function CreditProductAccountsForm() {
           <Combobox
             items={glAccounts}
             value={findGlAccount(account.interestGlAccountId)}
-            onValueChange={(value: GlAccount | null) => setAccountField('interestGlAccountId', value)}
+            onValueChange={(value: GlAccount | null) =>
+              setAccountField('interestGlAccountId', value)
+            }
             itemToStringValue={(item: GlAccount) => String(item.id)}
             itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
           >
             <ComboboxTrigger
               render={
-                <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between font-normal"
+                >
                   <ComboboxValue placeholder="Seleccione..." />
                   <ChevronDownIcon className="text-muted-foreground size-4" />
                 </Button>
@@ -174,7 +186,11 @@ export function CreditProductAccountsForm() {
           >
             <ComboboxTrigger
               render={
-                <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between font-normal"
+                >
                   <ComboboxValue placeholder="Seleccione..." />
                   <ChevronDownIcon className="text-muted-foreground size-4" />
                 </Button>
@@ -195,7 +211,9 @@ export function CreditProductAccountsForm() {
             </ComboboxContent>
           </Combobox>
           {accountErrors?.lateInterestGlAccountId?.message ? (
-            <p className="text-destructive text-xs">{accountErrors.lateInterestGlAccountId.message}</p>
+            <p className="text-destructive text-xs">
+              {accountErrors.lateInterestGlAccountId.message}
+            </p>
           ) : null}
         </Field>
       </div>

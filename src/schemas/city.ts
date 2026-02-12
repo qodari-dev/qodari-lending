@@ -39,7 +39,10 @@ const CITY_SORT_FIELDS = ['id', 'code', 'name', 'isActive', 'createdAt', 'update
 // INCLUDE
 // ============================================
 
-const CITY_INCLUDE_OPTIONS = ['coDebtorsHome', 'coDebtorsWork', 'thirdParties'] as const;
+const CITY_INCLUDE_OPTIONS = [
+  'thirdPartiesHome',
+  'thirdPartiesWork',
+] as const;
 const CityIncludeSchema = createIncludeSchema(CITY_INCLUDE_OPTIONS);
 
 // ============================================

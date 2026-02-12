@@ -364,7 +364,7 @@ export function LoanApplications() {
     <>
       <PageHeader
         title="Solicitudes de Credito"
-        description="Administre solicitudes, codeudores, documentos y estado operativo."
+        description="Administre solicitudes, terceros asociados, documentos y estado operativo."
       />
       <PageContent>
         <DataTable

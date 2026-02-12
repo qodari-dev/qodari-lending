@@ -46,10 +46,6 @@ const IDENTIFICATION_TYPE_INCLUDES = createIncludeMap<typeof db.query.identifica
     relation: 'insuranceCompanies',
     config: true,
   },
-  coDebtors: {
-    relation: 'coDebtors',
-    config: true,
-  },
 });
 
 // ============================================

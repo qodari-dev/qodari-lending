@@ -41,6 +41,16 @@ function getApplicantLabel(application: LoanApplication): string {
   return fullName || person.documentNumber;
 }
 
+function getThirdPartyLabel(party: LoanApplication['thirdParty'] | null): string {
+  if (!party) return '-';
+  if (party.personType === 'LEGAL') return party.businessName ?? party.documentNumber;
+  const fullName = [party.firstName, party.secondName, party.firstLastName, party.secondLastName]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  return fullName || party.documentNumber;
+}
+
 export function LoanApplicationDetails({
   loanApplication,
   className,
@@ -133,13 +143,13 @@ export function LoanApplicationDetails({
         <DescriptionList sections={sections} columns={2} />
 
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">Codeudores</h3>
+          <h3 className="text-sm font-semibold">Terceros Asociados</h3>
           {loanApplication.loanApplicationCoDebtors?.length ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Documento</TableHead>
-                  <TableHead>Empresa</TableHead>
+                  <TableHead>Tercero</TableHead>
                   <TableHead>Ciudad hogar</TableHead>
                   <TableHead>Ciudad trabajo</TableHead>
                 </TableRow>
@@ -147,17 +157,17 @@ export function LoanApplicationDetails({
               <TableBody>
                 {loanApplication.loanApplicationCoDebtors.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell>{row.coDebtor?.documentNumber ?? row.coDebtorId}</TableCell>
-                    <TableCell>{row.coDebtor?.companyName ?? '-'}</TableCell>
-                    <TableCell>{row.coDebtor?.homeCity?.name ?? '-'}</TableCell>
-                    <TableCell>{row.coDebtor?.workCity?.name ?? '-'}</TableCell>
+                    <TableCell>{row.thirdParty?.documentNumber ?? row.thirdPartyId ?? '-'}</TableCell>
+                    <TableCell>{getThirdPartyLabel(row.thirdParty)}</TableCell>
+                    <TableCell>{row.thirdParty?.homeCity?.name ?? '-'}</TableCell>
+                    <TableCell>{row.thirdParty?.workCity?.name ?? '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           ) : (
             <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
-              No hay codeudores.
+              No hay terceros asociados.
             </div>
           )}
         </div>

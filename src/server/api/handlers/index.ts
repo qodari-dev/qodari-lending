@@ -12,7 +12,6 @@ import { billingConcept } from './billing-concept';
 import { billingCycleProfile } from './billing-cycle-profile';
 import { channel } from './channel';
 import { city } from './city';
-import { coDebtor } from './co-debtor';
 import { costCenter } from './cost-center';
 import { creditProduct } from './credit-product';
 import { creditSimulation } from './credit-simulation';
@@ -50,7 +49,6 @@ export const handler = createNextHandler(contract, {
   billingCycleProfile,
   channel,
   city,
-  coDebtor,
   costCenter,
   creditFund,
   creditProduct,

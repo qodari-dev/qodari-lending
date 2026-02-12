@@ -309,6 +309,7 @@ export function LoanInfo({
                 <TabsTrigger value="installments">Cuotas</TabsTrigger>
                 <TabsTrigger value="payments">Abonos</TabsTrigger>
                 <TabsTrigger value="statement">Extracto</TabsTrigger>
+                <TabsTrigger value="thirdParties">Terceros</TabsTrigger>
                 <TabsTrigger value="application">Solicitud</TabsTrigger>
                 <TabsTrigger value="documents">Impresiones</TabsTrigger>
               </TabsList>
@@ -513,6 +514,37 @@ export function LoanInfo({
                 ) : (
                   <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
                     No se encontro la solicitud asociada.
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="thirdParties" className="pt-2">
+                {detail.loanApplication?.loanApplicationCoDebtors?.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Documento</TableHead>
+                        <TableHead>Tercero</TableHead>
+                        <TableHead>Ciudad hogar</TableHead>
+                        <TableHead>Ciudad trabajo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detail.loanApplication.loanApplicationCoDebtors.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            {item.thirdParty?.documentNumber ?? item.thirdPartyId ?? '-'}
+                          </TableCell>
+                          <TableCell>{getPartyLabel(item.thirdParty)}</TableCell>
+                          <TableCell>{item.thirdParty?.homeCity?.name ?? '-'}</TableCell>
+                          <TableCell>{item.thirdParty?.workCity?.name ?? '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                    No hay terceros asociados en la solicitud.
                   </div>
                 )}
               </TabsContent>

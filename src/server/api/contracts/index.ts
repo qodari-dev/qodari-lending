@@ -10,7 +10,6 @@ import { billingConcept } from './billing-concept';
 import { billingCycleProfile } from './billing-cycle-profile';
 import { channel } from './channel';
 import { city } from './city';
-import { coDebtor } from './co-debtor';
 import { creditProduct } from './credit-product';
 import { creditSimulation } from './credit-simulation';
 import { costCenter } from './cost-center';
@@ -52,7 +51,6 @@ export const contract = c.router(
     billingCycleProfile,
     channel,
     city,
-    coDebtor,
     creditProduct,
     creditSimulation,
     costCenter,

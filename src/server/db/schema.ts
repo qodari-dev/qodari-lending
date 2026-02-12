@@ -642,12 +642,13 @@ export const thirdParties = pgTable(
     // Datos generales
     sex: sexEnum('sex'),
     categoryCode: categoryCodeEnum('category_code').notNull(),
-    address: varchar('address', { length: 80 }),
-    cityId: integer('city_id')
-      .notNull()
-      .references(() => cities.id, { onDelete: 'restrict' }),
+    homeAddress: varchar('home_address', { length: 80 }),
+    homeCityId: integer('home_city_id').references(() => cities.id, { onDelete: 'restrict' }),
+    homePhone: varchar('home_phone', { length: 20 }),
+    workAddress: varchar('work_address', { length: 80 }),
+    workCityId: integer('work_city_id').references(() => cities.id, { onDelete: 'restrict' }),
+    workPhone: varchar('work_phone', { length: 20 }),
 
-    phone: varchar('phone', { length: 20 }).notNull(),
     mobilePhone: varchar('mobile_phone', { length: 20 }),
     email: varchar('email', { length: 60 }),
 
@@ -1270,48 +1271,9 @@ export const loanApplicationPledges = pgTable(
 );
 
 // ---------------------------------------------------------------------
-// Concr40 - Codeudores
+// Concr41 - Relación solicitud - terceros
 // Nota:
-// Maestro de codeudores (datos de contacto y laborales). Se maneja separado de terceros
-// para mantener compatibilidad con el modelo del crédito.
-// Campos clave:
-// - documentNumber: identificación del codeudor.
-// - home*/work*: datos de residencia y laborales.
-// ---------------------------------------------------------------------
-export const coDebtors = pgTable(
-  'co_debtors',
-  {
-    id: serial('id').primaryKey(),
-
-    identificationTypeId: integer('identification_type_id')
-      .notNull()
-      .references(() => identificationTypes.id, { onDelete: 'restrict' }),
-    documentNumber: varchar('document_number', { length: 20 }).notNull(),
-
-    homeAddress: varchar('home_address', { length: 80 }).notNull(),
-    homeCityId: integer('home_city_id')
-      .notNull()
-      .references(() => cities.id, { onDelete: 'restrict' }),
-    homePhone: varchar('home_phone', { length: 20 }).notNull(),
-
-    companyName: varchar('company_name', { length: 80 }).notNull(),
-    workAddress: varchar('work_address', { length: 80 }).notNull(),
-    workCityId: integer('work_city_id')
-      .notNull()
-      .references(() => cities.id, { onDelete: 'restrict' }),
-    workPhone: varchar('work_phone', { length: 20 }).notNull(),
-
-    ...timestamps,
-  },
-  (t) => [
-    uniqueIndex('uniq_co_debtors_document_number').on(t.identificationTypeId, t.documentNumber),
-  ]
-);
-
-// ---------------------------------------------------------------------
-// Concr41 - Relación solicitud - codeudor
-// Nota:
-// Asocia uno o varios codeudores a una solicitud de crédito.
+// Asocia uno o varios terceros a una solicitud de crédito.
 // ---------------------------------------------------------------------
 export const loanApplicationCoDebtors = pgTable(
   'loan_application_co_debtors',
@@ -1320,16 +1282,16 @@ export const loanApplicationCoDebtors = pgTable(
     loanApplicationId: integer('loan_application_id')
       .notNull()
       .references(() => loanApplications.id, { onDelete: 'cascade' }),
-    coDebtorId: integer('co_debtor_id')
-      .notNull()
-      .references(() => coDebtors.id, { onDelete: 'restrict' }),
+    thirdPartyId: integer('third_party_id').references(() => thirdParties.id, {
+      onDelete: 'restrict',
+    }),
 
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_application_codebtor').on(t.loanApplicationId, t.coDebtorId),
+    uniqueIndex('uniq_application_third_party').on(t.loanApplicationId, t.thirdPartyId),
     index('idx_application_codebtor_app').on(t.loanApplicationId),
-    index('idx_application_codebtor_codebtor').on(t.coDebtorId),
+    index('idx_application_codebtor_third_party').on(t.thirdPartyId),
   ]
 );
 

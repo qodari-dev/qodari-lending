@@ -83,9 +83,12 @@ export function ThirdPartyInfo({
       title: 'Contacto',
       columns: 2,
       items: [
-        { label: 'Ciudad', value: thirdParty.city?.name ?? '-' },
-        { label: 'Direccion', value: thirdParty.address ?? '-' },
-        { label: 'Telefono', value: thirdParty.phone },
+        { label: 'Direccion hogar', value: thirdParty.homeAddress ?? '-' },
+        { label: 'Ciudad hogar', value: thirdParty.homeCity?.name ?? '-' },
+        { label: 'Telefono hogar', value: thirdParty.homePhone ?? '-' },
+        { label: 'Direccion trabajo', value: thirdParty.workAddress ?? '-' },
+        { label: 'Ciudad trabajo', value: thirdParty.workCity?.name ?? '-' },
+        { label: 'Telefono trabajo', value: thirdParty.workPhone ?? '-' },
         { label: 'Celular', value: thirdParty.mobilePhone ?? '-' },
         { label: 'Correo', value: thirdParty.email ?? '-' },
       ],
@@ -141,6 +144,13 @@ export function ThirdPartyInfo({
 
   const loanApplications = thirdParty.loanApplications ?? [];
   const loans = thirdParty.loans ?? [];
+  const coDebtorLoans = Array.from(
+    new Map(
+      (thirdParty.loanApplicationCoDebtors ?? [])
+        .flatMap((item) => item.loanApplication?.loans ?? [])
+        .map((loan) => [loan.id, loan])
+    ).values()
+  );
 
   return (
     <Sheet open={opened} onOpenChange={(open) => onOpened(open)}>
@@ -236,6 +246,49 @@ export function ThirdPartyInfo({
             ) : (
               <div className="text-muted-foreground rounded-lg border py-8 text-center">
                 No hay creditos activos para este tercero.
+              </div>
+            )}
+          </div>
+
+          {/* Creditos como codeudor */}
+          <div className="mt-6">
+            <h3 className="mb-4 text-lg font-semibold">Creditos Como Codeudor</h3>
+            {coDebtorLoans.length > 0 ? (
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Codigo</TableHead>
+                      <TableHead>Fondo</TableHead>
+                      <TableHead>Monto Capital</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Fecha Inicio</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {coDebtorLoans.map((loan) => (
+                      <TableRow key={loan.id}>
+                        <TableCell className="font-medium">{loan.id}</TableCell>
+                        <TableCell>{loan.creditNumber ?? '-'}</TableCell>
+                        <TableCell>{loan.creditFund?.name ?? '-'}</TableCell>
+                        <TableCell>
+                          {loan.principalAmount ? formatCurrency(Number(loan.principalAmount)) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{loan.status ?? '-'}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {loan.creditStartDate ? formatDate(loan.creditStartDate) : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-muted-foreground rounded-lg border py-8 text-center">
+                No hay creditos donde este tercero figure como codeudor.
               </div>
             )}
           </div>

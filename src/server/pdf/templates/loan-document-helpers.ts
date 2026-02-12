@@ -16,11 +16,11 @@ export function getBorrowerDocument(loan: Loans): string {
 }
 
 export function getBorrowerAddress(loan: Loans): string {
-  return loan.borrower?.address ?? '-';
+  return loan.borrower?.homeAddress ?? loan.borrower?.workAddress ?? '-';
 }
 
 export function getBorrowerPhone(loan: Loans): string {
-  return loan.borrower?.mobilePhone ?? loan.borrower?.phone ?? '-';
+  return loan.borrower?.mobilePhone ?? loan.borrower?.homePhone ?? loan.borrower?.workPhone ?? '-';
 }
 
 export function getBorrowerEmail(loan: Loans): string {

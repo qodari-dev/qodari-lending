@@ -36,6 +36,27 @@
       "when": 1770834580325,
       "tag": "0004_furry_vanisher",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770869212096,
+      "tag": "0005_brave_dreadnoughts",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770870740461,
+      "tag": "0006_peaceful_magma",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770871225211,
+      "tag": "0007_cool_spectrum",
+      "breakpoints": true
     }
   ]
 }

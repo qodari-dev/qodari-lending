@@ -2,7 +2,6 @@ import {
   agreements,
   affiliationOffices,
   billingConceptRules,
-  coDebtors,
   creditProductCategories,
   creditProductBillingConcepts,
   creditProductDocuments,
@@ -130,7 +129,7 @@ const LOAN_APPLICATION_INCLUDES = createIncludeMap<typeof db.query.loanApplicati
     relation: 'loanApplicationCoDebtors',
     config: {
       with: {
-        coDebtor: {
+        thirdParty: {
           with: {
             identificationType: true,
             homeCity: true,
@@ -291,6 +290,26 @@ async function validateRequiredDocuments(args: {
         code: 'BAD_REQUEST',
       });
     }
+  }
+}
+
+async function ensureThirdPartiesExist(args: {
+  thirdPartyIds: number[];
+}) {
+  const ids = [...new Set(args.thirdPartyIds)];
+  if (!ids.length) return;
+
+  const existing = await db.query.thirdParties.findMany({
+    where: inArray(thirdParties.id, ids),
+    columns: { id: true },
+  });
+
+  if (existing.length !== ids.length) {
+    throwHttpError({
+      status: 400,
+      message: 'Uno o más terceros asociados no existen',
+      code: 'BAD_REQUEST',
+    });
   }
 }
 
@@ -618,44 +637,13 @@ export const loanApplication = tsr.router(contract.loanApplication, {
 
         const coDebtorsData = body.loanApplicationCoDebtors ?? [];
         if (coDebtorsData.length) {
-          const coDebtorIds: number[] = [];
-          for (const coDebtorInput of coDebtorsData) {
-            const existingCoDebtor = await tx.query.coDebtors.findFirst({
-              where: and(
-                eq(coDebtors.identificationTypeId, coDebtorInput.identificationTypeId),
-                eq(coDebtors.documentNumber, coDebtorInput.documentNumber)
-              ),
-              columns: { id: true },
-            });
-
-            if (existingCoDebtor) {
-              const [updatedCoDebtor] = await tx
-                .update(coDebtors)
-                .set({
-                  homeAddress: coDebtorInput.homeAddress,
-                  homeCityId: coDebtorInput.homeCityId,
-                  homePhone: coDebtorInput.homePhone,
-                  companyName: coDebtorInput.companyName,
-                  workAddress: coDebtorInput.workAddress,
-                  workCityId: coDebtorInput.workCityId,
-                  workPhone: coDebtorInput.workPhone,
-                })
-                .where(eq(coDebtors.id, existingCoDebtor.id))
-                .returning({ id: coDebtors.id });
-              coDebtorIds.push(updatedCoDebtor.id);
-            } else {
-              const [createdCoDebtor] = await tx
-                .insert(coDebtors)
-                .values(coDebtorInput)
-                .returning({ id: coDebtors.id });
-              coDebtorIds.push(createdCoDebtor.id);
-            }
-          }
+          const thirdPartyIds = [...new Set(coDebtorsData.map((item) => item.thirdPartyId))];
+          await ensureThirdPartiesExist({ thirdPartyIds });
 
           await tx.insert(loanApplicationCoDebtors).values(
-            [...new Set(coDebtorIds)].map((coDebtorId) => ({
+            thirdPartyIds.map((thirdPartyId) => ({
               loanApplicationId: application.id,
-              coDebtorId,
+              thirdPartyId,
             }))
           );
         }
@@ -856,44 +844,12 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             .where(eq(loanApplicationCoDebtors.loanApplicationId, id));
 
           if (body.loanApplicationCoDebtors.length) {
-            const coDebtorIds: number[] = [];
-            for (const coDebtorInput of body.loanApplicationCoDebtors) {
-              const existingCoDebtor = await tx.query.coDebtors.findFirst({
-                where: and(
-                  eq(coDebtors.identificationTypeId, coDebtorInput.identificationTypeId),
-                  eq(coDebtors.documentNumber, coDebtorInput.documentNumber)
-                ),
-                columns: { id: true },
-              });
-
-              if (existingCoDebtor) {
-                const [updatedCoDebtor] = await tx
-                  .update(coDebtors)
-                  .set({
-                    homeAddress: coDebtorInput.homeAddress,
-                    homeCityId: coDebtorInput.homeCityId,
-                    homePhone: coDebtorInput.homePhone,
-                    companyName: coDebtorInput.companyName,
-                    workAddress: coDebtorInput.workAddress,
-                    workCityId: coDebtorInput.workCityId,
-                    workPhone: coDebtorInput.workPhone,
-                  })
-                  .where(eq(coDebtors.id, existingCoDebtor.id))
-                  .returning({ id: coDebtors.id });
-                coDebtorIds.push(updatedCoDebtor.id);
-              } else {
-                const [createdCoDebtor] = await tx
-                  .insert(coDebtors)
-                  .values(coDebtorInput)
-                  .returning({ id: coDebtors.id });
-                coDebtorIds.push(createdCoDebtor.id);
-              }
-            }
-
+            const thirdPartyIds = [...new Set(body.loanApplicationCoDebtors.map((item) => item.thirdPartyId))];
+            await ensureThirdPartiesExist({ thirdPartyIds });
             await tx.insert(loanApplicationCoDebtors).values(
-              [...new Set(coDebtorIds)].map((coDebtorId) => ({
+              thirdPartyIds.map((thirdPartyId) => ({
                 loanApplicationId: id,
-                coDebtorId,
+                thirdPartyId,
               }))
             );
           }

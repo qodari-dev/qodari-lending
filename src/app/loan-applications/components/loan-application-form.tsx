@@ -59,20 +59,22 @@ import {
   CreateLoanApplicationBodySchema,
   LoanApplication,
 } from '@/schemas/loan-application';
+import { ThirdParty } from '@/schemas/third-party';
 import { formatDateISO } from '@/utils/formatters';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronDownIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
+import { ChevronDownIcon, Plus } from 'lucide-react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Controller, FormProvider, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { LoanApplicationCoDebtorsForm } from './loan-application-co-debtors-form';
+import { LoanApplicationThirdPartiesForm } from './loan-application-co-debtors-form';
 import {
   LoanApplicationDocumentsForm,
   RequiredDocumentItem,
 } from './loan-application-documents-form';
 import { LoanApplicationPledgesForm } from './loan-application-pledges-form';
+import { ThirdPartyForm } from '@/app/third-parties/components/third-party-form';
 
 type FormValues = z.infer<typeof CreateLoanApplicationBodySchema>;
 
@@ -107,6 +109,8 @@ export function LoanApplicationForm({
 }) {
   const formId = useId();
   const sheetContentRef = useRef<HTMLDivElement | null>(null);
+  const [openedThirdPartyForm, setOpenedThirdPartyForm] = useState(false);
+  const [localThirdParty, setLocalThirdParty] = useState<ThirdParty | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(CreateLoanApplicationBodySchema) as Resolver<FormValues>,
@@ -167,7 +171,12 @@ export function LoanApplicationForm({
     limit: 1000,
     sort: [{ field: 'createdAt', order: 'desc' }],
   });
-  const thirdParties = useMemo(() => thirdPartiesData?.body?.data ?? [], [thirdPartiesData]);
+  const thirdParties = useMemo(() => {
+    const base = thirdPartiesData?.body?.data ?? [];
+    if (!localThirdParty) return base;
+    if (base.some((item) => item.id === localThirdParty.id)) return base;
+    return [localThirdParty, ...base];
+  }, [thirdPartiesData, localThirdParty]);
 
   const { data: creditProductsData } = useCreditProducts({
     limit: 1000,
@@ -320,16 +329,8 @@ export function LoanApplicationForm({
       creditStudyFee: String(loanApplication?.creditStudyFee ?? '0'),
       loanApplicationCoDebtors:
         loanApplication?.loanApplicationCoDebtors?.map((item) => ({
-          identificationTypeId: item.coDebtor?.identificationTypeId ?? 0,
-          documentNumber: item.coDebtor?.documentNumber ?? '',
-          homeAddress: item.coDebtor?.homeAddress ?? '',
-          homeCityId: item.coDebtor?.homeCityId ?? 0,
-          homePhone: item.coDebtor?.homePhone ?? '',
-          companyName: item.coDebtor?.companyName ?? '',
-          workAddress: item.coDebtor?.workAddress ?? '',
-          workCityId: item.coDebtor?.workCityId ?? 0,
-          workPhone: item.coDebtor?.workPhone ?? '',
-        })) ?? [],
+          thirdPartyId: item.thirdParty?.id ?? item.thirdPartyId ?? 0,
+        })).filter((item) => item.thirdPartyId > 0) ?? [],
       loanApplicationDocuments:
         loanApplication?.loanApplicationDocuments?.map((item) => ({
           documentTypeId: item.documentTypeId,
@@ -448,7 +449,7 @@ export function LoanApplicationForm({
             {loanApplication ? 'Editar Solicitud de Credito' : 'Nueva Solicitud de Credito'}
           </SheetTitle>
           <SheetDescription>
-            Registre la solicitud, codeudores, documentos y pignoraciones asociadas.
+            Registre la solicitud, terceros asociados, documentos y pignoraciones.
           </SheetDescription>
         </SheetHeader>
 
@@ -457,7 +458,7 @@ export function LoanApplicationForm({
             <Tabs defaultValue="application" className="w-full">
               <TabsList className="mb-4 w-full">
                 <TabsTrigger value="application">Solicitud</TabsTrigger>
-                <TabsTrigger value="coDebtors">Codeudores</TabsTrigger>
+                <TabsTrigger value="coDebtors">Terceros</TabsTrigger>
                 <TabsTrigger value="documents">Documentos</TabsTrigger>
                 <TabsTrigger value="pledges" disabled={!pledgesSubsidy}>
                   Pignoraciones
@@ -571,7 +572,18 @@ export function LoanApplicationForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid} className="col-span-2">
-                          <FieldLabel htmlFor="thirdPartyId">Solicitante</FieldLabel>
+                          <div className="flex items-center justify-between gap-2">
+                            <FieldLabel htmlFor="thirdPartyId">Solicitante</FieldLabel>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setOpenedThirdPartyForm(true)}
+                            >
+                              <Plus className="mr-1 h-4 w-4" />
+                              Nuevo tercero
+                            </Button>
+                          </div>
                           <Combobox
                             items={thirdParties}
                             value={thirdParties.find((item) => item.id === field.value) ?? null}
@@ -1077,7 +1089,7 @@ export function LoanApplicationForm({
               </TabsContent>
 
               <TabsContent value="coDebtors" className="pt-2">
-                <LoanApplicationCoDebtorsForm />
+                <LoanApplicationThirdPartiesForm />
               </TabsContent>
 
               <TabsContent value="documents" className="pt-2">
@@ -1107,6 +1119,15 @@ export function LoanApplicationForm({
           </Button>
         </SheetFooter>
       </SheetContent>
+      <ThirdPartyForm
+        thirdParty={undefined}
+        opened={openedThirdPartyForm}
+        onOpened={setOpenedThirdPartyForm}
+        onSaved={(thirdParty) => {
+          setLocalThirdParty(thirdParty);
+          form.setValue('thirdPartyId', thirdParty.id, { shouldDirty: true, shouldValidate: true });
+        }}
+      />
     </Sheet>
   );
 }

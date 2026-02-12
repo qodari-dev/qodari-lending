@@ -21,7 +21,14 @@ export const thirdPartyExportConfig: ExportConfig<ThirdParty> = {
         return row.businessName ?? '-';
       },
     },
-    { header: 'Telefono', accessorKey: 'phone' },
+    {
+      header: 'Telefono hogar',
+      getValue: (row) => row.homePhone ?? '-',
+    },
+    {
+      header: 'Ciudad hogar',
+      getValue: (row) => row.homeCity?.name ?? '-',
+    },
     {
       header: 'Creado',
       accessorKey: 'createdAt',

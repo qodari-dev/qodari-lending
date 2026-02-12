@@ -122,15 +122,7 @@ function decimalStringField(message: string) {
 }
 
 export const LoanApplicationCoDebtorInputSchema = z.object({
-  identificationTypeId: z.number().int().positive(),
-  documentNumber: z.string().min(1).max(20),
-  homeAddress: z.string().min(1).max(80),
-  homeCityId: z.number().int().positive(),
-  homePhone: z.string().min(1).max(20),
-  companyName: z.string().min(1).max(80),
-  workAddress: z.string().min(1).max(80),
-  workCityId: z.number().int().positive(),
-  workPhone: z.string().min(1).max(20),
+  thirdPartyId: z.number().int().positive(),
 });
 
 export type LoanApplicationCoDebtorInput = z.infer<typeof LoanApplicationCoDebtorInputSchema>;
@@ -193,8 +185,7 @@ const addLoanApplicationValidation = <T extends z.ZodTypeAny>(schema: T) =>
         beneficiaryCode: number;
       }[];
       loanApplicationCoDebtors?: {
-        identificationTypeId: number;
-        documentNumber: string;
+        thirdPartyId: number;
       }[];
       loanApplicationDocuments?: {
         documentTypeId: number;
@@ -217,11 +208,11 @@ const addLoanApplicationValidation = <T extends z.ZodTypeAny>(schema: T) =>
     const coDebtors = data.loanApplicationCoDebtors ?? [];
     const coDebtorKeys = new Set<string>();
     for (const coDebtor of coDebtors) {
-      const key = `${coDebtor.identificationTypeId}-${coDebtor.documentNumber}`;
+      const key = `${coDebtor.thirdPartyId}`;
       if (coDebtorKeys.has(key)) {
         ctx.addIssue({
           code: 'custom',
-          message: 'No puede repetir el mismo codeudor',
+          message: 'No puede repetir el mismo tercero',
           path: ['loanApplicationCoDebtors'],
         });
         break;

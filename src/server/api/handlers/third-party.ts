@@ -30,9 +30,13 @@ const THIRD_PARTY_FIELDS: FieldMap = {
   firstName: thirdParties.firstName,
   firstLastName: thirdParties.firstLastName,
   businessName: thirdParties.businessName,
-  phone: thirdParties.phone,
   email: thirdParties.email,
-  cityId: thirdParties.cityId,
+  homeAddress: thirdParties.homeAddress,
+  homeCityId: thirdParties.homeCityId,
+  homePhone: thirdParties.homePhone,
+  workAddress: thirdParties.workAddress,
+  workCityId: thirdParties.workCityId,
+  workPhone: thirdParties.workPhone,
   thirdPartyTypeId: thirdParties.thirdPartyTypeId,
   taxpayerType: thirdParties.taxpayerType,
   hasRut: thirdParties.hasRut,
@@ -55,8 +59,12 @@ const THIRD_PARTY_INCLUDES = createIncludeMap<typeof db.query.thirdParties>()({
     relation: 'identificationType',
     config: true,
   },
-  city: {
-    relation: 'city',
+  homeCity: {
+    relation: 'homeCity',
+    config: true,
+  },
+  workCity: {
+    relation: 'workCity',
     config: true,
   },
   loanApplications: {
@@ -64,6 +72,22 @@ const THIRD_PARTY_INCLUDES = createIncludeMap<typeof db.query.thirdParties>()({
     config: {
       with: {
         creditProduct: true,
+      },
+    },
+  },
+  loanApplicationCoDebtors: {
+    relation: 'loanApplicationCoDebtors',
+    config: {
+      with: {
+        loanApplication: {
+          with: {
+            loans: {
+              with: {
+                creditFund: true,
+              },
+            },
+          },
+        },
       },
     },
   },
@@ -76,6 +100,67 @@ const THIRD_PARTY_INCLUDES = createIncludeMap<typeof db.query.thirdParties>()({
     },
   },
 });
+
+type ThirdPartyContactInput = Omit<
+  Partial<typeof thirdParties.$inferInsert>,
+  | 'homeAddress'
+  | 'homeCityId'
+  | 'homePhone'
+  | 'workAddress'
+  | 'workCityId'
+  | 'workPhone'
+> & {
+  homeAddress?: string | null;
+  homeCityId?: number | null;
+  homePhone?: string | null;
+  workAddress?: string | null;
+  workCityId?: number | null;
+  workPhone?: string | null;
+};
+
+function resolveThirdPartyContactPayload(
+  input: ThirdPartyContactInput,
+  existing?: typeof thirdParties.$inferSelect
+) {
+  const toNullableString = (value: string | null | undefined) => {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : null;
+  };
+
+  const homeAddress = toNullableString(input.homeAddress) ?? toNullableString(existing?.homeAddress);
+  const workAddress = toNullableString(input.workAddress) ?? toNullableString(existing?.workAddress);
+  const homeCityId = input.homeCityId ?? existing?.homeCityId ?? null;
+  const workCityId = input.workCityId ?? existing?.workCityId ?? null;
+  const homePhone = toNullableString(input.homePhone) ?? toNullableString(existing?.homePhone);
+  const workPhone = toNullableString(input.workPhone) ?? toNullableString(existing?.workPhone);
+
+  if (homeCityId === null && workCityId === null) {
+    throwHttpError({
+      status: 400,
+      message: 'Debe definir al menos una ciudad (hogar o trabajo)',
+      code: 'BAD_REQUEST',
+    });
+  }
+
+  if (!homePhone && !workPhone) {
+    throwHttpError({
+      status: 400,
+      message: 'Debe definir al menos un telefono (hogar o trabajo)',
+      code: 'BAD_REQUEST',
+    });
+  }
+
+  return {
+    ...input,
+    homeAddress,
+    homeCityId,
+    homePhone,
+    workAddress,
+    workCityId,
+    workPhone,
+  };
+}
 
 // ============================================
 // HANDLER
@@ -173,8 +258,13 @@ export const thirdParty = tsr.router(contract.thirdParty, {
         });
       }
 
+      const payload = resolveThirdPartyContactPayload(body);
+
       const newThirdParty = await db.transaction(async (tx) => {
-        const [newThirdParty] = await tx.insert(thirdParties).values(body).returning();
+        const [newThirdParty] = await tx
+          .insert(thirdParties)
+          .values(payload as typeof thirdParties.$inferInsert)
+          .returning();
 
         return newThirdParty;
       });
@@ -249,10 +339,12 @@ export const thirdParty = tsr.router(contract.thirdParty, {
         });
       }
 
+      const payload = resolveThirdPartyContactPayload(body, existing);
+
       const updated = await db.transaction(async (tx) => {
         const [updated] = await tx
           .update(thirdParties)
-          .set(body)
+          .set(payload)
           .where(eq(thirdParties.id, id))
           .returning();
 

@@ -36,7 +36,6 @@ import {
   creditProductAccounts,
   loanApplications,
   loanApplicationPledges,
-  coDebtors,
   loanApplicationCoDebtors,
   loanApplicationDocuments,
   loans,
@@ -83,16 +82,14 @@ import {
 export const identificationTypesRelations = relations(identificationTypes, ({ many }) => ({
   thirdParties: many(thirdParties),
   insuranceCompanies: many(insuranceCompanies),
-  coDebtors: many(coDebtors),
 }));
 
 // ---------------------------------------------------------------------
 // Cities
 // ---------------------------------------------------------------------
 export const citiesRelations = relations(cities, ({ many }) => ({
-  coDebtorsHome: many(coDebtors, { relationName: 'homeCity' }),
-  coDebtorsWork: many(coDebtors, { relationName: 'workCity' }),
-  thirdParties: many(thirdParties),
+  thirdPartiesHome: many(thirdParties, { relationName: 'thirdPartyHomeCity' }),
+  thirdPartiesWork: many(thirdParties, { relationName: 'thirdPartyWorkCity' }),
   affiliationOffices: many(affiliationOffices),
   insuranceCompanies: many(insuranceCompanies),
   agreements: many(agreements),
@@ -357,8 +354,14 @@ export const thirdPartiesRelations = relations(thirdParties, ({ one, many }) => 
     fields: [thirdParties.thirdPartyTypeId],
     references: [thirdPartyTypes.id],
   }),
-  city: one(cities, {
-    fields: [thirdParties.cityId],
+  homeCity: one(cities, {
+    relationName: 'thirdPartyHomeCity',
+    fields: [thirdParties.homeCityId],
+    references: [cities.id],
+  }),
+  workCity: one(cities, {
+    relationName: 'thirdPartyWorkCity',
+    fields: [thirdParties.workCityId],
     references: [cities.id],
   }),
   identificationType: one(identificationTypes, {
@@ -366,6 +369,7 @@ export const thirdPartiesRelations = relations(thirdParties, ({ one, many }) => 
     references: [identificationTypes.id],
   }),
   loanApplications: many(loanApplications),
+  loanApplicationCoDebtors: many(loanApplicationCoDebtors),
   loans: many(loans),
   accountingEntries: many(accountingEntries),
   // Relaciones inversas para loans (borrower y disbursementParty)
@@ -557,6 +561,7 @@ export const loanApplicationsRelations = relations(loanApplications, ({ one, man
     references: [paymentGuaranteeTypes.id],
   }),
 
+  loans: many(loans),
   loanApplicationCoDebtors: many(loanApplicationCoDebtors),
   loanApplicationDocuments: many(loanApplicationDocuments),
   loanApplicationPledges: many(loanApplicationPledges),
@@ -576,27 +581,6 @@ export const loanApplicationPledgesRelations = relations(loanApplicationPledges,
 }));
 
 // ---------------------------------------------------------------------
-// Concr40 - Codeudores
-// ---------------------------------------------------------------------
-export const coDebtorsRelations = relations(coDebtors, ({ many, one }) => ({
-  loanApplicationCoDebtors: many(loanApplicationCoDebtors),
-  identificationType: one(identificationTypes, {
-    fields: [coDebtors.identificationTypeId],
-    references: [identificationTypes.id],
-  }),
-  homeCity: one(cities, {
-    relationName: 'homeCity',
-    fields: [coDebtors.homeCityId],
-    references: [cities.id],
-  }),
-  workCity: one(cities, {
-    relationName: 'workCity',
-    fields: [coDebtors.workCityId],
-    references: [cities.id],
-  }),
-}));
-
-// ---------------------------------------------------------------------
 // Concr41 - Relación solicitud - codeudor
 // ---------------------------------------------------------------------
 export const loanApplicationCoDebtorsRelations = relations(loanApplicationCoDebtors, ({ one }) => ({
@@ -604,9 +588,9 @@ export const loanApplicationCoDebtorsRelations = relations(loanApplicationCoDebt
     fields: [loanApplicationCoDebtors.loanApplicationId],
     references: [loanApplications.id],
   }),
-  coDebtor: one(coDebtors, {
-    fields: [loanApplicationCoDebtors.coDebtorId],
-    references: [coDebtors.id],
+  thirdParty: one(thirdParties, {
+    fields: [loanApplicationCoDebtors.thirdPartyId],
+    references: [thirdParties.id],
   }),
 }));
 

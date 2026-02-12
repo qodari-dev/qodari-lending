@@ -63,10 +63,12 @@ export function ThirdPartyForm({
   thirdParty,
   opened,
   onOpened,
+  onSaved,
 }: {
   thirdParty: ThirdParty | undefined;
   opened: boolean;
   onOpened(opened: boolean): void;
+  onSaved?(thirdParty: ThirdParty): void;
 }) {
   const formId = useId();
   const sheetContentRef = useRef<HTMLDivElement | null>(null);
@@ -86,9 +88,12 @@ export function ThirdPartyForm({
       businessName: '',
       sex: undefined,
       categoryCode: 'D',
-      address: '',
-      cityId: undefined,
-      phone: '',
+      homeAddress: '',
+      homeCityId: undefined,
+      homePhone: '',
+      workAddress: '',
+      workCityId: undefined,
+      workPhone: '',
       mobilePhone: '',
       email: '',
       thirdPartyTypeId: undefined,
@@ -133,7 +138,7 @@ export function ThirdPartyForm({
     [identificationTypes]
   );
   const findCity = useCallback(
-    (id: number | undefined) => cities.find((c) => c.id === id) ?? null,
+    (id: number | null | undefined) => cities.find((c) => c.id === id) ?? null,
     [cities]
   );
 
@@ -152,9 +157,12 @@ export function ThirdPartyForm({
         businessName: thirdParty?.businessName ?? '',
         sex: thirdParty?.sex ?? undefined,
         categoryCode: thirdParty?.categoryCode ?? 'D',
-        address: thirdParty?.address ?? '',
-        cityId: thirdParty?.cityId ?? undefined,
-        phone: thirdParty?.phone ?? '',
+        homeAddress: thirdParty?.homeAddress ?? '',
+        homeCityId: thirdParty?.homeCityId ?? undefined,
+        homePhone: thirdParty?.homePhone ?? '',
+        workAddress: thirdParty?.workAddress ?? '',
+        workCityId: thirdParty?.workCityId ?? undefined,
+        workPhone: thirdParty?.workPhone ?? '',
         mobilePhone: thirdParty?.mobilePhone ?? '',
         email: thirdParty?.email ?? '',
         thirdPartyTypeId: thirdParty?.thirdPartyTypeId ?? undefined,
@@ -175,13 +183,15 @@ export function ThirdPartyForm({
   const onSubmit = useCallback(
     async (values: FormValues) => {
       if (thirdParty) {
-        await update({ params: { id: thirdParty.id }, body: values });
+        const response = await update({ params: { id: thirdParty.id }, body: values });
+        onSaved?.(response.body);
       } else {
-        await create({ body: values });
+        const response = await create({ body: values });
+        onSaved?.(response.body);
       }
       onOpened(false);
     },
-    [thirdParty, create, update, onOpened]
+    [thirdParty, create, update, onOpened, onSaved]
   );
 
   return (
@@ -438,79 +448,12 @@ export function ThirdPartyForm({
               </FieldGroup>
             )}
 
-            {/* Contacto */}
+            {/* Contacto Adicional */}
             <FieldGroup className="mt-6">
-              <h3 className="text-muted-foreground mb-2 text-sm font-semibold">Contacto</h3>
-              <Controller
-                name="address"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="address">Direccion</FieldLabel>
-                    <Input {...field} value={field.value ?? ''} aria-invalid={fieldState.invalid} />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="cityId"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="cityId">Ciudad</FieldLabel>
-                    <Combobox
-                      items={cities}
-                      value={findCity(field.value)}
-                      onValueChange={(val: City | null) => field.onChange(val?.id ?? undefined)}
-                      itemToStringValue={(item: City) => String(item.id)}
-                      itemToStringLabel={(item: City) => `${item.code} - ${item.name}`}
-                    >
-                      <ComboboxTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full justify-between font-normal"
-                          >
-                            <ComboboxValue placeholder="Seleccione..." />
-                            <ChevronDownIcon className="text-muted-foreground size-4" />
-                          </Button>
-                        }
-                      />
-                      <ComboboxContent portalContainer={sheetContentRef}>
-                        <ComboboxInput
-                          placeholder="Buscar ciudad..."
-                          showClear
-                          showTrigger={false}
-                        />
-                        <ComboboxList>
-                          <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
-                          <ComboboxCollection>
-                            {(item: City) => (
-                              <ComboboxItem key={item.id} value={item}>
-                                {item.code} - {item.name}
-                              </ComboboxItem>
-                            )}
-                          </ComboboxCollection>
-                        </ComboboxList>
-                      </ComboboxContent>
-                    </Combobox>
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
+              <h3 className="text-muted-foreground mb-2 text-sm font-semibold">
+                Contacto Adicional
+              </h3>
               <div className="grid grid-cols-2 gap-4">
-                <Controller
-                  name="phone"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="phone">Telefono</FieldLabel>
-                      <Input {...field} aria-invalid={fieldState.invalid} />
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
                 <Controller
                   name="mobilePhone"
                   control={form.control}
@@ -543,6 +486,172 @@ export function ThirdPartyForm({
                   </Field>
                 )}
               />
+            </FieldGroup>
+
+            {/* Contacto Hogar y Laboral */}
+            <FieldGroup className="mt-6">
+              <h3 className="text-muted-foreground mb-2 text-sm font-semibold">
+                Contacto Hogar y Laboral
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <Controller
+                  name="homeAddress"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="homeAddress">Direccion hogar</FieldLabel>
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+                <Controller
+                  name="homeCityId"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="homeCityId">Ciudad hogar</FieldLabel>
+                      <Combobox
+                        items={cities}
+                        value={findCity(field.value)}
+                        onValueChange={(val: City | null) => field.onChange(val?.id ?? undefined)}
+                        itemToStringValue={(item: City) => String(item.id)}
+                        itemToStringLabel={(item: City) => `${item.code} - ${item.name}`}
+                      >
+                        <ComboboxTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full justify-between font-normal"
+                            >
+                              <ComboboxValue placeholder="Seleccione..." />
+                              <ChevronDownIcon className="text-muted-foreground size-4" />
+                            </Button>
+                          }
+                        />
+                        <ComboboxContent portalContainer={sheetContentRef}>
+                          <ComboboxInput
+                            placeholder="Buscar ciudad..."
+                            showClear
+                            showTrigger={false}
+                          />
+                          <ComboboxList>
+                            <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
+                            <ComboboxCollection>
+                              {(item: City) => (
+                                <ComboboxItem key={item.id} value={item}>
+                                  {item.code} - {item.name}
+                                </ComboboxItem>
+                              )}
+                            </ComboboxCollection>
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+                <Controller
+                  name="homePhone"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="homePhone">Telefono hogar</FieldLabel>
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Controller
+                  name="workAddress"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="workAddress">Direccion trabajo</FieldLabel>
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+                <Controller
+                  name="workCityId"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="workCityId">Ciudad trabajo</FieldLabel>
+                      <Combobox
+                        items={cities}
+                        value={findCity(field.value)}
+                        onValueChange={(val: City | null) => field.onChange(val?.id ?? undefined)}
+                        itemToStringValue={(item: City) => String(item.id)}
+                        itemToStringLabel={(item: City) => `${item.code} - ${item.name}`}
+                      >
+                        <ComboboxTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full justify-between font-normal"
+                            >
+                              <ComboboxValue placeholder="Seleccione..." />
+                              <ChevronDownIcon className="text-muted-foreground size-4" />
+                            </Button>
+                          }
+                        />
+                        <ComboboxContent portalContainer={sheetContentRef}>
+                          <ComboboxInput
+                            placeholder="Buscar ciudad..."
+                            showClear
+                            showTrigger={false}
+                          />
+                          <ComboboxList>
+                            <ComboboxEmpty>No se encontraron ciudades</ComboboxEmpty>
+                            <ComboboxCollection>
+                              {(item: City) => (
+                                <ComboboxItem key={item.id} value={item}>
+                                  {item.code} - {item.name}
+                                </ComboboxItem>
+                              )}
+                            </ComboboxCollection>
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+                <Controller
+                  name="workPhone"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="workPhone">Telefono trabajo</FieldLabel>
+                      <Input
+                        {...field}
+                        value={field.value ?? ''}
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+              </div>
             </FieldGroup>
 
             {/* Clasificacion */}

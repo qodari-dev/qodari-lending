@@ -49,7 +49,6 @@ const IDENTIFICATION_TYPE_SORT_FIELDS = [
 const IDENTIFICATION_TYPE_INCLUDE_OPTIONS = [
   'thirdParties',
   'insuranceCompanies',
-  'coDebtors',
 ] as const;
 const IdentificationTypeIncludeSchema = createIncludeSchema(IDENTIFICATION_TYPE_INCLUDE_OPTIONS);
 

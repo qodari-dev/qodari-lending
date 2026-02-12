@@ -38,16 +38,12 @@ const CITY_QUERY_CONFIG: QueryConfig = {
 };
 
 const CITY_INCLUDES = createIncludeMap<typeof db.query.cities>()({
-  coDebtorsHome: {
-    relation: 'coDebtorsHome',
+  thirdPartiesHome: {
+    relation: 'thirdPartiesHome',
     config: true,
   },
-  coDebtorsWork: {
-    relation: 'coDebtorsWork',
-    config: true,
-  },
-  thirdParties: {
-    relation: 'thirdParties',
+  thirdPartiesWork: {
+    relation: 'thirdPartiesWork',
     config: true,
   },
 });

@@ -36,7 +36,6 @@ import type {
   creditProductAccounts,
   loanApplications,
   loanApplicationPledges,
-  coDebtors,
   loanApplicationCoDebtors,
   loanApplicationDocuments,
   loans,
@@ -83,7 +82,6 @@ import type {
 export type IdentificationTypes = typeof identificationTypes.$inferSelect & {
   thirdParties?: ThirdParties[];
   insuranceCompanies?: InsuranceCompanies[];
-  coDebtors?: CoDebtors[];
 };
 export type NewIdentificationTypes = typeof identificationTypes.$inferInsert;
 
@@ -91,9 +89,8 @@ export type NewIdentificationTypes = typeof identificationTypes.$inferInsert;
 // cities
 // ---------------------------------------------------------------------
 export type Cities = typeof cities.$inferSelect & {
-  coDebtorsHome?: CoDebtors[];
-  coDebtorsWork?: CoDebtors[];
-  thirdParties?: ThirdParties[];
+  thirdPartiesHome?: ThirdParties[];
+  thirdPartiesWork?: ThirdParties[];
   insuranceCompanies?: InsuranceCompanies[];
   affiliationOffices?: AffiliationOffices[];
   agreements?: Agreements[];
@@ -316,8 +313,10 @@ export type NewThirdPartyTypes = typeof thirdPartyTypes.$inferInsert;
 export type ThirdParties = typeof thirdParties.$inferSelect & {
   thirdPartyType?: ThirdPartyTypes;
   identificationType?: IdentificationTypes;
-  city?: Cities;
+  homeCity?: Cities | null;
+  workCity?: Cities | null;
   loanApplications?: LoanApplications[];
+  loanApplicationCoDebtors?: LoanApplicationCoDebtors[];
   loans?: Loans[];
   accountingEntries?: AccountingEntries[];
   loansBorrowed?: Loans[];
@@ -410,6 +409,7 @@ export type LoanApplications = typeof loanApplications.$inferSelect & {
   channel?: Channels | null;
   paymentGuaranteeType?: PaymentGuaranteeTypes;
 
+  loans?: Loans[];
   loanApplicationCoDebtors?: LoanApplicationCoDebtors[];
   loanApplicationDocuments?: LoanApplicationDocuments[];
   loanApplicationPledges?: LoanApplicationPledges[];
@@ -428,22 +428,11 @@ export type LoanApplicationPledges = typeof loanApplicationPledges.$inferSelect 
 export type NewLoanApplicationPledges = typeof loanApplicationPledges.$inferInsert;
 
 // ---------------------------------------------------------------------
-// Concr40 - Codeudores
-// ---------------------------------------------------------------------
-export type CoDebtors = typeof coDebtors.$inferSelect & {
-  loanApplicationCoDebtors?: LoanApplicationCoDebtors[];
-  homeCity?: Cities;
-  workCity?: Cities;
-  identificationType?: IdentificationTypes;
-};
-export type NewCoDebtors = typeof coDebtors.$inferInsert;
-
-// ---------------------------------------------------------------------
 // Concr41 - Relación solicitud - codeudor
 // ---------------------------------------------------------------------
 export type LoanApplicationCoDebtors = typeof loanApplicationCoDebtors.$inferSelect & {
   loanApplication?: LoanApplications;
-  coDebtor?: CoDebtors;
+  thirdParty?: ThirdParties | null;
 };
 export type NewLoanApplicationCoDebtors = typeof loanApplicationCoDebtors.$inferInsert;
 

@@ -148,7 +148,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 items: [
                   { title: 'Tipos de terceros', url: `/third-party-types` },
                   { title: 'Terceros', url: `/third-parties` },
-                  { title: 'Codeudares', url: `/co-debtors` },
                   { title: 'Empresas de seguros', url: `/insurance-companies` },
                   { title: 'Convenios', url: `/agreements` },
                 ],

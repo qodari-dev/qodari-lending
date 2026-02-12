@@ -48,7 +48,7 @@ export function ThirdParties() {
     handleSearchChange,
   } = useDataTable<ThirdPartySortField, ThirdPartyInclude>({
     defaultPageSize: 20,
-    defaultIncludes: ['thirdPartyType', 'identificationType', 'city'],
+    defaultIncludes: ['thirdPartyType', 'identificationType', 'homeCity', 'workCity'],
     defaultSorting: [{ field: 'createdAt', order: 'desc' }],
   });
 
@@ -56,7 +56,15 @@ export function ThirdParties() {
 
   // Query con include para obtener las solicitudes de credito y creditos
   const { data: thirdPartyDetail } = useThirdParty(selectedId ?? 0, {
-    include: ['thirdPartyType', 'identificationType', 'city', 'loanApplications', 'loans'],
+    include: [
+      'thirdPartyType',
+      'identificationType',
+      'homeCity',
+      'workCity',
+      'loanApplications',
+      'loanApplicationCoDebtors',
+      'loans',
+    ],
     enabled: !!selectedId,
   });
 

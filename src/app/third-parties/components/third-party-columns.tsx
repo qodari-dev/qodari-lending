@@ -63,24 +63,23 @@ export const thirdPartyColumns: ColumnDef<ThirdParty>[] = [
     },
   },
   {
-    accessorKey: 'phone',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Telefono" />,
+    id: 'homePhone',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Telefono hogar" />,
     cell: ({ row }) => {
       return (
         <div className="flex flex-col">
-          <span>{row.original.phone}</span>
+          <span>{row.original.homePhone ?? '-'}</span>
         </div>
       );
     },
   },
   {
-    accessorKey: 'cityId',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Ciudad" />,
+    id: 'homeCity',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Ciudad hogar" />,
     cell: ({ row }) => {
-      const city = row.original.city;
       return (
         <div className="flex flex-col">
-          <span>{city?.name ?? '-'}</span>
+          <span>{row.original.homeCity?.name ?? '-'}</span>
         </div>
       );
     },

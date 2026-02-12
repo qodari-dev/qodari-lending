@@ -79,7 +79,7 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
         paymentGuaranteeType: true,
         loanApplicationCoDebtors: {
           with: {
-            coDebtor: {
+            thirdParty: {
               with: {
                 identificationType: true,
                 homeCity: true,

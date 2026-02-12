@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { RefreshCw, X } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
+import * as React from 'react';
 
 interface ToolbarProps {
   searchValue: string;
@@ -23,6 +24,7 @@ interface ToolbarProps {
   onRangeDateFilterChange: (value: DateRange | undefined) => void;
   onReset: () => void;
   onRefresh?: () => void;
+  exportActions?: React.ReactNode;
   isRefreshing?: boolean;
 }
 
@@ -35,6 +37,7 @@ export function LoansToolbar({
   onRangeDateFilterChange,
   onReset,
   onRefresh,
+  exportActions,
   isRefreshing = false,
 }: ToolbarProps) {
   const isFiltered = Boolean(searchValue) || Boolean(statusFilter) || Boolean(rangeDateFilter?.from);
@@ -69,6 +72,8 @@ export function LoansToolbar({
       </div>
 
       <div className="flex items-center space-x-2">
+        {exportActions}
+
         {onRefresh && (
           <Button
             variant="outline"

@@ -118,7 +118,7 @@ export const creditExtractTemplate: PdfTemplateBuilder<CreditExtractReportRespon
         { label: 'Proximo vencimiento', value: formatDate(data.balanceSummary.nextDueDate) },
       ]),
       h(Text, { style: styles.sectionTitle, key: 'sec-balance' }, 'Saldo por auxiliar'),
-      ...PdfTable(rpdf, styles, {
+      PdfTable(rpdf, styles, {
         columns: balanceColumns,
         rows: data.balanceSummary.byAccount,
         emptyMessage: 'Sin informacion de cartera por auxiliar.',
@@ -126,7 +126,7 @@ export const creditExtractTemplate: PdfTemplateBuilder<CreditExtractReportRespon
         tableKey: 'balance',
       }),
       h(Text, { style: styles.sectionTitle, key: 'sec-movements' }, 'Movimientos'),
-      ...PdfTable(rpdf, styles, {
+      PdfTable(rpdf, styles, {
         columns: movementColumns,
         rows: data.statement.entries,
         emptyMessage: 'Sin movimientos.',

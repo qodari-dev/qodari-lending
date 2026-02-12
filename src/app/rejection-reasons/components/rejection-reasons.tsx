@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { rejectionReasonColumns } from './rejection-reason-columns';
 import { RejectionReasonForm } from './rejection-reason-form';
 import { RejectionReasonInfo } from './rejection-reason-info';
+import { rejectionReasonExportConfig } from './rejection-reason-export-config';
 import { RejectionReasonsToolbar } from './rejection-reason-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -106,6 +108,14 @@ export function RejectionReasons() {
     setRejectionReason(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.rejectionReason.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: RejectionReason[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<RejectionReason>>(
     () => ({
@@ -143,6 +153,12 @@ export function RejectionReasons() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={rejectionReasonExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { paymentFrequencyColumns } from './payment-frequency-columns';
 import { PaymentFrequencyForm } from './payment-frequency-form';
 import { PaymentFrequencyInfo } from './payment-frequency-info';
+import { paymentFrequencyExportConfig } from './payment-frequency-export-config';
 import { PaymentFrequenciesToolbar } from './payment-frequency-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -107,6 +109,14 @@ export function PaymentFrequencies() {
     setPaymentFrequency(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.paymentFrequency.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: PaymentFrequency[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<PaymentFrequency>>(
     () => ({
@@ -144,6 +154,12 @@ export function PaymentFrequencies() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={paymentFrequencyExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

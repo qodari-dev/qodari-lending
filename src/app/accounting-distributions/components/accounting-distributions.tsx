@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { accountingDistributionColumns } from './accounting-distribution-columns';
 import { AccountingDistributionForm } from './accounting-distribution-form';
 import { AccountingDistributionInfo } from './accounting-distribution-info';
+import { accountingDistributionExportConfig } from './accounting-distribution-export-config';
 import { AccountingDistributionsToolbar } from './accounting-distribution-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -113,6 +115,14 @@ export function AccountingDistributions() {
     setAccountingDistribution(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.accountingDistribution.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: AccountingDistribution[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<AccountingDistribution>>(
     () => ({
@@ -150,6 +160,12 @@ export function AccountingDistributions() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={accountingDistributionExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

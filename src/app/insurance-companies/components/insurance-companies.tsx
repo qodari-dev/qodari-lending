@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { insuranceCompanyColumns } from './insurance-company-columns';
 import { InsuranceCompanyForm } from './insurance-company-form';
 import { InsuranceCompanyInfo } from './insurance-company-info';
+import { insuranceCompanyExportConfig } from './insurance-company-export-config';
 import { InsuranceCompaniesToolbar } from './insurance-company-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -107,6 +109,14 @@ export function InsuranceCompanies() {
     setInsuranceCompany(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.insuranceCompany.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: InsuranceCompany[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<InsuranceCompany>>(
     () => ({
@@ -144,6 +154,12 @@ export function InsuranceCompanies() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={insuranceCompanyExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { paymentTenderTypeColumns } from './payment-tender-type-columns';
 import { PaymentTenderTypeForm } from './payment-tender-type-form';
 import { PaymentTenderTypeInfo } from './payment-tender-type-info';
+import { paymentTenderTypeExportConfig } from './payment-tender-type-export-config';
 import { PaymentTenderTypesToolbar } from './payment-tender-type-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -99,6 +101,14 @@ export function PaymentTenderTypes() {
     setPaymentTenderType(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.paymentTenderType.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: PaymentTenderType[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<PaymentTenderType>>(
     () => ({
@@ -133,6 +143,12 @@ export function PaymentTenderTypes() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={paymentTenderTypeExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import { PageContent, PageHeader } from '@/components/layout';
 import {
   AlertDialog,
@@ -27,6 +28,7 @@ import React from 'react';
 import { billingCycleProfileColumns } from './billing-cycle-profile-columns';
 import { BillingCycleProfileForm } from './billing-cycle-profile-form';
 import { BillingCycleProfileInfo } from './billing-cycle-profile-info';
+import { billingCycleProfileExportConfig } from './billing-cycle-profile-export-config';
 import { BillingCycleProfilesToolbar } from './billing-cycle-profile-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -108,6 +110,14 @@ export function BillingCycleProfiles() {
     setBillingCycleProfile(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.billingCycleProfile.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: BillingCycleProfile[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<BillingCycleProfile>>(
     () => ({
@@ -145,6 +155,12 @@ export function BillingCycleProfiles() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={billingCycleProfileExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

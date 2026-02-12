@@ -119,7 +119,7 @@ export const planDePagosTemplate: PdfTemplateBuilder<LoanDocumentData> = (data, 
 
       h(Text, { style: { ...styles.sectionTitle, marginTop: 12 }, key: 'sec-table' }, ''),
 
-      ...PdfTable(rpdf, styles, {
+      PdfTable(rpdf, styles, {
         columns,
         rows: installments as InstallmentRow[],
         emptyMessage: 'Sin cuotas registradas.',

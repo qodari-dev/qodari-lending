@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { bankColumns } from './bank-columns';
 import { BankForm } from './bank-form';
 import { BankInfo } from './bank-info';
+import { bankExportConfig } from './bank-export-config';
 import { BanksToolbar } from './bank-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -99,6 +101,14 @@ export function Banks() {
     setBank(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.bank.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: Bank[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<Bank>>(
     () => ({
@@ -133,6 +143,12 @@ export function Banks() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={bankExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

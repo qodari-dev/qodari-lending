@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { thirdPartyColumns } from './third-party-columns';
 import { ThirdPartyForm } from './third-party-form';
 import { ThirdPartyInfo } from './third-party-info';
+import { thirdPartyExportConfig } from './third-party-export-config';
 import { ThirdPartiesToolbar } from './third-party-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -108,6 +110,14 @@ export function ThirdParties() {
     setThirdParty(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.thirdParty.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: ThirdParty[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<ThirdParty>>(
     () => ({
@@ -151,6 +161,12 @@ export function ThirdParties() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={thirdPartyExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

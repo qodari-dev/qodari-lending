@@ -26,7 +26,7 @@ export function PdfTable<T>(
     keyExtractor: (row: T) => string;
     tableKey?: string;
   },
-): React.ReactElement[] {
+): React.ReactElement {
   const { View, Text } = rpdf;
   const { columns, rows, emptyMessage, keyExtractor, tableKey = 'table' } = options;
 
@@ -38,28 +38,35 @@ export function PdfTable<T>(
 
   const headRow = h(
     View,
-    { style: styles.headRow, key: `${tableKey}-head` },
+    { style: styles.headRow, key: `${tableKey}-head`, fixed: true },
     ...columns.map((col, i) => h(Text, { style: colStyle(col), key: `${tableKey}-th-${i}` }, col.header)),
   );
 
   if (rows.length === 0) {
-    return [
+    return h(
+      View,
+      { key: `${tableKey}-wrapper` },
       headRow,
       h(Text, { style: styles.small, key: `${tableKey}-empty` }, emptyMessage ?? 'Sin datos.'),
-    ];
+    );
   }
 
   const dataRows = rows.map((row) =>
     h(
       View,
-      { style: styles.row, key: keyExtractor(row) },
+      { style: styles.row, key: keyExtractor(row), wrap: false },
       ...columns.map((col, i) =>
         h(Text, { style: colStyle(col), key: `${keyExtractor(row)}-${i}` }, col.getValue(row)),
       ),
     ),
   );
 
-  return [headRow, ...dataRows];
+  return h(
+    View,
+    { key: `${tableKey}-wrapper` },
+    headRow,
+    ...dataRows,
+  );
 }
 
 // ---------------------------------------------------------------------------

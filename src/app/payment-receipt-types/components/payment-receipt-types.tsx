@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { paymentReceiptTypeColumns } from './payment-receipt-type-columns';
 import { PaymentReceiptTypeForm } from './payment-receipt-type-form';
 import { PaymentReceiptTypeInfo } from './payment-receipt-type-info';
+import { paymentReceiptTypeExportConfig } from './payment-receipt-type-export-config';
 import { PaymentReceiptTypesToolbar } from './payment-receipt-type-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -106,6 +108,14 @@ export function PaymentReceiptTypes() {
     setPaymentReceiptType(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.paymentReceiptType.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: PaymentReceiptType[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<PaymentReceiptType>>(
     () => ({
@@ -143,6 +153,12 @@ export function PaymentReceiptTypes() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={paymentReceiptTypeExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

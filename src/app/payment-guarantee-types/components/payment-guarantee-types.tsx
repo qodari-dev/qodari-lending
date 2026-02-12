@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { paymentGuaranteeTypeColumns } from './payment-guarantee-type-columns';
 import { PaymentGuaranteeTypeForm } from './payment-guarantee-type-form';
 import { PaymentGuaranteeTypeInfo } from './payment-guarantee-type-info';
+import { paymentGuaranteeTypeExportConfig } from './payment-guarantee-type-export-config';
 import { PaymentGuaranteeTypesToolbar } from './payment-guarantee-type-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -112,6 +114,14 @@ export function PaymentGuaranteeTypes() {
     setPaymentGuaranteeType(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.paymentGuaranteeType.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: PaymentGuaranteeType[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<PaymentGuaranteeType>>(
     () => ({
@@ -149,6 +159,12 @@ export function PaymentGuaranteeTypes() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={paymentGuaranteeTypeExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

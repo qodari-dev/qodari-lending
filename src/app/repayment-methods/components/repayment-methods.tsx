@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { repaymentMethodColumns } from './repayment-method-columns';
 import { RepaymentMethodForm } from './repayment-method-form';
 import { RepaymentMethodInfo } from './repayment-method-info';
+import { repaymentMethodExportConfig } from './repayment-method-export-config';
 import { RepaymentMethodsToolbar } from './repayment-method-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -106,6 +108,14 @@ export function RepaymentMethods() {
     setRepaymentMethod(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.repaymentMethod.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: RepaymentMethod[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<RepaymentMethod>>(
     () => ({
@@ -143,6 +153,12 @@ export function RepaymentMethods() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={repaymentMethodExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

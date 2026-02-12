@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { Plus, RefreshCw, X } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
+import * as React from 'react';
 
 interface ToolbarProps {
   searchValue: string;
@@ -25,6 +26,7 @@ interface ToolbarProps {
   onReset: () => void;
   onRefresh?: () => void;
   onCreate?: () => void;
+  exportActions?: React.ReactNode;
   isRefreshing?: boolean;
 }
 
@@ -38,6 +40,7 @@ export function LoanApplicationsToolbar({
   onReset,
   onRefresh,
   onCreate,
+  exportActions,
   isRefreshing = false,
 }: ToolbarProps) {
   const canCreate = useHasPermission('loan-applications:create');
@@ -74,6 +77,8 @@ export function LoanApplicationsToolbar({
       </div>
 
       <div className="flex items-center space-x-2">
+        {exportActions}
+
         {onRefresh && (
           <Button
             variant="outline"

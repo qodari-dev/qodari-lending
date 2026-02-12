@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { Plus, RefreshCw } from 'lucide-react';
+import * as React from 'react';
 
 // ============================================================================
 // Props Interface
@@ -18,6 +19,9 @@ interface ToolbarProps {
   onRefresh?: () => void;
   onCreate?: () => void;
 
+  // Export
+  exportActions?: React.ReactNode;
+
   // Loading states
   isRefreshing?: boolean;
 }
@@ -30,6 +34,7 @@ export function GlAccountsToolbar({
   onSearchChange,
   onRefresh,
   onCreate,
+  exportActions,
   isRefreshing = false,
 }: ToolbarProps) {
   const canCreate = useHasPermission('gl-accounts:create');
@@ -47,6 +52,8 @@ export function GlAccountsToolbar({
       </div>
 
       <div className="flex items-center space-x-2">
+        {exportActions}
+
         {onRefresh && (
           <Button
             variant="outline"

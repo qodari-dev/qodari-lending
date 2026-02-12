@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { thirdPartyTypeColumns } from './third-party-type-columns';
 import { ThirdPartyTypeForm } from './third-party-type-form';
 import { ThirdPartyTypeInfo } from './third-party-type-info';
+import { thirdPartyTypeExportConfig } from './third-party-type-export-config';
 import { ThirdPartyTypesToolbar } from './third-party-type-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -99,6 +101,14 @@ export function ThirdPartyTypes() {
     setThirdPartyType(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.thirdPartyType.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: ThirdPartyType[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<ThirdPartyType>>(
     () => ({
@@ -133,6 +143,12 @@ export function ThirdPartyTypes() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={thirdPartyTypeExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

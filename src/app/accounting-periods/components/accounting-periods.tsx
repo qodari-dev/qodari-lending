@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +25,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { accountingPeriodColumns } from './accounting-period-columns';
 import { AccountingPeriodForm } from './accounting-period-form';
 import { AccountingPeriodInfo } from './accounting-period-info';
+import { accountingPeriodExportConfig } from './accounting-period-export-config';
 import { AccountingPeriodsToolbar } from './accounting-period-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -109,6 +111,14 @@ export function AccountingPeriods() {
     setAccountingPeriod(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.accountingPeriod.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: AccountingPeriod[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<AccountingPeriod>>(
     () => ({
@@ -146,6 +156,12 @@ export function AccountingPeriods() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={accountingPeriodExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay periodos contables. Cree uno nuevo."

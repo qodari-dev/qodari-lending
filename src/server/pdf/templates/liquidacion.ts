@@ -60,7 +60,7 @@ export const liquidacionTemplate: PdfTemplateBuilder<LoanDocumentData> = (data, 
 
       h(Text, { style: { marginTop: 12 }, key: 'spacer' }, ''),
 
-      ...PdfTable(rpdf, styles, {
+      PdfTable(rpdf, styles, {
         columns,
         rows,
         keyExtractor: (r) => r.key,

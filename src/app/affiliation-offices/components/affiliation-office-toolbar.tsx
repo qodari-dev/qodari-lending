@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { Plus, RefreshCw } from 'lucide-react';
+import * as React from 'react';
 
 interface ToolbarProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   onRefresh?: () => void;
   onCreate?: () => void;
+  exportActions?: React.ReactNode;
   isRefreshing?: boolean;
 }
 
@@ -18,6 +20,7 @@ export function AffiliationOfficesToolbar({
   onSearchChange,
   onRefresh,
   onCreate,
+  exportActions,
   isRefreshing = false,
 }: ToolbarProps) {
   const canCreate = useHasPermission('affiliation-offices:create');
@@ -32,6 +35,8 @@ export function AffiliationOfficesToolbar({
       />
 
       <div className="flex items-center space-x-2">
+        {exportActions}
+
         {onRefresh && (
           <Button variant="outline" size="sm" onClick={onRefresh} disabled={isRefreshing} className="h-9">
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />

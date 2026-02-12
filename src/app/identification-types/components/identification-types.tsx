@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { identificationTypeColumns } from './identification-type-columns';
 import { IdentificationTypeForm } from './identification-type-form';
 import { IdentificationTypeInfo } from './identification-type-info';
+import { identificationTypeExportConfig } from './identification-type-export-config';
 import { IdentificationTypesToolbar } from './identification-type-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -107,6 +109,14 @@ export function IdentificationTypes() {
     setIdentificationType(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.identificationType.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: IdentificationType[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<IdentificationType>>(
     () => ({
@@ -144,6 +154,12 @@ export function IdentificationTypes() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={identificationTypeExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

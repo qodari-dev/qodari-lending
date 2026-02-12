@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { documentTypeColumns } from './document-type-columns';
 import { DocumentTypeForm } from './document-type-form';
 import { DocumentTypeInfo } from './document-type-info';
+import { documentTypeExportConfig } from './document-type-export-config';
 import { DocumentTypesToolbar } from './document-type-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -99,6 +101,14 @@ export function DocumentTypes() {
     setDocumentType(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.documentType.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: DocumentType[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<DocumentType>>(
     () => ({
@@ -133,6 +143,12 @@ export function DocumentTypes() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={documentTypeExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

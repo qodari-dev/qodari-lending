@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +26,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { agingProfileColumns } from './aging-profile-columns';
 import { AgingProfileForm } from './aging-profile-form';
 import { AgingProfileInfo } from './aging-profile-info';
+import { agingProfileExportConfig } from './aging-profile-export-config';
 import { AgingProfilesToolbar } from './aging-profile-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -118,6 +120,14 @@ export function AgingProfiles() {
     setAgingProfile(row);
     setOpenedDeactivateDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.agingProfile.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: AgingProfile[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<AgingProfile>>(
     () => ({
@@ -156,6 +166,12 @@ export function AgingProfiles() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={agingProfileExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

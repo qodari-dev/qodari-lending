@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { creditFundColumns } from './credit-fund-columns';
 import { CreditFundForm } from './credit-fund-form';
 import { CreditFundInfo } from './credit-fund-info';
+import { creditFundExportConfig } from './credit-fund-export-config';
 import { CreditFundsToolbar } from './credit-fund-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -99,6 +101,14 @@ export function CreditFunds() {
     setCreditFund(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.creditFund.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: CreditFund[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<CreditFund>>(
     () => ({
@@ -136,6 +146,12 @@ export function CreditFunds() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={creditFundExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

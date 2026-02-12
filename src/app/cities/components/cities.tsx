@@ -1,6 +1,6 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,12 +13,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import * as React from 'react';
 
+import { api } from '@/clients/api';
 import { PageContent, PageHeader } from '@/components/layout';
 import { Spinner } from '@/components/ui/spinner';
 import { useDeleteCity, useCities } from '@/hooks/queries/use-city-queries';
 import { City, CityInclude, CitySortField } from '@/schemas/city';
 import { RowData, TableMeta } from '@tanstack/react-table';
 import { cityColumns } from './city-columns';
+import { cityExportConfig } from './city-export-config';
 import { CityForm } from './city-form';
 import { CityInfo } from './city-info';
 import { CitiesToolbar } from './city-toolbar';
@@ -100,6 +102,13 @@ export function Cities() {
     setOpenedDeleteDialog(true);
   }, []);
 
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.city.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: City[] })?.data ?? [];
+  }, [queryParams]);
+
   const tableMeta = React.useMemo<TableMeta<City>>(
     () => ({
       onRowView: handleRowOpen,
@@ -133,6 +142,12 @@ export function Cities() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={cityExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay información. Intente ajustar los filtros."

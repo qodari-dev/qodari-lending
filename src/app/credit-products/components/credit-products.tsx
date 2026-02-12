@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import { PageContent, PageHeader } from '@/components/layout';
 import {
   AlertDialog,
@@ -23,6 +24,7 @@ import * as React from 'react';
 import { creditProductColumns } from './credit-product-columns';
 import { CreditProductForm } from './credit-product-form';
 import { CreditProductInfo } from './credit-product-info';
+import { creditProductExportConfig } from './credit-product-export-config';
 import { CreditProductsToolbar } from './credit-product-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -116,6 +118,14 @@ export function CreditProducts() {
     setCreditProduct(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.creditProduct.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: CreditProduct[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<CreditProduct>>(
     () => ({
@@ -153,6 +163,12 @@ export function CreditProducts() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={creditProductExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

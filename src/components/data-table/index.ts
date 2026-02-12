@@ -27,6 +27,10 @@ export {
   type UseDataTableReturn,
 } from './hooks/use-data-table';
 
+// Export
+export { ExportDropdown } from './export';
+export type { ExportColumn, ExportConfig } from './export';
+
 // Types
 export type {
   PaginationState,

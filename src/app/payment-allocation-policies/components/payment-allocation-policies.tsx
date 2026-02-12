@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import { PageContent, PageHeader } from '@/components/layout';
 import {
   AlertDialog,
@@ -28,6 +29,7 @@ import { PaymentAllocationPolicyColumns } from './payment-allocation-policy-colu
 import { PaymentAllocationPolicyForm } from './payment-allocation-policy-form';
 import { PaymentAllocationPolicyInfo } from './payment-allocation-policy-info';
 import { PaymentAllocationPolicyToolbar } from './payment-allocation-policy-toolbar';
+import { paymentAllocationPolicyExportConfig } from './payment-allocation-policy-export-config';
 
 declare module '@tanstack/table-core' {
   interface TableMeta<TData extends RowData> {
@@ -96,6 +98,12 @@ export function PaymentAllocationPolicies() {
     setPolicy(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.paymentAllocationPolicy.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: PaymentAllocationPolicy[] })?.data ?? [];
+  }, [queryParams]);
 
   const tableMeta = React.useMemo<TableMeta<PaymentAllocationPolicy>>(
     () => ({
@@ -133,6 +141,12 @@ export function PaymentAllocationPolicies() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={paymentAllocationPolicyExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."
@@ -156,8 +170,8 @@ export function PaymentAllocationPolicies() {
           <AlertDialogHeader>
             <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion no se puede deshacer. Esto eliminara permanentemente la politica
-              &quot;{policy?.name}&quot; y sus reglas.
+              Esta accion no se puede deshacer. Esto eliminara permanentemente la politica &quot;
+              {policy?.name}&quot; y sus reglas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

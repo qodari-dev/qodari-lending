@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { glAccountColumns } from './gl-account-columns';
 import { GlAccountForm } from './gl-account-form';
 import { GlAccountInfo } from './gl-account-info';
+import { glAccountExportConfig } from './gl-account-export-config';
 import { GlAccountsToolbar } from './gl-account-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -99,6 +101,14 @@ export function GlAccounts() {
     setGlAccount(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.glAccount.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: GlAccount[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<GlAccount>>(
     () => ({
@@ -133,6 +143,12 @@ export function GlAccounts() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={glAccountExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

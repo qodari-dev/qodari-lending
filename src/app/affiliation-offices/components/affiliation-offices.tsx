@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { affiliationOfficeColumns } from './affiliation-office-columns';
 import { AffiliationOfficeForm } from './affiliation-office-form';
 import { AffiliationOfficeInfo } from './affiliation-office-info';
+import { affiliationOfficeExportConfig } from './affiliation-office-export-config';
 import { AffiliationOfficesToolbar } from './affiliation-office-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -109,6 +111,14 @@ export function AffiliationOffices() {
     setAffiliationOffice(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.affiliationOffice.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: AffiliationOffice[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<AffiliationOffice>>(
     () => ({
@@ -146,6 +156,12 @@ export function AffiliationOffices() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={affiliationOfficeExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

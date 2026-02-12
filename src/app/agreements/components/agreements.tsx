@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import { PageContent, PageHeader } from '@/components/layout';
 import {
   AlertDialog,
@@ -23,6 +24,7 @@ import React from 'react';
 import { AgreementForm } from './agreement-form';
 import { AgreementInfo } from './agreement-info';
 import { agreementColumns } from './agreement-columns';
+import { agreementExportConfig } from './agreement-export-config';
 import { AgreementsToolbar } from './agreement-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -103,6 +105,14 @@ export function Agreements() {
     setAgreement(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.agreement.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: Agreement[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<Agreement>>(
     () => ({
@@ -140,6 +150,12 @@ export function Agreements() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={agreementExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

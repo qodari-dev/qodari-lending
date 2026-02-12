@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { costCenterColumns } from './cost-center-columns';
 import { CostCenterForm } from './cost-center-form';
 import { CostCenterInfo } from './cost-center-info';
+import { costCenterExportConfig } from './cost-center-export-config';
 import { CostCentersToolbar } from './cost-center-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -99,6 +101,14 @@ export function CostCenters() {
     setCostCenter(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.costCenter.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: CostCenter[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<CostCenter>>(
     () => ({
@@ -133,6 +143,12 @@ export function CostCenters() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={costCenterExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

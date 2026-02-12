@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import { PageContent, PageHeader } from '@/components/layout';
 import {
   AlertDialog,
@@ -19,6 +20,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import React from 'react';
 import { loanColumns } from './loan-columns';
 import { LoanInfo } from './loan-info';
+import { loanExportConfig } from './loan-export-config';
 import { LoansToolbar } from './loan-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -111,6 +113,14 @@ export function Loans() {
     setOpenedLiquidateDialog(false);
     setLoanToLiquidate(undefined);
   }, [liquidateLoan, loanToLiquidate]);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.loan.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: Loan[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<Loan>>(
     () => ({
@@ -160,6 +170,12 @@ export function Loans() {
               onReset={resetFilters}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={loanExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

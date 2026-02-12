@@ -1,6 +1,7 @@
 'use client';
 
-import { DataTable, useDataTable } from '@/components/data-table';
+import { api } from '@/clients/api';
+import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +26,7 @@ import { RowData, TableMeta } from '@tanstack/react-table';
 import { coDebtorColumns } from './co-debtor-columns';
 import { CoDebtorForm } from './co-debtor-form';
 import { CoDebtorInfo } from './co-debtor-info';
+import { coDebtorExportConfig } from './co-debtor-export-config';
 import { CoDebtorsToolbar } from './co-debtor-toolbar';
 
 declare module '@tanstack/table-core' {
@@ -112,6 +114,14 @@ export function CoDebtors() {
     setCoDebtor(row);
     setOpenedDeleteDialog(true);
   }, []);
+  const fetchAllData = React.useCallback(async () => {
+    const res = await api.coDebtor.list.query({
+      query: { ...queryParams, page: 1, limit: 10000 },
+    });
+    return (res.body as { data: CoDebtor[] })?.data ?? [];
+  }, [queryParams]);
+
+
 
   const tableMeta = React.useMemo<TableMeta<CoDebtor>>(
     () => ({
@@ -146,6 +156,12 @@ export function CoDebtors() {
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
+              exportActions={
+                <ExportDropdown
+                  config={coDebtorExportConfig}
+                  fetchAllData={fetchAllData}
+                />
+              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."

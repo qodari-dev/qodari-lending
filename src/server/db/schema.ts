@@ -1103,8 +1103,6 @@ export const loanApplications = pgTable(
       .notNull()
       .references(() => thirdParties.id, { onDelete: 'restrict' }),
 
-    // mancat S/N -> boolean
-    isCategoryManual: boolean('is_category_manual').notNull().default(false),
     // codcat
     categoryCode: categoryCodeEnum('category_code').notNull(),
 

@@ -150,7 +150,6 @@ const LoanApplicationBaseSchema = z.object({
   applicationDate: z.coerce.date(),
   affiliationOfficeId: z.number().int().positive(),
   thirdPartyId: z.number().int().positive(),
-  isCategoryManual: z.boolean(),
   categoryCode: CategoryCodeSchema,
   repaymentMethodId: z.number().int().positive().nullable().optional(),
   paymentGuaranteeTypeId: z.number().int().positive().nullable().optional(),

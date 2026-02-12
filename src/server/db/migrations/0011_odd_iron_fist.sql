@@ -1,0 +1,1 @@
+ALTER TABLE "loan_applications" DROP COLUMN "is_category_manual";

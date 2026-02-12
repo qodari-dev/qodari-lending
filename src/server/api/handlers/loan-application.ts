@@ -611,7 +611,6 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             createdByUserId: userId,
             createdByUserName: userName || userId,
             thirdPartyId: body.thirdPartyId,
-            isCategoryManual: body.isCategoryManual,
             categoryCode: body.categoryCode,
             repaymentMethodId: body.repaymentMethodId ?? null,
             paymentGuaranteeTypeId: body.paymentGuaranteeTypeId ?? null,
@@ -805,7 +804,6 @@ export const loanApplication = tsr.router(contract.loanApplication, {
               : existing.applicationDate,
             affiliationOfficeId: body.affiliationOfficeId ?? existing.affiliationOfficeId,
             thirdPartyId: body.thirdPartyId ?? existing.thirdPartyId,
-            isCategoryManual: body.isCategoryManual ?? existing.isCategoryManual,
             categoryCode: targetCategoryCode,
             repaymentMethodId:
               body.repaymentMethodId !== undefined

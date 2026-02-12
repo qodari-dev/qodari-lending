@@ -119,7 +119,6 @@ export function LoanApplicationForm({
       applicationDate: new Date(),
       affiliationOfficeId: undefined,
       thirdPartyId: undefined,
-      isCategoryManual: false,
       categoryCode: undefined,
       repaymentMethodId: null,
       paymentGuaranteeTypeId: null,
@@ -236,10 +235,6 @@ export function LoanApplicationForm({
     control: form.control,
     name: 'categoryCode',
   });
-  const isCategoryManual = useWatch({
-    control: form.control,
-    name: 'isCategoryManual',
-  });
   const pledgesSubsidy = useWatch({
     control: form.control,
     name: 'pledgesSubsidy',
@@ -306,7 +301,6 @@ export function LoanApplicationForm({
         : new Date(),
       affiliationOfficeId: loanApplication?.affiliationOfficeId ?? undefined,
       thirdPartyId: loanApplication?.thirdPartyId ?? undefined,
-      isCategoryManual: loanApplication?.isCategoryManual ?? false,
       categoryCode: loanApplication?.categoryCode ?? undefined,
       repaymentMethodId: loanApplication?.repaymentMethodId ?? null,
       paymentGuaranteeTypeId: loanApplication?.paymentGuaranteeTypeId ?? null,
@@ -349,10 +343,9 @@ export function LoanApplicationForm({
   }, [opened, loanApplication, form]);
 
   useEffect(() => {
-    if (isCategoryManual) return;
     if (!selectedThirdParty?.categoryCode) return;
     form.setValue('categoryCode', selectedThirdParty.categoryCode);
-  }, [form, isCategoryManual, selectedThirdParty?.categoryCode]);
+  }, [form, selectedThirdParty?.categoryCode]);
 
   useEffect(() => {
     if (!opened || !loanApplication?.categoryCode) return;
@@ -623,24 +616,6 @@ export function LoanApplicationForm({
                               </ComboboxList>
                             </ComboboxContent>
                           </Combobox>
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-
-                    <Controller
-                      name="isCategoryManual"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="isCategoryManual">Categoria manual?</FieldLabel>
-                          <div>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              aria-invalid={fieldState.invalid}
-                            />
-                          </div>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}

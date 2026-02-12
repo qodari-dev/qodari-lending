@@ -197,22 +197,55 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {
                 title: 'Creditos',
                 icon: ArrowLeftRight,
-                items: [{ title: 'Liquida credito', url: `/liquidation-credit` }],
+                items: [
+                  { title: 'Causacion del interes corriente', url: `/causation-current-interest` },
+                  { title: 'Causacion del seguro', url: `/causation-current-insurance` },
+                  { title: 'Causacion del interes mora', url: `/causation-current-interest-late` },
+                ],
+              },
+              {
+                title: 'Castiga Cartera',
+                icon: ArrowLeftRight,
+                items: [
+                  {
+                    title: 'Cargar Archivo para castigar cartera',
+                    url: `/causation-current-interest`,
+                  },
+                ],
               },
               {
                 title: 'Contable',
                 icon: Receipt,
-                items: [{ title: 'Interface de contabilidad', url: `/interface-accounting` }],
+                items: [
+                  { title: 'Interface Contable Credito', url: `/interface-accounting` },
+                  {
+                    title: 'Interface contable Interes Corriente',
+                    url: `/causation-current-insurance`,
+                  },
+                  { title: 'Interface contable Interes Mora', url: `/causation-current-insurance` },
+                  { title: 'Interface contable Abonos', url: `/causation-current-insurance` },
+                  { title: 'Interface contable Castiga', url: `/causation-current-insurance` },
+                  { title: 'Interface contable Provicion', url: `/causation-current-insurance` },
+                ],
               },
               {
                 title: 'Subsidio',
                 icon: HandHeart,
-                items: [{ title: 'Pignoracion', url: `/pignoracion` }],
+                items: [
+                  { title: 'Genera comprobante de abonos de pignoracion', url: `/pignoracion` },
+                  { title: 'Reporte de Pignoraciones realizadas', url: `/pignoracion` },
+                  { title: 'Reporte Pignorados no realizadas', url: `/report-credits/extract` },
+                ],
               },
               {
                 title: 'Archivos para bancos',
                 icon: FileUp,
-                items: [{ title: 'Genera Archivo Banco', url: `/generate-bank-file` }],
+                items: [
+                  { title: 'Genera Archivo Bancolombia', url: `/generate-bank-file` },
+                  { title: 'Genera Archivo AvVillas', url: `/generate-bank-file` },
+                  { title: 'Genera Archivo Daviplata', url: `/generate-bank-file` },
+                  { title: 'Correcion de cuenta bancaria del credito', url: `/generate-bank-file` },
+                ],
               },
             ],
             pathname
@@ -225,17 +258,57 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {
                 title: 'Cartera',
                 icon: Wallet,
-                items: [{ title: 'Edades de cartera', url: `/report-cartera/aging-profiles` }],
+                items: [
+                  { title: 'Cartera de Creditos Actual', url: `/report-cartera/aging-profiles` },
+                  {
+                    title: 'Historico de Cartera Por Periodo',
+                    url: `/report-cartera/aging-profiles`,
+                  },
+                  { title: 'Creditos para Cobro', url: `/report-credits/extract` },
+                  { title: 'Cartera de libranza por Convenio', url: `/report-credits/extract` },
+                  { title: 'Cartera por tipo de credito', url: `/report-credits/extract` },
+                  { title: 'Certificado de saldo del credito', url: `/report-credits/extract` },
+                  { title: 'Certificado de saldo del tercero', url: `/report-credits/extract` },
+                ],
               },
               {
                 title: 'Creditos',
                 icon: BarChart3,
-                items: [{ title: 'extracto', url: `/report-credits/extract` }],
+                items: [
+                  { title: 'extracto', url: `/report-credits/extract` },
+                  { title: 'Cuotas Pagadas', url: `/report-credits/extract` },
+                  { title: 'Creditos Liquidados', url: `/report-credits/extract` },
+                  { title: 'Creditos No liquidados', url: `/report-credits/extract` },
+                  { title: 'Creditos Anulados o rechazados', url: `/report-credits/extract` },
+                  { title: 'Acta', url: `/report-credits/extract` },
+                  { title: 'Indicadores de Cartera', url: `/report-credits/extract` },
+                  { title: 'Paz y Salvo de un Credito', url: `/report-credits/extract` },
+                  { title: 'Paz y Salvo de Tercero', url: `/report-credits/extract` },
+                  { title: 'Comprobante de Movimientos', url: `/report-credits/extract` },
+                  { title: 'Creditos Saldados', url: `/report-credits/extract` },
+                  { title: 'Superintendencia de sociedades', url: `/report-credits/extract` },
+                ],
+              },
+              {
+                title: 'Aseguradoras',
+                icon: ShieldAlert,
+                items: [{ title: 'Reporte para aseguradoras', url: `/report-credits/extract` }],
               },
               {
                 title: 'Centrales de riesgo',
                 icon: ShieldAlert,
-                items: [{ title: 'Centrales de riesgo', url: `/report-risk-centers/risk-centers` }],
+                items: [
+                  { title: 'Cifin', url: `/report-risk-centers/risk-centers` },
+                  { title: 'Datacredito', url: `/report-risk-centers/risk-centers` },
+                ],
+              },
+              {
+                title: 'Oficios de Cobro',
+                icon: ShieldAlert,
+                items: [
+                  { title: 'Cobro Administrativo', url: `/report-risk-centers/risk-centers` },
+                  { title: 'Cobro Prejuridico', url: `/report-risk-centers/risk-centers` },
+                ],
               },
             ],
             pathname

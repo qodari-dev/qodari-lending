@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import {
-  allocationOrderWithinLabels,
   allocationScopeLabels,
   overpaymentHandlingLabels,
   OverpaymentHandling,
@@ -84,7 +83,6 @@ export function PaymentAllocationPolicyInfo({
                     <TableHead>Prioridad</TableHead>
                     <TableHead>Concepto</TableHead>
                     <TableHead>Alcance</TableHead>
-                    <TableHead>Orden</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -100,7 +98,6 @@ export function PaymentAllocationPolicyInfo({
                             : rule.billingConceptId}
                         </TableCell>
                         <TableCell>{allocationScopeLabels[rule.scope]}</TableCell>
-                        <TableCell>{allocationOrderWithinLabels[rule.orderWithin]}</TableCell>
                       </TableRow>
                     ))}
                 </TableBody>

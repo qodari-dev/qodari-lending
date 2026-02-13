@@ -40,12 +40,20 @@ import {
 import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
 import { GlAccount } from '@/schemas/gl-account';
 import {
+  BILLING_CONCEPT_BASE_AMOUNT_OPTIONS,
+  BILLING_CONCEPT_CALC_METHOD_OPTIONS,
   BILLING_CONCEPT_FINANCING_MODE_OPTIONS,
   BILLING_CONCEPT_FREQUENCY_OPTIONS,
+  BILLING_CONCEPT_RANGE_METRIC_OPTIONS,
+  BILLING_CONCEPT_ROUNDING_MODE_OPTIONS,
   BILLING_CONCEPT_TYPE_OPTIONS,
   BillingConcept,
+  billingConceptBaseAmountLabels,
+  billingConceptCalcMethodLabels,
   billingConceptFinancingModeLabels,
   billingConceptFrequencyLabels,
+  billingConceptRangeMetricLabels,
+  billingConceptRoundingModeLabels,
   billingConceptTypeLabels,
   CreateBillingConceptBodySchema,
 } from '@/schemas/billing-concept';
@@ -53,7 +61,7 @@ import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
-import { Controller, FormProvider, type Resolver, useForm } from 'react-hook-form';
+import { Controller, FormProvider, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { BillingConceptRulesForm } from './billing-concept-rules-form';
 
@@ -80,12 +88,23 @@ export function BillingConceptForm({
       conceptType: 'FEE',
       defaultFrequency: 'ONE_TIME',
       defaultFinancingMode: 'BILLED_SEPARATELY',
+      calcMethod: 'FIXED_AMOUNT',
+      baseAmount: null,
+      rangeMetric: null,
+      minAmount: null,
+      maxAmount: null,
+      roundingMode: 'NEAREST',
+      roundingDecimals: 2,
       defaultGlAccountId: null,
       isActive: true,
       description: null,
       billingConceptRules: [],
     },
   });
+  const calcMethod = useWatch({ control: form.control, name: 'calcMethod' });
+  const isTieredMethod =
+    calcMethod === 'TIERED_FIXED_AMOUNT' || calcMethod === 'TIERED_PERCENTAGE';
+  const requiresBaseAmount = calcMethod === 'PERCENTAGE' || calcMethod === 'TIERED_PERCENTAGE';
 
   const { data: glAccountsData } = useGlAccounts({
     limit: 1000,
@@ -107,25 +126,24 @@ export function BillingConceptForm({
         conceptType: billingConcept?.conceptType ?? 'FEE',
         defaultFrequency: billingConcept?.defaultFrequency ?? 'ONE_TIME',
         defaultFinancingMode: billingConcept?.defaultFinancingMode ?? 'BILLED_SEPARATELY',
+        calcMethod: billingConcept?.calcMethod ?? 'FIXED_AMOUNT',
+        baseAmount: billingConcept?.baseAmount ?? null,
+        rangeMetric: billingConcept?.rangeMetric ?? null,
+        minAmount: billingConcept?.minAmount ?? null,
+        maxAmount: billingConcept?.maxAmount ?? null,
+        roundingMode: billingConcept?.roundingMode ?? 'NEAREST',
+        roundingDecimals: billingConcept?.roundingDecimals ?? 2,
         defaultGlAccountId: billingConcept?.defaultGlAccountId ?? null,
         isActive: billingConcept?.isActive ?? true,
         description: billingConcept?.description ?? null,
         billingConceptRules:
           billingConcept?.billingConceptRules?.map((rule) => ({
-            calcMethod: rule.calcMethod,
-            baseAmount: rule.baseAmount ?? null,
             rate: rule.rate ?? null,
             amount: rule.amount ?? null,
-            rangeMetric: rule.rangeMetric ?? null,
             valueFrom: rule.valueFrom ?? null,
             valueTo: rule.valueTo ?? null,
-            minAmount: rule.minAmount ?? null,
-            maxAmount: rule.maxAmount ?? null,
-            roundingMode: rule.roundingMode,
-            roundingDecimals: rule.roundingDecimals,
             effectiveFrom: rule.effectiveFrom ? new Date(rule.effectiveFrom) : null,
             effectiveTo: rule.effectiveTo ? new Date(rule.effectiveTo) : null,
-            priority: rule.priority,
             isActive: rule.isActive,
           })) ?? [],
       });
@@ -188,7 +206,14 @@ export function BillingConceptForm({
                           <Input
                             id="code"
                             value={field.value}
-                            onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+                            maxLength={50}
+                            onChange={(event) =>
+                              field.onChange(
+                                event.target.value
+                                  .toUpperCase()
+                                  .replace(/[^A-Z0-9_]/g, '')
+                              )
+                            }
                             aria-invalid={fieldState.invalid}
                           />
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -274,6 +299,162 @@ export function BillingConceptForm({
                               ))}
                             </SelectContent>
                           </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="calcMethod"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="calcMethod">Metodo calculo</FieldLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {BILLING_CONCEPT_CALC_METHOD_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {billingConceptCalcMethodLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    {requiresBaseAmount && (
+                      <Controller
+                        name="baseAmount"
+                        control={form.control}
+                        render={({ field, fieldState }) => (
+                          <Field data-invalid={fieldState.invalid}>
+                            <FieldLabel htmlFor="baseAmount">Base</FieldLabel>
+                            <Select
+                              value={field.value ?? ''}
+                              onValueChange={(value) => field.onChange(value || null)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {BILLING_CONCEPT_BASE_AMOUNT_OPTIONS.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {billingConceptBaseAmountLabels[option]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                          </Field>
+                        )}
+                      />
+                    )}
+
+                    {isTieredMethod && (
+                      <Controller
+                        name="rangeMetric"
+                        control={form.control}
+                        render={({ field, fieldState }) => (
+                          <Field data-invalid={fieldState.invalid}>
+                            <FieldLabel htmlFor="rangeMetric">Metrica rango</FieldLabel>
+                            <Select
+                              value={field.value ?? ''}
+                              onValueChange={(value) => field.onChange(value || null)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {BILLING_CONCEPT_RANGE_METRIC_OPTIONS.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {billingConceptRangeMetricLabels[option]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                          </Field>
+                        )}
+                      />
+                    )}
+
+                    <Controller
+                      name="minAmount"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="minAmount">Valor minimo</FieldLabel>
+                          <Input
+                            id="minAmount"
+                            value={field.value ?? ''}
+                            onChange={(event) => field.onChange(event.target.value || null)}
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="maxAmount"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="maxAmount">Valor maximo</FieldLabel>
+                          <Input
+                            id="maxAmount"
+                            value={field.value ?? ''}
+                            onChange={(event) => field.onChange(event.target.value || null)}
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="roundingMode"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="roundingMode">Redondeo</FieldLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {BILLING_CONCEPT_ROUNDING_MODE_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {billingConceptRoundingModeLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="roundingDecimals"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="roundingDecimals">Decimales</FieldLabel>
+                          <Input
+                            id="roundingDecimals"
+                            type="number"
+                            min={0}
+                            max={6}
+                            value={field.value ?? ''}
+                            onChange={(event) => field.onChange(Number(event.target.value))}
+                            aria-invalid={fieldState.invalid}
+                          />
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}

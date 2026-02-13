@@ -355,17 +355,10 @@ function pickApplicableBillingRule(args: {
   rules: Array<{
     id: number;
     billingConceptId: number;
-    priority: number;
-    calcMethod: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'TIERED';
-    baseAmount: 'DISBURSED_AMOUNT' | 'PRINCIPAL' | 'OUTSTANDING_BALANCE' | 'INSTALLMENT_AMOUNT' | null;
     rate: string | null;
     amount: string | null;
     valueFrom: string | null;
     valueTo: string | null;
-    minAmount: string | null;
-    maxAmount: string | null;
-    roundingMode: 'NEAREST' | 'UP' | 'DOWN';
-    roundingDecimals: number;
     effectiveFrom: string | Date | null;
     effectiveTo: string | Date | null;
   }>;
@@ -390,7 +383,9 @@ function pickApplicableBillingRule(args: {
   if (!applicable.length) return null;
 
   applicable.sort((a, b) => {
-    if (b.priority !== a.priority) return b.priority - a.priority;
+    const aFrom = toDateOnly(a.effectiveFrom) ?? '0000-01-01';
+    const bFrom = toDateOnly(b.effectiveFrom) ?? '0000-01-01';
+    if (bFrom !== aFrom) return bFrom.localeCompare(aFrom);
     return b.id - a.id;
   });
 
@@ -1484,16 +1479,17 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           frequency: item.overrideFrequency ?? concept.defaultFrequency,
           financingMode: item.overrideFinancingMode ?? concept.defaultFinancingMode,
           glAccountId: item.overrideGlAccountId ?? concept.defaultGlAccountId ?? null,
-          calcMethod: selectedRule.calcMethod,
-          baseAmount: selectedRule.baseAmount ?? null,
+          calcMethod: concept.calcMethod,
+          baseAmount: concept.baseAmount ?? null,
+          rangeMetric: concept.rangeMetric ?? null,
           rate: selectedRule.rate ?? null,
           amount: selectedRule.amount ?? null,
           valueFrom: selectedRule.valueFrom ?? null,
           valueTo: selectedRule.valueTo ?? null,
-          minAmount: selectedRule.minAmount ?? null,
-          maxAmount: selectedRule.maxAmount ?? null,
-          roundingMode: selectedRule.roundingMode,
-          roundingDecimals: selectedRule.roundingDecimals,
+          minAmount: concept.minAmount ?? null,
+          maxAmount: concept.maxAmount ?? null,
+          roundingMode: concept.roundingMode,
+          roundingDecimals: concept.roundingDecimals,
         };
       });
 

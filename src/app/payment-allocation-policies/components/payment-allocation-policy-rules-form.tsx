@@ -42,9 +42,7 @@ import { useBillingConcepts } from '@/hooks/queries/use-billing-concept-queries'
 import { cn } from '@/lib/utils';
 import { BillingConcept } from '@/schemas/billing-concept';
 import {
-  ALLOCATION_ORDER_WITHIN_OPTIONS,
   ALLOCATION_SCOPE_OPTIONS,
-  allocationOrderWithinLabels,
   allocationScopeLabels,
   CreatePaymentAllocationPolicyBodySchema,
   PaymentAllocationPolicyRuleInput,
@@ -83,7 +81,6 @@ export function PaymentAllocationPolicyRulesForm() {
       priority: 1,
       billingConceptId: undefined,
       scope: 'PAST_DUE_FIRST',
-      orderWithin: 'DUE_DATE_ASC',
     },
   });
 
@@ -125,7 +122,6 @@ export function PaymentAllocationPolicyRulesForm() {
       priority: fields.length + 1,
       billingConceptId: undefined,
       scope: 'PAST_DUE_FIRST',
-      orderWithin: 'DUE_DATE_ASC',
     });
     setEditingIndex(null);
     setIsDialogOpen(true);
@@ -137,7 +133,6 @@ export function PaymentAllocationPolicyRulesForm() {
       priority: current?.priority ?? index + 1,
       billingConceptId: current?.billingConceptId ?? undefined,
       scope: current?.scope ?? 'PAST_DUE_FIRST',
-      orderWithin: current?.orderWithin ?? 'DUE_DATE_ASC',
     });
     setEditingIndex(index);
     setIsDialogOpen(true);
@@ -288,28 +283,6 @@ export function PaymentAllocationPolicyRulesForm() {
                 )}
               />
 
-              <Controller
-                name="orderWithin"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="orderWithin">Orden interno</FieldLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ALLOCATION_ORDER_WITHIN_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {allocationOrderWithinLabels[option]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
             </div>
 
             <DialogFooter>
@@ -333,7 +306,6 @@ export function PaymentAllocationPolicyRulesForm() {
               <TableHead>Prioridad</TableHead>
               <TableHead>Concepto</TableHead>
               <TableHead>Alcance</TableHead>
-              <TableHead>Orden</TableHead>
               <TableHead className="w-30 text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -348,7 +320,6 @@ export function PaymentAllocationPolicyRulesForm() {
                     <TableCell>{field.priority}</TableCell>
                     <TableCell>{getConceptLabel(field.billingConceptId)}</TableCell>
                     <TableCell>{allocationScopeLabels[field.scope]}</TableCell>
-                    <TableCell>{allocationOrderWithinLabels[field.orderWithin]}</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-2">
                         <Button

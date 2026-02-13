@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { categoryCodeSelectOptions } from '@/schemas/category';
+import { rangesOverlap } from '@/utils/range-overlap';
 import {
   CreateCreditProductBodySchema,
   CreditProductLateInterestRuleInput,
@@ -45,10 +46,6 @@ import { z } from 'zod';
 type FormValues = z.infer<typeof CreateCreditProductBodySchema>;
 
 type Range = { from: number; to: number };
-
-function rangesOverlap(a: Range, b: Range) {
-  return a.from <= b.to && b.from <= a.to;
-}
 
 export function CreditProductLateInterestRulesForm() {
   const form = useFormContext<FormValues>();
@@ -126,7 +123,7 @@ export function CreditProductLateInterestRulesForm() {
         from: field.daysFrom,
         to: field.daysTo ?? Number.POSITIVE_INFINITY,
       };
-      return rangesOverlap(newRange, currentRange);
+      return rangesOverlap(newRange.from, newRange.to, currentRange.from, currentRange.to);
     });
 
     if (hasOverlap) {

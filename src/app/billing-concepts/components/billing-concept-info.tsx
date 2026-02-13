@@ -39,6 +39,15 @@ export function BillingConceptInfo({
   if (!billingConcept) return null;
 
   const rules = billingConcept.billingConceptRules ?? [];
+  const calcMethod = billingConcept.calcMethod as BillingConceptCalcMethod;
+  const isTieredMethod =
+    calcMethod === 'TIERED_FIXED_AMOUNT' || calcMethod === 'TIERED_PERCENTAGE';
+  const sortedRules = rules.slice().sort((a, b) => {
+    if (isTieredMethod) {
+      return Number(a.valueFrom ?? '0') - Number(b.valueFrom ?? '0');
+    }
+    return formatDateOnly(a.effectiveFrom ?? null).localeCompare(formatDateOnly(b.effectiveFrom ?? null));
+  });
 
   const sections: DescriptionSection[] = [
     {
@@ -66,6 +75,28 @@ export function BillingConceptInfo({
             billingConceptFinancingModeLabels[
               billingConcept.defaultFinancingMode as BillingConceptFinancingMode
             ] ?? billingConcept.defaultFinancingMode,
+        },
+        {
+          label: 'Metodo calculo',
+          value: billingConceptCalcMethodLabels[calcMethod] ?? billingConcept.calcMethod,
+        },
+        {
+          label: 'Base',
+          value: billingConcept.baseAmount
+            ? billingConceptBaseAmountLabels[billingConcept.baseAmount as BillingConceptBaseAmount]
+            : '-',
+        },
+        {
+          label: 'Metrica rango',
+          value: billingConcept.rangeMetric
+            ? billingConceptRangeMetricLabels[billingConcept.rangeMetric as BillingConceptRangeMetric]
+            : '-',
+        },
+        { label: 'Valor minimo', value: billingConcept.minAmount ?? '-' },
+        { label: 'Valor maximo', value: billingConcept.maxAmount ?? '-' },
+        {
+          label: 'Redondeo',
+          value: `${billingConcept.roundingMode} (${billingConcept.roundingDecimals} dec)`,
         },
         {
           label: 'Cuenta default',
@@ -113,43 +144,18 @@ export function BillingConceptInfo({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Metodo</TableHead>
-                    <TableHead>Base</TableHead>
                     <TableHead>Tasa</TableHead>
                     <TableHead>Valor</TableHead>
-                    <TableHead>Metrica</TableHead>
                     <TableHead>Rango</TableHead>
                     <TableHead>Vigencia</TableHead>
-                    <TableHead>Prioridad</TableHead>
                     <TableHead>Estado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rules
-                    .slice()
-                    .sort((a, b) => a.priority - b.priority)
-                    .map((rule) => (
+                  {sortedRules.map((rule) => (
                       <TableRow key={rule.id}>
-                        <TableCell>
-                          {billingConceptCalcMethodLabels[rule.calcMethod as BillingConceptCalcMethod] ??
-                            rule.calcMethod}
-                        </TableCell>
-                        <TableCell>
-                          {rule.baseAmount
-                            ? billingConceptBaseAmountLabels[
-                                rule.baseAmount as BillingConceptBaseAmount
-                              ]
-                            : '-'}
-                        </TableCell>
                         <TableCell className="font-mono text-xs">{rule.rate ?? '-'}</TableCell>
                         <TableCell className="font-mono text-xs">{rule.amount ?? '-'}</TableCell>
-                        <TableCell>
-                          {rule.rangeMetric
-                            ? billingConceptRangeMetricLabels[
-                                rule.rangeMetric as BillingConceptRangeMetric
-                              ]
-                            : '-'}
-                        </TableCell>
                         <TableCell className="font-mono text-xs">
                           {rule.valueFrom ?? '-'} / {rule.valueTo ?? '-'}
                         </TableCell>
@@ -157,7 +163,6 @@ export function BillingConceptInfo({
                           {formatDateOnly(rule.effectiveFrom) || '-'} /{' '}
                           {formatDateOnly(rule.effectiveTo) || '-'}
                         </TableCell>
-                        <TableCell>{rule.priority}</TableCell>
                         <TableCell>
                           <Badge variant={rule.isActive ? 'default' : 'outline'}>
                             {rule.isActive ? 'Activo' : 'Inactivo'}

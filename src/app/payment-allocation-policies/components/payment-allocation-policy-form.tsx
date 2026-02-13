@@ -76,7 +76,6 @@ export function PaymentAllocationPolicyForm({
             priority: rule.priority,
             billingConceptId: rule.billingConceptId,
             scope: rule.scope,
-            orderWithin: rule.orderWithin,
           })) ?? [],
       });
     }

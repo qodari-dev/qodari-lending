@@ -73,7 +73,7 @@ export function roundByMode(
 
 export function calculateOneTimeConceptAmount(args: {
   concept: {
-    calcMethod: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'TIERED';
+    calcMethod: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'TIERED_FIXED_AMOUNT' | 'TIERED_PERCENTAGE';
     baseAmount: 'DISBURSED_AMOUNT' | 'PRINCIPAL' | 'OUTSTANDING_BALANCE' | 'INSTALLMENT_AMOUNT' | null;
     rate: string | null;
     amount: string | null;
@@ -104,12 +104,10 @@ export function calculateOneTimeConceptAmount(args: {
     calculated = amountValue;
   } else if (args.concept.calcMethod === 'PERCENTAGE') {
     calculated = (base * rate) / 100;
-  } else if (args.concept.calcMethod === 'TIERED') {
-    if (Number.isFinite(amountValue) && amountValue > 0) {
-      calculated = amountValue;
-    } else {
-      calculated = (base * rate) / 100;
-    }
+  } else if (args.concept.calcMethod === 'TIERED_FIXED_AMOUNT') {
+    calculated = amountValue;
+  } else if (args.concept.calcMethod === 'TIERED_PERCENTAGE') {
+    calculated = (base * rate) / 100;
   }
 
   const minAmount = toNumber(args.concept.minAmount);

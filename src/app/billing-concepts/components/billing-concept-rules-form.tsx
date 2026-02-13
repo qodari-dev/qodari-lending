@@ -12,13 +12,6 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import {
   Table,
@@ -30,19 +23,14 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import {
-  BILLING_CONCEPT_BASE_AMOUNT_OPTIONS,
-  BILLING_CONCEPT_CALC_METHOD_OPTIONS,
-  BILLING_CONCEPT_RANGE_METRIC_OPTIONS,
-  BILLING_CONCEPT_ROUNDING_MODE_OPTIONS,
+  BillingConceptCalcMethod,
   BillingConceptRuleInput,
   BillingConceptRuleInputSchema,
-  billingConceptBaseAmountLabels,
-  billingConceptCalcMethodLabels,
-  billingConceptRangeMetricLabels,
-  billingConceptRoundingModeLabels,
   CreateBillingConceptBodySchema,
+  billingConceptCalcMethodLabels,
 } from '@/schemas/billing-concept';
 import { formatDateOnly } from '@/utils/formatters';
+import { datesOverlap, rangesOverlap, toFiniteNumber } from '@/utils/range-overlap';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -59,21 +47,17 @@ import { z } from 'zod';
 
 type FormValues = z.infer<typeof CreateBillingConceptBodySchema>;
 
-function formatRuleSummary(rule: BillingConceptRuleInput) {
-  if (rule.calcMethod === 'FIXED_AMOUNT') {
+function formatRuleSummary(rule: BillingConceptRuleInput, calcMethod: BillingConceptCalcMethod) {
+  if (calcMethod === 'FIXED_AMOUNT') {
     return `Monto: ${rule.amount ?? '-'}`;
   }
-  if (rule.calcMethod === 'PERCENTAGE') {
-    const base = rule.baseAmount ? billingConceptBaseAmountLabels[rule.baseAmount] : '-';
-    return `Base: ${base} | Tasa: ${rule.rate ?? '-'}`;
+  if (calcMethod === 'PERCENTAGE') {
+    return `Tasa: ${rule.rate ?? '-'}%`;
   }
-  const metric = rule.rangeMetric ? billingConceptRangeMetricLabels[rule.rangeMetric] : '-';
-  const ratePart =
-    rule.baseAmount && rule.rate
-      ? `Base: ${billingConceptBaseAmountLabels[rule.baseAmount]} | Tasa: ${rule.rate}`
-      : '';
-  const amountPart = rule.amount ? `Monto: ${rule.amount}` : '';
-  return [metric, ratePart, amountPart].filter(Boolean).join(' | ');
+
+  const valuePart = rule.amount ? `Monto: ${rule.amount}` : '';
+  const ratePart = rule.rate ? `Tasa: ${rule.rate}%` : '';
+  return [valuePart, ratePart].filter(Boolean).join(' | ') || '-';
 }
 
 export function BillingConceptRulesForm() {
@@ -84,31 +68,28 @@ export function BillingConceptRulesForm() {
     name: 'billingConceptRules',
   });
 
+  const calcMethod =
+    (useWatch({ control: form.control, name: 'calcMethod' }) as BillingConceptCalcMethod | undefined) ??
+    'FIXED_AMOUNT';
+  const isTieredMethod =
+    calcMethod === 'TIERED_FIXED_AMOUNT' || calcMethod === 'TIERED_PERCENTAGE';
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const dialogForm = useForm<BillingConceptRuleInput>({
     resolver: zodResolver(BillingConceptRuleInputSchema) as Resolver<BillingConceptRuleInput>,
     defaultValues: {
-      calcMethod: 'FIXED_AMOUNT',
-      baseAmount: null,
       rate: null,
       amount: null,
-      rangeMetric: null,
       valueFrom: null,
       valueTo: null,
-      minAmount: null,
-      maxAmount: null,
-      roundingMode: 'NEAREST',
-      roundingDecimals: 2,
       effectiveFrom: null,
       effectiveTo: null,
-      priority: 0,
       isActive: true,
     },
   });
 
-  const calcMethod = useWatch({ control: dialogForm.control, name: 'calcMethod' });
   const hasRules = useMemo(() => fields.length > 0, [fields.length]);
 
   const handleOpenChange = (open: boolean) => {
@@ -121,20 +102,12 @@ export function BillingConceptRulesForm() {
 
   const handleAddClick = () => {
     dialogForm.reset({
-      calcMethod: 'FIXED_AMOUNT',
-      baseAmount: null,
       rate: null,
       amount: null,
-      rangeMetric: null,
       valueFrom: null,
       valueTo: null,
-      minAmount: null,
-      maxAmount: null,
-      roundingMode: 'NEAREST',
-      roundingDecimals: 2,
       effectiveFrom: null,
       effectiveTo: null,
-      priority: fields.length,
       isActive: true,
     });
     setEditingIndex(null);
@@ -144,20 +117,12 @@ export function BillingConceptRulesForm() {
   const handleEditClick = (index: number) => {
     const current = fields[index];
     dialogForm.reset({
-      calcMethod: current?.calcMethod ?? 'FIXED_AMOUNT',
-      baseAmount: current?.baseAmount ?? null,
       rate: current?.rate ?? null,
       amount: current?.amount ?? null,
-      rangeMetric: current?.rangeMetric ?? null,
       valueFrom: current?.valueFrom ?? null,
       valueTo: current?.valueTo ?? null,
-      minAmount: current?.minAmount ?? null,
-      maxAmount: current?.maxAmount ?? null,
-      roundingMode: current?.roundingMode ?? 'NEAREST',
-      roundingDecimals: current?.roundingDecimals ?? 2,
       effectiveFrom: current?.effectiveFrom ? new Date(current.effectiveFrom) : null,
       effectiveTo: current?.effectiveTo ? new Date(current.effectiveTo) : null,
-      priority: current?.priority ?? 0,
       isActive: current?.isActive ?? true,
     });
     setEditingIndex(index);
@@ -175,19 +140,112 @@ export function BillingConceptRulesForm() {
       return;
     }
 
-    if (values.minAmount && values.maxAmount && Number(values.minAmount) > Number(values.maxAmount)) {
-      toast.error('Minimo no puede ser mayor a maximo');
-      return;
+    if (calcMethod === 'FIXED_AMOUNT') {
+      if (!values.amount) {
+        toast.error('Valor es requerido para metodo fijo');
+        return;
+      }
+      if (values.rate) {
+        toast.error('Metodo fijo no usa tasa');
+        return;
+      }
+    }
+
+    if (calcMethod === 'PERCENTAGE') {
+      if (!values.rate) {
+        toast.error('Tasa es requerida para metodo porcentaje');
+        return;
+      }
+      if (values.amount) {
+        toast.error('Metodo porcentaje no usa valor fijo');
+        return;
+      }
+    }
+
+    if (calcMethod === 'TIERED_FIXED_AMOUNT') {
+      if (!values.valueFrom || !values.valueTo || !values.amount) {
+        toast.error('Escalonado valor fijo requiere rango y valor');
+        return;
+      }
+      if (values.rate) {
+        toast.error('Escalonado valor fijo no usa tasa');
+        return;
+      }
+    }
+
+    if (calcMethod === 'TIERED_PERCENTAGE') {
+      if (!values.valueFrom || !values.valueTo || !values.rate) {
+        toast.error('Escalonado porcentaje requiere rango y tasa');
+        return;
+      }
+      if (values.amount) {
+        toast.error('Escalonado porcentaje no usa valor fijo');
+        return;
+      }
+    }
+
+    const normalized: BillingConceptRuleInput = {
+      ...values,
+      amount: values.amount || null,
+      rate: values.rate || null,
+      valueFrom: isTieredMethod ? values.valueFrom || null : null,
+      valueTo: isTieredMethod ? values.valueTo || null : null,
+    };
+
+    if (!isTieredMethod && normalized.isActive) {
+      const currentRules = form.getValues('billingConceptRules') ?? [];
+      const hasAnotherActiveRule = currentRules.some(
+        (rule, idx) => idx !== editingIndex && rule.isActive
+      );
+      if (hasAnotherActiveRule) {
+        toast.error('Metodo fijo/porcentaje permite una sola regla activa');
+        return;
+      }
+    }
+
+    if (isTieredMethod && normalized.isActive) {
+      const currentRules = form.getValues('billingConceptRules') ?? [];
+      const hasOverlap = currentRules.some((rule, idx) => {
+        if (idx === editingIndex || !rule.isActive) return false;
+        const existingFrom = toFiniteNumber(rule.valueFrom ?? null);
+        const existingTo = toFiniteNumber(rule.valueTo ?? null);
+        const newFrom = toFiniteNumber(normalized.valueFrom ?? null);
+        const newTo = toFiniteNumber(normalized.valueTo ?? null);
+
+        if (!rangesOverlap(existingFrom, existingTo, newFrom, newTo)) return false;
+        return datesOverlap(
+          rule.effectiveFrom ?? null,
+          rule.effectiveTo ?? null,
+          normalized.effectiveFrom ?? null,
+          normalized.effectiveTo ?? null
+        );
+      });
+
+      if (hasOverlap) {
+        toast.error('Reglas escalonadas activas no pueden solaparse en rango y vigencia');
+        return;
+      }
     }
 
     if (editingIndex !== null) {
-      update(editingIndex, values);
+      update(editingIndex, normalized);
     } else {
-      append(values);
+      append(normalized);
     }
 
     setIsDialogOpen(false);
   };
+
+  const sortedFields = fields.slice().sort((a, b) => {
+    if (isTieredMethod) {
+      const aFrom = Number(a.valueFrom ?? '0');
+      const bFrom = Number(b.valueFrom ?? '0');
+      return aFrom - bFrom;
+    }
+    const aFrom = a.effectiveFrom ? formatDateOnly(a.effectiveFrom) : '';
+    const bFrom = b.effectiveFrom ? formatDateOnly(b.effectiveFrom) : '';
+    return aFrom.localeCompare(bFrom);
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -195,7 +253,7 @@ export function BillingConceptRulesForm() {
         <div className="space-y-1">
           <p className="text-sm font-medium">Reglas de calculo</p>
           <p className="text-muted-foreground text-sm">
-            Configure como se calcula el concepto por metodo, rangos y vigencia.
+            Metodo actual: {billingConceptCalcMethodLabels[calcMethod]}
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
@@ -211,85 +269,6 @@ export function BillingConceptRulesForm() {
             </DialogHeader>
 
             <div className="space-y-3">
-              <Controller
-                name="calcMethod"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="calcMethod">Metodo calculo</FieldLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {BILLING_CONCEPT_CALC_METHOD_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {billingConceptCalcMethodLabels[option]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-
-              {calcMethod !== 'FIXED_AMOUNT' && (
-                <Controller
-                  name="baseAmount"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="baseAmount">Base</FieldLabel>
-                      <Select
-                        value={field.value ?? ''}
-                        onValueChange={(value) => field.onChange(value || null)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {BILLING_CONCEPT_BASE_AMOUNT_OPTIONS.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {billingConceptBaseAmountLabels[option]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-              )}
-
-              {calcMethod === 'TIERED' && (
-                <Controller
-                  name="rangeMetric"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="rangeMetric">Metrica rango</FieldLabel>
-                      <Select
-                        value={field.value ?? ''}
-                        onValueChange={(value) => field.onChange(value || null)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {BILLING_CONCEPT_RANGE_METRIC_OPTIONS.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {billingConceptRangeMetricLabels[option]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-              )}
-
               <div className="grid grid-cols-2 gap-3">
                 <Controller
                   name="amount"
@@ -326,120 +305,43 @@ export function BillingConceptRulesForm() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Controller
-                  name="valueFrom"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="valueFrom">Rango desde</FieldLabel>
-                      <Input
-                        id="valueFrom"
-                        value={field.value ?? ''}
-                        onChange={(event) => field.onChange(event.target.value || null)}
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
+              {isTieredMethod && (
+                <div className="grid grid-cols-2 gap-3">
+                  <Controller
+                    name="valueFrom"
+                    control={dialogForm.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid}>
+                        <FieldLabel htmlFor="valueFrom">Rango desde</FieldLabel>
+                        <Input
+                          id="valueFrom"
+                          value={field.value ?? ''}
+                          onChange={(event) => field.onChange(event.target.value || null)}
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.error && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
 
-                <Controller
-                  name="valueTo"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="valueTo">Rango hasta</FieldLabel>
-                      <Input
-                        id="valueTo"
-                        value={field.value ?? ''}
-                        onChange={(event) => field.onChange(event.target.value || null)}
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Controller
-                  name="minAmount"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="minAmount">Valor minimo</FieldLabel>
-                      <Input
-                        id="minAmount"
-                        value={field.value ?? ''}
-                        onChange={(event) => field.onChange(event.target.value || null)}
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="maxAmount"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="maxAmount">Valor maximo</FieldLabel>
-                      <Input
-                        id="maxAmount"
-                        value={field.value ?? ''}
-                        onChange={(event) => field.onChange(event.target.value || null)}
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Controller
-                  name="roundingMode"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="roundingMode">Redondeo</FieldLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {BILLING_CONCEPT_ROUNDING_MODE_OPTIONS.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {billingConceptRoundingModeLabels[option]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="roundingDecimals"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="roundingDecimals">Decimales</FieldLabel>
-                      <Input
-                        id="roundingDecimals"
-                        type="number"
-                        min={0}
-                        max={6}
-                        value={field.value ?? ''}
-                        onChange={(event) => field.onChange(Number(event.target.value))}
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-              </div>
+                  <Controller
+                    name="valueTo"
+                    control={dialogForm.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid}>
+                        <FieldLabel htmlFor="valueTo">Rango hasta</FieldLabel>
+                        <Input
+                          id="valueTo"
+                          value={field.value ?? ''}
+                          onChange={(event) => field.onChange(event.target.value || null)}
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.error && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <Controller
@@ -487,43 +389,23 @@ export function BillingConceptRulesForm() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Controller
-                  name="priority"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="priority">Prioridad</FieldLabel>
-                      <Input
-                        id="priority"
-                        type="number"
-                        min={0}
-                        value={field.value ?? ''}
-                        onChange={(event) => field.onChange(Number(event.target.value))}
+              <Controller
+                name="isActive"
+                control={dialogForm.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="isActive">Activo?</FieldLabel>
+                    <div>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
                         aria-invalid={fieldState.invalid}
                       />
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="isActive"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="isActive">Activo?</FieldLabel>
-                      <div>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          aria-invalid={fieldState.invalid}
-                        />
-                      </div>
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-              </div>
+                    </div>
+                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
             </div>
 
             <DialogFooter>
@@ -544,59 +426,52 @@ export function BillingConceptRulesForm() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Metodo</TableHead>
               <TableHead>Configuracion</TableHead>
               <TableHead>Rangos</TableHead>
               <TableHead>Vigencia</TableHead>
-              <TableHead>Prioridad</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="w-30 text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {fields
-              .slice()
-              .sort((a, b) => a.priority - b.priority)
-              .map((field) => {
-                const originalIndex = fields.findIndex((item) => item.id === field.id);
-                return (
-                  <TableRow key={field.id}>
-                    <TableCell>{billingConceptCalcMethodLabels[field.calcMethod]}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {formatRuleSummary(field)}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {field.valueFrom ?? '-'} / {field.valueTo ?? '-'}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {formatDateOnly(field.effectiveFrom ?? null) || '-'} /{' '}
-                      {formatDateOnly(field.effectiveTo ?? null) || '-'}
-                    </TableCell>
-                    <TableCell>{field.priority}</TableCell>
-                    <TableCell>{field.isActive ? 'Activo' : 'Inactivo'}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditClick(originalIndex)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => remove(originalIndex)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+            {sortedFields.map((field) => {
+              const originalIndex = fields.findIndex((item) => item.id === field.id);
+              return (
+                <TableRow key={field.id}>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {formatRuleSummary(field, calcMethod)}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {field.valueFrom ?? '-'} / {field.valueTo ?? '-'}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {formatDateOnly(field.effectiveFrom ?? null) || '-'} /{' '}
+                    {formatDateOnly(field.effectiveTo ?? null) || '-'}
+                  </TableCell>
+                  <TableCell>{field.isActive ? 'Activo' : 'Inactivo'}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditClick(originalIndex)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(originalIndex)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       ) : (

@@ -22,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { rangesOverlap } from '@/utils/range-overlap';
 import {
   AgingBucketInput,
   AgingBucketInputSchema,
@@ -37,10 +38,6 @@ import { z } from 'zod';
 type FormValues = z.infer<typeof CreateAgingProfileBodySchema>;
 
 type Range = { from: number; to: number };
-
-function rangesOverlap(a: Range, b: Range) {
-  return a.from <= b.to && b.from <= a.to;
-}
 
 export function AgingProfileBucketsForm() {
   const form = useFormContext<FormValues>();
@@ -128,7 +125,7 @@ export function AgingProfileBucketsForm() {
         from: field.daysFrom,
         to: field.daysTo ?? Number.POSITIVE_INFINITY,
       };
-      return rangesOverlap(newRange, range);
+      return rangesOverlap(newRange.from, newRange.to, range.from, range.to);
     });
 
     if (hasOverlap) {

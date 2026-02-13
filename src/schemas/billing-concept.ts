@@ -8,6 +8,7 @@ import {
   NumberOperatorsSchema,
   StringOperatorsSchema,
 } from '@/server/utils/query/schemas';
+import { datesOverlap, rangesOverlap, toFiniteNumber } from '@/utils/range-overlap';
 import { ClientInferResponseBody } from '@ts-rest/core';
 import { z } from 'zod';
 
@@ -31,7 +32,6 @@ export const BILLING_CONCEPT_FREQUENCY_OPTIONS = [
   'ONE_TIME',
   'MONTHLY',
   'PER_INSTALLMENT',
-  'PER_EVENT',
 ] as const;
 
 export type BillingConceptFrequency = (typeof BILLING_CONCEPT_FREQUENCY_OPTIONS)[number];
@@ -48,7 +48,8 @@ export type BillingConceptFinancingMode =
 export const BILLING_CONCEPT_CALC_METHOD_OPTIONS = [
   'FIXED_AMOUNT',
   'PERCENTAGE',
-  'TIERED',
+  'TIERED_FIXED_AMOUNT',
+  'TIERED_PERCENTAGE',
 ] as const;
 
 export type BillingConceptCalcMethod = (typeof BILLING_CONCEPT_CALC_METHOD_OPTIONS)[number];
@@ -91,7 +92,6 @@ export const billingConceptFrequencyLabels: Record<BillingConceptFrequency, stri
   ONE_TIME: 'Unica vez',
   MONTHLY: 'Mensual',
   PER_INSTALLMENT: 'Por cuota',
-  PER_EVENT: 'Por evento',
 };
 
 export const billingConceptFinancingModeLabels: Record<BillingConceptFinancingMode, string> = {
@@ -103,7 +103,8 @@ export const billingConceptFinancingModeLabels: Record<BillingConceptFinancingMo
 export const billingConceptCalcMethodLabels: Record<BillingConceptCalcMethod, string> = {
   FIXED_AMOUNT: 'Valor fijo',
   PERCENTAGE: 'Porcentaje',
-  TIERED: 'Escalonado',
+  TIERED_FIXED_AMOUNT: 'Escalonado valor fijo',
+  TIERED_PERCENTAGE: 'Escalonado porcentaje',
 };
 
 export const billingConceptBaseAmountLabels: Record<BillingConceptBaseAmount, string> = {
@@ -209,57 +210,146 @@ export const GetBillingConceptQuerySchema = z.object({
 // ============================================
 
 export const BillingConceptRuleInputSchema = z.object({
-  calcMethod: z.enum(BILLING_CONCEPT_CALC_METHOD_OPTIONS),
-  baseAmount: z.enum(BILLING_CONCEPT_BASE_AMOUNT_OPTIONS).nullable().optional(),
   rate: z.string().nullable().optional(),
   amount: z.string().nullable().optional(),
-  rangeMetric: z.enum(BILLING_CONCEPT_RANGE_METRIC_OPTIONS).nullable().optional(),
   valueFrom: z.string().nullable().optional(),
   valueTo: z.string().nullable().optional(),
-  minAmount: z.string().nullable().optional(),
-  maxAmount: z.string().nullable().optional(),
-  roundingMode: z.enum(BILLING_CONCEPT_ROUNDING_MODE_OPTIONS),
-  roundingDecimals: z.number().int().min(0).max(6),
   effectiveFrom: z.coerce.date().nullable().optional(),
   effectiveTo: z.coerce.date().nullable().optional(),
-  priority: z.number().int().min(0),
   isActive: z.boolean(),
 });
 
 export type BillingConceptRuleInput = z.infer<typeof BillingConceptRuleInputSchema>;
 
 const BillingConceptBaseSchema = z.object({
-  code: z.string().min(1).max(50),
+  code: z
+    .string()
+    .trim()
+    .min(1)
+    .max(50)
+    .regex(
+      /^[A-Z0-9_]+$/,
+      'Codigo invalido. Use solo letras mayusculas, numeros y guion bajo (_)'
+    ),
   name: z.string().min(1).max(150),
   isSystem: z.boolean(),
   conceptType: z.enum(BILLING_CONCEPT_TYPE_OPTIONS),
   defaultFrequency: z.enum(BILLING_CONCEPT_FREQUENCY_OPTIONS),
   defaultFinancingMode: z.enum(BILLING_CONCEPT_FINANCING_MODE_OPTIONS),
+  calcMethod: z.enum(BILLING_CONCEPT_CALC_METHOD_OPTIONS),
+  baseAmount: z.enum(BILLING_CONCEPT_BASE_AMOUNT_OPTIONS).nullable().optional(),
+  rangeMetric: z.enum(BILLING_CONCEPT_RANGE_METRIC_OPTIONS).nullable().optional(),
+  minAmount: z.string().nullable().optional(),
+  maxAmount: z.string().nullable().optional(),
+  roundingMode: z.enum(BILLING_CONCEPT_ROUNDING_MODE_OPTIONS),
+  roundingDecimals: z.number().int().min(0).max(6),
   defaultGlAccountId: z.number().int().positive().nullable().optional(),
   isActive: z.boolean(),
   description: z.string().nullable().optional(),
   billingConceptRules: BillingConceptRuleInputSchema.array().optional(),
 });
 
+function isTieredCalcMethod(method: BillingConceptCalcMethod | undefined): boolean {
+  return method === 'TIERED_FIXED_AMOUNT' || method === 'TIERED_PERCENTAGE';
+}
+
 const addBillingConceptValidation = <T extends z.ZodTypeAny>(schema: T) =>
   schema.superRefine((value, ctx) => {
     const data = value as {
+      calcMethod?: BillingConceptCalcMethod;
+      baseAmount?: BillingConceptBaseAmount | null;
+      rangeMetric?: BillingConceptRangeMetric | null;
+      minAmount?: string | null;
+      maxAmount?: string | null;
       billingConceptRules?: {
-        calcMethod: BillingConceptCalcMethod;
-        baseAmount?: BillingConceptBaseAmount | null;
         rate?: string | null;
         amount?: string | null;
-        rangeMetric?: BillingConceptRangeMetric | null;
         valueFrom?: string | null;
         valueTo?: string | null;
-        minAmount?: string | null;
-        maxAmount?: string | null;
         effectiveFrom?: Date | null;
         effectiveTo?: Date | null;
+        isActive?: boolean;
       }[];
     };
 
     const rules = data.billingConceptRules ?? [];
+    const activeRules = rules.filter((rule) => rule.isActive !== false);
+
+    if (data.minAmount && data.maxAmount && Number(data.minAmount) > Number(data.maxAmount)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Minimo no puede ser mayor a maximo',
+        path: ['minAmount'],
+      });
+      return;
+    }
+
+    if (!data.calcMethod) {
+      if (rules.length > 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Metodo calculo es requerido cuando hay reglas',
+          path: ['calcMethod'],
+        });
+      }
+      return;
+    }
+
+    if (data.calcMethod === 'PERCENTAGE' && !data.baseAmount) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Base es requerida para metodo porcentaje',
+        path: ['baseAmount'],
+      });
+    }
+
+    if (data.calcMethod === 'FIXED_AMOUNT' && data.baseAmount) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Metodo fijo no usa base',
+        path: ['baseAmount'],
+      });
+    }
+
+    if (data.calcMethod === 'TIERED_FIXED_AMOUNT' && data.baseAmount) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Escalonado valor fijo no usa base',
+        path: ['baseAmount'],
+      });
+    }
+
+    if (data.calcMethod === 'TIERED_PERCENTAGE' && !data.baseAmount) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Escalonado porcentaje requiere base',
+        path: ['baseAmount'],
+      });
+    }
+
+    if (isTieredCalcMethod(data.calcMethod) && !data.rangeMetric) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Metodo escalonado requiere metrica de rango',
+        path: ['rangeMetric'],
+      });
+    }
+
+    if (!isTieredCalcMethod(data.calcMethod) && data.rangeMetric) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Metrica de rango solo aplica para metodo escalonado',
+        path: ['rangeMetric'],
+      });
+    }
+
+    if (!isTieredCalcMethod(data.calcMethod) && activeRules.length > 1) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Metodo fijo/porcentaje permite una sola regla activa',
+        path: ['billingConceptRules'],
+      });
+    }
 
     for (const rule of rules) {
       if (rule.effectiveFrom && rule.effectiveTo && rule.effectiveFrom > rule.effectiveTo) {
@@ -271,7 +361,7 @@ const addBillingConceptValidation = <T extends z.ZodTypeAny>(schema: T) =>
         break;
       }
 
-      if (rule.calcMethod === 'FIXED_AMOUNT') {
+      if (data.calcMethod === 'FIXED_AMOUNT') {
         if (!rule.amount) {
           ctx.addIssue({
             code: 'custom',
@@ -280,26 +370,78 @@ const addBillingConceptValidation = <T extends z.ZodTypeAny>(schema: T) =>
           });
           break;
         }
-      }
-
-      if (rule.calcMethod === 'PERCENTAGE') {
-        if (!rule.baseAmount || !rule.rate) {
+        if (rule.rate) {
           ctx.addIssue({
             code: 'custom',
-            message: 'Base y tasa son requeridas para metodo porcentaje',
+            message: 'Metodo fijo no usa tasa',
             path: ['billingConceptRules'],
           });
           break;
         }
       }
 
-      if (rule.calcMethod === 'TIERED') {
-        const hasAmount = !!rule.amount;
-        const hasPercentage = !!rule.baseAmount && !!rule.rate;
-        if (!rule.rangeMetric || (!hasAmount && !hasPercentage)) {
+      if (data.calcMethod === 'PERCENTAGE') {
+        if (!rule.rate) {
           ctx.addIssue({
             code: 'custom',
-            message: 'Metodo escalonado requiere metrica y valor o porcentaje',
+            message: 'Tasa es requerida para metodo porcentaje',
+            path: ['billingConceptRules'],
+          });
+          break;
+        }
+        if (rule.amount) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Metodo porcentaje no usa valor fijo en la regla',
+            path: ['billingConceptRules'],
+          });
+          break;
+        }
+      }
+
+      if (!isTieredCalcMethod(data.calcMethod) && (rule.valueFrom || rule.valueTo)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Rango solo aplica para metodo escalonado',
+          path: ['billingConceptRules'],
+        });
+        break;
+      }
+
+      if (data.calcMethod === 'TIERED_FIXED_AMOUNT') {
+        const hasRange = !!rule.valueFrom && !!rule.valueTo;
+        if (!hasRange || !rule.amount) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Escalonado valor fijo requiere rango y valor',
+            path: ['billingConceptRules'],
+          });
+          break;
+        }
+        if (rule.rate) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Escalonado valor fijo no usa tasa',
+            path: ['billingConceptRules'],
+          });
+          break;
+        }
+      }
+
+      if (data.calcMethod === 'TIERED_PERCENTAGE') {
+        const hasRange = !!rule.valueFrom && !!rule.valueTo;
+        if (!hasRange || !rule.rate) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Escalonado porcentaje requiere rango y tasa',
+            path: ['billingConceptRules'],
+          });
+          break;
+        }
+        if (rule.amount) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Escalonado porcentaje no usa valor fijo',
             path: ['billingConceptRules'],
           });
           break;
@@ -314,14 +456,33 @@ const addBillingConceptValidation = <T extends z.ZodTypeAny>(schema: T) =>
         });
         break;
       }
+    }
 
-      if (rule.minAmount && rule.maxAmount && Number(rule.minAmount) > Number(rule.maxAmount)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Minimo no puede ser mayor a maximo',
-          path: ['billingConceptRules'],
-        });
-        break;
+    if (isTieredCalcMethod(data.calcMethod)) {
+      const tierRules = activeRules.map((rule, index) => ({
+        index,
+        from: toFiniteNumber(rule.valueFrom ?? null),
+        to: toFiniteNumber(rule.valueTo ?? null),
+        effectiveFrom: rule.effectiveFrom ?? null,
+        effectiveTo: rule.effectiveTo ?? null,
+      }));
+
+      for (let i = 0; i < tierRules.length; i += 1) {
+        for (let j = i + 1; j < tierRules.length; j += 1) {
+          const a = tierRules[i];
+          const b = tierRules[j];
+          if (!datesOverlap(a.effectiveFrom, a.effectiveTo, b.effectiveFrom, b.effectiveTo)) {
+            continue;
+          }
+          if (rangesOverlap(a.from, a.to, b.from, b.to)) {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'Reglas escalonadas activas no pueden solaparse en rango y vigencia',
+              path: ['billingConceptRules'],
+            });
+            return;
+          }
+        }
       }
     }
   });

@@ -221,7 +221,7 @@ export const CreditProductBillingConceptInputSchema = z.object({
   billingConceptId: z.number().int().positive(),
   isEnabled: z.boolean(),
   overrideFrequency: z
-    .enum(['ONE_TIME', 'MONTHLY', 'PER_INSTALLMENT', 'PER_EVENT'])
+    .enum(['ONE_TIME', 'MONTHLY', 'PER_INSTALLMENT'])
     .nullable()
     .optional(),
   overrideFinancingMode: z

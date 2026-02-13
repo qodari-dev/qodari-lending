@@ -22,17 +22,9 @@ export type OverpaymentHandling = (typeof OVERPAYMENT_HANDLING_OPTIONS)[number];
 export const ALLOCATION_SCOPE_OPTIONS = [
   'ONLY_PAST_DUE',
   'PAST_DUE_FIRST',
-  'CURRENT_ALLOWED',
 ] as const;
 
 export type AllocationScope = (typeof ALLOCATION_SCOPE_OPTIONS)[number];
-
-export const ALLOCATION_ORDER_WITHIN_OPTIONS = [
-  'DUE_DATE_ASC',
-  'INSTALLMENT_ASC',
-] as const;
-
-export type AllocationOrderWithin = (typeof ALLOCATION_ORDER_WITHIN_OPTIONS)[number];
 
 export const overpaymentHandlingLabels: Record<OverpaymentHandling, string> = {
   EXCESS_BALANCE: 'Saldo a favor',
@@ -43,12 +35,6 @@ export const overpaymentHandlingLabels: Record<OverpaymentHandling, string> = {
 export const allocationScopeLabels: Record<AllocationScope, string> = {
   ONLY_PAST_DUE: 'Solo vencido',
   PAST_DUE_FIRST: 'Vencido primero',
-  CURRENT_ALLOWED: 'Permite vigente',
-};
-
-export const allocationOrderWithinLabels: Record<AllocationOrderWithin, string> = {
-  DUE_DATE_ASC: 'Fecha vencimiento',
-  INSTALLMENT_ASC: 'Numero cuota',
 };
 
 const PaymentAllocationPolicyWhereFieldsSchema = z
@@ -100,7 +86,6 @@ export const PaymentAllocationPolicyRuleInputSchema = z.object({
   priority: z.number().int().min(1),
   billingConceptId: z.number().int().positive(),
   scope: z.enum(ALLOCATION_SCOPE_OPTIONS),
-  orderWithin: z.enum(ALLOCATION_ORDER_WITHIN_OPTIONS),
 });
 
 export type PaymentAllocationPolicyRuleInput = z.infer<

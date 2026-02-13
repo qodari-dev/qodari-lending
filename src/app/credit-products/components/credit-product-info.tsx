@@ -59,7 +59,7 @@ export function CreditProductInfo({
     id: number;
     billingConceptId: number;
     isEnabled: boolean;
-    overrideFrequency: 'ONE_TIME' | 'MONTHLY' | 'PER_INSTALLMENT' | 'PER_EVENT' | null;
+    overrideFrequency: 'ONE_TIME' | 'MONTHLY' | 'PER_INSTALLMENT' | null;
     overrideFinancingMode:
       | 'DISCOUNT_FROM_DISBURSEMENT'
       | 'FINANCED_IN_LOAN'

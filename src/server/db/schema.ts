@@ -2281,7 +2281,6 @@ export const billingConceptFrequencyEnum = pgEnum('billing_concept_frequency', [
   'ONE_TIME', // único (p.ej. estudio)
   'MONTHLY', // mensual
   'PER_INSTALLMENT', // por cuota
-  'PER_EVENT', // por evento (p.ej. cobranza, mora, etc.)
 ]);
 
 export const billingConceptFinancingModeEnum = pgEnum('billing_concept_financing_mode', [
@@ -2293,7 +2292,8 @@ export const billingConceptFinancingModeEnum = pgEnum('billing_concept_financing
 export const billingConceptCalcMethodEnum = pgEnum('billing_concept_calc_method', [
   'FIXED_AMOUNT', // valor fijo
   'PERCENTAGE', // porcentaje sobre una base
-  'TIERED', // por rangos (como seguro por rangos)
+  'TIERED_FIXED_AMOUNT', // por rangos con valor fijo
+  'TIERED_PERCENTAGE', // por rangos con porcentaje
 ]);
 
 export const billingConceptBaseAmountEnum = pgEnum('billing_concept_base_amount', [
@@ -2307,6 +2307,14 @@ export const billingConceptRoundingModeEnum = pgEnum('billing_concept_rounding_m
   'NEAREST',
   'UP',
   'DOWN',
+]);
+
+export const billingConceptRangeMetricEnum = pgEnum('billing_concept_range_metric', [
+  'INSTALLMENT_COUNT', // # de cuotas (1-10, 11-20, etc.)
+  'DISBURSED_AMOUNT', // monto desembolsado
+  'PRINCIPAL', // capital
+  'OUTSTANDING_BALANCE', // saldo
+  'INSTALLMENT_AMOUNT', // valor de la cuota
 ]);
 
 // ---------------------------------------------------------------------
@@ -2327,6 +2335,13 @@ export const billingConcepts = pgTable(
     // defaults (se pueden sobre-escribir en producto o en crédito)
     defaultFrequency: billingConceptFrequencyEnum('default_frequency').notNull(),
     defaultFinancingMode: billingConceptFinancingModeEnum('default_financing_mode').notNull(),
+    calcMethod: billingConceptCalcMethodEnum('calc_method').notNull(),
+    baseAmount: billingConceptBaseAmountEnum('base_amount'),
+    rangeMetric: billingConceptRangeMetricEnum('range_metric'),
+    minAmount: decimal('min_amount', { precision: 14, scale: 2 }),
+    maxAmount: decimal('max_amount', { precision: 14, scale: 2 }),
+    roundingMode: billingConceptRoundingModeEnum('rounding_mode').notNull().default('NEAREST'),
+    roundingDecimals: integer('rounding_decimals').notNull().default(2),
     // auxiliar / cuenta contable por defecto
     defaultGlAccountId: integer('default_gl_account_id').references(() => glAccounts.id, {
       onDelete: 'restrict',
@@ -2334,16 +2349,42 @@ export const billingConcepts = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
-  (t) => [uniqueIndex('uniq_billing_concepts_code').on(t.code)]
+  (t) => [
+    uniqueIndex('uniq_billing_concepts_code').on(t.code),
+    check(
+      'chk_billing_concepts_min_max_order',
+      sql`${t.minAmount} IS NULL OR ${t.maxAmount} IS NULL OR ${t.minAmount} <= ${t.maxAmount}`
+    ),
+    check(
+      'chk_billing_concepts_fixed_no_base',
+      sql`${t.calcMethod} <> 'FIXED_AMOUNT' OR ${t.baseAmount} IS NULL`
+    ),
+    check(
+      'chk_billing_concepts_percentage_requires_base',
+      sql`${t.calcMethod} <> 'PERCENTAGE' OR ${t.baseAmount} IS NOT NULL`
+    ),
+    check(
+      'chk_billing_concepts_tier_fixed_no_base',
+      sql`${t.calcMethod} <> 'TIERED_FIXED_AMOUNT' OR ${t.baseAmount} IS NULL`
+    ),
+    check(
+      'chk_billing_concepts_tier_percentage_requires_base',
+      sql`${t.calcMethod} <> 'TIERED_PERCENTAGE' OR ${t.baseAmount} IS NOT NULL`
+    ),
+    check(
+      'chk_billing_concepts_tier_requires_metric',
+      sql`${t.calcMethod} NOT IN ('TIERED_FIXED_AMOUNT', 'TIERED_PERCENTAGE') OR ${t.rangeMetric} IS NOT NULL`
+    ),
+    check(
+      'chk_billing_concepts_non_tier_no_metric',
+      sql`${t.calcMethod} IN ('TIERED_FIXED_AMOUNT', 'TIERED_PERCENTAGE') OR ${t.rangeMetric} IS NULL`
+    ),
+    check(
+      'chk_billing_concepts_rounding_decimals_range',
+      sql`${t.roundingDecimals} BETWEEN 0 AND 6`
+    ),
+  ]
 );
-
-export const billingConceptRangeMetricEnum = pgEnum('billing_concept_range_metric', [
-  'INSTALLMENT_COUNT', // # de cuotas (1-10, 11-20, etc.)
-  'DISBURSED_AMOUNT', // monto desembolsado
-  'PRINCIPAL', // capital
-  'OUTSTANDING_BALANCE', // saldo
-  'INSTALLMENT_AMOUNT', // valor de la cuota
-]);
 
 // ---------------------------------------------------------------------
 // Billing Concept Rules - Reglas / Rangos / Vigencias
@@ -2357,38 +2398,15 @@ export const billingConceptRules = pgTable(
     billingConceptId: integer('billing_concept_id')
       .notNull()
       .references(() => billingConcepts.id, { onDelete: 'cascade' }),
-
-    calcMethod: billingConceptCalcMethodEnum('calc_method').notNull(),
-
-    // base y rate aplican para PERCENTAGE / TIERED
-    baseAmount: billingConceptBaseAmountEnum('base_amount'),
     rate: decimal('rate', { precision: 12, scale: 6 }),
-
-    // amount aplica para FIXED_AMOUNT / TIERED
     amount: decimal('amount', { precision: 14, scale: 2 }),
-
-    rangeMetric: billingConceptRangeMetricEnum('range_metric'),
-
-    // rangos (para TIERED)
+    // rangos para reglas escalonadas
     valueFrom: decimal('value_from', { precision: 14, scale: 2 }),
     valueTo: decimal('value_to', { precision: 14, scale: 2 }),
-
-    // topes opcionales
-    minAmount: decimal('min_amount', { precision: 14, scale: 2 }),
-    maxAmount: decimal('max_amount', { precision: 14, scale: 2 }),
-
-    roundingMode: billingConceptRoundingModeEnum('rounding_mode').notNull().default('NEAREST'),
-    roundingDecimals: integer('rounding_decimals').notNull().default(2),
-
     // vigencia
     effectiveFrom: date('effective_from'),
     effectiveTo: date('effective_to'),
-
-    // si hay varias reglas activas que podrían aplicar, gana la mayor prioridad
-    priority: integer('priority').notNull().default(0),
-
     isActive: boolean('is_active').notNull().default(true),
-
     ...timestamps,
   },
   (t) => [
@@ -2396,32 +2414,16 @@ export const billingConceptRules = pgTable(
     index('idx_billing_concept_rules_active').on(t.billingConceptId, t.isActive),
     uniqueIndex('uniq_billing_concept_rule_id_concept').on(t.id, t.billingConceptId),
     check(
-      'chk_billing_concept_rules_tier_requires_metric',
-      sql`${t.calcMethod} <> 'TIERED' OR ${t.rangeMetric} IS NOT NULL`
-    ),
-    check(
       'chk_billing_concept_rules_range_order',
       sql`${t.valueFrom} IS NULL OR ${t.valueTo} IS NULL OR ${t.valueFrom} <= ${t.valueTo}`
     ),
     check(
-      'chk_billing_rules_percentage_required',
-      sql`${t.calcMethod} <> 'PERCENTAGE' OR (${t.baseAmount} IS NOT NULL AND ${t.rate} IS NOT NULL)`
+      'chk_billing_rules_range_pair',
+      sql`(${t.valueFrom} IS NULL AND ${t.valueTo} IS NULL) OR (${t.valueFrom} IS NOT NULL AND ${t.valueTo} IS NOT NULL)`
     ),
     check(
-      'chk_billing_rules_percentage_no_amount',
-      sql`${t.calcMethod} <> 'PERCENTAGE' OR ${t.amount} IS NULL`
-    ),
-    check(
-      'chk_billing_rules_fixed_amount_required',
-      sql`${t.calcMethod} <> 'FIXED_AMOUNT' OR ${t.amount} IS NOT NULL`
-    ),
-    check(
-      'chk_billing_rules_fixed_amount_no_rate',
-      sql`${t.calcMethod} <> 'FIXED_AMOUNT' OR (${t.baseAmount} IS NULL AND ${t.rate} IS NULL)`
-    ),
-    check(
-      'chk_billing_rules_tier_requires_value_source',
-      sql`${t.calcMethod} <> 'TIERED' OR (${t.amount} IS NOT NULL OR (${t.baseAmount} IS NOT NULL AND ${t.rate} IS NOT NULL))`
+      'chk_billing_rules_value_required',
+      sql`${t.amount} IS NOT NULL OR ${t.rate} IS NOT NULL`
     ),
     check(
       'chk_billing_rules_effective_order',
@@ -2502,6 +2504,7 @@ export const loanBillingConcepts = pgTable(
 
     calcMethod: billingConceptCalcMethodEnum('calc_method').notNull(),
     baseAmount: billingConceptBaseAmountEnum('base_amount'),
+    rangeMetric: billingConceptRangeMetricEnum('range_metric'),
     rate: decimal('rate', { precision: 12, scale: 6 }),
     amount: decimal('amount', { precision: 14, scale: 2 }),
     valueFrom: decimal('value_from', { precision: 14, scale: 2 }),
@@ -3047,12 +3050,6 @@ export const overpaymentHandlingEnum = pgEnum('overpayment_handling', [
 export const allocationScopeEnum = pgEnum('allocation_scope', [
   'ONLY_PAST_DUE', // solo vencido
   'PAST_DUE_FIRST', // vencido primero, luego vigente si sobra
-  'CURRENT_ALLOWED', // permite vigente (prepago) directamente
-]);
-
-export const orderWithinEnum = pgEnum('allocation_order_within', [
-  'DUE_DATE_ASC', // más antiguo primero
-  'INSTALLMENT_ASC', // cuota # menor primero
 ]);
 
 export const paymentAllocationPolicies = pgTable(
@@ -3087,7 +3084,6 @@ export const paymentAllocationPolicyRules = pgTable(
       .notNull()
       .references(() => billingConcepts.id, { onDelete: 'restrict' }),
     scope: allocationScopeEnum('scope').notNull().default('PAST_DUE_FIRST'),
-    orderWithin: orderWithinEnum('order_within').notNull().default('DUE_DATE_ASC'),
     ...timestamps,
   },
   (t) => [

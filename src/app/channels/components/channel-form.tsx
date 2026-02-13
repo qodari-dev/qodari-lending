@@ -96,7 +96,15 @@ export function ChannelForm({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="code">Código</FieldLabel>
-                    <Input {...field} aria-invalid={fieldState.invalid} className="font-mono" />
+                    <Input
+                      {...field}
+                      id="code"
+                      maxLength={30}
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+                      aria-invalid={fieldState.invalid}
+                      className="font-mono"
+                    />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}

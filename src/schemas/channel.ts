@@ -64,8 +64,20 @@ export const GetChannelQuerySchema = z.object({
 // MUTATIONS
 // ============================================
 
+const ChannelCodeSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim().toUpperCase() : value),
+  z
+    .string()
+    .min(1, 'Codigo requerido')
+    .max(30, 'Codigo maximo de 30 caracteres')
+    .regex(
+      /^[A-Z][A-Z0-9_]*$/,
+      'El codigo debe iniciar con letra y solo permite letras mayusculas, numeros y guion bajo (_)'
+    )
+);
+
 export const CreateChannelBodySchema = z.object({
-  code: z.string().min(1).max(30),
+  code: ChannelCodeSchema,
   name: z.string().min(1).max(100),
   description: z.string().max(255).optional(),
   isActive: z.boolean(),

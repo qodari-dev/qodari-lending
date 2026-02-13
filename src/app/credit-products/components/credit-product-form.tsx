@@ -58,6 +58,8 @@ import {
   insuranceRangeMetricLabels,
   INTEREST_ACCRUAL_METHOD_OPTIONS,
   interestAccrualMethodLabels,
+  LATE_INTEREST_AGE_BASIS_OPTIONS,
+  lateInterestAgeBasisLabels,
   INTEREST_RATE_TYPE_OPTIONS,
   interestRateTypeLabels,
   RISK_EVALUATION_MODE_OPTIONS,
@@ -108,6 +110,7 @@ export function CreditProductForm({
       costCenterId: null,
       riskEvaluationMode: 'NONE',
       riskMinScore: null,
+      ageBasis: 'OLDEST_OVERDUE_INSTALLMENT',
       interestRateType: 'EFFECTIVE_ANNUAL',
       interestAccrualMethod: 'DAILY',
       interestDayCountConvention: 'ACTUAL_360',
@@ -197,9 +200,13 @@ export function CreditProductForm({
   useEffect(() => {
     if (opened) {
       const currentDocuments =
-        (creditProduct as CreditProduct & {
-          creditProductDocuments?: { documentTypeId: number; isRequired: boolean }[];
-        } | undefined)?.creditProductDocuments ?? [];
+        (
+          creditProduct as
+            | (CreditProduct & {
+                creditProductDocuments?: { documentTypeId: number; isRequired: boolean }[];
+              })
+            | undefined
+        )?.creditProductDocuments ?? [];
 
       form.reset({
         name: creditProduct?.name ?? '',
@@ -217,12 +224,14 @@ export function CreditProductForm({
         costCenterId: creditProduct?.costCenterId ?? null,
         riskEvaluationMode: creditProduct?.riskEvaluationMode ?? 'NONE',
         riskMinScore: creditProduct?.riskMinScore ?? null,
+        ageBasis: creditProduct?.ageBasis ?? 'OLDEST_OVERDUE_INSTALLMENT',
         interestRateType: creditProduct?.interestRateType ?? 'EFFECTIVE_ANNUAL',
         interestAccrualMethod: creditProduct?.interestAccrualMethod ?? 'DAILY',
         interestDayCountConvention: creditProduct?.interestDayCountConvention ?? 'ACTUAL_360',
         lateInterestRateType: creditProduct?.lateInterestRateType ?? 'EFFECTIVE_ANNUAL',
         lateInterestAccrualMethod: creditProduct?.lateInterestAccrualMethod ?? 'DAILY',
-        lateInterestDayCountConvention: creditProduct?.lateInterestDayCountConvention ?? 'ACTUAL_360',
+        lateInterestDayCountConvention:
+          creditProduct?.lateInterestDayCountConvention ?? 'ACTUAL_360',
         insuranceAccrualMethod: creditProduct?.insuranceAccrualMethod ?? 'PER_INSTALLMENT',
         isActive: creditProduct?.isActive ?? true,
         creditProductRefinancePolicy: creditProduct?.creditProductRefinancePolicy
@@ -310,7 +319,9 @@ export function CreditProductForm({
     <Sheet open={opened} onOpenChange={onOpened}>
       <SheetContent ref={sheetContentRef} className="overflow-y-scroll sm:max-w-4xl">
         <SheetHeader>
-          <SheetTitle>{creditProduct ? 'Editar Tipo de Credito' : 'Nuevo Tipo de Credito'}</SheetTitle>
+          <SheetTitle>
+            {creditProduct ? 'Editar Tipo de Credito' : 'Nuevo Tipo de Credito'}
+          </SheetTitle>
           <SheetDescription>
             Configure el producto de credito, categorias, reglas de mora, documentos y cuentas.
           </SheetDescription>
@@ -356,20 +367,30 @@ export function CreditProductForm({
                           <Combobox
                             items={creditFunds}
                             value={findCreditFund(field.value)}
-                            onValueChange={(value: CreditFund | null) => field.onChange(value?.id ?? undefined)}
+                            onValueChange={(value: CreditFund | null) =>
+                              field.onChange(value?.id ?? undefined)
+                            }
                             itemToStringValue={(item: CreditFund) => String(item.id)}
                             itemToStringLabel={(item: CreditFund) => item.name}
                           >
                             <ComboboxTrigger
                               render={
-                                <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
                                   <ComboboxValue placeholder="Seleccione..." />
                                   <ChevronDownIcon className="text-muted-foreground size-4" />
                                 </Button>
                               }
                             />
                             <ComboboxContent portalContainer={sheetContentRef}>
-                              <ComboboxInput placeholder="Buscar fondo..." showClear showTrigger={false} />
+                              <ComboboxInput
+                                placeholder="Buscar fondo..."
+                                showClear
+                                showTrigger={false}
+                              />
                               <ComboboxList>
                                 <ComboboxEmpty>No se encontraron fondos</ComboboxEmpty>
                                 <ComboboxCollection>
@@ -423,9 +444,7 @@ export function CreditProductForm({
                                 showTrigger={false}
                               />
                               <ComboboxList>
-                                <ComboboxEmpty>
-                                  No se encontraron politicas
-                                </ComboboxEmpty>
+                                <ComboboxEmpty>No se encontraron politicas</ComboboxEmpty>
                                 <ComboboxCollection>
                                   {(item: PaymentAllocationPolicy) => (
                                     <ComboboxItem key={item.id} value={item}>
@@ -516,9 +535,7 @@ export function CreditProductForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="interestAccrualMethod">
-                            Causacion interes
-                          </FieldLabel>
+                          <FieldLabel htmlFor="interestAccrualMethod">Causacion interes</FieldLabel>
                           <Select value={field.value} onValueChange={field.onChange}>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione..." />
@@ -634,6 +651,29 @@ export function CreditProductForm({
                       )}
                     />
 
+                    <Controller
+                      name="ageBasis"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="ageBasis">Base edad mora</FieldLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {LATE_INTEREST_AGE_BASIS_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {lateInterestAgeBasisLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
                     <div className="col-span-2 pt-2">
                       <p className="text-sm font-semibold">Seguro</p>
                     </div>
@@ -688,9 +728,7 @@ export function CreditProductForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="insuranceAccrualMethod">
-                            Causacion seguro
-                          </FieldLabel>
+                          <FieldLabel htmlFor="insuranceAccrualMethod">Causacion seguro</FieldLabel>
                           <Select
                             value={field.value}
                             onValueChange={field.onChange}
@@ -721,7 +759,9 @@ export function CreditProductForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="capitalDistributionId">Distribucion capital</FieldLabel>
+                          <FieldLabel htmlFor="capitalDistributionId">
+                            Distribucion capital
+                          </FieldLabel>
                           <Combobox
                             items={accountingDistributions}
                             value={findAccountingDistribution(field.value)}
@@ -733,14 +773,22 @@ export function CreditProductForm({
                           >
                             <ComboboxTrigger
                               render={
-                                <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
                                   <ComboboxValue placeholder="Seleccione..." />
                                   <ChevronDownIcon className="text-muted-foreground size-4" />
                                 </Button>
                               }
                             />
                             <ComboboxContent portalContainer={sheetContentRef}>
-                              <ComboboxInput placeholder="Buscar distribucion..." showClear showTrigger={false} />
+                              <ComboboxInput
+                                placeholder="Buscar distribucion..."
+                                showClear
+                                showTrigger={false}
+                              />
                               <ComboboxList>
                                 <ComboboxEmpty>No se encontraron distribuciones</ComboboxEmpty>
                                 <ComboboxCollection>
@@ -763,7 +811,9 @@ export function CreditProductForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="interestDistributionId">Distribucion interes</FieldLabel>
+                          <FieldLabel htmlFor="interestDistributionId">
+                            Distribucion interes
+                          </FieldLabel>
                           <Combobox
                             items={accountingDistributions}
                             value={findAccountingDistribution(field.value)}
@@ -775,14 +825,22 @@ export function CreditProductForm({
                           >
                             <ComboboxTrigger
                               render={
-                                <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
                                   <ComboboxValue placeholder="Seleccione..." />
                                   <ChevronDownIcon className="text-muted-foreground size-4" />
                                 </Button>
                               }
                             />
                             <ComboboxContent portalContainer={sheetContentRef}>
-                              <ComboboxInput placeholder="Buscar distribucion..." showClear showTrigger={false} />
+                              <ComboboxInput
+                                placeholder="Buscar distribucion..."
+                                showClear
+                                showTrigger={false}
+                              />
                               <ComboboxList>
                                 <ComboboxEmpty>No se encontraron distribuciones</ComboboxEmpty>
                                 <ComboboxCollection>
@@ -805,7 +863,9 @@ export function CreditProductForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="lateInterestDistributionId">Distribucion mora</FieldLabel>
+                          <FieldLabel htmlFor="lateInterestDistributionId">
+                            Distribucion mora
+                          </FieldLabel>
                           <Combobox
                             items={accountingDistributions}
                             value={findAccountingDistribution(field.value)}
@@ -817,14 +877,22 @@ export function CreditProductForm({
                           >
                             <ComboboxTrigger
                               render={
-                                <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
                                   <ComboboxValue placeholder="Seleccione..." />
                                   <ChevronDownIcon className="text-muted-foreground size-4" />
                                 </Button>
                               }
                             />
                             <ComboboxContent portalContainer={sheetContentRef}>
-                              <ComboboxInput placeholder="Buscar distribucion..." showClear showTrigger={false} />
+                              <ComboboxInput
+                                placeholder="Buscar distribucion..."
+                                showClear
+                                showTrigger={false}
+                              />
                               <ComboboxList>
                                 <ComboboxEmpty>No se encontraron distribuciones</ComboboxEmpty>
                                 <ComboboxCollection>
@@ -876,20 +944,30 @@ export function CreditProductForm({
                           <Combobox
                             items={costCenters}
                             value={findCostCenter(field.value)}
-                            onValueChange={(value: CostCenter | null) => field.onChange(value?.id ?? null)}
+                            onValueChange={(value: CostCenter | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
                             itemToStringValue={(item: CostCenter) => String(item.id)}
                             itemToStringLabel={(item: CostCenter) => `${item.code} - ${item.name}`}
                           >
                             <ComboboxTrigger
                               render={
-                                <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
                                   <ComboboxValue placeholder="Seleccione..." />
                                   <ChevronDownIcon className="text-muted-foreground size-4" />
                                 </Button>
                               }
                             />
                             <ComboboxContent portalContainer={sheetContentRef}>
-                              <ComboboxInput placeholder="Buscar centro..." showClear showTrigger={false} />
+                              <ComboboxInput
+                                placeholder="Buscar centro..."
+                                showClear
+                                showTrigger={false}
+                              />
                               <ComboboxList>
                                 <ComboboxEmpty>No se encontraron centros</ComboboxEmpty>
                                 <ComboboxCollection>
@@ -962,7 +1040,9 @@ export function CreditProductForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="reportsToCreditBureau">Reporta centrales?</FieldLabel>
+                          <FieldLabel htmlFor="reportsToCreditBureau">
+                            Reporta centrales?
+                          </FieldLabel>
                           <div>
                             <Switch
                               checked={field.value}

@@ -24,8 +24,15 @@ export type InsuranceRangeMetric = (typeof INSURANCE_RANGE_METRIC_OPTIONS)[numbe
 export const RISK_EVALUATION_MODE_OPTIONS = ['NONE', 'VALIDATE_ONLY', 'REQUIRED'] as const;
 export type RiskEvaluationMode = (typeof RISK_EVALUATION_MODE_OPTIONS)[number];
 
+export const LATE_INTEREST_AGE_BASIS_OPTIONS = [
+  'OLDEST_OVERDUE_INSTALLMENT',
+  'EACH_INSTALLMENT',
+] as const;
+export type LateInterestAgeBasis = (typeof LATE_INTEREST_AGE_BASIS_OPTIONS)[number];
+
 export const INTEREST_RATE_TYPE_OPTIONS = [
   'EFFECTIVE_ANNUAL',
+  'EFFECTIVE_MONTHLY',
   'NOMINAL_MONTHLY',
   'NOMINAL_ANNUAL',
   'MONTHLY_FLAT',
@@ -65,8 +72,14 @@ export const riskEvaluationModeLabels: Record<RiskEvaluationMode, string> = {
   REQUIRED: 'Obligatorio',
 };
 
+export const lateInterestAgeBasisLabels: Record<LateInterestAgeBasis, string> = {
+  OLDEST_OVERDUE_INSTALLMENT: 'Cuota vencida mas antigua',
+  EACH_INSTALLMENT: 'Cada cuota vencida',
+};
+
 export const interestRateTypeLabels: Record<InterestRateType, string> = {
   EFFECTIVE_ANNUAL: 'Efectiva anual',
+  EFFECTIVE_MONTHLY: 'Efectiva mensual',
   NOMINAL_MONTHLY: 'Nominal mensual',
   NOMINAL_ANNUAL: 'Nominal anual',
   MONTHLY_FLAT: 'Mensual plana',
@@ -256,6 +269,7 @@ const CreditProductBaseSchema = z.object({
   costCenterId: z.number().int().positive().nullable().optional(),
   riskEvaluationMode: z.enum(RISK_EVALUATION_MODE_OPTIONS),
   riskMinScore: z.string().nullable().optional(),
+  ageBasis: z.enum(LATE_INTEREST_AGE_BASIS_OPTIONS),
   interestRateType: z.enum(INTEREST_RATE_TYPE_OPTIONS),
   interestAccrualMethod: z.enum(INTEREST_ACCRUAL_METHOD_OPTIONS),
   interestDayCountConvention: z.enum(DAY_COUNT_CONVENTION_OPTIONS),

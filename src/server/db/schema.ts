@@ -818,9 +818,10 @@ export const lateInterestAgeBasisEnum = pgEnum('late_interest_age_basis', [
 ]);
 
 export const interestRateTypeEnum = pgEnum('interest_rate_type', [
-  'EFFECTIVE_ANNUAL', // E.A.
-  'NOMINAL_MONTHLY', // N.M.V.
-  'NOMINAL_ANNUAL', // N.A.
+  'EFFECTIVE_ANNUAL', // tasa efectiva anual
+  'EFFECTIVE_MONTHLY', // tasa efectiva mensual
+  'NOMINAL_MONTHLY', // tasa nominal mensual
+  'NOMINAL_ANNUAL', // tasa nominal anual
   'MONTHLY_FLAT', // tasa mensual plana
 ]);
 

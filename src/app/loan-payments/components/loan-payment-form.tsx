@@ -26,23 +26,25 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { useLoans } from '@/hooks/queries/use-loan-queries';
+import { useLoanBalanceSummary, useLoans } from '@/hooks/queries/use-loan-queries';
 import { useCreateLoanPayment } from '@/hooks/queries/use-loan-payment-queries';
 import { usePaymentTenderTypes } from '@/hooks/queries/use-payment-tender-type-queries';
-import { Loan } from '@/schemas/loan';
+import { loanStatusLabels, Loan, LoanStatus } from '@/schemas/loan';
 import {
   AvailableUserReceiptType,
   CreateLoanPaymentBodySchema,
   paymentReceiptMovementTypeLabels,
 } from '@/schemas/loan-payment';
 import { PaymentTenderType } from '@/schemas/payment-tender-type';
-import { formatDateISO } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatDateISO } from '@/utils/formatters';
+import { parseDecimalString, roundMoney } from '@/utils/number-utils';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { Controller, FormProvider, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
+import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
 import { LoanPaymentAllocationsForm } from './loan-payment-allocations-form';
 
@@ -89,6 +91,7 @@ export function LoanPaymentForm({
       loanId: undefined,
       description: '',
       amount: '0',
+      overpaidAmount: 0,
       note: null,
       loanPaymentMethodAllocations: [],
     },
@@ -98,7 +101,7 @@ export function LoanPaymentForm({
 
   const { data: loansData } = useLoans({
     limit: 1000,
-    include: ['borrower'],
+    include: ['borrower', 'agreement', 'paymentFrequency', 'loanApplication'],
     sort: [{ field: 'createdAt', order: 'desc' }],
   });
   const loans = useMemo(() => loansData?.body?.data ?? [], [loansData]);
@@ -113,7 +116,10 @@ export function LoanPaymentForm({
     [collectionMethodsData]
   );
 
-  const findLoan = useCallback((id: number | undefined) => loans.find((item) => item.id === id) ?? null, [loans]);
+  const findLoan = useCallback(
+    (id: number | undefined) => loans.find((item) => item.id === id) ?? null,
+    [loans]
+  );
 
   const findReceiptType = useCallback(
     (id: number | undefined) =>
@@ -130,6 +136,7 @@ export function LoanPaymentForm({
       loanId: undefined,
       description: '',
       amount: '0',
+      overpaidAmount: 0,
       note: null,
       loanPaymentMethodAllocations: collectionMethods[0]
         ? [
@@ -152,6 +159,75 @@ export function LoanPaymentForm({
     () => findReceiptType(selectedReceiptTypeId),
     [findReceiptType, selectedReceiptTypeId]
   );
+
+  const selectedLoanId = useWatch({
+    control: form.control,
+    name: 'loanId',
+  });
+
+  const selectedLoan = useMemo(() => findLoan(selectedLoanId), [findLoan, selectedLoanId]);
+
+  const { data: balanceSummaryData, isLoading: isLoadingBalanceSummary } = useLoanBalanceSummary(
+    selectedLoanId ?? 0,
+    {
+      enabled: opened && Boolean(selectedLoanId),
+    }
+  );
+
+  const outstandingBalance = useMemo(() => {
+    if (!selectedLoanId) return null;
+    const rawCurrentBalance = balanceSummaryData?.body?.currentBalance;
+    if (rawCurrentBalance === undefined || rawCurrentBalance === null) return null;
+
+    const rawValue = Number(rawCurrentBalance);
+    return Number.isFinite(rawValue) ? Math.max(0, roundMoney(rawValue)) : null;
+  }, [selectedLoanId, balanceSummaryData?.body?.currentBalance]);
+
+  const currentAmount = useWatch({
+    control: form.control,
+    name: 'amount',
+  });
+
+  const currentOverpaidAmount = useWatch({
+    control: form.control,
+    name: 'overpaidAmount',
+  });
+
+  const [debouncedAmount] = useDebounce(currentAmount ?? '', 350);
+
+  useEffect(() => {
+    if (!opened || !selectedLoanId || outstandingBalance === null) return;
+
+    const parsedAmount = parseDecimalString(debouncedAmount ?? '');
+    if (parsedAmount === null) return;
+
+    if (parsedAmount - outstandingBalance > 0.01) {
+      const clampedAmount = roundMoney(outstandingBalance);
+      const overpaid = Math.max(0, Math.round(parsedAmount - clampedAmount));
+
+      if ((currentAmount ?? '') !== String(clampedAmount)) {
+        form.setValue('amount', String(clampedAmount), {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+      }
+
+      if (Number(currentOverpaidAmount ?? 0) !== overpaid) {
+        form.setValue('overpaidAmount', overpaid, {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+      }
+    }
+  }, [
+    opened,
+    selectedLoanId,
+    debouncedAmount,
+    currentOverpaidAmount,
+    outstandingBalance,
+    currentAmount,
+    form,
+  ]);
 
   const onSubmit = useCallback(
     async (values: FormValues) => {
@@ -190,6 +266,63 @@ export function LoanPaymentForm({
               </TabsList>
 
               <TabsContent value="payment" className="space-y-4 pt-2">
+                <div className="bg-primary-foreground grid gap-3 rounded-lg border p-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Saldo actual</p>
+                    <p className="text-sm font-semibold">
+                      {selectedLoanId
+                        ? isLoadingBalanceSummary || outstandingBalance === null
+                          ? 'Cargando...'
+                          : formatCurrency(outstandingBalance)
+                        : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Titular</p>
+                    <p className="truncate text-sm font-medium">
+                      {selectedLoan ? getBorrowerLabel(selectedLoan) : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Linea de credito</p>
+                    <p className="truncate text-sm font-medium">
+                      {selectedLoan?.loanApplication?.creditProduct?.name ?? '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Convenio</p>
+                    <p className="truncate text-sm font-medium">
+                      {selectedLoan?.agreement
+                        ? `${selectedLoan.agreement.agreementCode} - ${selectedLoan.agreement.businessName}`
+                        : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Estado credito</p>
+                    <p className="text-sm font-medium">
+                      {selectedLoan?.status
+                        ? loanStatusLabels[selectedLoan.status as LoanStatus]
+                        : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Fecha inicio</p>
+                    <p className="text-sm font-medium">
+                      {selectedLoan ? formatDate(selectedLoan.creditStartDate) : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Periodicidad</p>
+                    <p className="text-sm font-medium">
+                      {selectedLoan?.paymentFrequency?.name ?? '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Credito</p>
+                    <p className="text-sm font-medium">{selectedLoan?.creditNumber ?? '-'}</p>
+                  </div>
+                </div>
+
                 <FieldGroup>
                   <Controller
                     name="loanId"
@@ -200,20 +333,51 @@ export function LoanPaymentForm({
                         <Combobox
                           items={loans}
                           value={findLoan(field.value)}
-                          onValueChange={(value: Loan | null) => field.onChange(value?.id ?? undefined)}
+                          onValueChange={(value: Loan | null) => {
+                            field.onChange(value?.id ?? undefined);
+                            form.setValue('amount', '0', {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                            form.setValue('overpaidAmount', 0, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
+                            const currentAllocations =
+                              form.getValues('loanPaymentMethodAllocations') ?? [];
+                            form.setValue(
+                              'loanPaymentMethodAllocations',
+                              currentAllocations.map((item) => ({
+                                ...item,
+                                amount: '0',
+                              })),
+                              { shouldValidate: true, shouldDirty: true }
+                            );
+                          }}
                           itemToStringValue={(item: Loan) => String(item.id)}
-                          itemToStringLabel={(item: Loan) => `${item.creditNumber} - ${getBorrowerLabel(item)}`}
+                          itemToStringLabel={(item: Loan) =>
+                            `${item.creditNumber} - ${getBorrowerLabel(item)}`
+                          }
                         >
                           <ComboboxTrigger
                             render={
-                              <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-between font-normal"
+                              >
                                 <ComboboxValue placeholder="Seleccione..." />
                                 <ChevronDownIcon className="text-muted-foreground size-4" />
                               </Button>
                             }
                           />
                           <ComboboxContent portalContainer={sheetContentRef}>
-                            <ComboboxInput placeholder="Buscar credito..." showClear showTrigger={false} />
+                            <ComboboxInput
+                              placeholder="Buscar credito..."
+                              showClear
+                              showTrigger={false}
+                            />
                             <ComboboxList>
                               <ComboboxEmpty>No se encontraron creditos</ComboboxEmpty>
                               <ComboboxCollection>
@@ -250,14 +414,22 @@ export function LoanPaymentForm({
                         >
                           <ComboboxTrigger
                             render={
-                              <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-between font-normal"
+                              >
                                 <ComboboxValue placeholder="Seleccione..." />
                                 <ChevronDownIcon className="text-muted-foreground size-4" />
                               </Button>
                             }
                           />
                           <ComboboxContent portalContainer={sheetContentRef}>
-                            <ComboboxInput placeholder="Buscar tipo..." showClear showTrigger={false} />
+                            <ComboboxInput
+                              placeholder="Buscar tipo..."
+                              showClear
+                              showTrigger={false}
+                            />
                             <ComboboxList>
                               <ComboboxEmpty>No hay tipos de recibo habilitados</ComboboxEmpty>
                               <ComboboxCollection>
@@ -315,9 +487,23 @@ export function LoanPaymentForm({
                           id="amount"
                           inputMode="decimal"
                           value={field.value ?? ''}
-                          onChange={(event) => field.onChange(event.target.value)}
+                          onChange={(event) => {
+                            field.onChange(event.target.value);
+                            if (Number(currentOverpaidAmount ?? 0) > 0) {
+                              form.setValue('overpaidAmount', 0, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            }
+                          }}
                           aria-invalid={fieldState.invalid}
                         />
+                        {currentOverpaidAmount && currentOverpaidAmount > 0 ? (
+                          <p className="text-xs text-amber-700">
+                            Se detecto excedente: {formatCurrency(currentOverpaidAmount)}. Se
+                            registrara automaticamente.
+                          </p>
+                        ) : null}
                         {fieldState.error && <FieldError errors={[fieldState.error]} />}
                       </Field>
                     )}
@@ -374,7 +560,9 @@ export function LoanPaymentForm({
               </TabsContent>
 
               <TabsContent value="allocations" className="pt-2">
-                <LoanPaymentAllocationsForm collectionMethods={collectionMethods as PaymentTenderType[]} />
+                <LoanPaymentAllocationsForm
+                  collectionMethods={collectionMethods as PaymentTenderType[]}
+                />
               </TabsContent>
             </Tabs>
           </form>

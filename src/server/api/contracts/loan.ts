@@ -3,6 +3,9 @@ import {
   GetLoanStatementQuerySchema,
   LiquidateLoanBodySchema,
   ListLoansQuerySchema,
+  UpdateLoanLegalProcessBodySchema,
+  UpdateLoanPaymentAgreementBodySchema,
+  VoidLoanBodySchema,
 } from '@/schemas/loan';
 import type { LoanBalanceSummary, LoanStatement } from '@/schemas/loan';
 import { IdParamSchema } from '@/schemas/shared';
@@ -75,6 +78,70 @@ export const loan = c.router(
         403: TsRestErrorSchema,
         404: TsRestErrorSchema,
         409: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    void: {
+      method: 'POST',
+      path: '/:id/void',
+      pathParams: IdParamSchema,
+      body: VoidLoanBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'void',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: c.type<Loans>(),
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        409: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    updateLegalProcess: {
+      method: 'PATCH',
+      path: '/:id/legal-process',
+      pathParams: IdParamSchema,
+      body: UpdateLoanLegalProcessBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'update',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: c.type<Loans>(),
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    updatePaymentAgreement: {
+      method: 'PATCH',
+      path: '/:id/payment-agreement',
+      pathParams: IdParamSchema,
+      body: UpdateLoanPaymentAgreementBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'update',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: c.type<Loans>(),
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
         500: TsRestErrorSchema,
       },
     },

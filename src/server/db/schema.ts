@@ -2127,7 +2127,7 @@ export const loanPayments = pgTable(
     updatedByUserId: uuid('updated_by_user_id'),
     updatedByUserName: varchar('updated_by_user_name', { length: 255 }),
 
-    // valmay int (lo dejo legacy hasta entenderlo 100%)
+    // valmay int
     overpaidAmount: integer('over_paid_amount'),
 
     // auxiliar (cuando aplica por auxiliar)

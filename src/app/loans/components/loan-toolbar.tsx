@@ -20,6 +20,10 @@ interface ToolbarProps {
   onSearchChange: (value: string) => void;
   statusFilter?: LoanStatus;
   onStatusFilterChange: (value: LoanStatus | undefined) => void;
+  legalProcessFilter?: boolean;
+  onLegalProcessFilterChange: (value: boolean | undefined) => void;
+  paymentAgreementFilter?: boolean;
+  onPaymentAgreementFilterChange: (value: boolean | undefined) => void;
   rangeDateFilter?: DateRange;
   onRangeDateFilterChange: (value: DateRange | undefined) => void;
   onReset: () => void;
@@ -33,6 +37,10 @@ export function LoansToolbar({
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
+  legalProcessFilter,
+  onLegalProcessFilterChange,
+  paymentAgreementFilter,
+  onPaymentAgreementFilterChange,
   rangeDateFilter,
   onRangeDateFilterChange,
   onReset,
@@ -40,12 +48,25 @@ export function LoansToolbar({
   exportActions,
   isRefreshing = false,
 }: ToolbarProps) {
-  const isFiltered = Boolean(searchValue) || Boolean(statusFilter) || Boolean(rangeDateFilter?.from);
+  const isFiltered =
+    Boolean(searchValue) ||
+    Boolean(statusFilter) ||
+    legalProcessFilter !== undefined ||
+    paymentAgreementFilter !== undefined ||
+    Boolean(rangeDateFilter?.from);
 
   const statusOptions = LOAN_STATUS_OPTIONS.map((status) => ({
     label: loanStatusLabels[status],
     value: status,
   }));
+  const legalProcessOptions = [
+    { label: 'En juridica', value: 'true' },
+    { label: 'Fuera de juridica', value: 'false' },
+  ];
+  const paymentAgreementOptions = [
+    { label: 'Con acuerdo', value: 'true' },
+    { label: 'Sin acuerdo', value: 'false' },
+  ];
 
   return (
     <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -62,6 +83,42 @@ export function LoansToolbar({
           options={statusOptions}
           value={statusFilter}
           onValueChange={(value) => onStatusFilterChange(value as LoanStatus | undefined)}
+        />
+        <SimpleSelectFilter
+          title="Juridica"
+          options={legalProcessOptions}
+          value={
+            legalProcessFilter === undefined
+              ? undefined
+              : legalProcessFilter
+                ? 'true'
+                : 'false'
+          }
+          onValueChange={(value) => {
+            if (!value) {
+              onLegalProcessFilterChange(undefined);
+              return;
+            }
+            onLegalProcessFilterChange(value === 'true');
+          }}
+        />
+        <SimpleSelectFilter
+          title="Acuerdo"
+          options={paymentAgreementOptions}
+          value={
+            paymentAgreementFilter === undefined
+              ? undefined
+              : paymentAgreementFilter
+                ? 'true'
+                : 'false'
+          }
+          onValueChange={(value) => {
+            if (!value) {
+              onPaymentAgreementFilterChange(undefined);
+              return;
+            }
+            onPaymentAgreementFilterChange(value === 'true');
+          }}
         />
         {isFiltered && (
           <Button variant="ghost" onClick={onReset} className="h-9 px-2 lg:px-3">

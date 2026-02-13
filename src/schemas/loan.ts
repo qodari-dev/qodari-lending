@@ -1,5 +1,6 @@
 import { Contract } from '@/server/api/contracts';
 import {
+  BooleanOperatorsSchema,
   createIncludeSchema,
   createListQuerySchema,
   DateOperatorsSchema,
@@ -84,6 +85,10 @@ const LoanWhereFieldsSchema = z
     disbursementStatus: z
       .union([z.enum(LOAN_DISBURSEMENT_STATUS_OPTIONS), StringOperatorsSchema])
       .optional(),
+    hasLegalProcess: z.union([z.boolean(), BooleanOperatorsSchema]).optional(),
+    legalProcessDate: z.union([z.coerce.date(), DateOperatorsSchema]).optional(),
+    hasPaymentAgreement: z.union([z.boolean(), BooleanOperatorsSchema]).optional(),
+    paymentAgreementDate: z.union([z.coerce.date(), DateOperatorsSchema]).optional(),
     recordDate: z.union([z.coerce.date(), DateOperatorsSchema]).optional(),
     creditStartDate: z.union([z.coerce.date(), DateOperatorsSchema]).optional(),
     maturityDate: z.union([z.coerce.date(), DateOperatorsSchema]).optional(),
@@ -98,6 +103,10 @@ const LOAN_SORT_FIELDS = [
   'creditNumber',
   'agreementId',
   'status',
+  'hasLegalProcess',
+  'legalProcessDate',
+  'hasPaymentAgreement',
+  'paymentAgreementDate',
   'recordDate',
   'creditStartDate',
   'maturityDate',
@@ -141,6 +150,37 @@ export const GetLoanQuerySchema = z.object({
 });
 
 export const LiquidateLoanBodySchema = z.object({});
+export const VoidLoanBodySchema = z.object({
+  note: z.string().trim().min(5).max(255),
+});
+export const UpdateLoanLegalProcessBodySchema = z
+  .object({
+    hasLegalProcess: z.boolean(),
+    legalProcessDate: z.coerce.date().nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.hasLegalProcess && !value.legalProcessDate) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['legalProcessDate'],
+        message: 'Debe seleccionar la fecha del proceso juridico',
+      });
+    }
+  });
+export const UpdateLoanPaymentAgreementBodySchema = z
+  .object({
+    hasPaymentAgreement: z.boolean(),
+    paymentAgreementDate: z.coerce.date().nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.hasPaymentAgreement && !value.paymentAgreementDate) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['paymentAgreementDate'],
+        message: 'Debe seleccionar la fecha del acuerdo de pago',
+      });
+    }
+  });
 export const GetLoanStatementQuerySchema = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),

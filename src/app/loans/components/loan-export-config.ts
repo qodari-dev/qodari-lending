@@ -19,6 +19,26 @@ export const loanExportConfig: ExportConfig<Loan> = {
     },
     { header: 'Estado', accessorKey: 'status' },
     {
+      header: 'En Juridica',
+      accessorKey: 'hasLegalProcess',
+      getValue: (row) => (row.hasLegalProcess ? 'Si' : 'No'),
+    },
+    {
+      header: 'Fecha Juridica',
+      accessorKey: 'legalProcessDate',
+      getValue: (row) => formatDate(row.legalProcessDate),
+    },
+    {
+      header: 'Tiene Acuerdo Pago',
+      accessorKey: 'hasPaymentAgreement',
+      getValue: (row) => (row.hasPaymentAgreement ? 'Si' : 'No'),
+    },
+    {
+      header: 'Fecha Acuerdo Pago',
+      accessorKey: 'paymentAgreementDate',
+      getValue: (row) => formatDate(row.paymentAgreementDate),
+    },
+    {
       header: 'Fecha Registro',
       accessorKey: 'recordDate',
       getValue: (row) => formatDate(row.recordDate),

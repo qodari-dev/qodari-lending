@@ -14,25 +14,34 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Spinner } from '@/components/ui/spinner';
-import { useLiquidateLoan, useLoans } from '@/hooks/queries/use-loan-queries';
+import { Textarea } from '@/components/ui/textarea';
+import { useLiquidateLoan, useLoans, useVoidLoan } from '@/hooks/queries/use-loan-queries';
 import { Loan, LoanInclude, LOAN_STATUS_OPTIONS, LoanSortField, LoanStatus } from '@/schemas/loan';
 import { RowData, TableMeta } from '@tanstack/react-table';
 import React from 'react';
 import { loanColumns } from './loan-columns';
 import { LoanInfo } from './loan-info';
 import { loanExportConfig } from './loan-export-config';
+import { LoanLegalProcessDialog } from './loan-legal-process-dialog';
+import { LoanPaymentAgreementDialog } from './loan-payment-agreement-dialog';
 import { LoansToolbar } from './loan-toolbar';
 
 declare module '@tanstack/table-core' {
   interface TableMeta<TData extends RowData> {
     onRowView?: (row: TData) => void;
     onRowLiquidate?: (row: TData) => void;
+    onRowVoid?: (row: TData) => void;
+    onRowLegalProcess?: (row: TData) => void;
+    onRowPaymentAgreement?: (row: TData) => void;
   }
 }
 
 export function Loans() {
   const [loan, setLoan] = React.useState<Loan>();
   const [loanToLiquidate, setLoanToLiquidate] = React.useState<Loan>();
+  const [loanToVoid, setLoanToVoid] = React.useState<Loan>();
+  const [loanToUpdateLegalProcess, setLoanToUpdateLegalProcess] = React.useState<Loan>();
+  const [loanToUpdatePaymentAgreement, setLoanToUpdatePaymentAgreement] = React.useState<Loan>();
 
   const {
     pageIndex,
@@ -78,6 +87,21 @@ export function Loans() {
     return undefined;
   }, [filters.status]);
 
+  const legalProcessFilter = React.useMemo(() => {
+    const value = filters.hasLegalProcess;
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  }, [filters.hasLegalProcess]);
+  const paymentAgreementFilter = React.useMemo(() => {
+    const value = filters.hasPaymentAgreement;
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  }, [filters.hasPaymentAgreement]);
+
   const [openedInfoSheet, setOpenedInfoSheet] = React.useState(false);
   const handleInfoSheetChange = React.useCallback(
     (open: boolean) => {
@@ -95,11 +119,31 @@ export function Loans() {
   }, []);
 
   const { mutateAsync: liquidateLoan, isPending: isLiquidating } = useLiquidateLoan();
+  const { mutateAsync: voidLoan, isPending: isVoiding } = useVoidLoan();
   const [openedLiquidateDialog, setOpenedLiquidateDialog] = React.useState(false);
+  const [openedVoidDialog, setOpenedVoidDialog] = React.useState(false);
+  const [voidNote, setVoidNote] = React.useState('');
 
   const handleRowLiquidate = React.useCallback((row: Loan) => {
     setLoanToLiquidate(row);
     setOpenedLiquidateDialog(true);
+  }, []);
+  const handleRowVoid = React.useCallback((row: Loan) => {
+    setLoanToVoid(row);
+    setVoidNote('');
+    setOpenedVoidDialog(true);
+  }, []);
+  const [openedLegalProcessDialog, setOpenedLegalProcessDialog] = React.useState(false);
+
+  const handleRowLegalProcess = React.useCallback((row: Loan) => {
+    setLoanToUpdateLegalProcess(row);
+    setOpenedLegalProcessDialog(true);
+  }, []);
+  const [openedPaymentAgreementDialog, setOpenedPaymentAgreementDialog] = React.useState(false);
+
+  const handleRowPaymentAgreement = React.useCallback((row: Loan) => {
+    setLoanToUpdatePaymentAgreement(row);
+    setOpenedPaymentAgreementDialog(true);
   }, []);
 
   const submitLiquidate = React.useCallback(async () => {
@@ -113,6 +157,18 @@ export function Loans() {
     setOpenedLiquidateDialog(false);
     setLoanToLiquidate(undefined);
   }, [liquidateLoan, loanToLiquidate]);
+  const submitVoid = React.useCallback(async () => {
+    if (!loanToVoid?.id || !voidNote.trim()) return;
+
+    await voidLoan({
+      params: { id: loanToVoid.id },
+      body: { note: voidNote.trim() },
+    });
+
+    setOpenedVoidDialog(false);
+    setLoanToVoid(undefined);
+    setVoidNote('');
+  }, [loanToVoid, voidLoan, voidNote]);
   const fetchAllData = React.useCallback(async () => {
     const res = await api.loan.list.query({
       query: { ...queryParams, page: 1, limit: 10000 },
@@ -126,8 +182,11 @@ export function Loans() {
     () => ({
       onRowView: handleRowOpen,
       onRowLiquidate: handleRowLiquidate,
+      onRowVoid: handleRowVoid,
+      onRowLegalProcess: handleRowLegalProcess,
+      onRowPaymentAgreement: handleRowPaymentAgreement,
     }),
-    [handleRowOpen, handleRowLiquidate]
+    [handleRowOpen, handleRowLiquidate, handleRowVoid, handleRowLegalProcess, handleRowPaymentAgreement]
   );
 
   return (
@@ -155,6 +214,12 @@ export function Loans() {
               onSearchChange={handleSearchChange}
               statusFilter={statusFilter}
               onStatusFilterChange={(value) => handleFilterChange('status', value)}
+              legalProcessFilter={legalProcessFilter}
+              onLegalProcessFilterChange={(value) => handleFilterChange('hasLegalProcess', value)}
+              paymentAgreementFilter={paymentAgreementFilter}
+              onPaymentAgreementFilterChange={(value) =>
+                handleFilterChange('hasPaymentAgreement', value)
+              }
               rangeDateFilter={rangeDateFilter}
               onRangeDateFilterChange={(value) => {
                 if (value?.from && value?.to) {
@@ -184,6 +249,26 @@ export function Loans() {
       </PageContent>
 
       <LoanInfo loan={loan} opened={openedInfoSheet} onOpened={handleInfoSheetChange} />
+      <LoanLegalProcessDialog
+        loan={loanToUpdateLegalProcess}
+        opened={openedLegalProcessDialog}
+        onOpened={(open) => {
+          setOpenedLegalProcessDialog(open);
+          if (!open) {
+            setLoanToUpdateLegalProcess(undefined);
+          }
+        }}
+      />
+      <LoanPaymentAgreementDialog
+        loan={loanToUpdatePaymentAgreement}
+        opened={openedPaymentAgreementDialog}
+        onOpened={(open) => {
+          setOpenedPaymentAgreementDialog(open);
+          if (!open) {
+            setLoanToUpdatePaymentAgreement(undefined);
+          }
+        }}
+      />
 
       <AlertDialog
         open={openedLiquidateDialog}
@@ -207,6 +292,41 @@ export function Loans() {
             <AlertDialogAction disabled={isLiquidating} onClick={submitLiquidate}>
               {isLiquidating && <Spinner />}
               Liquidar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={openedVoidDialog}
+        onOpenChange={(open) => {
+          setOpenedVoidDialog(open);
+          if (!open) {
+            setLoanToVoid(undefined);
+            setVoidNote('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Anular credito</AlertDialogTitle>
+            <AlertDialogDescription>
+              El credito <strong>{loanToVoid?.creditNumber ?? ''}</strong> quedara en estado anulado.
+              Debe registrar el motivo de anulacion.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            value={voidNote}
+            onChange={(event) => setVoidNote(event.target.value)}
+            placeholder="Digite el motivo de anulacion..."
+            rows={4}
+            maxLength={255}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={isVoiding || voidNote.trim().length < 5} onClick={submitVoid}>
+              {isVoiding && <Spinner />}
+              Anular
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

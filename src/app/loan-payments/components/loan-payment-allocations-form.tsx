@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { PaymentTenderType } from '@/schemas/payment-tender-type';
 import { CreateLoanPaymentBodySchema } from '@/schemas/loan-payment';
 import { formatCurrency } from '@/utils/formatters';
+import { parseDecimalString, roundMoney } from '@/utils/number-utils';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { Controller, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
@@ -38,18 +39,26 @@ export function LoanPaymentAllocationsForm({
     name: 'loanPaymentMethodAllocations',
   });
 
-  const totalPayment = Number(useWatch({ control: form.control, name: 'amount' }) ?? 0);
+  const amount = useWatch({ control: form.control, name: 'amount' });
+  const overpaidAmount = useWatch({ control: form.control, name: 'overpaidAmount' });
+
+  const totalPayment = useMemo(() => {
+    const baseAmount = parseDecimalString(amount ?? '') ?? 0;
+    const overpaid = Number(overpaidAmount ?? 0);
+    const safeOverpaid = Number.isFinite(overpaid) ? overpaid : 0;
+    return roundMoney(baseAmount + safeOverpaid);
+  }, [amount, overpaidAmount]);
 
   const totalAllocated = useMemo(
     () =>
       (allocations ?? []).reduce((acc, item) => {
-        const value = Number(item?.amount ?? 0);
-        return acc + (Number.isFinite(value) ? value : 0);
+        const value = parseDecimalString(item?.amount ?? '') ?? 0;
+        return roundMoney(acc + value);
       }, 0),
     [allocations]
   );
 
-  const difference = totalPayment - totalAllocated;
+  const difference = roundMoney(totalPayment - totalAllocated);
 
   return (
     <div className="space-y-4">
@@ -57,7 +66,7 @@ export function LoanPaymentAllocationsForm({
         <div className="space-y-1">
           <p className="text-sm font-medium">Formas de pago</p>
           <p className="text-muted-foreground text-sm">
-            La suma de formas de pago debe ser igual al valor del abono.
+            La suma de formas de pago debe ser igual al total recibido (abono + excedente).
           </p>
         </div>
         <Button
@@ -164,7 +173,7 @@ export function LoanPaymentAllocationsForm({
             )}
           >
             <div className="flex items-center justify-between">
-              <span>Total abono</span>
+              <span>Total recibido</span>
               <span className="font-medium">{formatCurrency(totalPayment)}</span>
             </div>
             <div className="flex items-center justify-between">

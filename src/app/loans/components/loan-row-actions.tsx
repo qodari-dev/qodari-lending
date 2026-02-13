@@ -4,7 +4,7 @@ import { DataTableRowActions, type RowAction, type RowActionGroup } from '@/comp
 import { Loan } from '@/schemas/loan';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { Row, Table } from '@tanstack/react-table';
-import { CheckCircle2, Eye } from 'lucide-react';
+import { Ban, CheckCircle2, Eye, Handshake, Scale } from 'lucide-react';
 
 interface LoanRowActionsProps {
   row: Row<Loan>;
@@ -15,6 +15,8 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
   const loan = row.original;
   const meta = table.options.meta;
   const canLiquidate = useHasPermission('loans:liquidate');
+  const canUpdate = useHasPermission('loans:update');
+  const canVoid = useHasPermission('loans:void');
 
   const actions: (RowAction<Loan> | RowActionGroup<Loan>)[] = [
     {
@@ -27,6 +29,24 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
       icon: CheckCircle2,
       onClick: meta?.onRowLiquidate,
       hidden: !(canLiquidate && loan.status === 'GENERATED'),
+    },
+    {
+      label: 'Anular credito',
+      icon: Ban,
+      onClick: meta?.onRowVoid,
+      hidden: !(canVoid && loan.status !== 'VOID'),
+    },
+    {
+      label: 'Proceso juridico',
+      icon: Scale,
+      onClick: meta?.onRowLegalProcess,
+      hidden: !canUpdate,
+    },
+    {
+      label: 'Acuerdo de pago',
+      icon: Handshake,
+      onClick: meta?.onRowPaymentAgreement,
+      hidden: !canUpdate,
     },
   ];
 

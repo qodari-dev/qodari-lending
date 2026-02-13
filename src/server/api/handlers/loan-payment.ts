@@ -351,14 +351,15 @@ export const loanPayment = tsr.router(contract.loanPayment, {
       }
 
       const paymentDate = formatDateOnly(body.paymentDate);
-      const paymentAmount = roundMoney(toNumber(body.amount));
-      if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+      const requestedPaymentAmount = roundMoney(toNumber(body.amount));
+      if (!Number.isFinite(requestedPaymentAmount) || requestedPaymentAmount <= 0) {
         throwHttpError({
           status: 400,
           message: 'El valor del abono es invalido',
           code: 'BAD_REQUEST',
         });
       }
+      const providedOverpaidAmount = roundMoney(Number(body.overpaidAmount ?? 0));
 
       const openPortfolio = await db.query.portfolioEntries.findMany({
         where: and(
@@ -384,10 +385,15 @@ export const loanPayment = tsr.router(contract.loanPayment, {
       const totalOutstanding = roundMoney(
         openPortfolio.reduce((acc, row) => acc + toNumber(row.balance), 0)
       );
-      if (paymentAmount - totalOutstanding > 0.01) {
+
+      const appliedPaymentAmount = roundMoney(Math.min(requestedPaymentAmount, totalOutstanding));
+      const overflowByCap = roundMoney(Math.max(0, requestedPaymentAmount - appliedPaymentAmount));
+      const overpaidAmount = roundMoney(Math.max(0, providedOverpaidAmount) + overflowByCap);
+
+      if (!Number.isFinite(appliedPaymentAmount) || appliedPaymentAmount <= 0) {
         throwHttpError({
           status: 400,
-          message: `El abono excede el saldo pendiente (${toDecimalString(totalOutstanding)})`,
+          message: 'No hay saldo pendiente para aplicar al abono',
           code: 'BAD_REQUEST',
         });
       }
@@ -399,7 +405,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         amount: number;
       }> = [];
 
-      let remainingAmount = paymentAmount;
+      let remainingAmount = appliedPaymentAmount;
       for (const row of openPortfolio) {
         if (remainingAmount <= 0.01) break;
         const rowBalance = roundMoney(toNumber(row.balance));
@@ -441,7 +447,8 @@ export const loanPayment = tsr.router(contract.loanPayment, {
             issuedDate: nowDate,
             loanId: body.loanId,
             description: body.description,
-            amount: toDecimalString(paymentAmount),
+            amount: toDecimalString(appliedPaymentAmount),
+            overpaidAmount: overpaidAmount > 0 ? Math.round(overpaidAmount) : null,
             status: 'PAID',
             statusDate: nowDate,
             createdByUserId: userId,
@@ -478,7 +485,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
             thirdPartyId: existingLoan.thirdPartyId,
             description: `Abono ${paymentNumber} credito ${existingLoan.creditNumber}`.slice(0, 255),
             nature: 'DEBIT',
-            amount: toDecimalString(paymentAmount),
+            amount: toDecimalString(appliedPaymentAmount),
             loanId: existingLoan.id,
             status: 'DRAFT',
             statusDate: nowDate,

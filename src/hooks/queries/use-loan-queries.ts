@@ -83,6 +83,56 @@ export function useLiquidateLoan() {
   });
 }
 
+export function useVoidLoan() {
+  const queryClient = api.useQueryClient();
+
+  return api.loan.void.useMutation({
+    onSuccess: (_, variables) => {
+      const id = variables.params.id as number;
+      queryClient.invalidateQueries({ queryKey: loansKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loansKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: loansKeys.balanceSummary(id) });
+      queryClient.invalidateQueries({ queryKey: [...loansKeys.all, 'statement', id] });
+      toast.success('Credito anulado');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
+export function useUpdateLoanLegalProcess() {
+  const queryClient = api.useQueryClient();
+
+  return api.loan.updateLegalProcess.useMutation({
+    onSuccess: (_, variables) => {
+      const id = variables.params.id as number;
+      queryClient.invalidateQueries({ queryKey: loansKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loansKeys.detail(id) });
+      toast.success('Proceso juridico actualizado');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
+export function useUpdateLoanPaymentAgreement() {
+  const queryClient = api.useQueryClient();
+
+  return api.loan.updatePaymentAgreement.useMutation({
+    onSuccess: (_, variables) => {
+      const id = variables.params.id as number;
+      queryClient.invalidateQueries({ queryKey: loansKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loansKeys.detail(id) });
+      toast.success('Acuerdo de pago actualizado');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
 export function useLoanBalanceSummary(id: number, options?: { enabled?: boolean }) {
   return api.loan.getBalanceSummary.useQuery({
     queryKey: loansKeys.balanceSummary(id),

@@ -88,6 +88,26 @@ export const loanColumns: ColumnDef<Loan>[] = [
     cell: ({ row }) => <StatusBadge status={row.original.status as LoanStatus} />,
   },
   {
+    accessorKey: 'hasLegalProcess',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Juridica" />,
+    cell: ({ row }) =>
+      row.original.hasLegalProcess ? (
+        <span className="text-destructive text-xs font-medium">En juridica</span>
+      ) : (
+        <span className="text-muted-foreground text-xs">No</span>
+      ),
+  },
+  {
+    accessorKey: 'hasPaymentAgreement',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Acuerdo" />,
+    cell: ({ row }) =>
+      row.original.hasPaymentAgreement ? (
+        <span className="text-emerald-700 text-xs font-medium">Con acuerdo</span>
+      ) : (
+        <span className="text-muted-foreground text-xs">Sin acuerdo</span>
+      ),
+  },
+  {
     accessorKey: 'recordDate',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Fecha registro" />,
     cell: ({ row }) => <span>{formatDate(row.original.recordDate)}</span>,

@@ -46,6 +46,10 @@ const LOAN_FIELDS: FieldMap = {
   payeeThirdPartyId: loans.payeeThirdPartyId,
   status: loans.status,
   disbursementStatus: loans.disbursementStatus,
+  hasLegalProcess: loans.hasLegalProcess,
+  legalProcessDate: loans.legalProcessDate,
+  hasPaymentAgreement: loans.hasPaymentAgreement,
+  paymentAgreementDate: loans.paymentAgreementDate,
   recordDate: loans.recordDate,
   creditStartDate: loans.creditStartDate,
   maturityDate: loans.maturityDate,
@@ -284,6 +288,370 @@ export const loan = tsr.router(contract.loan, {
       return genericTsRestErrorResponse(e, {
         genericMsg: `Error al obtener extracto del credito ${id}`,
       });
+    }
+  },
+
+  void: async ({ params: { id }, body }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const existingLoan = await db.query.loans.findFirst({
+        where: eq(loans.id, id),
+      });
+
+      if (!existingLoan) {
+        throwHttpError({
+          status: 404,
+          message: `Credito con ID ${id} no encontrado`,
+          code: 'NOT_FOUND',
+        });
+      }
+
+      if (existingLoan.status === 'VOID') {
+        throwHttpError({
+          status: 409,
+          message: 'El credito ya se encuentra anulado',
+          code: 'CONFLICT',
+        });
+      }
+
+      if (existingLoan.status === 'PAID') {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede anular un credito pagado',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const paidLoanPayment = await db.query.loanPayments.findFirst({
+        where: and(eq(loanPayments.loanId, id), eq(loanPayments.status, 'PAID')),
+        columns: { id: true },
+      });
+
+      if (paidLoanPayment) {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede anular un credito con abonos registrados',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const liquidationEntry = await db.query.accountingEntries.findFirst({
+        where: and(
+          eq(accountingEntries.loanId, id),
+          eq(accountingEntries.sourceType, 'LOAN_APPROVAL'),
+          inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
+        ),
+        columns: { id: true },
+      });
+
+      if (liquidationEntry) {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede anular un credito con movimientos de liquidacion',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const statusDate = formatDateOnly(new Date());
+      const { userId, userName } = getRequiredUserContext(session);
+
+      const [updatedLoan] = await db.transaction(async (tx) => {
+        await tx
+          .update(loanInstallments)
+          .set({ status: 'VOID' })
+          .where(
+            and(
+              eq(loanInstallments.loanId, id),
+              inArray(loanInstallments.status, [
+                'GENERATED',
+                'ACCOUNTED',
+                'RELIQUIDATED',
+                'INACTIVE',
+              ])
+            )
+          );
+
+        const [loanUpdated] = await tx
+          .update(loans)
+          .set({
+            status: 'VOID',
+            statusDate,
+            statusChangedByUserId: userId,
+            statusChangedByUserName: userName || userId,
+            note: body.note,
+          })
+          .where(and(eq(loans.id, id), sql`${loans.status} <> 'VOID'`))
+          .returning();
+
+        if (!loanUpdated) {
+          throwHttpError({
+            status: 409,
+            message: 'El estado del credito cambio durante la anulacion, intente de nuevo',
+            code: 'CONFLICT',
+          });
+        }
+
+        await tx.insert(loanStatusHistory).values({
+          loanId: id,
+          fromStatus: existingLoan.status,
+          toStatus: 'VOID',
+          changedByUserId: userId,
+          changedByUserName: userName || userId,
+          note: body.note,
+          metadata: {
+            operation: 'VOID_LOAN',
+          },
+        });
+
+        return [loanUpdated];
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'void',
+        resourceId: id.toString(),
+        resourceLabel: existingLoan.creditNumber,
+        status: 'success',
+        beforeValue: existingLoan,
+        afterValue: updatedLoan,
+        metadata: {
+          note: body.note,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return {
+        status: 200 as const,
+        body: updatedLoan,
+      };
+    } catch (e) {
+      const error = genericTsRestErrorResponse(e, {
+        genericMsg: `Error al anular credito ${id}`,
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'void',
+        resourceId: id.toString(),
+        status: 'failure',
+        errorMessage: error.body.message,
+        metadata: {
+          note: body.note,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return error;
+    }
+  },
+
+  updateLegalProcess: async ({ params: { id }, body }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const existingLoan = await db.query.loans.findFirst({
+        where: eq(loans.id, id),
+      });
+
+      if (!existingLoan) {
+        throwHttpError({
+          status: 404,
+          message: `Credito con ID ${id} no encontrado`,
+          code: 'NOT_FOUND',
+        });
+      }
+
+      if (body.hasLegalProcess && !body.legalProcessDate) {
+        throwHttpError({
+          status: 400,
+          message: 'Debe indicar la fecha del proceso juridico',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const legalProcessDate = body.hasLegalProcess
+        ? formatDateOnly(body.legalProcessDate ?? new Date())
+        : null;
+
+      const [updatedLoan] = await db
+        .update(loans)
+        .set({
+          hasLegalProcess: body.hasLegalProcess,
+          legalProcessDate,
+        })
+        .where(eq(loans.id, id))
+        .returning();
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'updateLegalProcess',
+        resourceId: id.toString(),
+        resourceLabel: existingLoan.creditNumber,
+        status: 'success',
+        beforeValue: existingLoan,
+        afterValue: updatedLoan,
+        metadata: {
+          hasLegalProcess: updatedLoan.hasLegalProcess,
+          legalProcessDate: updatedLoan.legalProcessDate,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return {
+        status: 200 as const,
+        body: updatedLoan,
+      };
+    } catch (e) {
+      const error = genericTsRestErrorResponse(e, {
+        genericMsg: `Error al actualizar proceso juridico del credito ${id}`,
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'updateLegalProcess',
+        resourceId: id.toString(),
+        status: 'failure',
+        errorMessage: error.body.message,
+        metadata: {
+          requestedHasLegalProcess: body.hasLegalProcess,
+          requestedLegalProcessDate: body.legalProcessDate ? formatDateOnly(body.legalProcessDate) : null,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return error;
+    }
+  },
+
+  updatePaymentAgreement: async ({ params: { id }, body }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const existingLoan = await db.query.loans.findFirst({
+        where: eq(loans.id, id),
+      });
+
+      if (!existingLoan) {
+        throwHttpError({
+          status: 404,
+          message: `Credito con ID ${id} no encontrado`,
+          code: 'NOT_FOUND',
+        });
+      }
+
+      if (body.hasPaymentAgreement && !body.paymentAgreementDate) {
+        throwHttpError({
+          status: 400,
+          message: 'Debe indicar la fecha del acuerdo de pago',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const paymentAgreementDate = body.hasPaymentAgreement
+        ? formatDateOnly(body.paymentAgreementDate ?? new Date())
+        : null;
+
+      const [updatedLoan] = await db
+        .update(loans)
+        .set({
+          hasPaymentAgreement: body.hasPaymentAgreement,
+          paymentAgreementDate,
+        })
+        .where(eq(loans.id, id))
+        .returning();
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'updatePaymentAgreement',
+        resourceId: id.toString(),
+        resourceLabel: existingLoan.creditNumber,
+        status: 'success',
+        beforeValue: existingLoan,
+        afterValue: updatedLoan,
+        metadata: {
+          hasPaymentAgreement: updatedLoan.hasPaymentAgreement,
+          paymentAgreementDate: updatedLoan.paymentAgreementDate,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return {
+        status: 200 as const,
+        body: updatedLoan,
+      };
+    } catch (e) {
+      const error = genericTsRestErrorResponse(e, {
+        genericMsg: `Error al actualizar acuerdo de pago del credito ${id}`,
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'updatePaymentAgreement',
+        resourceId: id.toString(),
+        status: 'failure',
+        errorMessage: error.body.message,
+        metadata: {
+          requestedHasPaymentAgreement: body.hasPaymentAgreement,
+          requestedPaymentAgreementDate: body.paymentAgreementDate
+            ? formatDateOnly(body.paymentAgreementDate)
+            : null,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return error;
     }
   },
 

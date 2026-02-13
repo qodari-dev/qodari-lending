@@ -242,6 +242,26 @@ export function LoanInfo({
               label: 'Estado desembolso',
               value: loanDisbursementStatusLabels[detail.disbursementStatus],
             },
+            {
+              label: 'En juridica',
+              value: detail.hasLegalProcess ? 'Si' : 'No',
+            },
+            {
+              label: 'Fecha juridica',
+              value: formatDate(detail.legalProcessDate),
+            },
+            {
+              label: 'Acuerdo de pago',
+              value: detail.hasPaymentAgreement ? 'Si' : 'No',
+            },
+            {
+              label: 'Fecha acuerdo',
+              value: formatDate(detail.paymentAgreementDate),
+            },
+            {
+              label: 'Nota estado',
+              value: detail.note ?? '-',
+            },
             { label: 'Oficina', value: detail.affiliationOffice?.name ?? detail.affiliationOfficeId },
             { label: 'Canal', value: detail.channel?.name ?? '-' },
           ],

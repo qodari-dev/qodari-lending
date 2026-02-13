@@ -117,6 +117,7 @@ export const CreateLoanPaymentBodySchema = z
     amount: decimalStringField('Valor del abono es requerido').refine((value) => Number(value) > 0, {
       message: 'El valor debe ser mayor a cero',
     }),
+    overpaidAmount: z.number().int().min(0).optional().default(0),
     note: z.string().max(1000).nullable().optional(),
     loanPaymentMethodAllocations: LoanPaymentMethodAllocationInputSchema.array().min(1),
   })
@@ -136,13 +137,13 @@ export const CreateLoanPaymentBodySchema = z
       seen.add(method.collectionMethodId);
     }
 
-    const expected = Number(value.amount);
+    const expected = Number(value.amount) + Number(value.overpaidAmount ?? 0);
     const total = methods.reduce((acc, method) => acc + Number(method.amount), 0);
 
     if (Math.abs(total - expected) > 0.01) {
       ctx.addIssue({
         code: 'custom',
-        message: 'La suma de formas de pago debe ser igual al valor del abono',
+        message: 'La suma de formas de pago debe ser igual al total recibido (abono + excedente)',
         path: ['loanPaymentMethodAllocations'],
       });
     }

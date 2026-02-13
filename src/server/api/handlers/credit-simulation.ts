@@ -8,6 +8,7 @@ import {
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { calculateCreditSimulation } from '@/server/utils/credit-simulation';
+import { calculatePaymentCapacity } from '@/utils/payment-capacity';
 import { roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, eq, lte, gte } from 'drizzle-orm';
@@ -134,7 +135,10 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         insuranceRatePercent: insuranceFactor,
       });
 
-      const paymentCapacity = roundMoney((body.income - body.expenses) / 2);
+      const paymentCapacity = calculatePaymentCapacity({
+        income: body.income,
+        expenses: body.expenses,
+      });
       const maxInstallmentPayment = calculation.summary.maxInstallmentPayment;
       const capacityGap = roundMoney(paymentCapacity - maxInstallmentPayment);
       const isWithinCapacity = maxInstallmentPayment <= paymentCapacity;

@@ -50,6 +50,7 @@ import {
   toNumber,
   toRateString,
 } from '@/server/utils/value-utils';
+import { calculateLoanApplicationPaymentCapacity } from '@/utils/payment-capacity';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
@@ -87,7 +88,14 @@ const LOAN_APPLICATION_INCLUDES = createIncludeMap<typeof db.query.loanApplicati
   },
   thirdParty: {
     relation: 'thirdParty',
-    config: true,
+    config: {
+      with: {
+        identificationType: true,
+        thirdPartyType: true,
+        homeCity: true,
+        workCity: true,
+      },
+    },
   },
   repaymentMethod: {
     relation: 'repaymentMethod',
@@ -299,7 +307,7 @@ async function validateRequiredDocuments(args: {
   }
 }
 
-async function ensureThirdPartiesExist(args: {
+async function ensureThirdPartiesAreUpToDate(args: {
   thirdPartyIds: number[];
 }) {
   const ids = [...new Set(args.thirdPartyIds)];
@@ -307,13 +315,24 @@ async function ensureThirdPartiesExist(args: {
 
   const existing = await db.query.thirdParties.findMany({
     where: inArray(thirdParties.id, ids),
-    columns: { id: true },
+    columns: { id: true, updatedAt: true },
   });
 
   if (existing.length !== ids.length) {
     throwHttpError({
       status: 400,
       message: 'Uno o más terceros asociados no existen',
+      code: 'BAD_REQUEST',
+    });
+  }
+
+  const today = formatDateOnly(new Date());
+  const staleRecords = existing.filter((thirdParty) => formatDateOnly(thirdParty.updatedAt) !== today);
+
+  if (staleRecords.length) {
+    throwHttpError({
+      status: 400,
+      message: 'Debe actualizar hoy la informacion del solicitante y codeudores antes de guardar',
       code: 'BAD_REQUEST',
     });
   }
@@ -481,25 +500,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           }));
       }
 
-      const rows = await db.query.loanApplicationActNumbers.findMany({
-        where: eq(loanApplicationActNumbers.affiliationOfficeId, query.affiliationOfficeId),
-        orderBy: [desc(loanApplicationActNumbers.actDate), desc(loanApplicationActNumbers.id)],
-        limit: query.limit ?? 50,
-      });
-
-      const uniqueByActNumber = new Map<string, (typeof rows)[number]>();
-      if (todayAct) {
-        uniqueByActNumber.set(todayAct.actNumber, todayAct);
-      }
-      for (const row of rows) {
-        if (!uniqueByActNumber.has(row.actNumber)) {
-          uniqueByActNumber.set(row.actNumber, row);
-        }
-      }
-
       return {
         status: 200 as const,
-        body: Array.from(uniqueByActNumber.values()),
+        body: todayAct ? [todayAct] : [],
       };
     } catch (e) {
       return genericTsRestErrorResponse(e, {
@@ -551,6 +554,16 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const { userId, userName } = getRequiredUserContext(session);
 
       const requestedAmount = toNumber(body.requestedAmount);
+      const paymentCapacity = calculateLoanApplicationPaymentCapacity({
+        salary: body.salary,
+        otherIncome: body.otherIncome,
+        otherCredits: body.otherCredits,
+      });
+      const coDebtorThirdPartyIds = [...new Set((body.loanApplicationCoDebtors ?? []).map((item) => item.thirdPartyId))];
+      await ensureThirdPartiesAreUpToDate({
+        thirdPartyIds: [body.thirdPartyId, ...coDebtorThirdPartyIds],
+      });
+
       const { financingFactor } = await resolveCategoryAndFinancingFactor({
         creditProductId: body.creditProductId,
         categoryCode: body.categoryCode,
@@ -618,7 +631,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             salary: toDecimalString(body.salary),
             otherIncome: toDecimalString(body.otherIncome),
             otherCredits: toDecimalString(body.otherCredits),
-            paymentCapacity: toDecimalString(body.paymentCapacity),
+            paymentCapacity: toDecimalString(paymentCapacity),
             bankAccountNumber: body.bankAccountNumber,
             bankAccountType: body.bankAccountType,
             bankId: body.bankId,
@@ -640,13 +653,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           })
           .returning();
 
-        const coDebtorsData = body.loanApplicationCoDebtors ?? [];
-        if (coDebtorsData.length) {
-          const thirdPartyIds = [...new Set(coDebtorsData.map((item) => item.thirdPartyId))];
-          await ensureThirdPartiesExist({ thirdPartyIds });
-
+        if (coDebtorThirdPartyIds.length) {
           await tx.insert(loanApplicationCoDebtors).values(
-            thirdPartyIds.map((thirdPartyId) => ({
+            coDebtorThirdPartyIds.map((thirdPartyId) => ({
               loanApplicationId: application.id,
               thirdPartyId,
             }))
@@ -770,6 +779,39 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         body.insuranceCompanyId !== undefined
           ? body.insuranceCompanyId
           : existing.insuranceCompanyId;
+      const targetSalary = body.salary ?? existing.salary;
+      const targetOtherIncome = body.otherIncome ?? existing.otherIncome;
+      const targetOtherCredits = body.otherCredits ?? existing.otherCredits;
+      const paymentCapacity = calculateLoanApplicationPaymentCapacity({
+        salary: targetSalary,
+        otherIncome: targetOtherIncome,
+        otherCredits: targetOtherCredits,
+      });
+      const requestedCoDebtorIds =
+        body.loanApplicationCoDebtors !== undefined
+          ? [...new Set(body.loanApplicationCoDebtors.map((item) => item.thirdPartyId))]
+          : undefined;
+      const targetCoDebtorIds = (
+        requestedCoDebtorIds ??
+        (
+          await db.query.loanApplicationCoDebtors.findMany({
+            where: eq(loanApplicationCoDebtors.loanApplicationId, id),
+            columns: { thirdPartyId: true },
+          })
+        ).map((item) => item.thirdPartyId)
+      ).filter((thirdPartyId): thirdPartyId is number => thirdPartyId !== null);
+      const targetThirdPartyId = body.thirdPartyId ?? existing.thirdPartyId;
+      if (!targetThirdPartyId) {
+        throwHttpError({
+          status: 400,
+          message: 'Debe seleccionar un solicitante valido',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      await ensureThirdPartiesAreUpToDate({
+        thirdPartyIds: [targetThirdPartyId, ...targetCoDebtorIds],
+      });
 
       const { financingFactor } = await resolveCategoryAndFinancingFactor({
         creditProductId: targetCreditProductId,
@@ -814,10 +856,10 @@ export const loanApplication = tsr.router(contract.loanApplication, {
                 ? body.paymentGuaranteeTypeId
                 : existing.paymentGuaranteeTypeId,
             pledgesSubsidy: body.pledgesSubsidy ?? existing.pledgesSubsidy,
-            salary: toDecimalString(body.salary ?? existing.salary),
-            otherIncome: toDecimalString(body.otherIncome ?? existing.otherIncome),
-            otherCredits: toDecimalString(body.otherCredits ?? existing.otherCredits),
-            paymentCapacity: toDecimalString(body.paymentCapacity ?? existing.paymentCapacity),
+            salary: toDecimalString(targetSalary),
+            otherIncome: toDecimalString(targetOtherIncome),
+            otherCredits: toDecimalString(targetOtherCredits),
+            paymentCapacity: toDecimalString(paymentCapacity),
             bankAccountNumber: body.bankAccountNumber ?? existing.bankAccountNumber,
             bankAccountType: body.bankAccountType ?? existing.bankAccountType,
             bankId: body.bankId ?? existing.bankId,
@@ -847,11 +889,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             .delete(loanApplicationCoDebtors)
             .where(eq(loanApplicationCoDebtors.loanApplicationId, id));
 
-          if (body.loanApplicationCoDebtors.length) {
-            const thirdPartyIds = [...new Set(body.loanApplicationCoDebtors.map((item) => item.thirdPartyId))];
-            await ensureThirdPartiesExist({ thirdPartyIds });
+          if (requestedCoDebtorIds?.length) {
             await tx.insert(loanApplicationCoDebtors).values(
-              thirdPartyIds.map((thirdPartyId) => ({
+              requestedCoDebtorIds.map((thirdPartyId) => ({
                 loanApplicationId: id,
                 thirdPartyId,
               }))
@@ -1234,6 +1274,8 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           code: 'BAD_REQUEST',
         });
       }
+      const approvedInstallments = body.approvedInstallments;
+      const today = formatDateOnly(new Date());
 
       const [
         repaymentMethod,
@@ -1256,10 +1298,12 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             eq(paymentGuaranteeTypes.isActive, true)
           ),
         }),
-        db.query.agreements.findFirst({
-          where: and(eq(agreements.id, body.agreementId), eq(agreements.isActive, true)),
-          columns: { id: true },
-        }),
+        body.agreementId
+          ? db.query.agreements.findFirst({
+              where: and(eq(agreements.id, body.agreementId), eq(agreements.isActive, true)),
+              columns: { id: true },
+            })
+          : Promise.resolve(null),
         db.query.thirdParties.findFirst({
           where: eq(thirdParties.id, body.payeeThirdPartyId),
           columns: { id: true },
@@ -1279,6 +1323,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         db.query.loanApplicationActNumbers.findFirst({
           where: and(
             eq(loanApplicationActNumbers.affiliationOfficeId, existing.affiliationOfficeId),
+            eq(loanApplicationActNumbers.actDate, today),
             eq(loanApplicationActNumbers.actNumber, body.actNumber)
           ),
         }),
@@ -1300,7 +1345,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      if (!agreement) {
+      if (body.agreementId && !agreement) {
         throwHttpError({
           status: 404,
           message: 'Convenio no encontrado',
@@ -1321,6 +1366,13 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           status: 404,
           message: 'Linea de credito no encontrada',
           code: 'NOT_FOUND',
+        });
+      }
+      if (product.maxInstallments && approvedInstallments > product.maxInstallments) {
+        throwHttpError({
+          status: 400,
+          message: `El numero de cuotas supera el maximo permitido (${product.maxInstallments})`,
+          code: 'BAD_REQUEST',
         });
       }
 
@@ -1348,7 +1400,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         financingType: product.financingType,
         principal: approvedAmount,
         annualRatePercent: toNumber(existing.financingFactor),
-        installments: existing.installments,
+        installments: approvedInstallments,
         firstPaymentDate: body.firstCollectionDate,
         daysInterval: paymentFrequency.daysInterval,
         insuranceRatePercent: toNumber(existing.insuranceFactor),
@@ -1366,7 +1418,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       }
 
       const { userId, userName } = getRequiredUserContext(session);
-      const statusDate = formatDateOnly(new Date());
+      const statusDate = today;
       const firstCollectionDate = formatDateOnly(body.firstCollectionDate);
       const approvedDate = statusDate;
 
@@ -1471,10 +1523,10 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             createdByUserName: userName || userId,
             recordDate: statusDate,
             loanApplicationId: existing.id,
-            agreementId: body.agreementId,
+            agreementId: body.agreementId ?? null,
             thirdPartyId: existing.thirdPartyId,
             payeeThirdPartyId: body.payeeThirdPartyId,
-            installments: existing.installments,
+            installments: approvedInstallments,
             creditStartDate: firstInstallment.dueDate,
             maturityDate: lastInstallment.dueDate,
             firstCollectionDate,
@@ -1498,18 +1550,20 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           })
           .returning();
 
-        await tx.insert(loanAgreementHistory).values({
-          loanId: loan.id,
-          agreementId: body.agreementId,
-          effectiveDate: statusDate,
-          changedByUserId: userId,
-          changedByUserName: userName || userId,
-          note: 'Convenio asignado al aprobar solicitud',
-          metadata: {
-            sourceLoanApplicationId: id,
-            actNumber: body.actNumber,
-          },
-        });
+        if (body.agreementId) {
+          await tx.insert(loanAgreementHistory).values({
+            loanId: loan.id,
+            agreementId: body.agreementId,
+            effectiveDate: statusDate,
+            changedByUserId: userId,
+            changedByUserName: userName || userId,
+            note: 'Convenio asignado al aprobar solicitud',
+            metadata: {
+              sourceLoanApplicationId: id,
+              actNumber: body.actNumber,
+            },
+          });
+        }
 
         await tx.insert(loanStatusHistory).values({
           loanId: loan.id,
@@ -1521,6 +1575,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           metadata: {
             sourceLoanApplicationId: id,
             actNumber: body.actNumber,
+            approvedInstallments,
           },
         });
 
@@ -1556,8 +1611,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             loanId: loan.id,
             approvedAmount: toDecimalString(approvedAmount),
             actNumber: body.actNumber,
-            agreementId: body.agreementId,
+            agreementId: body.agreementId ?? null,
             payeeThirdPartyId: body.payeeThirdPartyId,
+            approvedInstallments,
             firstCollectionDate,
           },
         });

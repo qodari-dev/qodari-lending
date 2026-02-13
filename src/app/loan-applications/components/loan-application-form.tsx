@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Combobox,
   ComboboxCollection,
@@ -32,6 +33,14 @@ import {
 } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAffiliationOffices } from '@/hooks/queries/use-affiliation-office-queries';
@@ -60,8 +69,15 @@ import {
   LoanApplication,
 } from '@/schemas/loan-application';
 import { ThirdParty } from '@/schemas/third-party';
-import { formatDateISO } from '@/utils/formatters';
+import {
+  assessPaymentCapacity,
+  calculateLoanApplicationPaymentCapacity,
+} from '@/utils/payment-capacity';
+import { calculateCreditSimulation } from '@/utils/credit-simulation';
+import { formatCurrency, formatDateISO } from '@/utils/formatters';
+import { isUpdatedToday } from '@/utils/date-utils';
 import { onSubmitError } from '@/utils/on-submit-error';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon, Plus } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -78,26 +94,6 @@ import { ThirdPartyForm } from '@/app/third-parties/components/third-party-form'
 
 type FormValues = z.infer<typeof CreateLoanApplicationBodySchema>;
 
-function getThirdPartyLabel(item: {
-  personType: 'NATURAL' | 'LEGAL';
-  businessName?: string | null;
-  firstName?: string | null;
-  secondName?: string | null;
-  firstLastName?: string | null;
-  secondLastName?: string | null;
-  documentNumber: string;
-}): string {
-  if (item.personType === 'LEGAL') {
-    return item.businessName ?? item.documentNumber;
-  }
-
-  const fullName = [item.firstName, item.secondName, item.firstLastName, item.secondLastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fullName || item.documentNumber;
-}
-
 export function LoanApplicationForm({
   loanApplication,
   opened,
@@ -109,8 +105,14 @@ export function LoanApplicationForm({
 }) {
   const formId = useId();
   const sheetContentRef = useRef<HTMLDivElement | null>(null);
+  const [activeTab, setActiveTab] = useState('application');
   const [openedThirdPartyForm, setOpenedThirdPartyForm] = useState(false);
+  const [thirdPartyFormMode, setThirdPartyFormMode] = useState<'applicant' | 'coDebtor'>(
+    'applicant'
+  );
+  const [thirdPartyToEdit, setThirdPartyToEdit] = useState<ThirdParty | undefined>(undefined);
   const [localThirdParty, setLocalThirdParty] = useState<ThirdParty | null>(null);
+  const [showAmortizationPreview, setShowAmortizationPreview] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(CreateLoanApplicationBodySchema) as Resolver<FormValues>,
@@ -168,6 +170,7 @@ export function LoanApplicationForm({
 
   const { data: thirdPartiesData } = useThirdParties({
     limit: 1000,
+    include: ['identificationType', 'homeCity', 'workCity'],
     sort: [{ field: 'createdAt', order: 'desc' }],
   });
   const thirdParties = useMemo(() => {
@@ -235,6 +238,38 @@ export function LoanApplicationForm({
     control: form.control,
     name: 'categoryCode',
   });
+  const applicationDateValue = useWatch({
+    control: form.control,
+    name: 'applicationDate',
+  });
+  const selectedPaymentFrequencyId = useWatch({
+    control: form.control,
+    name: 'paymentFrequencyId',
+  });
+  const installmentsValue = useWatch({
+    control: form.control,
+    name: 'installments',
+  });
+  const requestedAmountValue = useWatch({
+    control: form.control,
+    name: 'requestedAmount',
+  });
+  const selectedInsuranceCompanyId = useWatch({
+    control: form.control,
+    name: 'insuranceCompanyId',
+  });
+  const salaryValue = useWatch({
+    control: form.control,
+    name: 'salary',
+  });
+  const otherIncomeValue = useWatch({
+    control: form.control,
+    name: 'otherIncome',
+  });
+  const otherCreditsValue = useWatch({
+    control: form.control,
+    name: 'otherCredits',
+  });
   const pledgesSubsidy = useWatch({
     control: form.control,
     name: 'pledgesSubsidy',
@@ -243,6 +278,10 @@ export function LoanApplicationForm({
   const selectedThirdParty = useMemo(
     () => thirdParties.find((item) => item.id === selectedThirdPartyId),
     [thirdParties, selectedThirdPartyId]
+  );
+  const selectedThirdPartyNeedsUpdate = useMemo(
+    () => !isUpdatedToday(selectedThirdParty?.updatedAt),
+    [selectedThirdParty]
   );
   const selectedCreditProduct = useMemo(
     () => creditProducts.find((item) => item.id === selectedCreditProductId),
@@ -290,6 +329,119 @@ export function LoanApplicationForm({
       documentTypeName: doc.documentType?.name ?? `Documento ${doc.documentTypeId}`,
     }));
   }, [selectedCreditProduct]);
+  const calculatedPaymentCapacity = useMemo(() => {
+    return calculateLoanApplicationPaymentCapacity({
+      salary: salaryValue,
+      otherIncome: otherIncomeValue,
+      otherCredits: otherCreditsValue,
+    });
+  }, [otherCreditsValue, otherIncomeValue, salaryValue]);
+
+  const selectedPaymentFrequency = useMemo(
+    () => paymentFrequencies.find((item) => item.id === selectedPaymentFrequencyId) ?? null,
+    [paymentFrequencies, selectedPaymentFrequencyId]
+  );
+  const selectedInsuranceCompany = useMemo(
+    () => insuranceCompanies.find((item) => item.id === selectedInsuranceCompanyId) ?? null,
+    [insuranceCompanies, selectedInsuranceCompanyId]
+  );
+
+  const selectedCategoryConfig = useMemo(() => {
+    if (!selectedCreditProduct || !selectedCategoryCode || !installmentsValue) return null;
+    return (
+      selectedCreditProduct.creditProductCategories?.find(
+        (item) =>
+          item.categoryCode === selectedCategoryCode &&
+          installmentsValue >= item.installmentsFrom &&
+          installmentsValue <= item.installmentsTo
+      ) ?? null
+    );
+  }, [installmentsValue, selectedCategoryCode, selectedCreditProduct]);
+
+  const estimatedInsuranceFactor = useMemo(() => {
+    if (!selectedCreditProduct) return null;
+    if (!selectedCreditProduct.paysInsurance) return 0;
+
+    if (!selectedInsuranceCompany || !installmentsValue || !requestedAmountValue) return null;
+
+    const metricValue =
+      selectedCreditProduct.insuranceRangeMetric === 'INSTALLMENT_COUNT'
+        ? Number(installmentsValue)
+        : Number(requestedAmountValue);
+
+    if (!Number.isFinite(metricValue)) return null;
+
+    const insuranceRange = selectedInsuranceCompany.insuranceRateRanges?.find(
+      (range) =>
+        range.rangeMetric === selectedCreditProduct.insuranceRangeMetric &&
+        metricValue >= range.valueFrom &&
+        metricValue <= range.valueTo
+    );
+
+    if (!insuranceRange) return null;
+
+    const factor = Number(insuranceRange.rateValue ?? 0);
+    return Number.isFinite(factor) ? factor : 0;
+  }, [installmentsValue, requestedAmountValue, selectedCreditProduct, selectedInsuranceCompany]);
+
+  const estimatedAmortization = useMemo(() => {
+    if (!selectedCreditProduct?.financingType || !selectedPaymentFrequency?.daysInterval) return null;
+    if (!selectedCategoryConfig) return null;
+
+    const principal = Number(requestedAmountValue);
+    const annualRatePercent = Number(selectedCategoryConfig.financingFactor);
+    const installments = Number(installmentsValue);
+    const insuranceRatePercent = Number(estimatedInsuranceFactor ?? 0);
+    const firstPaymentDate = applicationDateValue ? new Date(applicationDateValue) : null;
+
+    if (!Number.isFinite(principal) || principal <= 0) return null;
+    if (!Number.isFinite(annualRatePercent)) return null;
+    if (!Number.isFinite(installments) || installments <= 0) return null;
+    if (!Number.isFinite(insuranceRatePercent)) return null;
+    if (!firstPaymentDate || Number.isNaN(firstPaymentDate.getTime())) return null;
+
+    return calculateCreditSimulation({
+      financingType: selectedCreditProduct.financingType,
+      principal,
+      annualRatePercent,
+      installments,
+      firstPaymentDate,
+      daysInterval: selectedPaymentFrequency.daysInterval,
+      insuranceRatePercent,
+    });
+  }, [
+    applicationDateValue,
+    estimatedInsuranceFactor,
+    installmentsValue,
+    requestedAmountValue,
+    selectedCategoryConfig,
+    selectedCreditProduct,
+    selectedPaymentFrequency,
+  ]);
+
+  const paymentCapacityAssessment = useMemo(() => {
+    if (!estimatedAmortization) return null;
+    return assessPaymentCapacity({
+      paymentCapacity: calculatedPaymentCapacity,
+      installmentPayment: estimatedAmortization.summary.maxInstallmentPayment,
+    });
+  }, [calculatedPaymentCapacity, estimatedAmortization]);
+  const showAmortizationSection = showAmortizationPreview && !!estimatedAmortization && opened;
+
+  const openThirdPartyCreate = useCallback((mode: 'applicant' | 'coDebtor') => {
+    setThirdPartyFormMode(mode);
+    setThirdPartyToEdit(undefined);
+    setOpenedThirdPartyForm(true);
+  }, []);
+
+  const openThirdPartyEdit = useCallback(
+    (mode: 'applicant' | 'coDebtor', thirdParty: ThirdParty) => {
+      setThirdPartyFormMode(mode);
+      setThirdPartyToEdit(thirdParty);
+      setOpenedThirdPartyForm(true);
+    },
+    []
+  );
 
   useEffect(() => {
     if (!opened) return;
@@ -322,9 +474,11 @@ export function LoanApplicationForm({
       isInsuranceApproved: loanApplication?.isInsuranceApproved ?? false,
       creditStudyFee: String(loanApplication?.creditStudyFee ?? '0'),
       loanApplicationCoDebtors:
-        loanApplication?.loanApplicationCoDebtors?.map((item) => ({
-          thirdPartyId: item.thirdParty?.id ?? item.thirdPartyId ?? 0,
-        })).filter((item) => item.thirdPartyId > 0) ?? [],
+        loanApplication?.loanApplicationCoDebtors
+          ?.map((item) => ({
+            thirdPartyId: item.thirdParty?.id ?? item.thirdPartyId ?? 0,
+          }))
+          .filter((item) => item.thirdPartyId > 0) ?? [],
       loanApplicationDocuments:
         loanApplication?.loanApplicationDocuments?.map((item) => ({
           documentTypeId: item.documentTypeId,
@@ -358,6 +512,13 @@ export function LoanApplicationForm({
     if (selectedCreditProduct?.paysInsurance) return;
     form.setValue('insuranceCompanyId', null);
   }, [form, selectedCreditProduct?.paysInsurance]);
+
+  useEffect(() => {
+    form.setValue('paymentCapacity', calculatedPaymentCapacity.toFixed(2), {
+      shouldValidate: true,
+      shouldDirty: false,
+    });
+  }, [calculatedPaymentCapacity, form]);
 
   const uploadDocumentFile = useCallback(
     async ({ file }: { file: File; documentTypeId: number }) => {
@@ -397,6 +558,25 @@ export function LoanApplicationForm({
 
   const onSubmit = useCallback(
     async (values: FormValues) => {
+      const selectedApplicant = thirdParties.find((item) => item.id === values.thirdPartyId);
+      if (selectedApplicant && !isUpdatedToday(selectedApplicant.updatedAt)) {
+        setActiveTab('application');
+        openThirdPartyEdit('applicant', selectedApplicant);
+        toast.error('Debe actualizar la informacion del solicitante hoy antes de guardar');
+        return;
+      }
+
+      const staleCoDebtor = (values.loanApplicationCoDebtors ?? [])
+        .map((item) => thirdParties.find((party) => party.id === item.thirdPartyId))
+        .find((party) => party && !isUpdatedToday(party.updatedAt));
+
+      if (staleCoDebtor) {
+        setActiveTab('coDebtors');
+        openThirdPartyEdit('coDebtor', staleCoDebtor);
+        toast.error('Debe actualizar la informacion de los codeudores hoy antes de guardar');
+        return;
+      }
+
       if (maxInstallmentsForCategory && values.installments > maxInstallmentsForCategory) {
         toast.error(`El maximo de cuotas permitido es ${maxInstallmentsForCategory}`);
         return;
@@ -431,27 +611,45 @@ export function LoanApplicationForm({
 
       onOpened(false);
     },
-    [create, loanApplication, maxInstallmentsForCategory, onOpened, requiredDocuments, update]
+    [
+      create,
+      loanApplication,
+      maxInstallmentsForCategory,
+      onOpened,
+      openThirdPartyEdit,
+      requiredDocuments,
+      thirdParties,
+      update,
+    ]
   );
 
   return (
-    <Sheet open={opened} onOpenChange={onOpened}>
+    <Sheet
+      open={opened}
+      onOpenChange={(open) => {
+        setShowAmortizationPreview(false);
+        if (open) {
+          setActiveTab('application');
+        }
+        onOpened(open);
+      }}
+    >
       <SheetContent ref={sheetContentRef} className="overflow-y-scroll sm:max-w-5xl">
         <SheetHeader>
           <SheetTitle>
             {loanApplication ? 'Editar Solicitud de Credito' : 'Nueva Solicitud de Credito'}
           </SheetTitle>
           <SheetDescription>
-            Registre la solicitud, terceros asociados, documentos y pignoraciones.
+            Registre la solicitud, codeudores, documentos y pignoraciones.
           </SheetDescription>
         </SheetHeader>
 
         <FormProvider {...form}>
           <form id={formId} onSubmit={form.handleSubmit(onSubmit, onSubmitError)} className="px-4">
-            <Tabs defaultValue="application" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="mb-4 w-full">
                 <TabsTrigger value="application">Solicitud</TabsTrigger>
-                <TabsTrigger value="coDebtors">Terceros</TabsTrigger>
+                <TabsTrigger value="coDebtors">Codeudores</TabsTrigger>
                 <TabsTrigger value="documents">Documentos</TabsTrigger>
                 <TabsTrigger value="pledges" disabled={!pledgesSubsidy}>
                   Pignoraciones
@@ -561,96 +759,6 @@ export function LoanApplicationForm({
                     />
 
                     <Controller
-                      name="thirdPartyId"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid} className="col-span-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <FieldLabel htmlFor="thirdPartyId">Solicitante</FieldLabel>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setOpenedThirdPartyForm(true)}
-                            >
-                              <Plus className="mr-1 h-4 w-4" />
-                              Nuevo tercero
-                            </Button>
-                          </div>
-                          <Combobox
-                            items={thirdParties}
-                            value={thirdParties.find((item) => item.id === field.value) ?? null}
-                            onValueChange={(value) => field.onChange(value?.id ?? undefined)}
-                            itemToStringValue={(item) => String(item.id)}
-                            itemToStringLabel={(item) =>
-                              `${getThirdPartyLabel(item)} (${item.documentNumber})`
-                            }
-                          >
-                            <ComboboxTrigger
-                              render={
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="w-full justify-between font-normal"
-                                >
-                                  <ComboboxValue placeholder="Seleccione..." />
-                                  <ChevronDownIcon className="text-muted-foreground size-4" />
-                                </Button>
-                              }
-                            />
-                            <ComboboxContent portalContainer={sheetContentRef}>
-                              <ComboboxInput
-                                placeholder="Buscar solicitante..."
-                                showClear
-                                showTrigger={false}
-                              />
-                              <ComboboxList>
-                                <ComboboxEmpty>No se encontraron terceros</ComboboxEmpty>
-                                <ComboboxCollection>
-                                  {(item) => (
-                                    <ComboboxItem key={item.id} value={item}>
-                                      {getThirdPartyLabel(item)} ({item.documentNumber})
-                                    </ComboboxItem>
-                                  )}
-                                </ComboboxCollection>
-                              </ComboboxList>
-                            </ComboboxContent>
-                          </Combobox>
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-
-                    <Controller
-                      name="categoryCode"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="categoryCode">Categoria</FieldLabel>
-                          <Select
-                            value={field.value ?? ''}
-                            onValueChange={(value) => field.onChange(value || undefined)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(categoryOptions.length
-                                ? categoryOptions
-                                : categoryCodeSelectOptions.map((o) => o.value)
-                              ).map((value) => (
-                                <SelectItem key={value} value={value}>
-                                  {categoryCodeLabels[value]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-
-                    <Controller
                       name="creditProductId"
                       control={form.control}
                       render={({ field, fieldState }) => (
@@ -699,26 +807,80 @@ export function LoanApplicationForm({
                     />
 
                     <Controller
-                      name="installments"
+                      name="thirdPartyId"
                       control={form.control}
                       render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="installments">Numero cuotas</FieldLabel>
-                          <Input
-                            id="installments"
-                            type="number"
-                            min={1}
-                            value={field.value ?? ''}
-                            onChange={(event) =>
-                              field.onChange(
-                                event.target.value ? Number(event.target.value) : undefined
-                              )
+                        <Field data-invalid={fieldState.invalid} className="col-span-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <FieldLabel htmlFor="thirdPartyId">Solicitante</FieldLabel>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openThirdPartyCreate('applicant')}
+                              >
+                                <Plus className="mr-1 h-4 w-4" />
+                                Nuevo tercero
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={!selectedThirdParty}
+                                onClick={() =>
+                                  selectedThirdParty
+                                    ? openThirdPartyEdit('applicant', selectedThirdParty)
+                                    : undefined
+                                }
+                              >
+                                Editar tercero
+                              </Button>
+                            </div>
+                          </div>
+                          <Combobox
+                            items={thirdParties}
+                            value={thirdParties.find((item) => item.id === field.value) ?? null}
+                            onValueChange={(value) => field.onChange(value?.id ?? undefined)}
+                            itemToStringValue={(item) => String(item.id)}
+                            itemToStringLabel={(item) =>
+                              `${getThirdPartyLabel(item)} (${item.documentNumber})`
                             }
-                          />
-                          {maxInstallmentsForCategory ? (
-                            <p className="text-muted-foreground text-xs">
-                              Maximo permitido: {maxInstallmentsForCategory}
-                            </p>
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent portalContainer={sheetContentRef}>
+                              <ComboboxInput
+                                placeholder="Buscar solicitante..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron terceros</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {getThirdPartyLabel(item)} ({item.documentNumber})
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                          {selectedThirdParty && selectedThirdPartyNeedsUpdate ? (
+                            <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-700">
+                              El solicitante requiere actualizacion hoy.
+                            </div>
                           ) : null}
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
@@ -726,12 +888,29 @@ export function LoanApplicationForm({
                     />
 
                     <Controller
-                      name="requestedAmount"
+                      name="categoryCode"
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="requestedAmount">Valor solicitado</FieldLabel>
-                          <Input id="requestedAmount" {...field} value={field.value ?? ''} />
+                          <FieldLabel htmlFor="categoryCode">Categoria</FieldLabel>
+                          <Select
+                            value={field.value ?? ''}
+                            onValueChange={(value) => field.onChange(value || undefined)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(categoryOptions.length
+                                ? categoryOptions
+                                : categoryCodeSelectOptions.map((o) => o.value)
+                              ).map((value) => (
+                                <SelectItem key={value} value={value}>
+                                  {categoryCodeLabels[value]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -779,7 +958,14 @@ export function LoanApplicationForm({
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel htmlFor="paymentCapacity">Capacidad pago</FieldLabel>
-                          <Input id="paymentCapacity" {...field} value={field.value ?? ''} />
+                          <Input
+                            id="paymentCapacity"
+                            {...field}
+                            value={field.value ?? ''}
+                            readOnly
+                            disabled
+                          />
+                          <p className="text-muted-foreground text-xs">Calculado automáticamente.</p>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -830,6 +1016,45 @@ export function LoanApplicationForm({
                               </ComboboxList>
                             </ComboboxContent>
                           </Combobox>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="installments"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="installments">Numero cuotas</FieldLabel>
+                          <Input
+                            id="installments"
+                            type="number"
+                            min={1}
+                            value={field.value ?? ''}
+                            onChange={(event) =>
+                              field.onChange(
+                                event.target.value ? Number(event.target.value) : undefined
+                              )
+                            }
+                          />
+                          {maxInstallmentsForCategory ? (
+                            <p className="text-muted-foreground text-xs">
+                              Maximo permitido: {maxInstallmentsForCategory}
+                            </p>
+                          ) : null}
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="requestedAmount"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="requestedAmount">Valor solicitado</FieldLabel>
+                          <Input id="requestedAmount" {...field} value={field.value ?? ''} />
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -1030,6 +1255,89 @@ export function LoanApplicationForm({
                       )}
                     />
 
+                    <div className="col-span-2 space-y-3 rounded-md border p-4">
+                      <Collapsible open={showAmortizationSection} onOpenChange={setShowAmortizationPreview}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">Viabilidad de pago</p>
+                            <p className="text-muted-foreground text-xs">
+                              Se calcula con la cuota maxima estimada de la tabla de amortizacion.
+                            </p>
+                          </div>
+                          {estimatedAmortization ? (
+                            <CollapsibleTrigger asChild>
+                              <Button type="button" variant="outline" size="sm">
+                                {showAmortizationSection
+                                  ? 'Ocultar tabla estimada'
+                                  : 'Ver tabla estimada'}
+                              </Button>
+                            </CollapsibleTrigger>
+                          ) : null}
+                        </div>
+
+                        {estimatedAmortization ? (
+                          <CollapsibleContent className="pt-3">
+                            <div className="max-h-72 overflow-auto rounded-md border">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Cuota</TableHead>
+                                    <TableHead>Vencimiento</TableHead>
+                                    <TableHead>Pago</TableHead>
+                                    <TableHead>Capital</TableHead>
+                                    <TableHead>Interes</TableHead>
+                                    <TableHead>Seguro</TableHead>
+                                    <TableHead>Saldo final</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {estimatedAmortization.installments.map((item) => (
+                                    <TableRow key={item.installmentNumber}>
+                                      <TableCell>{item.installmentNumber}</TableCell>
+                                      <TableCell>{item.dueDate}</TableCell>
+                                      <TableCell>{formatCurrency(item.payment)}</TableCell>
+                                      <TableCell>{formatCurrency(item.principal)}</TableCell>
+                                      <TableCell>{formatCurrency(item.interest)}</TableCell>
+                                      <TableCell>{formatCurrency(item.insurance)}</TableCell>
+                                      <TableCell>{formatCurrency(item.closingBalance)}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </CollapsibleContent>
+                        ) : null}
+                      </Collapsible>
+
+                      {paymentCapacityAssessment ? (
+                        <div
+                          className={
+                            paymentCapacityAssessment.canPay
+                              ? 'rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800'
+                              : 'rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800'
+                          }
+                        >
+                          <p className="font-medium">
+                            {paymentCapacityAssessment.canPay
+                              ? 'Puede pagar la solicitud.'
+                              : 'No puede pagar la solicitud con la capacidad actual.'}
+                          </p>
+                          <p className="text-xs">
+                            Cuota maxima estimada: {formatCurrency(paymentCapacityAssessment.installmentPayment)}.
+                            Capacidad de pago: {formatCurrency(paymentCapacityAssessment.paymentCapacity)}.
+                            {paymentCapacityAssessment.canPay
+                              ? ` Margen: ${formatCurrency(paymentCapacityAssessment.margin)}.`
+                              : ` Faltante: ${formatCurrency(paymentCapacityAssessment.shortfall)}.`}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+                          Complete linea, categoria, periodicidad, cuotas y valor solicitado para
+                          validar la viabilidad.
+                        </div>
+                      )}
+                    </div>
+
                     <Controller
                       name="pledgesSubsidy"
                       control={form.control}
@@ -1039,7 +1347,12 @@ export function LoanApplicationForm({
                           <div>
                             <Switch
                               checked={field.value}
-                              onCheckedChange={field.onChange}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                if (!checked && activeTab === 'pledges') {
+                                  setActiveTab('application');
+                                }
+                              }}
                               aria-invalid={fieldState.invalid}
                             />
                           </div>
@@ -1064,7 +1377,11 @@ export function LoanApplicationForm({
               </TabsContent>
 
               <TabsContent value="coDebtors" className="pt-2">
-                <LoanApplicationThirdPartiesForm />
+                <LoanApplicationThirdPartiesForm
+                  thirdParties={thirdParties}
+                  onCreateThirdParty={() => openThirdPartyCreate('coDebtor')}
+                  onEditThirdParty={(thirdParty) => openThirdPartyEdit('coDebtor', thirdParty)}
+                />
               </TabsContent>
 
               <TabsContent value="documents" className="pt-2">
@@ -1095,12 +1412,20 @@ export function LoanApplicationForm({
         </SheetFooter>
       </SheetContent>
       <ThirdPartyForm
-        thirdParty={undefined}
+        thirdParty={thirdPartyToEdit}
         opened={openedThirdPartyForm}
-        onOpened={setOpenedThirdPartyForm}
+        onOpened={(open) => {
+          setOpenedThirdPartyForm(open);
+          if (!open) setThirdPartyToEdit(undefined);
+        }}
         onSaved={(thirdParty) => {
           setLocalThirdParty(thirdParty);
-          form.setValue('thirdPartyId', thirdParty.id, { shouldDirty: true, shouldValidate: true });
+          if (thirdPartyFormMode === 'applicant') {
+            form.setValue('thirdPartyId', thirdParty.id, {
+              shouldDirty: true,
+              shouldValidate: true,
+            });
+          }
         }}
       />
     </Sheet>

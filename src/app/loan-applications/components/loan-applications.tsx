@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -23,18 +22,12 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
-import { useAgreements } from '@/hooks/queries/use-agreement-queries';
 import {
-  useApproveLoanApplication,
   useCancelLoanApplication,
-  useLoanApplicationActNumbers,
   useLoanApplications,
   useRejectLoanApplication,
 } from '@/hooks/queries/use-loan-application-queries';
-import { usePaymentGuaranteeTypes } from '@/hooks/queries/use-payment-guarantee-type-queries';
 import { useRejectionReasons } from '@/hooks/queries/use-rejection-reason-queries';
-import { useRepaymentMethods } from '@/hooks/queries/use-repayment-method-queries';
-import { useThirdParties } from '@/hooks/queries/use-third-party-queries';
 import {
   LoanApplication,
   LoanApplicationInclude,
@@ -42,9 +35,9 @@ import {
   LoanApplicationStatus,
   LoanApplicationSortField,
 } from '@/schemas/loan-application';
-import { formatDateISO } from '@/utils/formatters';
 import { RowData, TableMeta } from '@tanstack/react-table';
 import React from 'react';
+import { LoanApplicationApproveDialog } from './loan-application-approve-dialog';
 import { loanApplicationColumns } from './loan-application-columns';
 import { LoanApplicationForm } from './loan-application-form';
 import { LoanApplicationInfo } from './loan-application-info';
@@ -59,26 +52,6 @@ declare module '@tanstack/table-core' {
     onRowCancel?: (row: TData) => void;
     onRowReject?: (row: TData) => void;
   }
-}
-
-function getThirdPartyLabel(item: {
-  personType: 'NATURAL' | 'LEGAL';
-  businessName?: string | null;
-  firstName?: string | null;
-  secondName?: string | null;
-  firstLastName?: string | null;
-  secondLastName?: string | null;
-  documentNumber: string;
-}): string {
-  if (item.personType === 'LEGAL') {
-    return item.businessName ?? item.documentNumber;
-  }
-
-  const fullName = [item.firstName, item.secondName, item.firstLastName, item.secondLastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fullName || item.documentNumber;
 }
 
 export function LoanApplications() {
@@ -133,8 +106,6 @@ export function LoanApplications() {
     }
     return undefined;
   }, [filters.status]);
-  const { mutateAsync: approveLoanApplication, isPending: isApproving } =
-    useApproveLoanApplication();
   const { mutateAsync: cancelLoanApplication, isPending: isCanceling } = useCancelLoanApplication();
   const { mutateAsync: rejectLoanApplication, isPending: isRejecting } = useRejectLoanApplication();
 
@@ -144,33 +115,6 @@ export function LoanApplications() {
     sort: [{ field: 'name', order: 'asc' }],
   });
   const rejectionReasons = rejectionReasonsData?.body?.data ?? [];
-
-  const { data: repaymentMethodsData } = useRepaymentMethods({
-    limit: 1000,
-    where: { and: [{ isActive: true }] },
-    sort: [{ field: 'name', order: 'asc' }],
-  });
-  const repaymentMethods = repaymentMethodsData?.body?.data ?? [];
-
-  const { data: paymentGuaranteeTypesData } = usePaymentGuaranteeTypes({
-    limit: 1000,
-    where: { and: [{ isActive: true }] },
-    sort: [{ field: 'name', order: 'asc' }],
-  });
-  const paymentGuaranteeTypes = paymentGuaranteeTypesData?.body?.data ?? [];
-
-  const { data: agreementsData } = useAgreements({
-    limit: 1000,
-    where: { and: [{ isActive: true }] },
-    sort: [{ field: 'businessName', order: 'asc' }],
-  });
-  const agreements = React.useMemo(() => agreementsData?.body?.data ?? [], [agreementsData]);
-
-  const { data: thirdPartiesData } = useThirdParties({
-    limit: 1000,
-    sort: [{ field: 'createdAt', order: 'desc' }],
-  });
-  const thirdParties = thirdPartiesData?.body?.data ?? [];
 
   const [openedInfoSheet, setOpenedInfoSheet] = React.useState(false);
   const handleInfoSheetChange = React.useCallback(
@@ -197,28 +141,9 @@ export function LoanApplications() {
   const [openedCancelDialog, setOpenedCancelDialog] = React.useState(false);
   const [cancelNote, setCancelNote] = React.useState('');
   const [openedApproveDialog, setOpenedApproveDialog] = React.useState(false);
-  const [approveRepaymentMethodId, setApproveRepaymentMethodId] = React.useState<
-    number | undefined
-  >();
-  const [approvePaymentGuaranteeTypeId, setApprovePaymentGuaranteeTypeId] = React.useState<
-    number | undefined
-  >();
-  const [approveAgreementId, setApproveAgreementId] = React.useState<number | undefined>();
-  const [approveApprovedAmount, setApproveApprovedAmount] = React.useState('');
-  const [approveActNumber, setApproveActNumber] = React.useState('');
-  const [approvePayeeThirdPartyId, setApprovePayeeThirdPartyId] = React.useState<
-    number | undefined
-  >();
-  const [approveFirstCollectionDate, setApproveFirstCollectionDate] = React.useState('');
   const [openedRejectDialog, setOpenedRejectDialog] = React.useState(false);
   const [rejectNote, setRejectNote] = React.useState('');
   const [rejectReasonId, setRejectReasonId] = React.useState<number | undefined>();
-
-  const { data: actNumbersData, isLoading: isLoadingActNumbers } = useLoanApplicationActNumbers({
-    affiliationOfficeId: loanApplication?.affiliationOfficeId ?? 0,
-    limit: 100,
-  });
-  const actNumbers = React.useMemo(() => actNumbersData?.body ?? [], [actNumbersData]);
 
   const handleCreate = React.useCallback(() => {
     setLoanApplication(undefined);
@@ -237,13 +162,6 @@ export function LoanApplications() {
 
   const handleRowApprove = React.useCallback((row: LoanApplication) => {
     setLoanApplication(row);
-    setApproveRepaymentMethodId(row.repaymentMethodId ?? undefined);
-    setApprovePaymentGuaranteeTypeId(row.paymentGuaranteeTypeId ?? undefined);
-    setApproveAgreementId(undefined);
-    setApproveApprovedAmount(String(row.requestedAmount ?? '0'));
-    setApproveActNumber(row.actNumber ?? '');
-    setApprovePayeeThirdPartyId(row.thirdPartyId);
-    setApproveFirstCollectionDate(formatDateISO(new Date()));
     setOpenedApproveDialog(true);
   }, []);
 
@@ -259,16 +177,6 @@ export function LoanApplications() {
     setRejectReasonId(undefined);
     setOpenedRejectDialog(true);
   }, []);
-
-  React.useEffect(() => {
-    if (!openedApproveDialog || approveActNumber || !actNumbers.length) return;
-    setApproveActNumber(actNumbers[0]?.actNumber ?? '');
-  }, [actNumbers, approveActNumber, openedApproveDialog]);
-
-  React.useEffect(() => {
-    if (!openedApproveDialog || approveAgreementId || !agreements.length) return;
-    setApproveAgreementId(agreements[0]?.id);
-  }, [agreements, approveAgreementId, openedApproveDialog]);
 
   const submitCancel = React.useCallback(async () => {
     if (!loanApplication?.id) return;
@@ -299,55 +207,12 @@ export function LoanApplications() {
     setOpenedRejectDialog(false);
     setLoanApplication(undefined);
   }, [loanApplication, rejectLoanApplication, rejectReasonId, rejectNote]);
-
-  const submitApprove = React.useCallback(async () => {
-    if (
-      !loanApplication?.id ||
-      !approveRepaymentMethodId ||
-      !approvePaymentGuaranteeTypeId ||
-      !approveAgreementId ||
-      !approveApprovedAmount.trim() ||
-      !approveActNumber.trim() ||
-      !approvePayeeThirdPartyId ||
-      !approveFirstCollectionDate
-    ) {
-      return;
-    }
-
-    await approveLoanApplication({
-      params: { id: loanApplication.id },
-      body: {
-        repaymentMethodId: approveRepaymentMethodId,
-        paymentGuaranteeTypeId: approvePaymentGuaranteeTypeId,
-        agreementId: approveAgreementId,
-        approvedAmount: approveApprovedAmount.trim(),
-        actNumber: approveActNumber.trim(),
-        payeeThirdPartyId: approvePayeeThirdPartyId,
-        firstCollectionDate: new Date(`${approveFirstCollectionDate}T00:00:00`),
-      },
-    });
-
-    setOpenedApproveDialog(false);
-    setLoanApplication(undefined);
-  }, [
-    approveActNumber,
-    approveAgreementId,
-    approveApprovedAmount,
-    approveFirstCollectionDate,
-    approveLoanApplication,
-    approvePaymentGuaranteeTypeId,
-    approvePayeeThirdPartyId,
-    approveRepaymentMethodId,
-    loanApplication,
-  ]);
   const fetchAllData = React.useCallback(async () => {
     const res = await api.loanApplication.list.query({
       query: { ...queryParams, page: 1, limit: 10000 },
     });
     return (res.body as { data: LoanApplication[] })?.data ?? [];
   }, [queryParams]);
-
-
 
   const tableMeta = React.useMemo<TableMeta<LoanApplication>>(
     () => ({
@@ -364,7 +229,7 @@ export function LoanApplications() {
     <>
       <PageHeader
         title="Solicitudes de Credito"
-        description="Administre solicitudes, terceros asociados, documentos y estado operativo."
+        description="Administre solicitudes, codeudores, documentos y estado operativo."
       />
       <PageContent>
         <DataTable
@@ -403,10 +268,7 @@ export function LoanApplications() {
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
               exportActions={
-                <ExportDropdown
-                  config={loanApplicationExportConfig}
-                  fetchAllData={fetchAllData}
-                />
+                <ExportDropdown config={loanApplicationExportConfig} fetchAllData={fetchAllData} />
               }
             />
           }
@@ -419,6 +281,8 @@ export function LoanApplications() {
         loanApplication={loanApplication}
         opened={openedInfoSheet}
         onOpened={handleInfoSheetChange}
+        onApprove={handleRowApprove}
+        onReject={handleRowReject}
       />
       <LoanApplicationForm
         loanApplication={loanApplication}
@@ -426,164 +290,12 @@ export function LoanApplications() {
         onOpened={handleFormSheetChange}
       />
 
-      <Dialog open={openedApproveDialog} onOpenChange={setOpenedApproveDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Aprobar solicitud</DialogTitle>
-            <DialogDescription>
-              Complete los datos de aprobacion para generar el credito y su tabla de amortizacion.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="approveRepaymentMethodId">Forma de pago</Label>
-              <Select
-                value={approveRepaymentMethodId ? String(approveRepaymentMethodId) : ''}
-                onValueChange={(value) =>
-                  setApproveRepaymentMethodId(value ? Number(value) : undefined)
-                }
-              >
-                <SelectTrigger id="approveRepaymentMethodId">
-                  <SelectValue placeholder="Seleccione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {repaymentMethods.map((item) => (
-                    <SelectItem key={item.id} value={String(item.id)}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="approvePaymentGuaranteeTypeId">Garantia de pago</Label>
-              <Select
-                value={approvePaymentGuaranteeTypeId ? String(approvePaymentGuaranteeTypeId) : ''}
-                onValueChange={(value) =>
-                  setApprovePaymentGuaranteeTypeId(value ? Number(value) : undefined)
-                }
-              >
-                <SelectTrigger id="approvePaymentGuaranteeTypeId">
-                  <SelectValue placeholder="Seleccione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentGuaranteeTypes.map((item) => (
-                    <SelectItem key={item.id} value={String(item.id)}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="approveAgreementId">Convenio</Label>
-              <Select
-                value={approveAgreementId ? String(approveAgreementId) : ''}
-                onValueChange={(value) => setApproveAgreementId(value ? Number(value) : undefined)}
-              >
-                <SelectTrigger id="approveAgreementId">
-                  <SelectValue placeholder="Seleccione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {agreements.map((item) => (
-                    <SelectItem key={item.id} value={String(item.id)}>
-                      {item.agreementCode} - {item.businessName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="approveApprovedAmount">Valor aprobado</Label>
-              <Input
-                id="approveApprovedAmount"
-                value={approveApprovedAmount}
-                onChange={(event) => setApproveApprovedAmount(event.target.value)}
-                placeholder="0"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="approveActNumber">Acta</Label>
-              <Select
-                value={approveActNumber}
-                onValueChange={(value) => setApproveActNumber(value)}
-                disabled={isLoadingActNumbers}
-              >
-                <SelectTrigger id="approveActNumber">
-                  <SelectValue
-                    placeholder={isLoadingActNumbers ? 'Cargando...' : 'Seleccione...'}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {actNumbers.map((item) => (
-                    <SelectItem key={item.id} value={item.actNumber}>
-                      {item.actNumber}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="col-span-2 space-y-2">
-              <Label htmlFor="approvePayeeThirdPartyId">Tercero desembolso</Label>
-              <Select
-                value={approvePayeeThirdPartyId ? String(approvePayeeThirdPartyId) : ''}
-                onValueChange={(value) =>
-                  setApprovePayeeThirdPartyId(value ? Number(value) : undefined)
-                }
-              >
-                <SelectTrigger id="approvePayeeThirdPartyId">
-                  <SelectValue placeholder="Seleccione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {thirdParties.map((item) => (
-                    <SelectItem key={item.id} value={String(item.id)}>
-                      {getThirdPartyLabel(item)} ({item.documentNumber})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="approveFirstCollectionDate">Fecha primer recaudo</Label>
-              <Input
-                id="approveFirstCollectionDate"
-                type="date"
-                value={approveFirstCollectionDate}
-                onChange={(event) => setApproveFirstCollectionDate(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenedApproveDialog(false)}>
-              Cerrar
-            </Button>
-            <Button
-              onClick={submitApprove}
-              disabled={
-                isApproving ||
-                !approveRepaymentMethodId ||
-                !approvePaymentGuaranteeTypeId ||
-                !approveAgreementId ||
-                !approveApprovedAmount.trim() ||
-                !approveActNumber.trim() ||
-                !approvePayeeThirdPartyId ||
-                !approveFirstCollectionDate
-              }
-            >
-              {isApproving && <Spinner />}
-              Aprobar solicitud
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LoanApplicationApproveDialog
+        loanApplication={loanApplication}
+        opened={openedApproveDialog}
+        onOpened={setOpenedApproveDialog}
+        onApproved={() => setLoanApplication(undefined)}
+      />
 
       <Dialog open={openedCancelDialog} onOpenChange={setOpenedCancelDialog}>
         <DialogContent>

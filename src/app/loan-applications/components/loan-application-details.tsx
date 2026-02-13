@@ -12,43 +12,24 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { usePresignLoanApplicationDocumentView } from '@/hooks/queries/use-loan-application-queries';
+import { financingTypeLabels } from '@/schemas/credit-product';
 import {
   bankAccountTypeLabels,
   categoryCodeLabels,
   LoanApplication,
   loanApplicationStatusLabels,
 } from '@/schemas/loan-application';
-import { formatCurrency, formatDate } from '@/utils/formatters';
+import { calculateCreditSimulation } from '@/utils/credit-simulation';
+import { formatCurrency, formatDate, formatPercent } from '@/utils/formatters';
+import { assessPaymentCapacity } from '@/utils/payment-capacity';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import { Eye } from 'lucide-react';
+import { useMemo } from 'react';
 
 function getApplicantLabel(application: LoanApplication): string {
   const person = application.thirdParty;
   if (!person) return String(application.thirdPartyId);
-
-  if (person.personType === 'LEGAL') {
-    return person.businessName ?? person.documentNumber;
-  }
-
-  const fullName = [
-    person.firstName,
-    person.secondName,
-    person.firstLastName,
-    person.secondLastName,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fullName || person.documentNumber;
-}
-
-function getThirdPartyLabel(party: LoanApplication['thirdParty'] | null): string {
-  if (!party) return '-';
-  if (party.personType === 'LEGAL') return party.businessName ?? party.documentNumber;
-  const fullName = [party.firstName, party.secondName, party.firstLastName, party.secondLastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fullName || party.documentNumber;
+  return getThirdPartyLabel(person);
 }
 
 export function LoanApplicationDetails({
@@ -59,15 +40,71 @@ export function LoanApplicationDetails({
   className?: string;
 }) {
   const { mutateAsync: presignView } = usePresignLoanApplicationDocumentView();
+  const amortizationData = useMemo(() => {
+    const financingType = loanApplication.creditProduct?.financingType;
+    const daysInterval = loanApplication.paymentFrequency?.daysInterval;
+    const installments = Number(loanApplication.installments ?? 0);
+    const principal = Number(loanApplication.approvedAmount ?? loanApplication.requestedAmount ?? 0);
+    const annualRatePercent = Number(loanApplication.financingFactor ?? 0);
+    const insuranceRatePercent = Number(loanApplication.insuranceFactor ?? 0);
+    const firstPaymentDate = loanApplication.applicationDate
+      ? new Date(`${loanApplication.applicationDate}T00:00:00`)
+      : null;
+
+    if (!financingType || !daysInterval || !installments || !firstPaymentDate) {
+      return null;
+    }
+
+    if (Number.isNaN(firstPaymentDate.getTime())) {
+      return null;
+    }
+
+    return calculateCreditSimulation({
+      financingType,
+      principal,
+      annualRatePercent,
+      installments,
+      firstPaymentDate,
+      daysInterval,
+      insuranceRatePercent,
+    });
+  }, [loanApplication]);
+
+  const paymentCapacityAssessment = useMemo(() => {
+    if (!amortizationData) return null;
+    return assessPaymentCapacity({
+      paymentCapacity: loanApplication.paymentCapacity,
+      installmentPayment: amortizationData.summary.maxInstallmentPayment,
+    });
+  }, [amortizationData, loanApplication.paymentCapacity]);
 
   const openDocumentFile = async (fileKey: string) => {
     const response = await presignView({ body: { fileKey } });
     window.open(response.body.viewUrl, '_blank', 'noopener,noreferrer');
   };
+  const applicant = loanApplication.thirdParty;
+  const applicantDocument = applicant
+    ? `${applicant.identificationType?.name ?? 'Documento'} ${applicant.documentNumber}${applicant.verificationDigit ? `-${applicant.verificationDigit}` : ''}`
+    : String(loanApplication.thirdPartyId);
+  const applicantPersonType = applicant
+    ? applicant.personType === 'LEGAL'
+      ? 'Juridica'
+      : 'Natural'
+    : '-';
+  const paymentFrequencyLabel = loanApplication.paymentFrequency
+    ? `${loanApplication.paymentFrequency.name} (${loanApplication.paymentFrequency.daysInterval} dias)`
+    : loanApplication.paymentFrequencyId ?? '-';
+  const financingTypeLabel = loanApplication.creditProduct?.financingType
+    ? (financingTypeLabels[loanApplication.creditProduct.financingType] ??
+      loanApplication.creditProduct.financingType)
+    : '-';
+  const applicantCategoryLabel = applicant?.categoryCode
+    ? (categoryCodeLabels[applicant.categoryCode] ?? applicant.categoryCode)
+    : '-';
 
   const sections: DescriptionSection[] = [
     {
-      title: 'General',
+      title: 'Solicitud',
       columns: 3,
       items: [
         { label: 'Numero solicitud', value: loanApplication.creditNumber },
@@ -85,40 +122,50 @@ export function LoanApplicationDetails({
           value: loanApplication.affiliationOffice?.name ?? loanApplication.affiliationOfficeId,
         },
         { label: 'Canal', value: loanApplication.channel?.name ?? loanApplication.channelId },
+        { label: 'Acta', value: loanApplication.actNumber ?? '-' },
+        { label: 'Motivo rechazo', value: loanApplication.rejectionReason?.name ?? '-' },
       ],
     },
     {
-      title: 'Solicitante',
-      columns: 2,
+      title: 'Credito y condiciones',
+      columns: 3,
       items: [
-        { label: 'Solicitante', value: getApplicantLabel(loanApplication) },
-        { label: 'Categoria', value: categoryCodeLabels[loanApplication.categoryCode] },
         {
           label: 'Producto',
           value: loanApplication.creditProduct?.name ?? loanApplication.creditProductId,
         },
         { label: 'Fondo', value: loanApplication.creditFund?.name ?? loanApplication.creditFundId },
+        { label: 'Categoria solicitud', value: categoryCodeLabels[loanApplication.categoryCode] },
+        { label: 'Tipo financiacion', value: financingTypeLabel },
+        { label: 'Periodicidad', value: paymentFrequencyLabel },
+        { label: 'Cuotas', value: loanApplication.installments },
+        { label: 'Tasa financiacion', value: formatPercent(loanApplication.financingFactor, 4) },
+        { label: 'Tasa seguro', value: formatPercent(loanApplication.insuranceFactor, 4) },
+        { label: 'Valor solicitado', value: formatCurrency(loanApplication.requestedAmount) },
+        { label: 'Valor aprobado', value: formatCurrency(loanApplication.approvedAmount ?? '-') },
       ],
     },
     {
-      title: 'Valores',
+      title: 'Capacidad y desembolso',
       columns: 3,
       items: [
-        { label: 'Valor solicitado', value: formatCurrency(loanApplication.requestedAmount) },
-        { label: 'Capacidad de pago', value: formatCurrency(loanApplication.paymentCapacity) },
         { label: 'Salario', value: formatCurrency(loanApplication.salary) },
         { label: 'Otros ingresos', value: formatCurrency(loanApplication.otherIncome) },
         { label: 'Otros creditos', value: formatCurrency(loanApplication.otherCredits) },
-        { label: 'Cuotas', value: loanApplication.installments },
-      ],
-    },
-    {
-      title: 'Desembolso',
-      columns: 2,
-      items: [
+        { label: 'Capacidad de pago', value: formatCurrency(loanApplication.paymentCapacity) },
+        {
+          label: 'Viabilidad cuota estimada',
+          value: paymentCapacityAssessment
+            ? paymentCapacityAssessment.canPay
+              ? `Puede pagar (margen ${formatCurrency(paymentCapacityAssessment.margin)})`
+              : `No puede pagar (faltante ${formatCurrency(paymentCapacityAssessment.shortfall)})`
+            : 'No evaluable',
+        },
+        { label: 'Forma de pago', value: loanApplication.repaymentMethod?.name ?? '-' },
+        { label: 'Garantia de pago', value: loanApplication.paymentGuaranteeType?.name ?? '-' },
         { label: 'Banco', value: loanApplication.bank?.name ?? loanApplication.bankId },
-        { label: 'Cuenta', value: loanApplication.bankAccountNumber },
         { label: 'Tipo de cuenta', value: bankAccountTypeLabels[loanApplication.bankAccountType] },
+        { label: 'Cuenta', value: loanApplication.bankAccountNumber },
         {
           label: 'Aseguradora',
           value: loanApplication.insuranceCompany?.businessName ?? '-',
@@ -126,7 +173,26 @@ export function LoanApplicationDetails({
       ],
     },
     {
-      title: 'Actividad',
+      title: 'Solicitante (Tercero)',
+      columns: 3,
+      items: [
+        { label: 'Solicitante', value: getApplicantLabel(loanApplication) },
+        { label: 'Tipo de persona', value: applicantPersonType },
+        { label: 'Documento', value: applicantDocument },
+        { label: 'Tipo de tercero', value: applicant?.thirdPartyType?.name ?? '-' },
+        { label: 'Categoria tercero', value: applicantCategoryLabel },
+        { label: 'Email', value: applicant?.email ?? '-' },
+        { label: 'Celular', value: applicant?.mobilePhone ?? '-' },
+        { label: 'Telefono hogar', value: applicant?.homePhone ?? '-' },
+        { label: 'Telefono trabajo', value: applicant?.workPhone ?? '-' },
+        { label: 'Direccion hogar', value: applicant?.homeAddress ?? '-' },
+        { label: 'Ciudad hogar', value: applicant?.homeCity?.name ?? '-' },
+        { label: 'Direccion trabajo', value: applicant?.workAddress ?? '-' },
+        { label: 'Ciudad trabajo', value: applicant?.workCity?.name ?? '-' },
+      ],
+    },
+    {
+      title: 'Seguimiento',
       columns: 2,
       items: [
         { label: 'Creado', value: formatDate(loanApplication.createdAt) },
@@ -143,13 +209,75 @@ export function LoanApplicationDetails({
         <DescriptionList sections={sections} columns={2} />
 
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">Terceros Asociados</h3>
+          <h3 className="text-sm font-semibold">Tabla de amortizacion estimada</h3>
+          {paymentCapacityAssessment ? (
+            <div
+              className={
+                paymentCapacityAssessment.canPay
+                  ? 'rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800'
+                  : 'rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800'
+              }
+            >
+              <p className="font-medium">
+                {paymentCapacityAssessment.canPay
+                  ? 'Puede pagar la solicitud.'
+                  : 'No puede pagar la solicitud con la capacidad actual.'}
+              </p>
+              <p className="text-xs">
+                Cuota maxima estimada: {formatCurrency(paymentCapacityAssessment.installmentPayment)}.
+                Capacidad de pago: {formatCurrency(paymentCapacityAssessment.paymentCapacity)}.
+                {paymentCapacityAssessment.canPay
+                  ? ` Margen: ${formatCurrency(paymentCapacityAssessment.margin)}.`
+                  : ` Faltante: ${formatCurrency(paymentCapacityAssessment.shortfall)}.`}
+              </p>
+            </div>
+          ) : null}
+          {amortizationData ? (
+            <div className="max-h-120 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cuota</TableHead>
+                    <TableHead>Vencimiento</TableHead>
+                    <TableHead>Saldo inicial</TableHead>
+                    <TableHead>Capital</TableHead>
+                    <TableHead>Interes</TableHead>
+                    <TableHead>Seguro</TableHead>
+                    <TableHead>Pago</TableHead>
+                    <TableHead>Saldo final</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {amortizationData.installments.map((item) => (
+                    <TableRow key={item.installmentNumber}>
+                      <TableCell>{item.installmentNumber}</TableCell>
+                      <TableCell>{item.dueDate}</TableCell>
+                      <TableCell>{formatCurrency(item.openingBalance)}</TableCell>
+                      <TableCell>{formatCurrency(item.principal)}</TableCell>
+                      <TableCell>{formatCurrency(item.interest)}</TableCell>
+                      <TableCell>{formatCurrency(item.insurance)}</TableCell>
+                      <TableCell>{formatCurrency(item.payment)}</TableCell>
+                      <TableCell>{formatCurrency(item.closingBalance)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+              No se pudo calcular la tabla de amortizacion (faltan datos de tasa o periodicidad).
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Codeudores</h3>
           {loanApplication.loanApplicationCoDebtors?.length ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Documento</TableHead>
-                  <TableHead>Tercero</TableHead>
+                  <TableHead>Codeudor</TableHead>
                   <TableHead>Ciudad hogar</TableHead>
                   <TableHead>Ciudad trabajo</TableHead>
                 </TableRow>
@@ -167,7 +295,7 @@ export function LoanApplicationDetails({
             </Table>
           ) : (
             <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
-              No hay terceros asociados.
+              No hay codeudores asociados.
             </div>
           )}
         </div>

@@ -275,7 +275,8 @@ export const RejectLoanApplicationBodySchema = z.object({
 export const ApproveLoanApplicationBodySchema = z.object({
   repaymentMethodId: z.number().int().positive(),
   paymentGuaranteeTypeId: z.number().int().positive(),
-  agreementId: z.number().int().positive(),
+  agreementId: z.number().int().positive().nullable().optional(),
+  approvedInstallments: z.number().int().positive(),
   approvedAmount: decimalStringField('Valor aprobado es requerido').refine(
     (value) => Number(value) > 0,
     { message: 'Valor aprobado debe ser mayor a cero' }

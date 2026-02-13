@@ -162,6 +162,7 @@ export type NewPaymentTenderTypes = typeof paymentTenderTypes.$inferInsert;
 // ---------------------------------------------------------------------
 export type Banks = typeof banks.$inferSelect & {
   loanApplications?: LoanApplications[];
+  loans?: Loans[];
 };
 export type NewBanks = typeof banks.$inferInsert;
 
@@ -449,6 +450,7 @@ export type NewLoanApplicationDocuments = typeof loanApplicationDocuments.$infer
 export type Loans = typeof loans.$inferSelect & {
   loanApplication?: LoanApplications;
   agreement?: Agreements | null;
+  bank?: Banks | null;
   creditFund?: CreditFunds | null;
   repaymentMethod?: RepaymentMethods;
   paymentFrequency?: PaymentFrequencies | null;

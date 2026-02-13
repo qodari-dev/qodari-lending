@@ -1,6 +1,7 @@
 import {
   accountingDistributionLines,
   accountingEntries,
+  banks,
   db,
   loanApplications,
   loanAgreementHistory,
@@ -44,6 +45,9 @@ const LOAN_FIELDS: FieldMap = {
   agreementId: loans.agreementId,
   thirdPartyId: loans.thirdPartyId,
   payeeThirdPartyId: loans.payeeThirdPartyId,
+  bankId: loans.bankId,
+  bankAccountType: loans.bankAccountType,
+  bankAccountNumber: loans.bankAccountNumber,
   status: loans.status,
   disbursementStatus: loans.disbursementStatus,
   hasLegalProcess: loans.hasLegalProcess,
@@ -103,6 +107,10 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
   },
   agreement: {
     relation: 'agreement',
+    config: true,
+  },
+  bank: {
+    relation: 'bank',
     config: true,
   },
   creditFund: {
@@ -646,6 +654,109 @@ export const loan = tsr.router(contract.loan, {
           requestedPaymentAgreementDate: body.paymentAgreementDate
             ? formatDateOnly(body.paymentAgreementDate)
             : null,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return error;
+    }
+  },
+
+  updateBankInfo: async ({ params: { id }, body }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const existingLoan = await db.query.loans.findFirst({
+        where: eq(loans.id, id),
+      });
+
+      if (!existingLoan) {
+        throwHttpError({
+          status: 404,
+          message: `Credito con ID ${id} no encontrado`,
+          code: 'NOT_FOUND',
+        });
+      }
+
+      const bank = await db.query.banks.findFirst({
+        where: and(eq(banks.id, body.bankId), eq(banks.isActive, true)),
+        columns: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!bank) {
+        throwHttpError({
+          status: 400,
+          message: 'Banco invalido o inactivo',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const [updatedLoan] = await db
+        .update(loans)
+        .set({
+          bankId: body.bankId,
+          bankAccountType: body.bankAccountType,
+          bankAccountNumber: body.bankAccountNumber.trim(),
+        })
+        .where(eq(loans.id, id))
+        .returning();
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'updateBankInfo',
+        resourceId: id.toString(),
+        resourceLabel: existingLoan.creditNumber,
+        status: 'success',
+        beforeValue: existingLoan,
+        afterValue: updatedLoan,
+        metadata: {
+          bankName: bank.name,
+          bankId: updatedLoan.bankId,
+          bankAccountType: updatedLoan.bankAccountType,
+          bankAccountNumber: updatedLoan.bankAccountNumber,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return {
+        status: 200 as const,
+        body: updatedLoan,
+      };
+    } catch (e) {
+      const error = genericTsRestErrorResponse(e, {
+        genericMsg: `Error al actualizar datos bancarios del credito ${id}`,
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'updateBankInfo',
+        resourceId: id.toString(),
+        status: 'failure',
+        errorMessage: error.body.message,
+        metadata: {
+          requestedBankId: body.bankId,
+          requestedBankAccountType: body.bankAccountType,
+          requestedBankAccountNumber: body.bankAccountNumber,
         },
         ipAddress,
         userAgent,

@@ -35,6 +35,7 @@ import {
   Loan,
   LoanStatus,
 } from '@/schemas/loan';
+import { BankAccountType, bankAccountTypeLabels } from '@/schemas/loan-application';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 
@@ -179,6 +180,7 @@ function LoanDocumentsTab({ loanId, creditNumber }: { loanId: number; creditNumb
 const LOAN_DETAIL_INCLUDES: LoanInclude[] = [
   'borrower',
   'disbursementParty',
+  'bank',
   'agreement',
   'creditFund',
   'repaymentMethod',
@@ -278,6 +280,14 @@ export function LoanInfo({
                 ? `${detail.agreement.agreementCode} - ${detail.agreement.businessName}`
                 : '-',
             },
+            { label: 'Banco', value: detail.bank?.name ?? '-' },
+            {
+              label: 'Tipo cuenta',
+              value: detail.bankAccountType
+                ? bankAccountTypeLabels[detail.bankAccountType as BankAccountType]
+                : '-',
+            },
+            { label: 'Numero cuenta', value: detail.bankAccountNumber ?? '-' },
             { label: 'Fondo', value: detail.creditFund?.name ?? '-' },
             { label: 'Aseguradora', value: detail.insuranceCompany?.businessName ?? '-' },
             { label: 'Forma de pago', value: detail.repaymentMethod?.name ?? detail.repaymentMethodId },

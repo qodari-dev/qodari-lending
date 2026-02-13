@@ -1,4 +1,5 @@
 import { Contract } from '@/server/api/contracts';
+import { BANK_ACCOUNT_TYPE_OPTIONS } from '@/schemas/loan-application';
 import {
   BooleanOperatorsSchema,
   createIncludeSchema,
@@ -81,6 +82,9 @@ const LoanWhereFieldsSchema = z
     agreementId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     thirdPartyId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     payeeThirdPartyId: z.union([z.number(), NumberOperatorsSchema]).optional(),
+    bankId: z.union([z.number(), NumberOperatorsSchema]).optional(),
+    bankAccountType: z.union([z.enum(BANK_ACCOUNT_TYPE_OPTIONS), StringOperatorsSchema]).optional(),
+    bankAccountNumber: z.union([z.string(), StringOperatorsSchema]).optional(),
     status: z.union([z.enum(LOAN_STATUS_OPTIONS), StringOperatorsSchema]).optional(),
     disbursementStatus: z
       .union([z.enum(LOAN_DISBURSEMENT_STATUS_OPTIONS), StringOperatorsSchema])
@@ -127,6 +131,7 @@ const LOAN_INCLUDE_OPTIONS = [
   'costCenter',
   'borrower',
   'disbursementParty',
+  'bank',
   'channel',
   'loanInstallments',
   'loanPayments',
@@ -181,6 +186,11 @@ export const UpdateLoanPaymentAgreementBodySchema = z
       });
     }
   });
+export const UpdateLoanBankInfoBodySchema = z.object({
+  bankId: z.number().int().positive(),
+  bankAccountType: z.enum(BANK_ACCOUNT_TYPE_OPTIONS),
+  bankAccountNumber: z.string().trim().min(1).max(25),
+});
 export const GetLoanStatementQuerySchema = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),

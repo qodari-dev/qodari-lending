@@ -1353,6 +1353,11 @@ export const loans = pgTable(
     agreementId: integer('agreement_id').references(() => agreements.id, {
       onDelete: 'set null',
     }),
+    bankId: integer('bank_id').references(() => banks.id, {
+      onDelete: 'set null',
+    }),
+    bankAccountType: bankAccountTypeEnum('bank_account_type'),
+    bankAccountNumber: varchar('bank_account_number', { length: 25 }),
 
     // Deudor (solicitante)
     thirdPartyId: integer('third_party_id')
@@ -1461,6 +1466,7 @@ export const loans = pgTable(
 
     index('idx_loans_application').on(t.loanApplicationId),
     index('idx_loans_agreement').on(t.agreementId),
+    index('idx_loans_bank').on(t.bankId),
     index('idx_loans_status').on(t.status),
     index('idx_loans_start_status').on(t.creditStartDate, t.status),
     index('idx_loans_office').on(t.affiliationOfficeId),

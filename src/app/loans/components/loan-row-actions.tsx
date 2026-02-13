@@ -4,7 +4,7 @@ import { DataTableRowActions, type RowAction, type RowActionGroup } from '@/comp
 import { Loan } from '@/schemas/loan';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { Row, Table } from '@tanstack/react-table';
-import { Ban, CheckCircle2, Eye, Handshake, Scale } from 'lucide-react';
+import { Ban, CheckCircle2, Eye, Handshake, Landmark, Scale } from 'lucide-react';
 
 interface LoanRowActionsProps {
   row: Row<Loan>;
@@ -16,6 +16,7 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
   const meta = table.options.meta;
   const canLiquidate = useHasPermission('loans:liquidate');
   const canUpdate = useHasPermission('loans:update');
+  const canUpdateBankInfo = useHasPermission('loans:update-bank-info');
   const canVoid = useHasPermission('loans:void');
 
   const actions: (RowAction<Loan> | RowActionGroup<Loan>)[] = [
@@ -47,6 +48,12 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
       icon: Handshake,
       onClick: meta?.onRowPaymentAgreement,
       hidden: !canUpdate,
+    },
+    {
+      label: 'Datos bancarios',
+      icon: Landmark,
+      onClick: meta?.onRowBankInfo,
+      hidden: !canUpdateBankInfo,
     },
   ];
 

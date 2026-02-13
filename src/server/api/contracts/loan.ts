@@ -3,6 +3,7 @@ import {
   GetLoanStatementQuerySchema,
   LiquidateLoanBodySchema,
   ListLoansQuerySchema,
+  UpdateLoanBankInfoBodySchema,
   UpdateLoanLegalProcessBodySchema,
   UpdateLoanPaymentAgreementBodySchema,
   VoidLoanBodySchema,
@@ -134,6 +135,27 @@ export const loan = c.router(
         permissionKey: {
           resourceKey,
           actionKey: 'update',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: c.type<Loans>(),
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    updateBankInfo: {
+      method: 'PATCH',
+      path: '/:id/bank-info',
+      pathParams: IdParamSchema,
+      body: UpdateLoanBankInfoBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'update-bank-info',
         },
       } satisfies TsRestMetaData,
       responses: {

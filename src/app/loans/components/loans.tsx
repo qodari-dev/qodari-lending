@@ -20,6 +20,7 @@ import { Loan, LoanInclude, LOAN_STATUS_OPTIONS, LoanSortField, LoanStatus } fro
 import { RowData, TableMeta } from '@tanstack/react-table';
 import React from 'react';
 import { loanColumns } from './loan-columns';
+import { LoanBankInfoDialog } from './loan-bank-info-dialog';
 import { LoanInfo } from './loan-info';
 import { loanExportConfig } from './loan-export-config';
 import { LoanLegalProcessDialog } from './loan-legal-process-dialog';
@@ -33,6 +34,7 @@ declare module '@tanstack/table-core' {
     onRowVoid?: (row: TData) => void;
     onRowLegalProcess?: (row: TData) => void;
     onRowPaymentAgreement?: (row: TData) => void;
+    onRowBankInfo?: (row: TData) => void;
   }
 }
 
@@ -42,6 +44,7 @@ export function Loans() {
   const [loanToVoid, setLoanToVoid] = React.useState<Loan>();
   const [loanToUpdateLegalProcess, setLoanToUpdateLegalProcess] = React.useState<Loan>();
   const [loanToUpdatePaymentAgreement, setLoanToUpdatePaymentAgreement] = React.useState<Loan>();
+  const [loanToUpdateBankInfo, setLoanToUpdateBankInfo] = React.useState<Loan>();
 
   const {
     pageIndex,
@@ -145,6 +148,12 @@ export function Loans() {
     setLoanToUpdatePaymentAgreement(row);
     setOpenedPaymentAgreementDialog(true);
   }, []);
+  const [openedBankInfoDialog, setOpenedBankInfoDialog] = React.useState(false);
+
+  const handleRowBankInfo = React.useCallback((row: Loan) => {
+    setLoanToUpdateBankInfo(row);
+    setOpenedBankInfoDialog(true);
+  }, []);
 
   const submitLiquidate = React.useCallback(async () => {
     if (!loanToLiquidate?.id) return;
@@ -185,8 +194,16 @@ export function Loans() {
       onRowVoid: handleRowVoid,
       onRowLegalProcess: handleRowLegalProcess,
       onRowPaymentAgreement: handleRowPaymentAgreement,
+      onRowBankInfo: handleRowBankInfo,
     }),
-    [handleRowOpen, handleRowLiquidate, handleRowVoid, handleRowLegalProcess, handleRowPaymentAgreement]
+    [
+      handleRowOpen,
+      handleRowLiquidate,
+      handleRowVoid,
+      handleRowLegalProcess,
+      handleRowPaymentAgreement,
+      handleRowBankInfo,
+    ]
   );
 
   return (
@@ -266,6 +283,16 @@ export function Loans() {
           setOpenedPaymentAgreementDialog(open);
           if (!open) {
             setLoanToUpdatePaymentAgreement(undefined);
+          }
+        }}
+      />
+      <LoanBankInfoDialog
+        loan={loanToUpdateBankInfo}
+        opened={openedBankInfoDialog}
+        onOpened={(open) => {
+          setOpenedBankInfoDialog(open);
+          if (!open) {
+            setLoanToUpdateBankInfo(undefined);
           }
         }}
       />

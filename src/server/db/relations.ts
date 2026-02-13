@@ -153,6 +153,7 @@ export const paymentTenderTypesRelations = relations(paymentTenderTypes, ({ many
 // ---------------------------------------------------------------------
 export const banksRelations = relations(banks, ({ many }) => ({
   loanApplications: many(loanApplications),
+  loans: many(loans),
 }));
 
 // ---------------------------------------------------------------------
@@ -620,6 +621,10 @@ export const loansRelations = relations(loans, ({ one, many }) => ({
   agreement: one(agreements, {
     fields: [loans.agreementId],
     references: [agreements.id],
+  }),
+  bank: one(banks, {
+    fields: [loans.bankId],
+    references: [banks.id],
   }),
   creditFund: one(creditFunds, {
     fields: [loans.creditFundId],

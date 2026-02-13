@@ -33,6 +33,20 @@ export const DashboardApplicationsByOfficeSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 
+export const DashboardApplicationsByChannelSchema = z.object({
+  channelId: z.number().int().positive().nullable(),
+  channelCode: z.string().nullable(),
+  channelName: z.string(),
+  total: z.number().int().nonnegative(),
+});
+
+export const DashboardApplicationsByInvestmentTypeSchema = z.object({
+  investmentTypeId: z.number().int().positive().nullable(),
+  investmentTypeName: z.string(),
+  total: z.number().int().nonnegative(),
+  requestedAmountTotal: z.number().nonnegative(),
+});
+
 export const DashboardTopRejectionReasonSchema = z.object({
   rejectionReasonId: z.number().int().positive().nullable(),
   rejectionReasonName: z.string(),
@@ -85,6 +99,8 @@ export const DashboardSummaryResponseSchema = z.object({
     canceledCount: z.number().int().nonnegative(),
     byCurrentStatus: z.array(DashboardStatusCountSchema),
     byOffice: z.array(DashboardApplicationsByOfficeSchema),
+    byChannel: z.array(DashboardApplicationsByChannelSchema),
+    byInvestmentType: z.array(DashboardApplicationsByInvestmentTypeSchema),
     topRejectionReasons: z.array(DashboardTopRejectionReasonSchema),
   }),
   collections: z.object({

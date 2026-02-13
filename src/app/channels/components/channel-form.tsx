@@ -24,7 +24,7 @@ import {
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useId, useMemo } from 'react';
-import { Controller, FormProvider, useForm } from 'react-hook-form';
+import { Controller, FormProvider, type Resolver, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 type FormValues = z.infer<typeof CreateChannelBodySchema>;
@@ -41,7 +41,7 @@ export function ChannelForm({
   const formId = useId();
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(CreateChannelBodySchema),
+    resolver: zodResolver(CreateChannelBodySchema) as Resolver<FormValues>,
     defaultValues: {
       code: '',
       name: '',

@@ -72,6 +72,20 @@ const officeChartConfig = {
   },
 } satisfies ChartConfig;
 
+const channelChartConfig = {
+  total: {
+    label: 'Solicitudes',
+    color: 'var(--chart-4)',
+  },
+} satisfies ChartConfig;
+
+const investmentTypeChartConfig = {
+  amount: {
+    label: 'Monto solicitado',
+    color: 'var(--chart-5)',
+  },
+} satisfies ChartConfig;
+
 const collectionChartConfig = {
   amount: {
     label: 'Valor',
@@ -139,6 +153,22 @@ export function Dashboard() {
     return summary.applications.byOffice.slice(0, 10).map((item) => ({
       officeLabel: item.affiliationOfficeCode ?? item.affiliationOfficeName,
       total: item.total,
+    }));
+  }, [summary]);
+
+  const channelChartData = React.useMemo(() => {
+    if (!summary) return [];
+    return summary.applications.byChannel.slice(0, 10).map((item) => ({
+      channelLabel: item.channelCode ?? item.channelName,
+      total: item.total,
+    }));
+  }, [summary]);
+
+  const investmentTypeChartData = React.useMemo(() => {
+    if (!summary) return [];
+    return summary.applications.byInvestmentType.slice(0, 10).map((item) => ({
+      investmentTypeLabel: item.investmentTypeName,
+      amount: item.requestedAmountTotal,
     }));
   }, [summary]);
 
@@ -370,6 +400,44 @@ export function Dashboard() {
                       <YAxis allowDecimals={false} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <Bar dataKey="total" fill="var(--color-total)" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Solicitudes por canal</CardTitle>
+                  <CardDescription>Top canales de entrada en el periodo</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={channelChartConfig} className="h-[280px] w-full">
+                    <BarChart data={channelChartData}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="channelLabel" tickLine={false} axisLine={false} />
+                      <YAxis allowDecimals={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="total" fill="var(--color-total)" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Monto por tipo de inversion</CardTitle>
+                  <CardDescription>Valor solicitado agrupado por destino de inversion</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={investmentTypeChartConfig} className="h-[280px] w-full">
+                    <BarChart data={investmentTypeChartData}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="investmentTypeLabel" tickLine={false} axisLine={false} />
+                      <YAxis allowDecimals={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="amount" fill="var(--color-amount)" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ChartContainer>
                 </CardContent>

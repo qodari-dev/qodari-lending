@@ -2,9 +2,11 @@ import { DashboardSummary } from '@/schemas/dashboard';
 import {
   accountingPeriods,
   affiliationOffices,
+  channels,
   creditFundBudgets,
   creditFunds,
   db,
+  investmentTypes,
   loanApplicationStatusHistory,
   loanApplications,
   loanPaymentMethodAllocations,
@@ -147,6 +149,8 @@ async function calculateDashboardSummary(accountingPeriodId: number): Promise<Da
     applicationsByCurrentStatusRows,
     applicationStatusTransitionRows,
     applicationsByOfficeRows,
+    applicationsByChannelRows,
+    applicationsByInvestmentTypeRows,
     topRejectionReasonResult,
     collectionTotalsRows,
     collectionByMethodRows,
@@ -201,6 +205,45 @@ async function calculateDashboardSummary(accountingPeriodId: number): Promise<Da
       )
       .groupBy(affiliationOffices.id, affiliationOffices.code, affiliationOffices.name)
       .orderBy(sql`count(*) desc`, affiliationOffices.name),
+
+    db
+      .select({
+        channelId: channels.id,
+        channelCode: channels.code,
+        channelName: sql<string>`coalesce(${channels.name}, 'Sin canal')`,
+        total: sql<number>`count(*)::int`,
+      })
+      .from(loanApplications)
+      .leftJoin(channels, eq(loanApplications.channelId, channels.id))
+      .where(
+        and(
+          gte(loanApplications.applicationDate, periodStart),
+          lt(loanApplications.applicationDate, periodNextStart)
+        )
+      )
+      .groupBy(channels.id, channels.code, channels.name)
+      .orderBy(sql`count(*) desc`, channels.name),
+
+    db
+      .select({
+        investmentTypeId: investmentTypes.id,
+        investmentTypeName: sql<string>`coalesce(${investmentTypes.name}, 'Sin tipo de inversion')`,
+        total: sql<number>`count(*)::int`,
+        requestedAmountTotal: sql<string>`coalesce(sum(${loanApplications.requestedAmount}), 0)`,
+      })
+      .from(loanApplications)
+      .leftJoin(investmentTypes, eq(loanApplications.investmentTypeId, investmentTypes.id))
+      .where(
+        and(
+          gte(loanApplications.applicationDate, periodStart),
+          lt(loanApplications.applicationDate, periodNextStart)
+        )
+      )
+      .groupBy(investmentTypes.id, investmentTypes.name)
+      .orderBy(
+        sql`coalesce(sum(${loanApplications.requestedAmount}), 0) desc`,
+        investmentTypes.name
+      ),
 
     db.execute(sql<{
       rejectionReasonId: number | null;
@@ -360,6 +403,20 @@ async function calculateDashboardSummary(accountingPeriodId: number): Promise<Da
     })
   );
 
+  const applicationsByChannel = applicationsByChannelRows.map((row) => ({
+    channelId: toNullableInteger(row.channelId),
+    channelCode: toSafeString(row.channelCode, '') || null,
+    channelName: toSafeString(row.channelName, 'Sin canal'),
+    total: Number(row.total ?? 0),
+  }));
+
+  const applicationsByInvestmentType = applicationsByInvestmentTypeRows.map((row) => ({
+    investmentTypeId: toNullableInteger(row.investmentTypeId),
+    investmentTypeName: toSafeString(row.investmentTypeName, 'Sin tipo de inversion'),
+    total: Number(row.total ?? 0),
+    requestedAmountTotal: toNumber(row.requestedAmountTotal),
+  }));
+
   const collectionTotals = collectionTotalsRows[0];
   const totalCollectionCount = Number(collectionTotals?.totalCount ?? 0);
   const totalCollectionAmount = toNumber(collectionTotals?.totalAmount ?? 0);
@@ -472,6 +529,8 @@ async function calculateDashboardSummary(accountingPeriodId: number): Promise<Da
         affiliationOfficeName: row.affiliationOfficeName,
         total: Number(row.total ?? 0),
       })),
+      byChannel: applicationsByChannel,
+      byInvestmentType: applicationsByInvestmentType,
       topRejectionReasons,
     },
     collections: {

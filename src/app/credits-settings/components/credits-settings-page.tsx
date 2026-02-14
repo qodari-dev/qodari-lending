@@ -92,6 +92,7 @@ export function CreditsSettingsPage() {
         postAccountingOnline: settings.postAccountingOnline ?? false,
         subsidyEnabled: settings.subsidyEnabled ?? false,
         accountingEnabled: settings.accountingEnabled ?? true,
+        minDaysBeforeFirstCollection: settings.minDaysBeforeFirstCollection ?? 7,
         cashGlAccountId: settings.cashGlAccountId ?? undefined,
         majorGlAccountId: settings.majorGlAccountId ?? undefined,
         minimumMajorPaidAmount: settings.minimumMajorPaidAmount ?? null,
@@ -195,6 +196,30 @@ export function CreditsSettingsPage() {
                             {...field}
                             value={field.value ?? ''}
                             maxLength={2}
+                            disabled={!canUpdate}
+                          />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="minDaysBeforeFirstCollection"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Días min. primer recaudo</FieldLabel>
+                          <Input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={field.value ?? 7}
+                            onChange={(event) =>
+                              field.onChange(
+                                event.target.value === ''
+                                  ? undefined
+                                  : Number.parseInt(event.target.value, 10)
+                              )
+                            }
                             disabled={!canUpdate}
                           />
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

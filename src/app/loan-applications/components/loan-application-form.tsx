@@ -146,7 +146,7 @@ export function LoanApplicationForm({
       installments: 12,
       insuranceCompanyId: null,
       requestedAmount: '0',
-      investmentTypeId: null,
+      investmentTypeId: undefined,
       note: '',
       isInsuranceApproved: false,
       creditStudyFee: '0',
@@ -512,7 +512,7 @@ export function LoanApplicationForm({
       installments: loanApplication?.installments ?? 12,
       insuranceCompanyId: loanApplication?.insuranceCompanyId ?? null,
       requestedAmount: String(loanApplication?.requestedAmount ?? '0'),
-      investmentTypeId: loanApplication?.investmentTypeId ?? null,
+      investmentTypeId: loanApplication?.investmentTypeId ?? undefined,
       note: loanApplication?.note ?? '',
       isInsuranceApproved: loanApplication?.isInsuranceApproved ?? false,
       creditStudyFee: String(loanApplication?.creditStudyFee ?? '0'),
@@ -1205,7 +1205,7 @@ export function LoanApplicationForm({
                           <Combobox
                             items={investmentTypes}
                             value={investmentTypes.find((item) => item.id === field.value) ?? null}
-                            onValueChange={(value) => field.onChange(value?.id ?? null)}
+                            onValueChange={(value) => field.onChange(value?.id ?? undefined)}
                             itemToStringValue={(item) => String(item.id)}
                             itemToStringLabel={(item) => item.name}
                           >

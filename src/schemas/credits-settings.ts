@@ -48,6 +48,7 @@ export const UpdateCreditsSettingsBodySchema = z.object({
   postAccountingOnline: z.boolean().optional(),
   subsidyEnabled: z.boolean().optional(),
   accountingEnabled: z.boolean().optional(),
+  minDaysBeforeFirstCollection: z.number().int().min(0).max(365).optional(),
 
   // GL Accounts
   cashGlAccountId: z.number().nullable().optional(),

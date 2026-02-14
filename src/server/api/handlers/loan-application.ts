@@ -2,6 +2,7 @@ import {
   agreements,
   affiliationOffices,
   billingConceptRules,
+  creditsSettings,
   creditProductCategories,
   creditProductBillingConcepts,
   creditProductDocuments,
@@ -12,6 +13,7 @@ import {
   loanApplicationCoDebtors,
   loanApplicationDocuments,
   loanApplicationPledges,
+  loanApplicationRiskAssessments,
   loanApplications,
   loanAgreementHistory,
   loanBillingConcepts,
@@ -55,10 +57,14 @@ import {
   toRateString,
 } from '@/server/utils/value-utils';
 import { calculateLoanApplicationPaymentCapacity } from '@/utils/payment-capacity';
-import { resolvePaymentFrequencyIntervalDays } from '@/utils/payment-frequency';
+import {
+  resolvePaymentFrequencyIntervalDays,
+  resolveSuggestedFirstCollectionDate,
+} from '@/utils/payment-frequency';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
+import { env } from '@/env';
 
 type LoanApplicationColumn = keyof typeof loanApplications.$inferSelect;
 
@@ -168,6 +174,12 @@ const LOAN_APPLICATION_INCLUDES = createIncludeMap<typeof db.query.loanApplicati
     relation: 'loanApplicationStatusHistory',
     config: {
       orderBy: [desc(loanApplicationStatusHistory.changedAt)],
+    },
+  },
+  loanApplicationRiskAssessments: {
+    relation: 'loanApplicationRiskAssessments',
+    config: {
+      orderBy: [desc(loanApplicationRiskAssessments.executedAt)],
     },
   },
 });
@@ -659,7 +671,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             insuranceCompanyId,
             insuranceFactor: toRateString(insuranceFactor),
             requestedAmount: toDecimalString(body.requestedAmount),
-            investmentTypeId: body.investmentTypeId ?? null,
+            investmentTypeId: body.investmentTypeId,
             status: 'PENDING',
             statusChangedByUserId: userId,
             statusDate,
@@ -710,6 +722,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           fromStatus: null,
           toStatus: 'PENDING',
           changedByUserId: userId,
+          changedByUserName: userName || userId,
           note: 'Solicitud creada',
         });
 
@@ -1046,7 +1059,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      const { userId } = getRequiredUserContext(session);
+      const { userId, userName } = getRequiredUserContext(session);
       const statusDate = formatDateOnly(new Date());
 
       const [updated] = await db.transaction(async (tx) => {
@@ -1067,6 +1080,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           fromStatus: existing.status,
           toStatus: 'CANCELED',
           changedByUserId: userId,
+          changedByUserName: userName || userId,
           note: body.statusNote.slice(0, 255),
         });
 
@@ -1160,7 +1174,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      const { userId } = getRequiredUserContext(session);
+      const { userId, userName } = getRequiredUserContext(session);
       const statusDate = formatDateOnly(new Date());
 
       const [updated] = await db.transaction(async (tx) => {
@@ -1181,6 +1195,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           fromStatus: existing.status,
           toStatus: 'REJECTED',
           changedByUserId: userId,
+          changedByUserName: userName || userId,
           note: body.statusNote.slice(0, 255),
           metadata: {
             rejectionReasonId: body.rejectionReasonId,
@@ -1302,6 +1317,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         product,
         paymentFrequency,
         actNumber,
+        settings,
       ] = await Promise.all([
         db.query.repaymentMethods.findFirst({
           where: and(
@@ -1343,6 +1359,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             eq(loanApplicationActNumbers.actDate, today),
             eq(loanApplicationActNumbers.actNumber, body.actNumber)
           ),
+        }),
+        db.query.creditsSettings.findFirst({
+          where: eq(creditsSettings.appSlug, env.IAM_APP_SLUG),
         }),
       ]);
 
@@ -1420,6 +1439,28 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           status: 404,
           message: 'Acta no encontrada para la oficina de la solicitud',
           code: 'NOT_FOUND',
+        });
+      }
+
+      const minimumDaysBeforeFirstCollection = settings?.minDaysBeforeFirstCollection ?? 7;
+      const minimumAllowedFirstCollectionDate = resolveSuggestedFirstCollectionDate({
+        baseDate: new Date(`${today}T00:00:00`),
+        minimumDaysBeforeCollection: minimumDaysBeforeFirstCollection,
+        scheduleMode: paymentFrequency.scheduleMode,
+        intervalDays: paymentFrequency.intervalDays,
+        dayOfMonth: paymentFrequency.dayOfMonth,
+        semiMonthDay1: paymentFrequency.semiMonthDay1,
+        semiMonthDay2: paymentFrequency.semiMonthDay2,
+        useEndOfMonthFallback: paymentFrequency.useEndOfMonthFallback,
+      });
+      const selectedFirstCollectionDate = new Date(body.firstCollectionDate);
+      selectedFirstCollectionDate.setHours(0, 0, 0, 0);
+
+      if (selectedFirstCollectionDate < minimumAllowedFirstCollectionDate) {
+        throwHttpError({
+          status: 400,
+          message: `La fecha de primer recaudo debe ser igual o posterior a ${formatDateOnly(minimumAllowedFirstCollectionDate)}`,
+          code: 'BAD_REQUEST',
         });
       }
 

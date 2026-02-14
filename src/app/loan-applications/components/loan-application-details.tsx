@@ -20,7 +20,7 @@ import {
   loanApplicationStatusLabels,
 } from '@/schemas/loan-application';
 import { calculateCreditSimulation } from '@/utils/credit-simulation';
-import { formatCurrency, formatDate, formatPercent } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatDateTime, formatPercent } from '@/utils/formatters';
 import { assessPaymentCapacity } from '@/utils/payment-capacity';
 import {
   formatPaymentFrequencyRule,
@@ -29,6 +29,11 @@ import {
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { Eye } from 'lucide-react';
 import { useMemo } from 'react';
+
+const riskDecisionLabels: Record<'PASS' | 'FAIL', string> = {
+  PASS: 'Aprobado',
+  FAIL: 'Rechazado',
+};
 
 function getApplicantLabel(application: LoanApplication): string {
   const person = application.thirdParty;
@@ -56,7 +61,9 @@ export function LoanApplicationDetails({
         })
       : 0;
     const installments = Number(loanApplication.installments ?? 0);
-    const principal = Number(loanApplication.approvedAmount ?? loanApplication.requestedAmount ?? 0);
+    const principal = Number(
+      loanApplication.approvedAmount ?? loanApplication.requestedAmount ?? 0
+    );
     const annualRatePercent = Number(loanApplication.financingFactor ?? 0);
     const insuranceRatePercent = Number(loanApplication.insuranceFactor ?? 0);
     const firstPaymentDate = loanApplication.applicationDate
@@ -119,7 +126,7 @@ export function LoanApplicationDetails({
         semiMonthDay1: loanApplication.paymentFrequency.semiMonthDay1,
         semiMonthDay2: loanApplication.paymentFrequency.semiMonthDay2,
       })})`
-    : loanApplication.paymentFrequencyId ?? '-';
+    : (loanApplication.paymentFrequencyId ?? '-');
   const financingTypeLabel = loanApplication.creditProduct?.financingType
     ? (financingTypeLabels[loanApplication.creditProduct.financingType] ??
       loanApplication.creditProduct.financingType)
@@ -250,8 +257,9 @@ export function LoanApplicationDetails({
                   : 'No puede pagar la solicitud con la capacidad actual.'}
               </p>
               <p className="text-xs">
-                Cuota maxima estimada: {formatCurrency(paymentCapacityAssessment.installmentPayment)}.
-                Capacidad de pago: {formatCurrency(paymentCapacityAssessment.paymentCapacity)}.
+                Cuota maxima estimada:{' '}
+                {formatCurrency(paymentCapacityAssessment.installmentPayment)}. Capacidad de pago:{' '}
+                {formatCurrency(paymentCapacityAssessment.paymentCapacity)}.
                 {paymentCapacityAssessment.canPay
                   ? ` Margen: ${formatCurrency(paymentCapacityAssessment.margin)}.`
                   : ` Faltante: ${formatCurrency(paymentCapacityAssessment.shortfall)}.`}
@@ -297,6 +305,78 @@ export function LoanApplicationDetails({
         </div>
 
         <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Historial de estados</h3>
+          {loanApplication.loanApplicationStatusHistory?.length ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha cambio</TableHead>
+                  <TableHead>Estado anterior</TableHead>
+                  <TableHead>Estado nuevo</TableHead>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>Nota</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loanApplication.loanApplicationStatusHistory.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{formatDateTime(row.changedAt)}</TableCell>
+                    <TableCell>
+                      {row.fromStatus
+                        ? (loanApplicationStatusLabels[row.fromStatus] ?? row.fromStatus)
+                        : '-'}
+                    </TableCell>
+                    <TableCell>{loanApplicationStatusLabels[row.toStatus] ?? row.toStatus}</TableCell>
+                    <TableCell>{row.changedByUserName ?? row.changedByUserId ?? '-'}</TableCell>
+                    <TableCell>{row.note ?? '-'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+              No hay cambios de estado registrados.
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Evaluaciones de riesgo</h3>
+          {loanApplication.loanApplicationRiskAssessments?.length ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha ejecucion</TableHead>
+                  <TableHead>Decision</TableHead>
+                  <TableHead>Score</TableHead>
+                  <TableHead>Ejecutado por</TableHead>
+                  <TableHead>Error</TableHead>
+                  <TableHead>Nota</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loanApplication.loanApplicationRiskAssessments.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{formatDateTime(row.executedAt)}</TableCell>
+                    <TableCell>
+                      {row.decision ? (riskDecisionLabels[row.decision] ?? row.decision) : '-'}
+                    </TableCell>
+                    <TableCell>{row.score ?? '-'}</TableCell>
+                    <TableCell>{row.executedByUserName ?? row.executedByUserId ?? '-'}</TableCell>
+                    <TableCell>{row.errorMessage ?? '-'}</TableCell>
+                    <TableCell>{row.note ?? '-'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+              No hay evaluaciones de riesgo registradas.
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
           <h3 className="text-sm font-semibold">Codeudores</h3>
           {loanApplication.loanApplicationCoDebtors?.length ? (
             <Table>
@@ -311,7 +391,9 @@ export function LoanApplicationDetails({
               <TableBody>
                 {loanApplication.loanApplicationCoDebtors.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell>{row.thirdParty?.documentNumber ?? row.thirdPartyId ?? '-'}</TableCell>
+                    <TableCell>
+                      {row.thirdParty?.documentNumber ?? row.thirdPartyId ?? '-'}
+                    </TableCell>
                     <TableCell>{getThirdPartyLabel(row.thirdParty)}</TableCell>
                     <TableCell>{row.thirdParty?.homeCity?.name ?? '-'}</TableCell>
                     <TableCell>{row.thirdParty?.workCity?.name ?? '-'}</TableCell>

@@ -113,6 +113,20 @@
       "when": 1771100000000,
       "tag": "0015_modern_payment_frequency_schedule",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1771200000000,
+      "tag": "0016_require_investment_type_on_loan_application",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1771300000000,
+      "tag": "0017_credit_settings_first_collection_min_days",
+      "breakpoints": true
     }
   ]
 }

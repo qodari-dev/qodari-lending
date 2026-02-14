@@ -74,6 +74,8 @@ export function LoanApplications() {
     defaultIncludes: [
       'thirdParty',
       'creditProduct',
+      'creditFund',
+      'paymentFrequency',
       'affiliationOffice',
       'bank',
       'channel',
@@ -83,6 +85,7 @@ export function LoanApplications() {
       'loanApplicationDocuments',
       'loanApplicationPledges',
       'loanApplicationStatusHistory',
+      'loanApplicationRiskAssessments',
     ],
     defaultSorting: [{ field: 'createdAt', order: 'desc' }],
   });

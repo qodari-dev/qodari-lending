@@ -86,6 +86,7 @@ const LOAN_APPLICATION_INCLUDE_OPTIONS = [
   'loanApplicationDocuments',
   'loanApplicationPledges',
   'loanApplicationStatusHistory',
+  'loanApplicationRiskAssessments',
 ] as const;
 const LoanApplicationIncludeSchema = createIncludeSchema(LOAN_APPLICATION_INCLUDE_OPTIONS);
 
@@ -166,7 +167,10 @@ const LoanApplicationBaseSchema = z.object({
   installments: z.number().int().positive(),
   insuranceCompanyId: z.number().int().positive().nullable().optional(),
   requestedAmount: decimalStringField('Valor solicitado es requerido'),
-  investmentTypeId: z.number().int().positive().nullable().optional(),
+  investmentTypeId: z
+    .number({ message: 'Tipo de inversion es requerido' })
+    .int()
+    .positive('Tipo de inversion es requerido'),
   note: z.string().nullable().optional(),
   isInsuranceApproved: z.boolean().optional(),
   creditStudyFee: decimalStringField('Estudio de credito invalido').nullable().optional(),

@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { useAgreements } from '@/hooks/queries/use-agreement-queries';
+import { useCreditsSettings } from '@/hooks/queries/use-credits-settings-queries';
 import {
   useApproveLoanApplication,
   useLoanApplicationActNumbers,
@@ -30,11 +31,10 @@ import { usePaymentGuaranteeTypes } from '@/hooks/queries/use-payment-guarantee-
 import { useRepaymentMethods } from '@/hooks/queries/use-repayment-method-queries';
 import { useThirdParties } from '@/hooks/queries/use-third-party-queries';
 import { cn } from '@/lib/utils';
-import {
-  ApproveLoanApplicationBodySchema,
-  LoanApplication,
-} from '@/schemas/loan-application';
+import { ApproveLoanApplicationBodySchema, LoanApplication } from '@/schemas/loan-application';
+import { useHasPermission } from '@/stores/auth-store-provider';
 import { formatDate } from '@/utils/formatters';
+import { resolveSuggestedFirstCollectionDate } from '@/utils/payment-frequency';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CalendarIcon } from 'lucide-react';
@@ -55,6 +55,7 @@ export function LoanApplicationApproveDialog({
   onOpened(opened: boolean): void;
   onApproved?(): void;
 }) {
+  const canReadCreditsSettings = useHasPermission('credits-settings:read');
   const form = useForm<ApproveFormValues>({
     resolver: zodResolver(ApproveLoanApplicationBodySchema) as Resolver<ApproveFormValues>,
     mode: 'onChange',
@@ -72,13 +73,19 @@ export function LoanApplicationApproveDialog({
 
   const { mutateAsync: approveLoanApplication, isPending: isApproving } =
     useApproveLoanApplication();
+  const { data: creditsSettingsData } = useCreditsSettings({
+    enabled: opened && canReadCreditsSettings,
+  });
 
   const { data: repaymentMethodsData } = useRepaymentMethods({
     limit: 1000,
     where: { and: [{ isActive: true }] },
     sort: [{ field: 'name', order: 'asc' }],
   });
-  const repaymentMethods = React.useMemo(() => repaymentMethodsData?.body?.data ?? [], [repaymentMethodsData]);
+  const repaymentMethods = React.useMemo(
+    () => repaymentMethodsData?.body?.data ?? [],
+    [repaymentMethodsData]
+  );
 
   const { data: paymentGuaranteeTypesData } = usePaymentGuaranteeTypes({
     limit: 1000,
@@ -108,6 +115,31 @@ export function LoanApplicationApproveDialog({
     limit: 100,
   });
   const actNumbers = React.useMemo(() => actNumbersData?.body ?? [], [actNumbersData]);
+  const minimumDaysBeforeFirstCollection = React.useMemo(
+    () => creditsSettingsData?.body?.minDaysBeforeFirstCollection ?? 7,
+    [creditsSettingsData?.body?.minDaysBeforeFirstCollection]
+  );
+  const suggestedFirstCollectionDate = React.useMemo(
+    () =>
+      resolveSuggestedFirstCollectionDate({
+        minimumDaysBeforeCollection: minimumDaysBeforeFirstCollection,
+        scheduleMode: loanApplication?.paymentFrequency?.scheduleMode,
+        intervalDays: loanApplication?.paymentFrequency?.intervalDays,
+        dayOfMonth: loanApplication?.paymentFrequency?.dayOfMonth,
+        semiMonthDay1: loanApplication?.paymentFrequency?.semiMonthDay1,
+        semiMonthDay2: loanApplication?.paymentFrequency?.semiMonthDay2,
+        useEndOfMonthFallback: loanApplication?.paymentFrequency?.useEndOfMonthFallback,
+      }),
+    [
+      loanApplication?.paymentFrequency?.dayOfMonth,
+      loanApplication?.paymentFrequency?.intervalDays,
+      loanApplication?.paymentFrequency?.scheduleMode,
+      loanApplication?.paymentFrequency?.semiMonthDay1,
+      loanApplication?.paymentFrequency?.semiMonthDay2,
+      loanApplication?.paymentFrequency?.useEndOfMonthFallback,
+      minimumDaysBeforeFirstCollection,
+    ]
+  );
 
   React.useEffect(() => {
     if (!opened || !loanApplication) return;
@@ -120,9 +152,19 @@ export function LoanApplicationApproveDialog({
       approvedAmount: String(loanApplication.requestedAmount ?? '0'),
       actNumber: '',
       payeeThirdPartyId: loanApplication.thirdPartyId ?? undefined,
-      firstCollectionDate: new Date(),
+      firstCollectionDate: suggestedFirstCollectionDate,
     });
-  }, [form, loanApplication, opened]);
+  }, [form, loanApplication, opened, suggestedFirstCollectionDate]);
+
+  React.useEffect(() => {
+    if (!opened || !loanApplication) return;
+    if (form.getFieldState('firstCollectionDate').isDirty) return;
+
+    form.setValue('firstCollectionDate', suggestedFirstCollectionDate, {
+      shouldDirty: false,
+      shouldValidate: true,
+    });
+  }, [form, loanApplication, opened, suggestedFirstCollectionDate]);
 
   React.useEffect(() => {
     if (!opened || !actNumbers.length) return;
@@ -152,7 +194,7 @@ export function LoanApplicationApproveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpened}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Aprobar solicitud</DialogTitle>
           <DialogDescription>
@@ -194,7 +236,7 @@ export function LoanApplicationApproveDialog({
               name="paymentGuaranteeTypeId"
               control={form.control}
               render={({ field, fieldState }) => (
-                <div className="space-y-2">
+                <div className="col-span-2 space-y-2">
                   <Label htmlFor="approvePaymentGuaranteeTypeId">Garantia de pago</Label>
                   <Select
                     value={field.value ? String(field.value) : ''}
@@ -290,7 +332,9 @@ export function LoanApplicationApproveDialog({
                     value={field.value ?? ''}
                     onChange={(event) =>
                       field.onChange(
-                        event.target.value === '' ? undefined : Number.parseInt(event.target.value, 10)
+                        event.target.value === ''
+                          ? undefined
+                          : Number.parseInt(event.target.value, 10)
                       )
                     }
                     placeholder="0"
@@ -375,10 +419,15 @@ export function LoanApplicationApproveDialog({
                         mode="single"
                         selected={field.value}
                         onSelect={(value) => field.onChange(value)}
+                        disabled={(date) => date < suggestedFirstCollectionDate}
                         captionLayout="dropdown"
                       />
                     </PopoverContent>
                   </Popover>
+                  <p className="text-muted-foreground text-xs">
+                    Sugerida desde {formatDate(suggestedFirstCollectionDate)} (mínimo{' '}
+                    {minimumDaysBeforeFirstCollection} días).
+                  </p>
                   {fieldState.error ? (
                     <p className="text-destructive text-xs">{fieldState.error.message}</p>
                   ) : null}

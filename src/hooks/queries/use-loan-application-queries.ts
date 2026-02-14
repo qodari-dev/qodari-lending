@@ -32,6 +32,8 @@ function defaultQuery(filters?: Partial<ListLoanApplicationsQuery>) {
     include: filters?.include ?? [
       'thirdParty',
       'creditProduct',
+      'creditFund',
+      'paymentFrequency',
       'affiliationOffice',
       'bank',
       'channel',
@@ -41,6 +43,7 @@ function defaultQuery(filters?: Partial<ListLoanApplicationsQuery>) {
       'loanApplicationDocuments',
       'loanApplicationPledges',
       'loanApplicationStatusHistory',
+      'loanApplicationRiskAssessments',
     ],
     sort: filters?.sort ?? [],
     where: filters?.where,

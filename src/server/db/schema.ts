@@ -1223,9 +1223,11 @@ export const loanApplications = pgTable(
     }).notNull(),
     approvedAmount: decimal('approved_amount', { precision: 14, scale: 2 }),
 
-    investmentTypeId: integer('investment_type_id').references(() => investmentTypes.id, {
-      onDelete: 'restrict',
-    }),
+    investmentTypeId: integer('investment_type_id')
+      .notNull()
+      .references(() => investmentTypes.id, {
+        onDelete: 'restrict',
+      }),
 
     status: loanApplicationStatusEnum('status').notNull().default('PENDING'),
 
@@ -2272,6 +2274,11 @@ export const creditsSettings = pgTable('credits_settings', {
 
   // conta: si integra contabilidad
   accountingEnabled: boolean('accounting_enabled').notNull().default(true),
+
+  // Días mínimos entre la fecha de aprobación/desembolso y el primer recaudo.
+  minDaysBeforeFirstCollection: integer('min_days_before_first_collection')
+    .notNull()
+    .default(7),
 
   // Auxiliares (glAccounts)
   cashGlAccountId: integer('cash_gl_account_id').references(() => glAccounts.id, {

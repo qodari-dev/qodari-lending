@@ -3,6 +3,7 @@ import { CategoryCodeSchema } from '@/schemas/category';
 import { ClientInferResponseBody } from '@ts-rest/core';
 import { z } from 'zod';
 import { FINANCING_TYPE_OPTIONS } from './credit-product';
+import { INSURANCE_RATE_TYPE_OPTIONS } from './insurance-company';
 
 export const CalculateCreditSimulationBodySchema = z.object({
   creditProductId: z.number().int().positive(),
@@ -55,6 +56,7 @@ export const CalculateCreditSimulationResponseSchema = z.object({
   financingType: z.enum(FINANCING_TYPE_OPTIONS),
   financingFactor: z.number(),
   insuranceFactor: z.number(),
+  insuranceRateType: z.enum(INSURANCE_RATE_TYPE_OPTIONS).nullable(),
   capacity: CreditSimulationCapacitySchema,
   summary: CreditSimulationSummarySchema,
   installments: z.array(CreditSimulationInstallmentSchema),

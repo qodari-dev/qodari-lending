@@ -25,7 +25,12 @@ type PaymentFrequencyColumn = keyof typeof paymentFrequencies.$inferSelect;
 const PAYMENT_FREQUENCY_FIELDS: FieldMap = {
   id: paymentFrequencies.id,
   name: paymentFrequencies.name,
-  daysInterval: paymentFrequencies.daysInterval,
+  scheduleMode: paymentFrequencies.scheduleMode,
+  intervalDays: paymentFrequencies.intervalDays,
+  dayOfMonth: paymentFrequencies.dayOfMonth,
+  semiMonthDay1: paymentFrequencies.semiMonthDay1,
+  semiMonthDay2: paymentFrequencies.semiMonthDay2,
+  useEndOfMonthFallback: paymentFrequencies.useEndOfMonthFallback,
   isActive: paymentFrequencies.isActive,
   createdAt: paymentFrequencies.createdAt,
   updatedAt: paymentFrequencies.updatedAt,

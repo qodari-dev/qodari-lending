@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Switch } from '@/components/ui/switch';
 import {
   Table,
@@ -350,16 +351,12 @@ export function BillingConceptRulesForm() {
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="effectiveFrom">Vigencia desde</FieldLabel>
-                      <Input
+                      <DatePicker
                         id="effectiveFrom"
-                        type="date"
-                        value={formatDateOnly(field.value ?? null)}
-                        onChange={(event) =>
-                          field.onChange(
-                            event.target.value ? new Date(`${event.target.value}T00:00:00`) : null
-                          )
-                        }
-                        aria-invalid={fieldState.invalid}
+                        value={field.value ?? null}
+                        onChange={field.onChange}
+                        ariaInvalid={fieldState.invalid}
+                        allowClear
                       />
                       {fieldState.error && <FieldError errors={[fieldState.error]} />}
                     </Field>
@@ -372,16 +369,13 @@ export function BillingConceptRulesForm() {
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor="effectiveTo">Vigencia hasta</FieldLabel>
-                      <Input
+                      <DatePicker
                         id="effectiveTo"
-                        type="date"
-                        value={formatDateOnly(field.value ?? null)}
-                        onChange={(event) =>
-                          field.onChange(
-                            event.target.value ? new Date(`${event.target.value}T00:00:00`) : null
-                          )
-                        }
-                        aria-invalid={fieldState.invalid}
+                        value={field.value ?? null}
+                        onChange={field.onChange}
+                        ariaInvalid={fieldState.invalid}
+                        placeholder="Sin fecha fin"
+                        allowClear
                       />
                       {fieldState.error && <FieldError errors={[fieldState.error]} />}
                     </Field>

@@ -1,8 +1,12 @@
 import { DescriptionList, DescriptionSection } from '@/components/description-list';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { PaymentFrequency } from '@/schemas/payment-frequency';
+import {
+  paymentScheduleModeLabels,
+  PaymentFrequency,
+} from '@/schemas/payment-frequency';
 import { formatDate } from '@/utils/formatters';
+import { formatPaymentFrequencyRule } from '@/utils/payment-frequency';
 
 export function PaymentFrequencyInfo({
   paymentFrequency,
@@ -21,7 +25,21 @@ export function PaymentFrequencyInfo({
       columns: 2,
       items: [
         { label: 'Nombre', value: paymentFrequency.name },
-        { label: 'Intervalo de días', value: `${paymentFrequency.daysInterval} días` },
+        { label: 'Modo', value: paymentScheduleModeLabels[paymentFrequency.scheduleMode] },
+        {
+          label: 'Regla',
+          value: formatPaymentFrequencyRule({
+            scheduleMode: paymentFrequency.scheduleMode,
+            intervalDays: paymentFrequency.intervalDays,
+            dayOfMonth: paymentFrequency.dayOfMonth,
+            semiMonthDay1: paymentFrequency.semiMonthDay1,
+            semiMonthDay2: paymentFrequency.semiMonthDay2,
+          }),
+        },
+        {
+          label: 'Ajusta fin de mes',
+          value: paymentFrequency.useEndOfMonthFallback ? 'Sí' : 'No',
+        },
         {
           label: 'Estado',
           value: (

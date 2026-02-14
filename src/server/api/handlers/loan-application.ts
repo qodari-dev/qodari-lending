@@ -43,7 +43,11 @@ import {
   createSpacesPresignedGetUrl,
   createSpacesPresignedPutUrl,
 } from '@/server/utils/storage/spaces-presign';
-import { calculateCreditSimulation } from '@/server/utils/credit-simulation';
+import {
+  calculateCreditSimulation,
+  findInsuranceRateRange,
+  resolveInsuranceFactorFromRange,
+} from '@/utils/credit-simulation';
 import {
   formatDateOnly,
   toDecimalString,
@@ -51,6 +55,7 @@ import {
   toRateString,
 } from '@/server/utils/value-utils';
 import { calculateLoanApplicationPaymentCapacity } from '@/utils/payment-capacity';
+import { resolvePaymentFrequencyIntervalDays } from '@/utils/payment-frequency';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
@@ -203,10 +208,13 @@ async function resolveInsuranceFactor(args: {
   insuranceCompanyId: number | null | undefined;
   installments: number;
   requestedAmount: number;
+  product?: typeof creditProducts.$inferSelect | null;
 }) {
-  const product = await db.query.creditProducts.findFirst({
-    where: and(eq(creditProducts.id, args.creditProductId), eq(creditProducts.isActive, true)),
-  });
+  const product =
+    args.product ??
+    (await db.query.creditProducts.findFirst({
+      where: and(eq(creditProducts.id, args.creditProductId), eq(creditProducts.isActive, true)),
+    }));
 
   if (!product) {
     throwHttpError({
@@ -217,7 +225,15 @@ async function resolveInsuranceFactor(args: {
   }
 
   if (!product.paysInsurance) {
-    return { product, insuranceFactor: 0, insuranceCompanyId: null };
+    return {
+      product,
+      insuranceFactor: 0,
+      insuranceCompanyId: null,
+      insuranceRateType: null,
+      insuranceRatePercent: 0,
+      insuranceFixedAmount: 0,
+      insuranceMinimumAmount: 0,
+    };
   }
 
   if (!args.insuranceCompanyId) {
@@ -249,12 +265,11 @@ async function resolveInsuranceFactor(args: {
   const metricValue =
     product.insuranceRangeMetric === 'INSTALLMENT_COUNT' ? args.installments : args.requestedAmount;
 
-  const insuranceRange = insurer.insuranceRateRanges.find(
-    (range) =>
-      range.rangeMetric === product.insuranceRangeMetric &&
-      metricValue >= range.valueFrom &&
-      metricValue <= range.valueTo
-  );
+  const insuranceRange = findInsuranceRateRange({
+    ranges: insurer.insuranceRateRanges,
+    rangeMetric: product.insuranceRangeMetric,
+    metricValue,
+  });
 
   if (!insuranceRange) {
     throwHttpError({
@@ -264,12 +279,19 @@ async function resolveInsuranceFactor(args: {
     });
   }
 
-  const insuranceFactor = toNumber(insuranceRange.rateValue);
+  const insuranceResolved = resolveInsuranceFactorFromRange({
+    range: insuranceRange,
+    minimumValue: insurer.minimumValue,
+  });
 
   return {
     product,
-    insuranceFactor,
+    insuranceFactor: insuranceResolved.insuranceRatePercent,
     insuranceCompanyId: insurer.id,
+    insuranceRateType: insuranceResolved.insuranceRateType,
+    insuranceRatePercent: insuranceResolved.insuranceRatePercent,
+    insuranceFixedAmount: insuranceResolved.insuranceFixedAmount,
+    insuranceMinimumAmount: insuranceResolved.insuranceMinimumAmount,
   };
 }
 
@@ -1371,15 +1393,25 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      if (
-        !paymentFrequency ||
-        !paymentFrequency.daysInterval ||
-        paymentFrequency.daysInterval <= 0
-      ) {
+      if (!paymentFrequency) {
         throwHttpError({
           status: 404,
           message: 'Periodicidad de pago no valida',
           code: 'NOT_FOUND',
+        });
+      }
+      const paymentFrequencyIntervalDays = resolvePaymentFrequencyIntervalDays({
+        scheduleMode: paymentFrequency.scheduleMode,
+        intervalDays: paymentFrequency.intervalDays,
+        dayOfMonth: paymentFrequency.dayOfMonth,
+        semiMonthDay1: paymentFrequency.semiMonthDay1,
+        semiMonthDay2: paymentFrequency.semiMonthDay2,
+      });
+      if (paymentFrequencyIntervalDays <= 0) {
+        throwHttpError({
+          status: 400,
+          message: 'Periodicidad de pago no valida',
+          code: 'BAD_REQUEST',
         });
       }
 
@@ -1391,14 +1423,33 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
+      const insuranceCalculation = await resolveInsuranceFactor({
+        creditProductId: existing.creditProductId,
+        insuranceCompanyId: existing.insuranceCompanyId,
+        installments: approvedInstallments,
+        requestedAmount: approvedAmount,
+        product,
+      });
+
       const schedule = calculateCreditSimulation({
         financingType: product.financingType,
         principal: approvedAmount,
         annualRatePercent: toNumber(existing.financingFactor),
+        interestRateType: product.interestRateType,
+        interestDayCountConvention: product.interestDayCountConvention,
         installments: approvedInstallments,
         firstPaymentDate: body.firstCollectionDate,
-        daysInterval: paymentFrequency.daysInterval,
-        insuranceRatePercent: toNumber(existing.insuranceFactor),
+        disbursementDate: new Date(`${today}T00:00:00`),
+        daysInterval: paymentFrequencyIntervalDays,
+        paymentScheduleMode: paymentFrequency.scheduleMode,
+        dayOfMonth: paymentFrequency.dayOfMonth,
+        semiMonthDay1: paymentFrequency.semiMonthDay1,
+        semiMonthDay2: paymentFrequency.semiMonthDay2,
+        useEndOfMonthFallback: paymentFrequency.useEndOfMonthFallback,
+        insuranceAccrualMethod: product.insuranceAccrualMethod,
+        insuranceRatePercent: insuranceCalculation.insuranceRatePercent,
+        insuranceFixedAmount: insuranceCalculation.insuranceFixedAmount,
+        insuranceMinimumAmount: insuranceCalculation.insuranceMinimumAmount,
       });
 
       const firstInstallment = schedule.installments[0];
@@ -1526,7 +1577,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             thirdPartyId: existing.thirdPartyId,
             payeeThirdPartyId: body.payeeThirdPartyId,
             installments: approvedInstallments,
-            creditStartDate: firstInstallment.dueDate,
+            creditStartDate: statusDate,
             maturityDate: lastInstallment.dueDate,
             firstCollectionDate,
             principalAmount: toDecimalString(approvedAmount),

@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -192,17 +193,11 @@ export function LoanApplicationPledgesForm() {
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid} className="col-span-2">
                     <FieldLabel htmlFor="effectiveDate">Fecha vigencia</FieldLabel>
-                    <Input
+                    <DatePicker
                       id="effectiveDate"
-                      type="date"
-                      value={field.value ? formatDateISO(field.value) : ''}
-                      onChange={(event) =>
-                        field.onChange(
-                          event.target.value
-                            ? new Date(`${event.target.value}T00:00:00`)
-                            : new Date()
-                        )
-                      }
+                      value={field.value ?? null}
+                      onChange={(value) => field.onChange(value ?? new Date())}
+                      ariaInvalid={fieldState.invalid}
                     />
                     {fieldState.error && <FieldError errors={[fieldState.error]} />}
                   </Field>

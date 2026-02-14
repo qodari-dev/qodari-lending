@@ -12,6 +12,7 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from '@/components/ui/combobox';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -36,7 +37,7 @@ import {
   paymentReceiptMovementTypeLabels,
 } from '@/schemas/loan-payment';
 import { PaymentTenderType } from '@/schemas/payment-tender-type';
-import { formatCurrency, formatDate, formatDateISO } from '@/utils/formatters';
+import { formatCurrency, formatDate } from '@/utils/formatters';
 import { parseDecimalString, roundMoney } from '@/utils/number-utils';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -453,12 +454,11 @@ export function LoanPaymentForm({
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="paymentDate">Fecha pago</FieldLabel>
-                        <Input
+                        <DatePicker
                           id="paymentDate"
-                          type="date"
-                          value={field.value ? formatDateISO(field.value) : ''}
-                          onChange={(event) => field.onChange(event.target.value)}
-                          aria-invalid={fieldState.invalid}
+                          value={field.value ?? null}
+                          onChange={(value) => field.onChange(value ?? new Date())}
+                          ariaInvalid={fieldState.invalid}
                         />
                         {fieldState.error && <FieldError errors={[fieldState.error]} />}
                       </Field>

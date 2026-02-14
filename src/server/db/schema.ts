@@ -166,19 +166,75 @@ export const paymentGuaranteeTypes = pgTable(
 // Define cada cuánto se paga el crédito (frecuencia de recaudo).
 // Campos clave:
 // - name: nombre de la periodicidad (Ej: Mensual, Quincenal).
-// - dayCount: número de días del periodo (base de cálculo / programación).
+// - scheduleMode: tipo de programación del vencimiento.
+// - intervalDays: para frecuencias por intervalo fijo de días.
+// - dayOfMonth / semiMonthDay*: para frecuencias por calendario.
 // ---------------------------------------------------------------------
+export const paymentScheduleModeEnum = pgEnum('payment_schedule_mode', [
+  'INTERVAL_DAYS',
+  'MONTHLY_CALENDAR',
+  'SEMI_MONTHLY',
+]);
+
 export const paymentFrequencies = pgTable(
   'payment_frequencies',
   {
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
-    // numdia
-    daysInterval: integer('days_interval').notNull(),
+    scheduleMode: paymentScheduleModeEnum('schedule_mode').notNull().default('INTERVAL_DAYS'),
+    intervalDays: integer('interval_days'),
+    dayOfMonth: integer('day_of_month'),
+    semiMonthDay1: integer('semi_month_day_1'),
+    semiMonthDay2: integer('semi_month_day_2'),
+    useEndOfMonthFallback: boolean('use_end_of_month_fallback').notNull().default(true),
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
-  (t) => [uniqueIndex('uniq_payment_frequencies_name').on(t.name)]
+  (t) => [
+    uniqueIndex('uniq_payment_frequencies_name').on(t.name),
+    check('chk_pf_interval_days_min', sql`${t.intervalDays} IS NULL OR ${t.intervalDays} >= 1`),
+    check('chk_pf_day_of_month_range', sql`${t.dayOfMonth} IS NULL OR ${t.dayOfMonth} BETWEEN 1 AND 31`),
+    check(
+      'chk_pf_semi_month_day1_range',
+      sql`${t.semiMonthDay1} IS NULL OR ${t.semiMonthDay1} BETWEEN 1 AND 31`
+    ),
+    check(
+      'chk_pf_semi_month_day2_range',
+      sql`${t.semiMonthDay2} IS NULL OR ${t.semiMonthDay2} BETWEEN 1 AND 31`
+    ),
+    check(
+      'chk_pf_semi_month_day_order',
+      sql`${t.semiMonthDay1} IS NULL OR ${t.semiMonthDay2} IS NULL OR ${t.semiMonthDay1} < ${t.semiMonthDay2}`
+    ),
+    check(
+      'chk_pf_mode_fields',
+      sql`
+        (
+          ${t.scheduleMode} = 'INTERVAL_DAYS'
+          AND ${t.intervalDays} IS NOT NULL
+          AND ${t.dayOfMonth} IS NULL
+          AND ${t.semiMonthDay1} IS NULL
+          AND ${t.semiMonthDay2} IS NULL
+        )
+        OR
+        (
+          ${t.scheduleMode} = 'MONTHLY_CALENDAR'
+          AND ${t.intervalDays} IS NULL
+          AND ${t.dayOfMonth} IS NOT NULL
+          AND ${t.semiMonthDay1} IS NULL
+          AND ${t.semiMonthDay2} IS NULL
+        )
+        OR
+        (
+          ${t.scheduleMode} = 'SEMI_MONTHLY'
+          AND ${t.intervalDays} IS NULL
+          AND ${t.dayOfMonth} IS NULL
+          AND ${t.semiMonthDay1} IS NOT NULL
+          AND ${t.semiMonthDay2} IS NOT NULL
+        )
+      `
+    ),
+  ]
 );
 
 // ---------------------------------------------------------------------

@@ -106,6 +106,13 @@
       "when": 1771015414000,
       "tag": "0014_tidy_payment_allocation_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1771100000000,
+      "tag": "0015_modern_payment_frequency_schedule",
+      "breakpoints": true
     }
   ]
 }

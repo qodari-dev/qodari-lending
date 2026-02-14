@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/combobox';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Select,
   SelectContent,
@@ -42,7 +43,8 @@ import {
   CalculateCreditSimulationBodySchema,
   CreditSimulationResult,
 } from '@/schemas/credit-simulation';
-import { formatCurrency, formatDateISO, formatNumber, formatPercent } from '@/utils/formatters';
+import { formatPaymentFrequencyRule } from '@/utils/payment-frequency';
+import { formatCurrency, formatNumber, formatPercent } from '@/utils/formatters';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertTriangle, ChevronDownIcon, Info } from 'lucide-react';
 import React from 'react';
@@ -324,18 +326,11 @@ export function CreditSimulation() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel htmlFor="firstPaymentDate">Fecha primer pago</FieldLabel>
-                          <Input
+                          <DatePicker
                             id="firstPaymentDate"
-                            type="date"
-                            value={field.value ? formatDateISO(field.value) : ''}
-                            onChange={(event) =>
-                              field.onChange(
-                                event.target.value
-                                  ? new Date(`${event.target.value}T00:00:00`)
-                                  : new Date()
-                              )
-                            }
-                            aria-invalid={fieldState.invalid}
+                            value={field.value ?? null}
+                            onChange={(value) => field.onChange(value ?? new Date())}
+                            ariaInvalid={fieldState.invalid}
                           />
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
@@ -355,7 +350,15 @@ export function CreditSimulation() {
                             }
                             onValueChange={(value) => field.onChange(value?.id ?? undefined)}
                             itemToStringValue={(item) => String(item.id)}
-                            itemToStringLabel={(item) => `${item.name} (${item.daysInterval} dias)`}
+                            itemToStringLabel={(item) =>
+                              `${item.name} (${formatPaymentFrequencyRule({
+                                scheduleMode: item.scheduleMode,
+                                intervalDays: item.intervalDays,
+                                dayOfMonth: item.dayOfMonth,
+                                semiMonthDay1: item.semiMonthDay1,
+                                semiMonthDay2: item.semiMonthDay2,
+                              })})`
+                            }
                           >
                             <ComboboxTrigger
                               render={
@@ -380,7 +383,15 @@ export function CreditSimulation() {
                                 <ComboboxCollection>
                                   {(item) => (
                                     <ComboboxItem key={item.id} value={item}>
-                                      {item.name} ({item.daysInterval} dias)
+                                      {item.name} (
+                                      {formatPaymentFrequencyRule({
+                                        scheduleMode: item.scheduleMode,
+                                        intervalDays: item.intervalDays,
+                                        dayOfMonth: item.dayOfMonth,
+                                        semiMonthDay1: item.semiMonthDay1,
+                                        semiMonthDay2: item.semiMonthDay2,
+                                      })}
+                                      )
                                     </ComboboxItem>
                                   )}
                                 </ComboboxCollection>
@@ -529,8 +540,16 @@ export function CreditSimulation() {
                         value={formatPercent(result.financingFactor, 4)}
                       />
                       <Stat
-                        label="Factor de seguro"
-                        value={formatPercent(result.insuranceFactor, 4)}
+                        label={
+                          result.insuranceRateType === 'FIXED_AMOUNT'
+                            ? 'Seguro (valor fijo)'
+                            : 'Factor de seguro'
+                        }
+                        value={
+                          result.insuranceRateType === 'FIXED_AMOUNT'
+                            ? formatCurrency(result.insuranceFactor)
+                            : formatPercent(result.insuranceFactor, 4)
+                        }
                       />
                       <Stat
                         label="Capacidad de pago"

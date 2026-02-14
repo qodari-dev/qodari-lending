@@ -22,6 +22,10 @@ import {
 import { calculateCreditSimulation } from '@/utils/credit-simulation';
 import { formatCurrency, formatDate, formatPercent } from '@/utils/formatters';
 import { assessPaymentCapacity } from '@/utils/payment-capacity';
+import {
+  formatPaymentFrequencyRule,
+  resolvePaymentFrequencyIntervalDays,
+} from '@/utils/payment-frequency';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { Eye } from 'lucide-react';
 import { useMemo } from 'react';
@@ -42,7 +46,15 @@ export function LoanApplicationDetails({
   const { mutateAsync: presignView } = usePresignLoanApplicationDocumentView();
   const amortizationData = useMemo(() => {
     const financingType = loanApplication.creditProduct?.financingType;
-    const daysInterval = loanApplication.paymentFrequency?.daysInterval;
+    const daysInterval = loanApplication.paymentFrequency
+      ? resolvePaymentFrequencyIntervalDays({
+          scheduleMode: loanApplication.paymentFrequency.scheduleMode,
+          intervalDays: loanApplication.paymentFrequency.intervalDays,
+          dayOfMonth: loanApplication.paymentFrequency.dayOfMonth,
+          semiMonthDay1: loanApplication.paymentFrequency.semiMonthDay1,
+          semiMonthDay2: loanApplication.paymentFrequency.semiMonthDay2,
+        })
+      : 0;
     const installments = Number(loanApplication.installments ?? 0);
     const principal = Number(loanApplication.approvedAmount ?? loanApplication.requestedAmount ?? 0);
     const annualRatePercent = Number(loanApplication.financingFactor ?? 0);
@@ -63,9 +75,17 @@ export function LoanApplicationDetails({
       financingType,
       principal,
       annualRatePercent,
+      interestRateType: loanApplication.creditProduct?.interestRateType,
+      interestDayCountConvention: loanApplication.creditProduct?.interestDayCountConvention,
       installments,
       firstPaymentDate,
       daysInterval,
+      paymentScheduleMode: loanApplication.paymentFrequency?.scheduleMode,
+      dayOfMonth: loanApplication.paymentFrequency?.dayOfMonth ?? null,
+      semiMonthDay1: loanApplication.paymentFrequency?.semiMonthDay1 ?? null,
+      semiMonthDay2: loanApplication.paymentFrequency?.semiMonthDay2 ?? null,
+      useEndOfMonthFallback: loanApplication.paymentFrequency?.useEndOfMonthFallback,
+      insuranceAccrualMethod: loanApplication.creditProduct?.insuranceAccrualMethod,
       insuranceRatePercent,
     });
   }, [loanApplication]);
@@ -92,7 +112,13 @@ export function LoanApplicationDetails({
       : 'Natural'
     : '-';
   const paymentFrequencyLabel = loanApplication.paymentFrequency
-    ? `${loanApplication.paymentFrequency.name} (${loanApplication.paymentFrequency.daysInterval} dias)`
+    ? `${loanApplication.paymentFrequency.name} (${formatPaymentFrequencyRule({
+        scheduleMode: loanApplication.paymentFrequency.scheduleMode,
+        intervalDays: loanApplication.paymentFrequency.intervalDays,
+        dayOfMonth: loanApplication.paymentFrequency.dayOfMonth,
+        semiMonthDay1: loanApplication.paymentFrequency.semiMonthDay1,
+        semiMonthDay2: loanApplication.paymentFrequency.semiMonthDay2,
+      })})`
     : loanApplication.paymentFrequencyId ?? '-';
   const financingTypeLabel = loanApplication.creditProduct?.financingType
     ? (financingTypeLabels[loanApplication.creditProduct.financingType] ??

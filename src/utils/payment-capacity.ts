@@ -1,14 +1,4 @@
-type NumericInput = string | number | null | undefined;
-
-function toSafeNumber(value: NumericInput): number {
-  if (value === null || value === undefined || value === '') return 0;
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
-}
+import { roundMoney, toSafeNumber, type NumericInput } from './number-utils';
 
 export function calculatePaymentCapacity(args: { income: NumericInput; expenses: NumericInput }): number {
   const income = toSafeNumber(args.income);

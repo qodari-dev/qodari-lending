@@ -2,8 +2,12 @@
 
 import { DataTableColumnHeader } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
-import { PaymentFrequency } from '@/schemas/payment-frequency';
+import {
+  paymentScheduleModeLabels,
+  PaymentFrequency,
+} from '@/schemas/payment-frequency';
 import { formatDate } from '@/utils/formatters';
+import { formatPaymentFrequencyRule } from '@/utils/payment-frequency';
 import type { ColumnDef } from '@tanstack/react-table';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { PaymentFrequencyRowActions } from './payment-frequency-row-actions';
@@ -46,14 +50,33 @@ export const paymentFrequencyColumns: ColumnDef<PaymentFrequency>[] = [
     },
   },
 
-  // Days Interval Column
+  // Mode Column
   {
-    accessorKey: 'daysInterval',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Días" />,
+    accessorKey: 'scheduleMode',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Modo" />,
     cell: ({ row }) => {
       return (
         <div className="flex flex-col">
-          <span>{row.original.daysInterval} días</span>
+          <span>{paymentScheduleModeLabels[row.original.scheduleMode]}</span>
+        </div>
+      );
+    },
+  },
+  {
+    id: 'scheduleRule',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Regla" />,
+    cell: ({ row }) => {
+      return (
+        <div className="flex flex-col">
+          <span>
+            {formatPaymentFrequencyRule({
+              scheduleMode: row.original.scheduleMode,
+              intervalDays: row.original.intervalDays,
+              dayOfMonth: row.original.dayOfMonth,
+              semiMonthDay1: row.original.semiMonthDay1,
+              semiMonthDay2: row.original.semiMonthDay2,
+            })}
+          </span>
         </div>
       );
     },

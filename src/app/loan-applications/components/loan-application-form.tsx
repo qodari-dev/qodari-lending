@@ -13,6 +13,7 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from '@/components/ui/combobox';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -73,8 +74,16 @@ import {
   assessPaymentCapacity,
   calculateLoanApplicationPaymentCapacity,
 } from '@/utils/payment-capacity';
-import { calculateCreditSimulation } from '@/utils/credit-simulation';
-import { formatCurrency, formatDateISO } from '@/utils/formatters';
+import {
+  calculateCreditSimulation,
+  findInsuranceRateRange,
+  resolveInsuranceFactorFromRange,
+} from '@/utils/credit-simulation';
+import {
+  formatPaymentFrequencyRule,
+  resolvePaymentFrequencyIntervalDays,
+} from '@/utils/payment-frequency';
+import { formatCurrency } from '@/utils/formatters';
 import { isUpdatedToday } from '@/utils/date-utils';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { getThirdPartyLabel } from '@/utils/third-party';
@@ -341,6 +350,16 @@ export function LoanApplicationForm({
     () => paymentFrequencies.find((item) => item.id === selectedPaymentFrequencyId) ?? null,
     [paymentFrequencies, selectedPaymentFrequencyId]
   );
+  const selectedPaymentFrequencyIntervalDays = useMemo(() => {
+    if (!selectedPaymentFrequency) return 0;
+    return resolvePaymentFrequencyIntervalDays({
+      scheduleMode: selectedPaymentFrequency.scheduleMode,
+      intervalDays: selectedPaymentFrequency.intervalDays,
+      dayOfMonth: selectedPaymentFrequency.dayOfMonth,
+      semiMonthDay1: selectedPaymentFrequency.semiMonthDay1,
+      semiMonthDay2: selectedPaymentFrequency.semiMonthDay2,
+    });
+  }, [selectedPaymentFrequency]);
   const selectedInsuranceCompany = useMemo(
     () => insuranceCompanies.find((item) => item.id === selectedInsuranceCompanyId) ?? null,
     [insuranceCompanies, selectedInsuranceCompanyId]
@@ -358,9 +377,16 @@ export function LoanApplicationForm({
     );
   }, [installmentsValue, selectedCategoryCode, selectedCreditProduct]);
 
-  const estimatedInsuranceFactor = useMemo(() => {
+  const estimatedInsurance = useMemo(() => {
     if (!selectedCreditProduct) return null;
-    if (!selectedCreditProduct.paysInsurance) return 0;
+    if (!selectedCreditProduct.paysInsurance) {
+      return {
+        insuranceFactor: 0,
+        insuranceRatePercent: 0,
+        insuranceFixedAmount: 0,
+        insuranceMinimumAmount: 0,
+      };
+    }
 
     if (!selectedInsuranceCompany || !installmentsValue || !requestedAmountValue) return null;
 
@@ -371,52 +397,69 @@ export function LoanApplicationForm({
 
     if (!Number.isFinite(metricValue)) return null;
 
-    const insuranceRange = selectedInsuranceCompany.insuranceRateRanges?.find(
-      (range) =>
-        range.rangeMetric === selectedCreditProduct.insuranceRangeMetric &&
-        metricValue >= range.valueFrom &&
-        metricValue <= range.valueTo
-    );
+    const insuranceRange = findInsuranceRateRange({
+      ranges: selectedInsuranceCompany.insuranceRateRanges,
+      rangeMetric: selectedCreditProduct.insuranceRangeMetric,
+      metricValue,
+    });
 
     if (!insuranceRange) return null;
 
-    const factor = Number(insuranceRange.rateValue ?? 0);
-    return Number.isFinite(factor) ? factor : 0;
+    return resolveInsuranceFactorFromRange({
+      range: insuranceRange,
+      minimumValue: selectedInsuranceCompany.minimumValue,
+    });
   }, [installmentsValue, requestedAmountValue, selectedCreditProduct, selectedInsuranceCompany]);
 
   const estimatedAmortization = useMemo(() => {
-    if (!selectedCreditProduct?.financingType || !selectedPaymentFrequency?.daysInterval) return null;
+    if (!selectedCreditProduct?.financingType || selectedPaymentFrequencyIntervalDays <= 0) {
+      return null;
+    }
     if (!selectedCategoryConfig) return null;
 
     const principal = Number(requestedAmountValue);
     const annualRatePercent = Number(selectedCategoryConfig.financingFactor);
     const installments = Number(installmentsValue);
-    const insuranceRatePercent = Number(estimatedInsuranceFactor ?? 0);
+    const insuranceRatePercent = Number(estimatedInsurance?.insuranceRatePercent ?? 0);
+    const insuranceFixedAmount = Number(estimatedInsurance?.insuranceFixedAmount ?? 0);
+    const insuranceMinimumAmount = Number(estimatedInsurance?.insuranceMinimumAmount ?? 0);
     const firstPaymentDate = applicationDateValue ? new Date(applicationDateValue) : null;
 
     if (!Number.isFinite(principal) || principal <= 0) return null;
     if (!Number.isFinite(annualRatePercent)) return null;
     if (!Number.isFinite(installments) || installments <= 0) return null;
     if (!Number.isFinite(insuranceRatePercent)) return null;
+    if (!Number.isFinite(insuranceFixedAmount)) return null;
+    if (!Number.isFinite(insuranceMinimumAmount)) return null;
     if (!firstPaymentDate || Number.isNaN(firstPaymentDate.getTime())) return null;
 
     return calculateCreditSimulation({
       financingType: selectedCreditProduct.financingType,
       principal,
       annualRatePercent,
+      interestRateType: selectedCreditProduct.interestRateType,
+      interestDayCountConvention: selectedCreditProduct.interestDayCountConvention,
       installments,
       firstPaymentDate,
-      daysInterval: selectedPaymentFrequency.daysInterval,
+      daysInterval: selectedPaymentFrequencyIntervalDays,
+      paymentScheduleMode: selectedPaymentFrequency?.scheduleMode,
+      dayOfMonth: selectedPaymentFrequency?.dayOfMonth ?? null,
+      semiMonthDay1: selectedPaymentFrequency?.semiMonthDay1 ?? null,
+      semiMonthDay2: selectedPaymentFrequency?.semiMonthDay2 ?? null,
+      useEndOfMonthFallback: selectedPaymentFrequency?.useEndOfMonthFallback,
+      insuranceAccrualMethod: selectedCreditProduct.insuranceAccrualMethod,
       insuranceRatePercent,
+      insuranceFixedAmount,
+      insuranceMinimumAmount,
     });
   }, [
     applicationDateValue,
-    estimatedInsuranceFactor,
+    estimatedInsurance,
     installmentsValue,
     requestedAmountValue,
     selectedCategoryConfig,
     selectedCreditProduct,
-    selectedPaymentFrequency,
+    selectedPaymentFrequencyIntervalDays,
   ]);
 
   const paymentCapacityAssessment = useMemo(() => {
@@ -741,17 +784,11 @@ export function LoanApplicationForm({
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel htmlFor="applicationDate">Fecha solicitud</FieldLabel>
-                          <Input
+                          <DatePicker
                             id="applicationDate"
-                            type="date"
-                            value={field.value ? formatDateISO(field.value) : ''}
-                            onChange={(event) =>
-                              field.onChange(
-                                event.target.value
-                                  ? new Date(`${event.target.value}T00:00:00`)
-                                  : new Date()
-                              )
-                            }
+                            value={field.value ?? null}
+                            onChange={(value) => field.onChange(value ?? new Date())}
+                            ariaInvalid={fieldState.invalid}
                           />
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
@@ -984,7 +1021,15 @@ export function LoanApplicationForm({
                             }
                             onValueChange={(value) => field.onChange(value?.id ?? null)}
                             itemToStringValue={(item) => String(item.id)}
-                            itemToStringLabel={(item) => `${item.name} (${item.daysInterval} dias)`}
+                            itemToStringLabel={(item) =>
+                              `${item.name} (${formatPaymentFrequencyRule({
+                                scheduleMode: item.scheduleMode,
+                                intervalDays: item.intervalDays,
+                                dayOfMonth: item.dayOfMonth,
+                                semiMonthDay1: item.semiMonthDay1,
+                                semiMonthDay2: item.semiMonthDay2,
+                              })})`
+                            }
                           >
                             <ComboboxTrigger
                               render={
@@ -1009,7 +1054,15 @@ export function LoanApplicationForm({
                                 <ComboboxCollection>
                                   {(item) => (
                                     <ComboboxItem key={item.id} value={item}>
-                                      {item.name} ({item.daysInterval} dias)
+                                      {item.name} (
+                                      {formatPaymentFrequencyRule({
+                                        scheduleMode: item.scheduleMode,
+                                        intervalDays: item.intervalDays,
+                                        dayOfMonth: item.dayOfMonth,
+                                        semiMonthDay1: item.semiMonthDay1,
+                                        semiMonthDay2: item.semiMonthDay2,
+                                      })}
+                                      )
                                     </ComboboxItem>
                                   )}
                                 </ComboboxCollection>

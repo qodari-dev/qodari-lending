@@ -1,4 +1,9 @@
 import {
+  calculateCreditSimulation,
+  findInsuranceRateRange,
+  resolveInsuranceFactorFromRange,
+} from '@/utils/credit-simulation';
+import {
   creditProductCategories,
   creditProducts,
   db,
@@ -7,8 +12,8 @@ import {
 } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { calculateCreditSimulation } from '@/server/utils/credit-simulation';
 import { calculatePaymentCapacity } from '@/utils/payment-capacity';
+import { resolvePaymentFrequencyIntervalDays } from '@/utils/payment-frequency';
 import { roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, eq, lte, gte } from 'drizzle-orm';
@@ -46,6 +51,21 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
           code: 'NOT_FOUND',
         });
       }
+      const paymentFrequencyIntervalDays = resolvePaymentFrequencyIntervalDays({
+        scheduleMode: paymentFrequency.scheduleMode,
+        intervalDays: paymentFrequency.intervalDays,
+        dayOfMonth: paymentFrequency.dayOfMonth,
+        semiMonthDay1: paymentFrequency.semiMonthDay1,
+        semiMonthDay2: paymentFrequency.semiMonthDay2,
+      });
+
+      if (paymentFrequencyIntervalDays <= 0) {
+        throwHttpError({
+          status: 400,
+          message: 'Periodicidad de pago no valida',
+          code: 'BAD_REQUEST',
+        });
+      }
 
       if (product.maxInstallments && body.installments > product.maxInstallments) {
         throwHttpError({
@@ -74,6 +94,10 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
       }
 
       let insuranceFactor = 0;
+      let insuranceRateType: 'PERCENTAGE' | 'FIXED_AMOUNT' | null = null;
+      let insuranceRatePercent = 0;
+      let insuranceFixedAmount = 0;
+      let insuranceMinimumAmount = 0;
 
       if (product.paysInsurance) {
         if (!body.insuranceCompanyId) {
@@ -105,12 +129,11 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         const metricValue =
           product.insuranceRangeMetric === 'INSTALLMENT_COUNT' ? body.installments : body.creditAmount;
 
-        const insuranceRange = insurer.insuranceRateRanges.find(
-          (range) =>
-            range.rangeMetric === product.insuranceRangeMetric &&
-            metricValue >= range.valueFrom &&
-            metricValue <= range.valueTo
-        );
+        const insuranceRange = findInsuranceRateRange({
+          ranges: insurer.insuranceRateRanges,
+          rangeMetric: product.insuranceRangeMetric,
+          metricValue,
+        });
 
         if (!insuranceRange) {
           throwHttpError({
@@ -120,7 +143,16 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
           });
         }
 
-        insuranceFactor = toNumber(insuranceRange.rateValue);
+        const resolvedInsurance = resolveInsuranceFactorFromRange({
+          range: insuranceRange,
+          minimumValue: insurer.minimumValue,
+        });
+
+        insuranceFactor = resolvedInsurance.insuranceFactor;
+        insuranceRateType = resolvedInsurance.insuranceRateType;
+        insuranceRatePercent = resolvedInsurance.insuranceRatePercent;
+        insuranceFixedAmount = resolvedInsurance.insuranceFixedAmount;
+        insuranceMinimumAmount = resolvedInsurance.insuranceMinimumAmount;
       }
 
       const financingFactor = toNumber(category.financingFactor);
@@ -129,10 +161,21 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         financingType: product.financingType,
         principal: body.creditAmount,
         annualRatePercent: financingFactor,
+        interestRateType: product.interestRateType,
+        interestDayCountConvention: product.interestDayCountConvention,
         installments: body.installments,
         firstPaymentDate: body.firstPaymentDate,
-        daysInterval: paymentFrequency.daysInterval,
-        insuranceRatePercent: insuranceFactor,
+        disbursementDate: new Date(),
+        daysInterval: paymentFrequencyIntervalDays,
+        paymentScheduleMode: paymentFrequency.scheduleMode,
+        dayOfMonth: paymentFrequency.dayOfMonth,
+        semiMonthDay1: paymentFrequency.semiMonthDay1,
+        semiMonthDay2: paymentFrequency.semiMonthDay2,
+        useEndOfMonthFallback: paymentFrequency.useEndOfMonthFallback,
+        insuranceAccrualMethod: product.insuranceAccrualMethod,
+        insuranceRatePercent,
+        insuranceFixedAmount,
+        insuranceMinimumAmount,
       });
 
       const paymentCapacity = calculatePaymentCapacity({
@@ -153,6 +196,7 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
           financingType: product.financingType,
           financingFactor,
           insuranceFactor,
+          insuranceRateType,
           capacity: {
             paymentCapacity,
             maxInstallmentPayment,

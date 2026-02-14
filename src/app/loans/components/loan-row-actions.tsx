@@ -41,13 +41,13 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
       label: 'Proceso juridico',
       icon: Scale,
       onClick: meta?.onRowLegalProcess,
-      hidden: !canUpdate,
+      hidden: !(canUpdate && loan.status === 'ACTIVE'),
     },
     {
       label: 'Acuerdo de pago',
       icon: Handshake,
       onClick: meta?.onRowPaymentAgreement,
-      hidden: !canUpdate,
+      hidden: !(canUpdate && loan.status === 'ACTIVE'),
     },
     {
       label: 'Datos bancarios',

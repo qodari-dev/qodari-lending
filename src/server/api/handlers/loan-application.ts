@@ -341,9 +341,7 @@ async function validateRequiredDocuments(args: {
   }
 }
 
-async function ensureThirdPartiesAreUpToDate(args: {
-  thirdPartyIds: number[];
-}) {
+async function ensureThirdPartiesAreUpToDate(args: { thirdPartyIds: number[] }) {
   const ids = [...new Set(args.thirdPartyIds)];
   if (!ids.length) return;
 
@@ -361,7 +359,9 @@ async function ensureThirdPartiesAreUpToDate(args: {
   }
 
   const today = formatDateOnly(new Date());
-  const staleRecords = existing.filter((thirdParty) => formatDateOnly(thirdParty.updatedAt) !== today);
+  const staleRecords = existing.filter(
+    (thirdParty) => formatDateOnly(thirdParty.updatedAt) !== today
+  );
 
   if (staleRecords.length) {
     throwHttpError({
@@ -588,7 +588,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         otherIncome: body.otherIncome,
         otherCredits: body.otherCredits,
       });
-      const coDebtorThirdPartyIds = [...new Set((body.loanApplicationCoDebtors ?? []).map((item) => item.thirdPartyId))];
+      const coDebtorThirdPartyIds = [
+        ...new Set((body.loanApplicationCoDebtors ?? []).map((item) => item.thirdPartyId)),
+      ];
       await ensureThirdPartiesAreUpToDate({
         thirdPartyIds: [body.thirdPartyId, ...coDebtorThirdPartyIds],
       });
@@ -1556,7 +1558,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             asOfDate: approvedDate,
           });
 
-        if (!selectedRule) {
+        if (!selectedRule && !concept.isSystem) {
           throwHttpError({
             status: 400,
             message: `El concepto ${concept.name} no tiene regla activa para la fecha de aprobacion`,
@@ -1567,17 +1569,17 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         return {
           billingConceptId: item.billingConceptId,
           sourceCreditProductConceptId: item.id,
-          sourceRuleId: selectedRule.id,
+          sourceRuleId: selectedRule?.id ?? null,
           frequency: item.overrideFrequency ?? concept.defaultFrequency,
           financingMode: item.overrideFinancingMode ?? concept.defaultFinancingMode,
           glAccountId: item.overrideGlAccountId ?? concept.defaultGlAccountId ?? null,
           calcMethod: concept.calcMethod,
           baseAmount: concept.baseAmount ?? null,
           rangeMetric: concept.rangeMetric ?? null,
-          rate: selectedRule.rate ?? null,
-          amount: selectedRule.amount ?? null,
-          valueFrom: selectedRule.valueFrom ?? null,
-          valueTo: selectedRule.valueTo ?? null,
+          rate: selectedRule?.rate ?? null,
+          amount: selectedRule?.amount ?? null,
+          valueFrom: selectedRule?.valueFrom ?? null,
+          valueTo: selectedRule?.valueTo ?? null,
           minAmount: concept.minAmount ?? null,
           maxAmount: concept.maxAmount ?? null,
           roundingMode: concept.roundingMode,

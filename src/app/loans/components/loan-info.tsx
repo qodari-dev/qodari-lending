@@ -339,7 +339,7 @@ export function LoanInfo({
                 <TabsTrigger value="installments">Cuotas</TabsTrigger>
                 <TabsTrigger value="payments">Abonos</TabsTrigger>
                 <TabsTrigger value="statement">Extracto</TabsTrigger>
-                <TabsTrigger value="thirdParties">Terceros</TabsTrigger>
+                <TabsTrigger value="codebtors">Codeudores</TabsTrigger>
                 <TabsTrigger value="application">Solicitud</TabsTrigger>
                 <TabsTrigger value="documents">Impresiones</TabsTrigger>
               </TabsList>
@@ -358,22 +358,31 @@ export function LoanInfo({
                         <TableHead>Capital</TableHead>
                         <TableHead>Interes</TableHead>
                         <TableHead>Seguro</TableHead>
+                        <TableHead>Cuota</TableHead>
                         <TableHead>Saldo capital</TableHead>
                         <TableHead>Estado</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {detail.loanInstallments.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.installmentNumber}</TableCell>
-                          <TableCell>{formatDate(item.dueDate)}</TableCell>
-                          <TableCell>{formatCurrency(item.principalAmount)}</TableCell>
-                          <TableCell>{formatCurrency(item.interestAmount)}</TableCell>
-                          <TableCell>{formatCurrency(item.insuranceAmount)}</TableCell>
-                          <TableCell>{formatCurrency(item.remainingPrincipal)}</TableCell>
-                          <TableCell>{installmentRecordStatusLabels[item.status]}</TableCell>
-                        </TableRow>
-                      ))}
+                      {detail.loanInstallments.map((item) => {
+                        const installmentPayment =
+                          Number(item.principalAmount) +
+                          Number(item.interestAmount) +
+                          Number(item.insuranceAmount);
+
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell>{item.installmentNumber}</TableCell>
+                            <TableCell>{formatDate(item.dueDate)}</TableCell>
+                            <TableCell>{formatCurrency(item.principalAmount)}</TableCell>
+                            <TableCell>{formatCurrency(item.interestAmount)}</TableCell>
+                            <TableCell>{formatCurrency(item.insuranceAmount)}</TableCell>
+                            <TableCell>{formatCurrency(installmentPayment)}</TableCell>
+                            <TableCell>{formatCurrency(item.remainingPrincipal)}</TableCell>
+                            <TableCell>{installmentRecordStatusLabels[item.status]}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 ) : (
@@ -548,13 +557,13 @@ export function LoanInfo({
                 )}
               </TabsContent>
 
-              <TabsContent value="thirdParties" className="pt-2">
+              <TabsContent value="codebtors" className="pt-2">
                 {detail.loanApplication?.loanApplicationCoDebtors?.length ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Documento</TableHead>
-                        <TableHead>Tercero</TableHead>
+                        <TableHead>Codeudor</TableHead>
                         <TableHead>Ciudad hogar</TableHead>
                         <TableHead>Ciudad trabajo</TableHead>
                       </TableRow>
@@ -574,7 +583,7 @@ export function LoanInfo({
                   </Table>
                 ) : (
                   <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
-                    No hay terceros asociados en la solicitud.
+                    No hay codeudores asociados en la solicitud.
                   </div>
                 )}
               </TabsContent>

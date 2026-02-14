@@ -472,6 +472,7 @@ export type Loans = typeof loans.$inferSelect & {
   loanPayments?: LoanPayments[];
   loanAgreementHistory?: LoanAgreementHistory[];
   loanStatusHistory?: LoanStatusHistory[];
+  loanBillingConcepts?: LoanBillingConcepts[];
 };
 export type NewLoans = typeof loans.$inferInsert;
 

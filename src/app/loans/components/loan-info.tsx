@@ -27,6 +27,11 @@ import {
   useLoanStatement,
 } from '@/hooks/queries/use-loan-queries';
 import {
+  billingConceptCalcMethodLabels,
+  billingConceptFinancingModeLabels,
+  billingConceptFrequencyLabels,
+} from '@/schemas/billing-concept';
+import {
   installmentRecordStatusLabels,
   loanDisbursementStatusLabels,
   LoanInclude,
@@ -37,7 +42,7 @@ import {
 } from '@/schemas/loan';
 import { BankAccountType, bankAccountTypeLabels } from '@/schemas/loan-application';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatDate } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatDateTime, formatPercent } from '@/utils/formatters';
 
 const LOAN_DOCUMENT_TYPES = [
   'plan-de-pagos',
@@ -192,6 +197,11 @@ const LOAN_DETAIL_INCLUDES: LoanInclude[] = [
   'channel',
   'loanInstallments',
   'loanPayments',
+  'loanAgreementHistory',
+  'loanStatusHistory',
+  'loanBillingConcepts',
+  'loanRefinancingLinksRefinanced',
+  'loanRefinancingLinksReference',
   'loanApplication',
 ];
 
@@ -236,14 +246,55 @@ export function LoanInfo({
               label: 'Estado',
               value: <StatusBadge status={detail.status as LoanStatus} />,
             },
-            { label: 'Fecha registro', value: formatDate(detail.recordDate) },
-            { label: 'Inicio credito', value: formatDate(detail.creditStartDate) },
-            { label: 'Vencimiento final', value: formatDate(detail.maturityDate) },
-            { label: 'Primer recaudo', value: formatDate(detail.firstCollectionDate) },
             {
               label: 'Estado desembolso',
               value: loanDisbursementStatusLabels[detail.disbursementStatus],
             },
+            { label: 'Fecha registro', value: formatDate(detail.recordDate) },
+            { label: 'Inicio credito', value: formatDate(detail.creditStartDate) },
+            { label: 'Vencimiento final', value: formatDate(detail.maturityDate) },
+            { label: 'Primer recaudo', value: formatDate(detail.firstCollectionDate) },
+            { label: 'Fecha estado', value: formatDate(detail.statusDate) },
+            { label: 'Cuotas', value: detail.installments },
+            { label: 'Capital', value: formatCurrency(detail.principalAmount) },
+            { label: 'Total inicial', value: formatCurrency(detail.initialTotalAmount) },
+            { label: 'Seguro', value: formatCurrency(detail.insuranceValue) },
+          ],
+        },
+        {
+          title: 'Partes y recaudo',
+          columns: 3,
+          items: [
+            { label: 'Titular', value: getPartyLabel(detail.borrower) },
+            { label: 'Desembolso a', value: getPartyLabel(detail.disbursementParty) },
+            {
+              label: 'Convenio',
+              value: detail.agreement
+                ? `${detail.agreement.agreementCode} - ${detail.agreement.businessName}`
+                : '-',
+            },
+            { label: 'Fondo', value: detail.creditFund?.name ?? '-' },
+            { label: 'Forma de pago', value: detail.repaymentMethod?.name ?? '-' },
+            { label: 'Periodicidad', value: detail.paymentFrequency?.name ?? '-' },
+            { label: 'Garantia', value: detail.paymentGuaranteeType?.name ?? '-' },
+            { label: 'Aseguradora', value: detail.insuranceCompany?.businessName ?? '-' },
+            { label: 'Banco', value: detail.bank?.name ?? '-' },
+            {
+              label: 'Tipo cuenta',
+              value: detail.bankAccountType
+                ? bankAccountTypeLabels[detail.bankAccountType as BankAccountType]
+                : '-',
+            },
+            { label: 'Numero cuenta', value: detail.bankAccountNumber ?? '-' },
+            { label: 'Centro de costo', value: detail.costCenter?.name ?? '-' },
+            { label: 'Oficina', value: detail.affiliationOffice?.name ?? '-' },
+            { label: 'Canal', value: detail.channel?.name ?? '-' },
+          ],
+        },
+        {
+          title: 'Gestion',
+          columns: 3,
+          items: [
             {
               label: 'En juridica',
               value: detail.hasLegalProcess ? 'Si' : 'No',
@@ -261,60 +312,50 @@ export function LoanInfo({
               value: formatDate(detail.paymentAgreementDate),
             },
             {
-              label: 'Nota estado',
-              value: detail.note ?? '-',
+              label: 'Reportado a CIFIN',
+              value: detail.isReportedToCifin ? 'Si' : 'No',
             },
-            { label: 'Oficina', value: detail.affiliationOffice?.name ?? detail.affiliationOfficeId },
-            { label: 'Canal', value: detail.channel?.name ?? '-' },
+            {
+              label: 'Fecha reporte CIFIN',
+              value: formatDate(detail.cifinReportDate),
+            },
+            { label: 'Ultimo pago', value: formatDate(detail.lastPaymentDate) },
+            { label: 'Valor saldo retenido', value: formatCurrency(detail.withheldBalanceValue) },
           ],
         },
         {
-          title: 'Partes',
-          columns: 2,
-          items: [
-            { label: 'Titular', value: getPartyLabel(detail.borrower) },
-            { label: 'Desembolso a', value: getPartyLabel(detail.disbursementParty) },
-            {
-              label: 'Convenio',
-              value: detail.agreement
-                ? `${detail.agreement.agreementCode} - ${detail.agreement.businessName}`
-                : '-',
-            },
-            { label: 'Banco', value: detail.bank?.name ?? '-' },
-            {
-              label: 'Tipo cuenta',
-              value: detail.bankAccountType
-                ? bankAccountTypeLabels[detail.bankAccountType as BankAccountType]
-                : '-',
-            },
-            { label: 'Numero cuenta', value: detail.bankAccountNumber ?? '-' },
-            { label: 'Fondo', value: detail.creditFund?.name ?? '-' },
-            { label: 'Aseguradora', value: detail.insuranceCompany?.businessName ?? '-' },
-            { label: 'Forma de pago', value: detail.repaymentMethod?.name ?? detail.repaymentMethodId },
-            {
-              label: 'Periodicidad',
-              value: detail.paymentFrequency?.name ?? '-',
-            },
-            {
-              label: 'Garantia',
-              value: detail.paymentGuaranteeType?.name ?? detail.paymentGuaranteeTypeId,
-            },
-            { label: 'Centro de costo', value: detail.costCenter?.name ?? '-' },
-          ],
-        },
-        {
-          title: 'Valores',
+          title: 'Castigos y garantias',
           columns: 3,
           items: [
-            { label: 'Capital', value: formatCurrency(detail.principalAmount) },
-            { label: 'Total inicial', value: formatCurrency(detail.initialTotalAmount) },
-            { label: 'Seguro', value: formatCurrency(detail.insuranceValue) },
-            { label: 'Cuotas', value: detail.installments },
+            { label: 'Credito castigado', value: detail.isWrittenOff ? 'Si' : 'No' },
+            { label: 'Fecha castigo', value: formatDate(detail.writtenOffDate) },
+            { label: 'Interes castigado', value: detail.isInterestWrittenOff ? 'Si' : 'No' },
+            {
+              label: 'Documento castigo interes',
+              value: detail.interestWriteOffDocument ?? '-',
+            },
             {
               label: 'Descuenta estudio',
               value: detail.discountStudyCredit ? 'Si' : 'No',
             },
             { label: 'Documento garantia', value: detail.guaranteeDocument ?? '-' },
+          ],
+        },
+        {
+          title: 'Auditoria',
+          columns: 3,
+          items: [
+            { label: 'Creado por', value: detail.createdByUserName ?? '-' },
+            { label: 'Fecha creacion', value: formatDateTime(detail.createdAt) },
+            { label: 'Ultima actualizacion', value: formatDateTime(detail.updatedAt) },
+            {
+              label: 'Ultimo cambio estado por',
+              value: detail.statusChangedByUserName ?? '-',
+            },
+            {
+              label: 'Nota estado',
+              value: detail.note ?? '-',
+            },
           ],
         },
       ]
@@ -334,11 +375,14 @@ export function LoanInfo({
         ) : detail ? (
           <div className="space-y-4 px-4">
             <Tabs defaultValue="loan" className="w-full">
-              <TabsList className="mb-4 w-full">
+              <TabsList className="mb-4 flex h-auto w-full flex-wrap justify-start gap-1">
                 <TabsTrigger value="loan">Credito</TabsTrigger>
                 <TabsTrigger value="installments">Cuotas</TabsTrigger>
                 <TabsTrigger value="payments">Abonos</TabsTrigger>
                 <TabsTrigger value="statement">Extracto</TabsTrigger>
+                <TabsTrigger value="history">Historial</TabsTrigger>
+                <TabsTrigger value="concepts">Conceptos</TabsTrigger>
+                <TabsTrigger value="refinancing">Refinanciacion</TabsTrigger>
                 <TabsTrigger value="codebtors">Codeudores</TabsTrigger>
                 <TabsTrigger value="application">Solicitud</TabsTrigger>
                 <TabsTrigger value="documents">Impresiones</TabsTrigger>
@@ -545,6 +589,193 @@ export function LoanInfo({
                     )}
                   </>
                 )}
+              </TabsContent>
+
+              <TabsContent value="history" className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Historial de estados</h3>
+                  {detail.loanStatusHistory?.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha cambio</TableHead>
+                          <TableHead>Estado anterior</TableHead>
+                          <TableHead>Estado nuevo</TableHead>
+                          <TableHead>Usuario</TableHead>
+                          <TableHead>Nota</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detail.loanStatusHistory.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{formatDateTime(item.changedAt)}</TableCell>
+                            <TableCell>
+                              {item.fromStatus
+                                ? (loanStatusLabels[item.fromStatus as LoanStatus] ?? item.fromStatus)
+                                : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {loanStatusLabels[item.toStatus as LoanStatus] ?? item.toStatus}
+                            </TableCell>
+                            <TableCell>{item.changedByUserName ?? item.changedByUserId ?? '-'}</TableCell>
+                            <TableCell>{item.note ?? '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                      No hay cambios de estado registrados.
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Historial de convenios</h3>
+                  {detail.loanAgreementHistory?.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha cambio</TableHead>
+                          <TableHead>Fecha vigencia</TableHead>
+                          <TableHead>Convenio</TableHead>
+                          <TableHead>Usuario</TableHead>
+                          <TableHead>Nota</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detail.loanAgreementHistory.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{formatDateTime(item.changedAt)}</TableCell>
+                            <TableCell>{formatDate(item.effectiveDate)}</TableCell>
+                            <TableCell>
+                              {item.agreement
+                                ? `${item.agreement.agreementCode} - ${item.agreement.businessName}`
+                                : item.agreementId}
+                            </TableCell>
+                            <TableCell>{item.changedByUserName ?? item.changedByUserId ?? '-'}</TableCell>
+                            <TableCell>{item.note ?? '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                      No hay cambios de convenio registrados.
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="concepts" className="pt-2">
+                {detail.loanBillingConcepts?.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Concepto</TableHead>
+                        <TableHead>Frecuencia</TableHead>
+                        <TableHead>Modo</TableHead>
+                        <TableHead>Metodo</TableHead>
+                        <TableHead>Tasa</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Auxiliar</TableHead>
+                        <TableHead>Regla origen</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detail.loanBillingConcepts.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            {item.billingConcept
+                              ? `${item.billingConcept.code} - ${item.billingConcept.name}`
+                              : item.billingConceptId}
+                          </TableCell>
+                          <TableCell>{billingConceptFrequencyLabels[item.frequency] ?? item.frequency}</TableCell>
+                          <TableCell>
+                            {billingConceptFinancingModeLabels[item.financingMode] ?? item.financingMode}
+                          </TableCell>
+                          <TableCell>{billingConceptCalcMethodLabels[item.calcMethod] ?? item.calcMethod}</TableCell>
+                          <TableCell>{item.rate ? formatPercent(item.rate, 6) : '-'}</TableCell>
+                          <TableCell>{item.amount ? formatCurrency(item.amount) : '-'}</TableCell>
+                          <TableCell>
+                            {[item.glAccount?.code, item.glAccount?.name].filter(Boolean).join(' - ') || '-'}
+                          </TableCell>
+                          <TableCell>{item.sourceRuleId ?? '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                    No hay conceptos de cobro asociados.
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="refinancing" className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Creditos origen de esta refinanciacion</h3>
+                  {detail.loanRefinancingLinksRefinanced?.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Credito origen</TableHead>
+                          <TableHead>Valor cancelado</TableHead>
+                          <TableHead>Creado por</TableHead>
+                          <TableHead>Fecha</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detail.loanRefinancingLinksRefinanced.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>
+                              {item.referenceLoan?.creditNumber ?? item.referenceLoanId}
+                            </TableCell>
+                            <TableCell>{formatCurrency(item.payoffAmount)}</TableCell>
+                            <TableCell>{item.createdByUserName ?? item.createdByUserId}</TableCell>
+                            <TableCell>{formatDateTime(item.createdAt)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                      Este credito no tiene origenes de refinanciacion.
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">
+                    Creditos que refinanciaron este credito
+                  </h3>
+                  {detail.loanRefinancingLinksReference?.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Credito nuevo</TableHead>
+                          <TableHead>Valor cancelado</TableHead>
+                          <TableHead>Creado por</TableHead>
+                          <TableHead>Fecha</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detail.loanRefinancingLinksReference.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{item.refinancedLoan?.creditNumber ?? item.loanId}</TableCell>
+                            <TableCell>{formatCurrency(item.payoffAmount)}</TableCell>
+                            <TableCell>{item.createdByUserName ?? item.createdByUserId}</TableCell>
+                            <TableCell>{formatDateTime(item.createdAt)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                      Ningun credito ha refinanciado este credito.
+                    </div>
+                  )}
+                </div>
               </TabsContent>
 
               <TabsContent value="application" className="pt-2">

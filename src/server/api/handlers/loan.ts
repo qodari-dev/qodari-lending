@@ -8,6 +8,7 @@ import {
   loanBillingConcepts,
   loanInstallments,
   loanPayments,
+  loanRefinancingLinks,
   loans,
   loanStatusHistory,
 } from '@/server/db';
@@ -187,6 +188,35 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
     relation: 'loanStatusHistory',
     config: {
       orderBy: [desc(loanStatusHistory.changedAt)],
+    },
+  },
+  loanBillingConcepts: {
+    relation: 'loanBillingConcepts',
+    config: {
+      with: {
+        billingConcept: true,
+        glAccount: true,
+        sourceBillingConceptRule: true,
+      },
+      orderBy: [asc(loanBillingConcepts.id)],
+    },
+  },
+  loanRefinancingLinksRefinanced: {
+    relation: 'loanRefinancingLinksRefinanced',
+    config: {
+      with: {
+        referenceLoan: true,
+      },
+      orderBy: [desc(loanRefinancingLinks.createdAt)],
+    },
+  },
+  loanRefinancingLinksReference: {
+    relation: 'loanRefinancingLinksReference',
+    config: {
+      with: {
+        refinancedLoan: true,
+      },
+      orderBy: [desc(loanRefinancingLinks.createdAt)],
     },
   },
 });

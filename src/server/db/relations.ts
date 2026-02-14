@@ -672,6 +672,7 @@ export const loansRelations = relations(loans, ({ one, many }) => ({
   loanPayments: many(loanPayments),
   loanAgreementHistory: many(loanAgreementHistory),
   loanStatusHistory: many(loanStatusHistory),
+  loanBillingConcepts: many(loanBillingConcepts),
 }));
 
 // ---------------------------------------------------------------------

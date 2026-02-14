@@ -137,6 +137,9 @@ const LOAN_INCLUDE_OPTIONS = [
   'loanPayments',
   'loanAgreementHistory',
   'loanStatusHistory',
+  'loanBillingConcepts',
+  'loanRefinancingLinksRefinanced',
+  'loanRefinancingLinksReference',
 ] as const;
 
 const LoanIncludeSchema = createIncludeSchema(LOAN_INCLUDE_OPTIONS);

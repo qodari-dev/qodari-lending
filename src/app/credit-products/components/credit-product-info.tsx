@@ -76,6 +76,7 @@ export function CreditProductInfo({
 
   const accounts = ((creditProduct as unknown as { creditProductAccounts?: unknown[] })
     .creditProductAccounts ?? []) as AccountView[];
+  const account = accounts[0];
 
   const billingConcepts = ((creditProduct as unknown as { creditProductBillingConcepts?: unknown[] })
     .creditProductBillingConcepts ?? []) as BillingConceptView[];
@@ -368,37 +369,43 @@ export function CreditProductInfo({
 
             <TabsContent value="accounts" className="space-y-2">
               <h3 className="text-sm font-semibold">Cuentas contables</h3>
-              {accounts.length ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Capital</TableHead>
-                      <TableHead>Interes</TableHead>
-                      <TableHead>Mora</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {accounts.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          {item.capitalGlAccount
-                            ? `${item.capitalGlAccount.code} - ${item.capitalGlAccount.name}`
-                            : item.capitalGlAccountId}
-                        </TableCell>
-                        <TableCell>
-                          {item.interestGlAccount
-                            ? `${item.interestGlAccount.code} - ${item.interestGlAccount.name}`
-                            : item.interestGlAccountId}
-                        </TableCell>
-                        <TableCell>
-                          {item.lateInterestGlAccount
-                            ? `${item.lateInterestGlAccount.code} - ${item.lateInterestGlAccount.name}`
-                            : item.lateInterestGlAccountId}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              {account ? (
+                <div className="space-y-3">
+                  <DescriptionList
+                    columns={2}
+                    sections={[
+                      {
+                        title: 'Configuracion',
+                        columns: 2,
+                        items: [
+                          {
+                            label: 'Cuenta capital',
+                            value: account.capitalGlAccount
+                              ? `${account.capitalGlAccount.code} - ${account.capitalGlAccount.name}`
+                              : account.capitalGlAccountId,
+                          },
+                          {
+                            label: 'Cuenta interes',
+                            value: account.interestGlAccount
+                              ? `${account.interestGlAccount.code} - ${account.interestGlAccount.name}`
+                              : account.interestGlAccountId,
+                          },
+                          {
+                            label: 'Cuenta mora',
+                            value: account.lateInterestGlAccount
+                              ? `${account.lateInterestGlAccount.code} - ${account.lateInterestGlAccount.name}`
+                              : account.lateInterestGlAccountId,
+                          },
+                        ],
+                      },
+                    ]}
+                  />
+                  {accounts.length > 1 ? (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
+                      Se encontraron multiples configuraciones de cuentas; se muestra la primera.
+                    </div>
+                  ) : null}
+                </div>
               ) : (
                 <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
                   No hay cuentas configuradas.

@@ -35,6 +35,7 @@ import {
   InsuranceRateRangeInput,
   InsuranceRateRangeInputSchema,
 } from '@/schemas/insurance-company';
+import { rangesOverlap } from '@/utils/range-overlap';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -123,6 +124,22 @@ export function InsuranceCompanyRateRangesForm() {
   };
 
   const onSave = (values: InsuranceRateRangeInput) => {
+    if (values.valueFrom > values.valueTo) {
+      toast.error('El valor desde debe ser menor o igual al valor hasta');
+      return;
+    }
+
+    const hasOverlap = fields.some(
+      (f, idx) =>
+        idx !== editingIndex &&
+        f.rangeMetric === values.rangeMetric &&
+        rangesOverlap(f.valueFrom, f.valueTo, values.valueFrom, values.valueTo)
+    );
+    if (hasOverlap) {
+      toast.error('No puede solapar rangos para la misma métrica');
+      return;
+    }
+
     const isDuplicate = fields.some(
       (f, idx) =>
         f.rangeMetric === values.rangeMetric &&
@@ -133,11 +150,6 @@ export function InsuranceCompanyRateRangesForm() {
 
     if (isDuplicate) {
       toast.error('Ya existe un rango con esa métrica y valores');
-      return;
-    }
-
-    if (values.valueFrom > values.valueTo) {
-      toast.error('El valor desde debe ser menor o igual al valor hasta');
       return;
     }
 

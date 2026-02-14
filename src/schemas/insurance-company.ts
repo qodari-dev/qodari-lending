@@ -7,6 +7,7 @@ import {
   NumberOperatorsSchema,
   StringOperatorsSchema,
 } from '@/server/utils/query/schemas';
+import { rangesOverlap } from '@/utils/range-overlap';
 import { ClientInferResponseBody } from '@ts-rest/core';
 import { z } from 'zod';
 
@@ -138,7 +139,7 @@ export const InsuranceRateRangeInputSchema = z.object({
 
 export type InsuranceRateRangeInput = z.infer<typeof InsuranceRateRangeInputSchema>;
 
-export const CreateInsuranceCompanyBodySchema = z.object({
+const InsuranceCompanyBaseSchema = z.object({
   identificationTypeId: z.number().int().positive(),
   documentNumber: z.string().min(1).max(20),
   verificationDigit: z.string().max(1).nullable().optional(),
@@ -158,7 +159,52 @@ export const CreateInsuranceCompanyBodySchema = z.object({
   ),
 });
 
-export const UpdateInsuranceCompanyBodySchema = CreateInsuranceCompanyBodySchema.partial();
+const addInsuranceRateRangesValidation = <T extends z.ZodTypeAny>(schema: T) =>
+  schema.superRefine((value, ctx) => {
+    const data = value as {
+      insuranceRateRanges?: Array<{
+        rangeMetric: 'INSTALLMENT_COUNT' | 'CREDIT_AMOUNT';
+        valueFrom: number;
+        valueTo: number;
+      }>;
+    };
+
+    const ranges = data.insuranceRateRanges;
+    if (ranges === undefined) return;
+
+    if (ranges.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debe configurar al menos un rango de tasa',
+        path: ['insuranceRateRanges'],
+      });
+      return;
+    }
+
+    for (let i = 0; i < ranges.length; i += 1) {
+      for (let j = i + 1; j < ranges.length; j += 1) {
+        const a = ranges[i];
+        const b = ranges[j];
+        if (a.rangeMetric !== b.rangeMetric) continue;
+        if (rangesOverlap(a.valueFrom, a.valueTo, b.valueFrom, b.valueTo)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'No puede solapar rangos para la misma métrica',
+            path: ['insuranceRateRanges'],
+          });
+          return;
+        }
+      }
+    }
+  });
+
+export const CreateInsuranceCompanyBodySchema = addInsuranceRateRangesValidation(
+  InsuranceCompanyBaseSchema
+);
+
+export const UpdateInsuranceCompanyBodySchema = addInsuranceRateRangesValidation(
+  InsuranceCompanyBaseSchema.partial()
+);
 
 // ============================================
 // TYPES

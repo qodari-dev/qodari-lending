@@ -17,7 +17,7 @@ import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
 import { CreateCreditProductBodySchema, CreditProductAccountInput } from '@/schemas/credit-product';
 import { GlAccount } from '@/schemas/gl-account';
 import { ChevronDownIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -26,6 +26,8 @@ type AccountFieldKey = keyof CreditProductAccountInput;
 
 export function CreditProductAccountsForm() {
   const form = useFormContext<FormValues>();
+  const dialogContentRef = useRef<HTMLDivElement | null>(null);
+
   const accountValues = useWatch({
     control: form.control,
     name: 'creditProductAccounts',
@@ -76,7 +78,7 @@ export function CreditProductAccountsForm() {
   }, [form]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div ref={dialogContentRef} className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm font-medium">Cuentas contables</p>
@@ -88,7 +90,7 @@ export function CreditProductAccountsForm() {
           Limpiar
         </Button>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4">
         <Field data-invalid={Boolean(accountErrors?.capitalGlAccountId)}>
           <FieldLabel htmlFor="capitalGlAccountId">Cuenta capital</FieldLabel>
           <Combobox
@@ -112,7 +114,7 @@ export function CreditProductAccountsForm() {
                 </Button>
               }
             />
-            <ComboboxContent>
+            <ComboboxContent portalContainer={dialogContentRef}>
               <ComboboxInput placeholder="Buscar cuenta..." showClear showTrigger={false} />
               <ComboboxList>
                 <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
@@ -154,7 +156,7 @@ export function CreditProductAccountsForm() {
                 </Button>
               }
             />
-            <ComboboxContent>
+            <ComboboxContent portalContainer={dialogContentRef}>
               <ComboboxInput placeholder="Buscar cuenta..." showClear showTrigger={false} />
               <ComboboxList>
                 <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
@@ -196,7 +198,7 @@ export function CreditProductAccountsForm() {
                 </Button>
               }
             />
-            <ComboboxContent>
+            <ComboboxContent portalContainer={dialogContentRef}>
               <ComboboxInput placeholder="Buscar cuenta..." showClear showTrigger={false} />
               <ComboboxList>
                 <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>

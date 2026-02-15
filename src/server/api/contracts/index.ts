@@ -6,6 +6,7 @@ import { agreement } from './agreement';
 import { affiliationOffice } from './affiliation-office';
 import { agingProfile } from './aging-profile';
 import { auth } from './auth';
+import { bankFile } from './bank-file';
 import { bank } from './bank';
 import { billingConcept } from './billing-concept';
 import { billingCycleProfile } from './billing-cycle-profile';
@@ -22,6 +23,7 @@ import { glAccount } from './gl-account';
 import { identificationType } from './identification-type';
 import { iamUser } from './iam-user';
 import { insuranceCompany } from './insurance-company';
+import { insuranceReport } from './insurance-report';
 import { investmentType } from './investment-type';
 import { loan } from './loan';
 import { loanApplication } from './loan-application';
@@ -38,6 +40,7 @@ import { rejectionReason } from './rejection-reason';
 import { reportCredit } from './report-credit';
 import { riskCenterReport } from './risk-center-report';
 import { repaymentMethod } from './repayment-method';
+import { subsidy } from './subsidy';
 import { thirdParty } from './third-party';
 import { thirdPartyType } from './third-party-type';
 
@@ -52,6 +55,7 @@ export const contract = c.router(
     affiliationOffice,
     agingProfile,
     auth,
+    bankFile,
     bank,
     billingConcept,
     billingCycleProfile,
@@ -68,6 +72,7 @@ export const contract = c.router(
     identificationType,
     iamUser,
     insuranceCompany,
+    insuranceReport,
     investmentType,
     loan,
     loanApplication,
@@ -84,6 +89,7 @@ export const contract = c.router(
     reportCredit,
     riskCenterReport,
     repaymentMethod,
+    subsidy,
     thirdParty,
     thirdPartyType,
   },

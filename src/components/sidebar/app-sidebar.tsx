@@ -232,20 +232,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 title: 'Subsidio',
                 icon: HandHeart,
                 items: [
-                  { title: 'Genera comprobante de abonos de pignoracion', url: `/pignoracion` },
-                  { title: 'Reporte de Pignoraciones realizadas', url: `/pignoracion` },
-                  { title: 'Reporte Pignorados no realizadas', url: `/report-credits/extract` },
+                  {
+                    title: 'Genera comprobante de abonos de pignoracion',
+                    url: `/subsidy/pledge-payment-voucher`,
+                  },
+                  {
+                    title: 'Reporte de Pignoraciones realizadas',
+                    url: `/subsidy/pledges-performed-report`,
+                  },
+                  {
+                    title: 'Reporte Pignorados no realizadas',
+                    url: `/subsidy/pledges-not-performed-report`,
+                  },
                 ],
               },
               {
                 title: 'Archivos para bancos',
                 icon: FileUp,
-                items: [
-                  { title: 'Genera Archivo Bancolombia', url: `/generate-bank-file` },
-                  { title: 'Genera Archivo AvVillas', url: `/generate-bank-file` },
-                  { title: 'Genera Archivo Daviplata', url: `/generate-bank-file` },
-                  { title: 'Correcion de cuenta bancaria del credito', url: `/generate-bank-file` },
-                ],
+                items: [{ title: 'Generar archivo para banco', url: `/bank-files` }],
               },
             ],
             pathname
@@ -292,7 +296,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {
                 title: 'Aseguradoras',
                 icon: ShieldAlert,
-                items: [{ title: 'Reporte para aseguradoras', url: `/report-credits/extract` }],
+                items: [{ title: 'Reporte para aseguradoras', url: `/insurance-reports` }],
               },
               {
                 title: 'Centrales de riesgo',

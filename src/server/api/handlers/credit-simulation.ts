@@ -7,6 +7,7 @@ import {
   creditProductCategories,
   creditProducts,
   db,
+  identificationTypes,
   insuranceCompanies,
   paymentFrequencies,
 } from '@/server/db';
@@ -211,6 +212,119 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
     } catch (e) {
       return genericTsRestErrorResponse(e, {
         genericMsg: 'Error al calcular simulacion de credito',
+      });
+    }
+  },
+  workerStudy: async ({ body }, { request, appRoute }) => {
+    try {
+      await getAuthContextAndValidatePermission(request, appRoute.metadata);
+
+      const identificationType = await db.query.identificationTypes.findFirst({
+        where: and(
+          eq(identificationTypes.id, body.identificationTypeId),
+          eq(identificationTypes.isActive, true)
+        ),
+      });
+
+      if (!identificationType) {
+        throwHttpError({
+          status: 404,
+          message: 'Tipo de identificacion no encontrado',
+          code: 'NOT_FOUND',
+        });
+      }
+
+      // TODO(worker-study): conectar con el modulo de subsidio para consultar data real:
+      // - historial de aportes del afiliado
+      // - historial de empresas aportantes
+      // - trayectoria laboral
+      // - salario historico y salario actual
+      // Esta respuesta mock existe solo para soportar la captura de presentacion.
+      const documentTail = Number(body.documentNumber.replace(/\D/g, '').slice(-2) || '0');
+      const salaryBase = 1800000 + documentTail * 15000;
+      const currentSalary = roundMoney(salaryBase);
+      const averageSalaryLastSixMonths = roundMoney(salaryBase * 0.96);
+      const highestSalaryLastSixMonths = roundMoney(salaryBase * 1.08);
+
+      return {
+        status: 200 as const,
+        body: {
+          worker: {
+            fullName: 'Afiliado demo',
+            identificationTypeId: identificationType.id,
+            identificationTypeCode: identificationType.code,
+            identificationTypeName: identificationType.name,
+            documentNumber: body.documentNumber.trim(),
+          },
+          salary: {
+            currentSalary,
+            averageSalaryLastSixMonths,
+            highestSalaryLastSixMonths,
+          },
+          trajectory: {
+            totalContributionMonths: 92,
+            currentCompanyName: 'Servicios Integrales SAS',
+            previousCompanyName: 'Comercial Andina LTDA',
+          },
+          contributions: [
+            {
+              period: '2025-09',
+              companyName: 'Servicios Integrales SAS',
+              contributionBaseSalary: currentSalary,
+              contributionValue: roundMoney(currentSalary * 0.04),
+            },
+            {
+              period: '2025-10',
+              companyName: 'Servicios Integrales SAS',
+              contributionBaseSalary: currentSalary,
+              contributionValue: roundMoney(currentSalary * 0.04),
+            },
+            {
+              period: '2025-11',
+              companyName: 'Servicios Integrales SAS',
+              contributionBaseSalary: currentSalary,
+              contributionValue: roundMoney(currentSalary * 0.04),
+            },
+            {
+              period: '2025-12',
+              companyName: 'Servicios Integrales SAS',
+              contributionBaseSalary: currentSalary,
+              contributionValue: roundMoney(currentSalary * 0.04),
+            },
+            {
+              period: '2026-01',
+              companyName: 'Servicios Integrales SAS',
+              contributionBaseSalary: currentSalary,
+              contributionValue: roundMoney(currentSalary * 0.04),
+            },
+            {
+              period: '2026-02',
+              companyName: 'Servicios Integrales SAS',
+              contributionBaseSalary: currentSalary,
+              contributionValue: roundMoney(currentSalary * 0.04),
+            },
+          ],
+          companyHistory: [
+            {
+              companyName: 'Servicios Integrales SAS',
+              fromDate: '2022-03-01',
+              toDate: null,
+              contributionMonths: 47,
+            },
+            {
+              companyName: 'Comercial Andina LTDA',
+              fromDate: '2018-01-01',
+              toDate: '2022-02-28',
+              contributionMonths: 50,
+            },
+          ],
+          notes: 'Sin observaciones.',
+          generatedAt: new Date().toISOString(),
+        },
+      };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: 'Error al consultar estudio de trabajador',
       });
     }
   },

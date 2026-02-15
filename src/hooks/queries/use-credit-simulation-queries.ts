@@ -9,3 +9,11 @@ export function useCalculateCreditSimulation() {
     },
   });
 }
+
+export function useWorkerStudy() {
+  return api.creditSimulation.workerStudy.useMutation({
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}

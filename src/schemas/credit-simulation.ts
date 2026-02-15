@@ -17,6 +17,11 @@ export const CalculateCreditSimulationBodySchema = z.object({
   insuranceCompanyId: z.number().int().positive().nullable().optional(),
 });
 
+export const WorkerStudyBodySchema = z.object({
+  identificationTypeId: z.number().int().positive(),
+  documentNumber: z.string().trim().min(3).max(30),
+});
+
 export const CreditSimulationInstallmentSchema = z.object({
   installmentNumber: z.number().int(),
   dueDate: z.string(),
@@ -62,9 +67,52 @@ export const CalculateCreditSimulationResponseSchema = z.object({
   installments: z.array(CreditSimulationInstallmentSchema),
 });
 
+export const WorkerStudyContributionSchema = z.object({
+  period: z.string(),
+  companyName: z.string(),
+  contributionBaseSalary: z.number(),
+  contributionValue: z.number(),
+});
+
+export const WorkerStudyCompanyHistorySchema = z.object({
+  companyName: z.string(),
+  fromDate: z.string(),
+  toDate: z.string().nullable(),
+  contributionMonths: z.number().int().nonnegative(),
+});
+
+export const WorkerStudyResponseSchema = z.object({
+  worker: z.object({
+    fullName: z.string(),
+    identificationTypeId: z.number().int().positive(),
+    identificationTypeCode: z.string(),
+    identificationTypeName: z.string(),
+    documentNumber: z.string(),
+  }),
+  salary: z.object({
+    currentSalary: z.number().nonnegative(),
+    averageSalaryLastSixMonths: z.number().nonnegative(),
+    highestSalaryLastSixMonths: z.number().nonnegative(),
+  }),
+  trajectory: z.object({
+    totalContributionMonths: z.number().int().nonnegative(),
+    currentCompanyName: z.string().nullable(),
+    previousCompanyName: z.string().nullable(),
+  }),
+  contributions: z.array(WorkerStudyContributionSchema),
+  companyHistory: z.array(WorkerStudyCompanyHistorySchema),
+  notes: z.string().nullable(),
+  generatedAt: z.string(),
+});
+
 export type CreditSimulationResult = ClientInferResponseBody<
   Contract['creditSimulation']['calculate'],
   200
 >;
+export type WorkerStudyResult = ClientInferResponseBody<
+  Contract['creditSimulation']['workerStudy'],
+  200
+>;
 
 export type CalculateCreditSimulationBody = z.infer<typeof CalculateCreditSimulationBodySchema>;
+export type WorkerStudyBody = z.infer<typeof WorkerStudyBodySchema>;

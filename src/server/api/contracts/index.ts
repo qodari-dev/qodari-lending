@@ -10,6 +10,7 @@ import { bankFile } from './bank-file';
 import { bank } from './bank';
 import { billingConcept } from './billing-concept';
 import { billingCycleProfile } from './billing-cycle-profile';
+import { causation } from './causation';
 import { channel } from './channel';
 import { city } from './city';
 import { creditProduct } from './credit-product';
@@ -31,6 +32,7 @@ import { loanPaymentFile } from './loan-payment-file';
 import { loanPaymentPayroll } from './loan-payment-payroll';
 import { loanRefinancing } from './loan-refinancing';
 import { loanPayment } from './loan-payment';
+import { loanWriteOff } from './loan-write-off';
 import { paymentFrequency } from './payment-frequency';
 import { paymentGuaranteeType } from './payment-guarantee-type';
 import { paymentAllocationPolicy } from './payment-allocation-policy';
@@ -59,6 +61,7 @@ export const contract = c.router(
     bank,
     billingConcept,
     billingCycleProfile,
+    causation,
     channel,
     city,
     creditProduct,
@@ -80,6 +83,7 @@ export const contract = c.router(
     loanPaymentPayroll,
     loanRefinancing,
     loanPayment,
+    loanWriteOff,
     paymentFrequency,
     paymentGuaranteeType,
     paymentAllocationPolicy,

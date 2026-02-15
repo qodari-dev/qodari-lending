@@ -12,6 +12,7 @@ import { bankFile } from './bank-file';
 import { bank } from './bank';
 import { billingConcept } from './billing-concept';
 import { billingCycleProfile } from './billing-cycle-profile';
+import { causation } from './causation';
 import { channel } from './channel';
 import { city } from './city';
 import { costCenter } from './cost-center';
@@ -32,6 +33,7 @@ import { loanPaymentFile } from './loan-payment-file';
 import { loanPaymentPayroll } from './loan-payment-payroll';
 import { loanRefinancing } from './loan-refinancing';
 import { loanPayment } from './loan-payment';
+import { loanWriteOff } from './loan-write-off';
 import { paymentFrequency } from './payment-frequency';
 import { paymentGuaranteeType } from './payment-guarantee-type';
 import { paymentAllocationPolicy } from './payment-allocation-policy';
@@ -57,6 +59,7 @@ export const handler = createNextHandler(contract, {
   bank,
   billingConcept,
   billingCycleProfile,
+  causation,
   channel,
   city,
   costCenter,
@@ -78,6 +81,7 @@ export const handler = createNextHandler(contract, {
   loanPaymentPayroll,
   loanRefinancing,
   loanPayment,
+  loanWriteOff,
   paymentAllocationPolicy,
   paymentFrequency,
   paymentGuaranteeType,

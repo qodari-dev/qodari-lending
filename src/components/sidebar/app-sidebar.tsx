@@ -201,6 +201,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Interes corriente', url: `/causation-current-interest` },
                   { title: 'Seguro', url: `/causation-current-insurance` },
                   { title: 'Interes mora', url: `/causation-current-interest-late` },
+                  { title: 'Cierre de periodo', url: `/causation-period-closing` },
                 ],
               },
               {
@@ -208,8 +209,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 icon: ArrowLeftRight,
                 items: [
                   {
-                    title: 'Cargar Archivo para castigar cartera',
-                    url: `/causation-current-interest`,
+                    title: 'Generar, revisar y ejecutar castiga cartera',
+                    url: `/loan-write-off`,
                   },
                 ],
               },

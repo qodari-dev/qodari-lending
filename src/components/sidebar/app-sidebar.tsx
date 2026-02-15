@@ -264,34 +264,64 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 title: 'Cartera',
                 icon: Wallet,
                 items: [
-                  { title: 'Cartera de Creditos Actual', url: `/report-cartera/aging-profiles` },
+                  {
+                    title: 'Cartera de Creditos Actual',
+                    url: `/portfolio-reports/current-credits`,
+                  },
                   {
                     title: 'Historico de Cartera Por Periodo',
-                    url: `/report-cartera/aging-profiles`,
+                    url: `/portfolio-reports/historical-period`,
                   },
-                  { title: 'Creditos para Cobro', url: `/report-credits/extract` },
-                  { title: 'Cartera de libranza por Convenio', url: `/report-credits/extract` },
-                  { title: 'Cartera por tipo de credito', url: `/report-credits/extract` },
-                  { title: 'Certificado de saldo del credito', url: `/report-credits/extract` },
-                  { title: 'Certificado de saldo del tercero', url: `/report-credits/extract` },
+                  {
+                    title: 'Creditos para Cobro',
+                    url: `/portfolio-reports/credits-for-collection`,
+                  },
+                  {
+                    title: 'Cartera de libranza por Convenio',
+                    url: `/portfolio-reports/payroll-by-agreement`,
+                  },
+                  {
+                    title: 'Cartera por tipo de credito',
+                    url: `/portfolio-reports/by-credit-type`,
+                  },
+                  {
+                    title: 'Certificado de saldo del credito',
+                    url: `/portfolio-reports/credit-balance-certificate`,
+                  },
+                  {
+                    title: 'Certificado de saldo del tercero',
+                    url: `/portfolio-reports/third-party-balance-certificate`,
+                  },
+                  {
+                    title: 'Indicadores de Cartera',
+                    url: `/portfolio-reports/portfolio-indicators`,
+                  },
                 ],
               },
               {
                 title: 'Creditos',
                 icon: BarChart3,
                 items: [
-                  { title: 'extracto', url: `/report-credits/extract` },
-                  { title: 'Cuotas Pagadas', url: `/report-credits/extract` },
-                  { title: 'Creditos Liquidados', url: `/report-credits/extract` },
-                  { title: 'Creditos No liquidados', url: `/report-credits/extract` },
-                  { title: 'Creditos Anulados o rechazados', url: `/report-credits/extract` },
-                  { title: 'Acta', url: `/report-credits/extract` },
-                  { title: 'Indicadores de Cartera', url: `/report-credits/extract` },
-                  { title: 'Paz y Salvo de un Credito', url: `/report-credits/extract` },
-                  { title: 'Paz y Salvo de Tercero', url: `/report-credits/extract` },
-                  { title: 'Comprobante de Movimientos', url: `/report-credits/extract` },
-                  { title: 'Creditos Saldados', url: `/report-credits/extract` },
-                  { title: 'Superintendencia de sociedades', url: `/report-credits/extract` },
+                  { title: 'Extracto', url: `/report-credits/extract` },
+                  { title: 'Cuotas Pagadas', url: `/credit-reports/paid-installments` },
+                  { title: 'Creditos Liquidados', url: `/credit-reports/liquidated-credits` },
+                  {
+                    title: 'Creditos No liquidados',
+                    url: `/credit-reports/non-liquidated-credits`,
+                  },
+                  {
+                    title: 'Creditos Anulados o rechazados',
+                    url: `/credit-reports/cancelled-rejected-credits`,
+                  },
+                  { title: 'Acta', url: `/credit-reports/minutes` },
+                  { title: 'Paz y Salvo de un Credito', url: `/credit-reports/credit-clearance` },
+                  { title: 'Paz y Salvo de Tercero', url: `/credit-reports/third-party-clearance` },
+                  { title: 'Comprobante de Movimientos', url: `/credit-reports/movement-voucher` },
+                  { title: 'Creditos Saldados', url: `/credit-reports/settled-credits` },
+                  {
+                    title: 'Superintendencia de sociedades',
+                    url: `/credit-reports/superintendencia`,
+                  },
                 ],
               },
               {

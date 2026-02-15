@@ -14,6 +14,7 @@ import { causation } from './causation';
 import { channel } from './channel';
 import { city } from './city';
 import { creditProduct } from './credit-product';
+import { creditReport } from './credit-report';
 import { creditSimulation } from './credit-simulation';
 import { costCenter } from './cost-center';
 import { creditFund } from './credit-fund';
@@ -38,6 +39,7 @@ import { paymentGuaranteeType } from './payment-guarantee-type';
 import { paymentAllocationPolicy } from './payment-allocation-policy';
 import { paymentReceiptType } from './payment-receipt-type';
 import { paymentTenderType } from './payment-tender-type';
+import { portfolioReport } from './portfolio-report';
 import { rejectionReason } from './rejection-reason';
 import { reportCredit } from './report-credit';
 import { riskCenterReport } from './risk-center-report';
@@ -65,6 +67,7 @@ export const contract = c.router(
     channel,
     city,
     creditProduct,
+    creditReport,
     creditSimulation,
     costCenter,
     creditFund,
@@ -89,6 +92,7 @@ export const contract = c.router(
     paymentAllocationPolicy,
     paymentReceiptType,
     paymentTenderType,
+    portfolioReport,
     rejectionReason,
     reportCredit,
     riskCenterReport,

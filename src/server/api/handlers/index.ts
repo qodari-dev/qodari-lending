@@ -17,6 +17,7 @@ import { channel } from './channel';
 import { city } from './city';
 import { costCenter } from './cost-center';
 import { creditProduct } from './credit-product';
+import { creditReport } from './credit-report';
 import { creditSimulation } from './credit-simulation';
 import { creditsSettingsHandler } from './credits-settings';
 import { dashboard } from './dashboard';
@@ -39,6 +40,7 @@ import { paymentGuaranteeType } from './payment-guarantee-type';
 import { paymentAllocationPolicy } from './payment-allocation-policy';
 import { paymentReceiptType } from './payment-receipt-type';
 import { paymentTenderType } from './payment-tender-type';
+import { portfolioReport } from './portfolio-report';
 import { rejectionReason } from './rejection-reason';
 import { reportCredit } from './report-credit';
 import { riskCenterReport } from './risk-center-report';
@@ -65,6 +67,7 @@ export const handler = createNextHandler(contract, {
   costCenter,
   creditFund,
   creditProduct,
+  creditReport,
   creditSimulation,
   creditsSettings: creditsSettingsHandler,
   dashboard,
@@ -87,6 +90,7 @@ export const handler = createNextHandler(contract, {
   paymentGuaranteeType,
   paymentReceiptType,
   paymentTenderType,
+  portfolioReport,
   rejectionReason,
   reportCredit,
   riskCenterReport,

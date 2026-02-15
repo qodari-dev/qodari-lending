@@ -220,12 +220,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Creditos', url: `/interface-accounting` },
                   {
                     title: 'Interes Corriente',
-                    url: `/causation-current-insurance`,
+                    url: `/interface-accounting/current-interest`,
                   },
-                  { title: 'Interes Mora', url: `/causation-current-insurance` },
-                  { title: 'Abonos', url: `/causation-current-insurance` },
-                  { title: 'Castiga', url: `/causation-current-insurance` },
-                  { title: 'Provicion', url: `/causation-current-insurance` },
+                  { title: 'Interes Mora', url: `/interface-accounting/late-interest` },
+                  { title: 'Abonos', url: `/interface-accounting/payments` },
+                  { title: 'Castiga', url: `/interface-accounting/write-off` },
+                  { title: 'Provicion', url: `/interface-accounting/provision` },
                 ],
               },
               {

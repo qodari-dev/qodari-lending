@@ -1,5 +1,6 @@
 import { contract } from '@/server/api/contracts';
 import { createNextHandler } from '@ts-rest/serverless/next';
+import { accountingInterface } from './accounting-interface';
 import { accountingDistribution } from './accounting-distribution';
 import { affiliationOffice } from './affiliation-office';
 import { agreement } from './agreement';
@@ -41,6 +42,7 @@ import { thirdParty } from './third-party';
 import { thirdPartyType } from './third-party-type';
 
 export const handler = createNextHandler(contract, {
+  accountingInterface,
   accountingDistribution,
   accountingPeriod,
   affiliationOffice,

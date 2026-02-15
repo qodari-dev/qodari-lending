@@ -1,4 +1,5 @@
 import { initContract } from '@ts-rest/core';
+import { accountingInterface } from './accounting-interface';
 import { accountingDistribution } from './accounting-distribution';
 import { accountingPeriod } from './accounting-period';
 import { agreement } from './agreement';
@@ -43,6 +44,7 @@ const c = initContract();
 
 export const contract = c.router(
   {
+    accountingInterface,
     accountingDistribution,
     accountingPeriod,
     agreement,

@@ -182,7 +182,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 icon: HandCoins,
                 items: [
                   { title: 'Abono Individual', url: `/loan-payments` },
-                  { title: 'Abono por libranza', url: `/loan-payments` },
+                  { title: 'Abono por libranza', url: `/loan-payment-payroll` },
                   { title: 'Abono por archivo', url: `/loan-payment-file` },
                 ],
               },
@@ -195,12 +195,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           items: withAutoActive(
             [
               {
-                title: 'Creditos',
+                title: 'Causacion',
                 icon: ArrowLeftRight,
                 items: [
-                  { title: 'Causacion del interes corriente', url: `/causation-current-interest` },
-                  { title: 'Causacion del seguro', url: `/causation-current-insurance` },
-                  { title: 'Causacion del interes mora', url: `/causation-current-interest-late` },
+                  { title: 'Interes corriente', url: `/causation-current-interest` },
+                  { title: 'Seguro', url: `/causation-current-insurance` },
+                  { title: 'Interes mora', url: `/causation-current-interest-late` },
                 ],
               },
               {
@@ -214,18 +214,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 ],
               },
               {
-                title: 'Contable',
+                title: 'Interface Contable',
                 icon: Receipt,
                 items: [
-                  { title: 'Interface Contable Credito', url: `/interface-accounting` },
+                  { title: 'Creditos', url: `/interface-accounting` },
                   {
-                    title: 'Interface contable Interes Corriente',
+                    title: 'Interes Corriente',
                     url: `/causation-current-insurance`,
                   },
-                  { title: 'Interface contable Interes Mora', url: `/causation-current-insurance` },
-                  { title: 'Interface contable Abonos', url: `/causation-current-insurance` },
-                  { title: 'Interface contable Castiga', url: `/causation-current-insurance` },
-                  { title: 'Interface contable Provicion', url: `/causation-current-insurance` },
+                  { title: 'Interes Mora', url: `/causation-current-insurance` },
+                  { title: 'Abonos', url: `/causation-current-insurance` },
+                  { title: 'Castiga', url: `/causation-current-insurance` },
+                  { title: 'Provicion', url: `/causation-current-insurance` },
                 ],
               },
               {

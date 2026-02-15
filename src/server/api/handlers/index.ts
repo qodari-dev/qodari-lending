@@ -26,6 +26,7 @@ import { investmentType } from './investment-type';
 import { loan } from './loan';
 import { loanApplication } from './loan-application';
 import { loanPaymentFile } from './loan-payment-file';
+import { loanPaymentPayroll } from './loan-payment-payroll';
 import { loanRefinancing } from './loan-refinancing';
 import { loanPayment } from './loan-payment';
 import { paymentFrequency } from './payment-frequency';
@@ -66,6 +67,7 @@ export const handler = createNextHandler(contract, {
   loan,
   loanApplication,
   loanPaymentFile,
+  loanPaymentPayroll,
   loanRefinancing,
   loanPayment,
   paymentAllocationPolicy,

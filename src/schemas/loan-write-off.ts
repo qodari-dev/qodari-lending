@@ -53,6 +53,19 @@ export type ReviewLoanWriteOffProposalResult = ClientInferResponseBody<
 
 export const ExecuteLoanWriteOffBodySchema = z.object({
   proposalId: z.string().trim().min(1),
+  selectedCreditNumbers: z
+    .array(z.string().trim().min(1))
+    .min(1, 'Debe seleccionar al menos un credito para ejecutar castigo')
+    .superRefine((values, ctx) => {
+      const unique = new Set(values.map((value) => value.toUpperCase()));
+      if (unique.size !== values.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['selectedCreditNumbers'],
+          message: 'No se permiten creditos repetidos',
+        });
+      }
+    }),
 });
 
 export const ExecuteLoanWriteOffResponseSchema = z.object({

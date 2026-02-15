@@ -141,19 +141,24 @@ async function execute(body: ExecuteLoanWriteOffBody, context: HandlerContext) {
 
     const proposalId = body.proposalId.trim().toUpperCase();
     const rows = buildMockRows(proposalId);
+    const selectedCreditNumbers = new Set(
+      body.selectedCreditNumbers.map((creditNumber) => creditNumber.trim().toUpperCase())
+    );
+    const selectedRows = rows.filter((row) => selectedCreditNumbers.has(row.creditNumber.toUpperCase()));
     const totalWrittenOffAmount = roundMoney(
-      rows.reduce((acc, row) => acc + row.recommendedWriteOffAmount, 0)
+      selectedRows.reduce((acc, row) => acc + row.recommendedWriteOffAmount, 0)
     );
 
     // TODO(loan-write-off-execute): implementar ejecucion real del castigo:
     // - ejecutar castigo en transaccion (estado credito + movimientos + contabilidad)
+    // - ejecutar solo sobre creditos seleccionados/confirmados en la revision
     // - bloquear doble ejecucion del mismo lote
     // - registrar usuario, fecha y resultado por credito
     return {
       status: 200 as const,
       body: {
         proposalId,
-        executedCredits: rows.length,
+        executedCredits: selectedRows.length,
         totalWrittenOffAmount,
         movementDate: toDateOnly(new Date()),
         message: 'Ejecucion de castiga cartera recibida. Pendiente implementacion.',

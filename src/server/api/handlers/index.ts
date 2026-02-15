@@ -37,6 +37,7 @@ import { paymentReceiptType } from './payment-receipt-type';
 import { paymentTenderType } from './payment-tender-type';
 import { rejectionReason } from './rejection-reason';
 import { reportCredit } from './report-credit';
+import { riskCenterReport } from './risk-center-report';
 import { repaymentMethod } from './repayment-method';
 import { thirdParty } from './third-party';
 import { thirdPartyType } from './third-party-type';
@@ -79,6 +80,7 @@ export const handler = createNextHandler(contract, {
   paymentTenderType,
   rejectionReason,
   reportCredit,
+  riskCenterReport,
   repaymentMethod,
   thirdParty,
   thirdPartyType,

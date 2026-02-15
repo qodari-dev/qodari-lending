@@ -298,16 +298,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 title: 'Centrales de riesgo',
                 icon: ShieldAlert,
                 items: [
-                  { title: 'Cifin', url: `/report-risk-centers/risk-centers` },
-                  { title: 'Datacredito', url: `/report-risk-centers/risk-centers` },
+                  { title: 'Cifin', url: `/risk-center-reports/cifin` },
+                  { title: 'Datacredito', url: `/risk-center-reports/datacredito` },
                 ],
               },
               {
                 title: 'Oficios de Cobro',
                 icon: ShieldAlert,
                 items: [
-                  { title: 'Cobro Administrativo', url: `/report-risk-centers/risk-centers` },
-                  { title: 'Cobro Prejuridico', url: `/report-risk-centers/risk-centers` },
+                  { title: 'Cobro administrativo', url: `/collection-letters/administrative` },
+                  { title: 'Cobro prejuridico', url: `/collection-letters/pre-legal` },
                 ],
               },
             ],

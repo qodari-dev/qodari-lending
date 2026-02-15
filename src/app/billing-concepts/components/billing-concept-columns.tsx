@@ -58,6 +58,14 @@ export const billingConceptColumns: ColumnDef<BillingConcept>[] = [
       row.original.defaultFrequency,
   },
   {
+    accessorKey: 'defaultGlAccountId',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Auxiliar" />,
+    cell: ({ row }) =>
+      row.original.defaultGlAccount
+        ? `${row.original.defaultGlAccount.code} - ${row.original.defaultGlAccount.name}`
+        : '-',
+  },
+  {
     accessorKey: 'isSystem',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Sistema" />,
     cell: ({ row }) => (

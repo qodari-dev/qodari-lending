@@ -25,7 +25,7 @@ import {
   billingConceptRangeMetricLabels,
   billingConceptTypeLabels,
 } from '@/schemas/billing-concept';
-import { formatDate, formatDateOnly } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatDateOnly, formatPercent } from '@/utils/formatters';
 
 export function BillingConceptInfo({
   billingConcept,
@@ -42,6 +42,8 @@ export function BillingConceptInfo({
   const calcMethod = billingConcept.calcMethod as BillingConceptCalcMethod;
   const isTieredMethod =
     calcMethod === 'TIERED_FIXED_AMOUNT' || calcMethod === 'TIERED_PERCENTAGE';
+  const usesAmount = calcMethod === 'FIXED_AMOUNT' || calcMethod === 'TIERED_FIXED_AMOUNT';
+  const usesRate = calcMethod === 'PERCENTAGE' || calcMethod === 'TIERED_PERCENTAGE';
   const sortedRules = rules.slice().sort((a, b) => {
     if (isTieredMethod) {
       return Number(a.valueFrom ?? '0') - Number(b.valueFrom ?? '0');
@@ -154,8 +156,12 @@ export function BillingConceptInfo({
                 <TableBody>
                   {sortedRules.map((rule) => (
                       <TableRow key={rule.id}>
-                        <TableCell className="font-mono text-xs">{rule.rate ?? '-'}</TableCell>
-                        <TableCell className="font-mono text-xs">{rule.amount ?? '-'}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {usesRate && rule.rate ? formatPercent(rule.rate, 6) : '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {usesAmount && rule.amount ? formatCurrency(rule.amount) : '-'}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">
                           {rule.valueFrom ?? '-'} / {rule.valueTo ?? '-'}
                         </TableCell>

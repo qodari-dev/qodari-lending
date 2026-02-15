@@ -11,6 +11,13 @@ export const billingConceptExportConfig: ExportConfig<BillingConcept> = {
     { header: 'Tipo', accessorKey: 'conceptType' },
     { header: 'Frecuencia', accessorKey: 'defaultFrequency' },
     {
+      header: 'Auxiliar',
+      getValue: (row) =>
+        row.defaultGlAccount
+          ? `${row.defaultGlAccount.code} - ${row.defaultGlAccount.name}`
+          : '-',
+    },
+    {
       header: 'Estado',
       accessorKey: 'isActive',
       getValue: (row) => (row.isActive ? 'Activo' : 'Inactivo'),

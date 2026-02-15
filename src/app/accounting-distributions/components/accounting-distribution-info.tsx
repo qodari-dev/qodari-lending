@@ -15,7 +15,7 @@ import {
   entryNatureLabels,
   EntryNature,
 } from '@/schemas/accounting-distribution';
-import { formatDate } from '@/utils/formatters';
+import { formatDate, formatPercent } from '@/utils/formatters';
 
 export function AccountingDistributionInfo({
   accountingDistribution,
@@ -29,6 +29,19 @@ export function AccountingDistributionInfo({
   if (!accountingDistribution) return null;
 
   const lines = accountingDistribution.accountingDistributionLines ?? [];
+  const totals = lines.reduce(
+    (acc, line) => {
+      const value = Number(line.percentage) || 0;
+      if (line.nature === 'DEBIT') acc.debit += value;
+      if (line.nature === 'CREDIT') acc.credit += value;
+      return acc;
+    },
+    { debit: 0, credit: 0 }
+  );
+  const epsilon = 0.01;
+  const debitOk = Math.abs(totals.debit - 100) <= epsilon;
+  const creditOk = Math.abs(totals.credit - 100) <= epsilon;
+  const isBalanced = debitOk && creditOk;
 
   const sections: DescriptionSection[] = [
     {
@@ -43,6 +56,31 @@ export function AccountingDistributionInfo({
               {accountingDistribution.isActive ? 'Activo' : 'Inactivo'}
             </Badge>
           ),
+        },
+      ],
+    },
+    {
+      title: 'Control de Distribucion',
+      columns: 3,
+      items: [
+        { label: 'Total lineas', value: lines.length },
+        { label: '% Debito', value: formatPercent(totals.debit, 2) },
+        { label: '% Credito', value: formatPercent(totals.credit, 2) },
+        {
+          label: 'Estado cuadre',
+          value: (
+            <Badge variant={isBalanced ? 'default' : 'outline'}>
+              {isBalanced ? 'Cuadrado' : 'Descuadrado'}
+            </Badge>
+          ),
+        },
+        {
+          label: 'Diferencia debito',
+          value: formatPercent(totals.debit - 100, 2),
+        },
+        {
+          label: 'Diferencia credito',
+          value: formatPercent(totals.credit - 100, 2),
         },
       ],
     },
@@ -64,7 +102,7 @@ export function AccountingDistributionInfo({
 
   return (
     <Sheet open={opened} onOpenChange={(open) => onOpened(open)}>
-      <SheetContent className="overflow-y-scroll sm:max-w-2xl">
+      <SheetContent className="overflow-y-scroll sm:max-w-5xl">
         <SheetHeader>
         <SheetTitle>Informacion</SheetTitle>
         </SheetHeader>
@@ -78,6 +116,7 @@ export function AccountingDistributionInfo({
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>#</TableHead>
                     <TableHead>Cuenta</TableHead>
                     <TableHead>Centro de Costo</TableHead>
                     <TableHead>Naturaleza</TableHead>
@@ -85,8 +124,9 @@ export function AccountingDistributionInfo({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lines.map((line) => (
+                  {lines.map((line, index) => (
                     <TableRow key={line.id}>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell>
                         {line.glAccount
                           ? `${line.glAccount.code} - ${line.glAccount.name}`
@@ -101,7 +141,7 @@ export function AccountingDistributionInfo({
                         {entryNatureLabels[line.nature as EntryNature] ?? line.nature}
                       </TableCell>
                       <TableCell className="text-muted-foreground font-mono text-xs">
-                        {line.percentage}
+                        {formatPercent(line.percentage, 2)}
                       </TableCell>
                     </TableRow>
                   ))}

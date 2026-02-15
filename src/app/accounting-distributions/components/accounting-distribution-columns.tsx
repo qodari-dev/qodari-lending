@@ -3,7 +3,7 @@
 import { DataTableColumnHeader } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { AccountingDistribution } from '@/schemas/accounting-distribution';
-import { formatDate } from '@/utils/formatters';
+import { formatDate, formatPercent } from '@/utils/formatters';
 import type { ColumnDef } from '@tanstack/react-table';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { AccountingDistributionRowActions } from './accounting-distribution-row-actions';
@@ -49,6 +49,37 @@ export const accountingDistributionColumns: ColumnDef<AccountingDistribution>[] 
     cell: ({ row }) => {
       const count = row.original.accountingDistributionLines?.length ?? 0;
       return <Badge variant="outline">{count}</Badge>;
+    },
+  },
+  {
+    id: 'distributionBalance',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Cuadre" />,
+    cell: ({ row }) => {
+      const lines = row.original.accountingDistributionLines ?? [];
+      const totals = lines.reduce(
+        (acc, line) => {
+          const value = Number(line.percentage) || 0;
+          if (line.nature === 'DEBIT') acc.debit += value;
+          if (line.nature === 'CREDIT') acc.credit += value;
+          return acc;
+        },
+        { debit: 0, credit: 0 }
+      );
+      const epsilon = 0.01;
+      const debitOk = Math.abs(totals.debit - 100) <= epsilon;
+      const creditOk = Math.abs(totals.credit - 100) <= epsilon;
+      const balanced = debitOk && creditOk;
+
+      return (
+        <div className="flex flex-col gap-1">
+          <Badge variant={balanced ? 'default' : 'outline'}>
+            {balanced ? 'Cuadrado' : 'Descuadrado'}
+          </Badge>
+          <span className="text-muted-foreground text-xs font-mono">
+            D {formatPercent(totals.debit, 2)} | C {formatPercent(totals.credit, 2)}
+          </span>
+        </div>
+      );
     },
   },
   {

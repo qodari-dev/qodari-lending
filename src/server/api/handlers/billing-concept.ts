@@ -69,6 +69,40 @@ function normalizeRuleDates<
   };
 }
 
+function normalizeNullableDecimal(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeRuleByCalcMethod<
+  T extends {
+    rate?: string | null;
+    amount?: string | null;
+    valueFrom?: string | null;
+    valueTo?: string | null;
+  },
+>(
+  rule: T,
+  calcMethod: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'TIERED_FIXED_AMOUNT' | 'TIERED_PERCENTAGE'
+): Omit<T, 'rate' | 'amount' | 'valueFrom' | 'valueTo'> & {
+  rate: string | null;
+  amount: string | null;
+  valueFrom: string | null;
+  valueTo: string | null;
+} {
+  const isTiered = calcMethod === 'TIERED_FIXED_AMOUNT' || calcMethod === 'TIERED_PERCENTAGE';
+  const usesRate = calcMethod === 'PERCENTAGE' || calcMethod === 'TIERED_PERCENTAGE';
+  const usesAmount = calcMethod === 'FIXED_AMOUNT' || calcMethod === 'TIERED_FIXED_AMOUNT';
+
+  return {
+    ...rule,
+    rate: usesRate ? normalizeNullableDecimal(rule.rate) : null,
+    amount: usesAmount ? normalizeNullableDecimal(rule.amount) : null,
+    valueFrom: isTiered ? normalizeNullableDecimal(rule.valueFrom) : null,
+    valueTo: isTiered ? normalizeNullableDecimal(rule.valueTo) : null,
+  };
+}
+
 // ============================================
 // HANDLER
 // ============================================
@@ -152,13 +186,16 @@ export const billingConcept = tsr.router(contract.billingConcept, {
       }
 
       const { billingConceptRules: rulesData, ...conceptData } = body;
+      const normalizedRules = rulesData?.map((rule) =>
+        normalizeRuleByCalcMethod(rule, conceptData.calcMethod)
+      );
 
       const [created] = await db.transaction(async (tx) => {
         const [concept] = await tx.insert(billingConcepts).values(conceptData).returning();
 
-        if (rulesData?.length) {
+        if (normalizedRules?.length) {
           await tx.insert(billingConceptRules).values(
-            rulesData.map((rule) => ({
+            normalizedRules.map((rule) => ({
               ...normalizeRuleDates(rule),
               billingConceptId: concept.id,
             }))
@@ -178,7 +215,7 @@ export const billingConcept = tsr.router(contract.billingConcept, {
         status: 'success',
         afterValue: {
           ...created,
-          _billingConceptRules: rulesData ?? [],
+          _billingConceptRules: normalizedRules ?? [],
         },
         ipAddress,
         userAgent,
@@ -237,6 +274,10 @@ export const billingConcept = tsr.router(contract.billingConcept, {
       });
 
       const { billingConceptRules: rulesData, ...conceptData } = body;
+      const effectiveCalcMethod = conceptData.calcMethod ?? existing.calcMethod;
+      const normalizedRules = rulesData?.map((rule) =>
+        normalizeRuleByCalcMethod(rule, effectiveCalcMethod)
+      );
 
       const [updated] = await db.transaction(async (tx) => {
         const [conceptUpdated] = await tx
@@ -245,12 +286,12 @@ export const billingConcept = tsr.router(contract.billingConcept, {
           .where(eq(billingConcepts.id, id))
           .returning();
 
-        if (rulesData) {
+        if (normalizedRules) {
           await tx.delete(billingConceptRules).where(eq(billingConceptRules.billingConceptId, id));
 
-          if (rulesData.length) {
+          if (normalizedRules.length) {
             await tx.insert(billingConceptRules).values(
-              rulesData.map((rule) => ({
+              normalizedRules.map((rule) => ({
                 ...normalizeRuleDates(rule),
                 billingConceptId: id,
               }))
@@ -275,7 +316,7 @@ export const billingConcept = tsr.router(contract.billingConcept, {
         },
         afterValue: {
           ...updated,
-          _billingConceptRules: rulesData ?? existingRules,
+          _billingConceptRules: normalizedRules ?? existingRules,
         },
         ipAddress,
         userAgent,

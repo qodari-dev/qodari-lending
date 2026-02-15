@@ -55,6 +55,12 @@ function formatRuleSummary(rule: BillingConceptRuleInput, calcMethod: BillingCon
   if (calcMethod === 'PERCENTAGE') {
     return `Tasa: ${rule.rate ?? '-'}%`;
   }
+  if (calcMethod === 'TIERED_FIXED_AMOUNT') {
+    return `Monto: ${rule.amount ?? '-'}`;
+  }
+  if (calcMethod === 'TIERED_PERCENTAGE') {
+    return `Tasa: ${rule.rate ?? '-'}%`;
+  }
 
   const valuePart = rule.amount ? `Monto: ${rule.amount}` : '';
   const ratePart = rule.rate ? `Tasa: ${rule.rate}%` : '';
@@ -74,6 +80,8 @@ export function BillingConceptRulesForm() {
     'FIXED_AMOUNT';
   const isTieredMethod =
     calcMethod === 'TIERED_FIXED_AMOUNT' || calcMethod === 'TIERED_PERCENTAGE';
+  const usesAmount = calcMethod === 'FIXED_AMOUNT' || calcMethod === 'TIERED_FIXED_AMOUNT';
+  const usesRate = calcMethod === 'PERCENTAGE' || calcMethod === 'TIERED_PERCENTAGE';
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -131,55 +139,65 @@ export function BillingConceptRulesForm() {
   };
 
   const onSave = (values: BillingConceptRuleInput) => {
+    const clean = (value: string | null | undefined) => {
+      const normalized = value?.trim();
+      return normalized ? normalized : null;
+    };
+
+    const amount = clean(values.amount);
+    const rate = clean(values.rate);
+    const valueFrom = clean(values.valueFrom);
+    const valueTo = clean(values.valueTo);
+
     if (values.effectiveFrom && values.effectiveTo && values.effectiveFrom > values.effectiveTo) {
       toast.error('Fecha inicio no puede ser mayor a fecha fin');
       return;
     }
 
-    if (values.valueFrom && values.valueTo && Number(values.valueFrom) > Number(values.valueTo)) {
+    if (valueFrom && valueTo && Number(valueFrom) > Number(valueTo)) {
       toast.error('Valor desde no puede ser mayor a valor hasta');
       return;
     }
 
     if (calcMethod === 'FIXED_AMOUNT') {
-      if (!values.amount) {
+      if (!amount) {
         toast.error('Valor es requerido para metodo fijo');
         return;
       }
-      if (values.rate) {
+      if (rate) {
         toast.error('Metodo fijo no usa tasa');
         return;
       }
     }
 
     if (calcMethod === 'PERCENTAGE') {
-      if (!values.rate) {
+      if (!rate) {
         toast.error('Tasa es requerida para metodo porcentaje');
         return;
       }
-      if (values.amount) {
+      if (amount) {
         toast.error('Metodo porcentaje no usa valor fijo');
         return;
       }
     }
 
     if (calcMethod === 'TIERED_FIXED_AMOUNT') {
-      if (!values.valueFrom || !values.valueTo || !values.amount) {
+      if (!valueFrom || !valueTo || !amount) {
         toast.error('Escalonado valor fijo requiere rango y valor');
         return;
       }
-      if (values.rate) {
+      if (rate) {
         toast.error('Escalonado valor fijo no usa tasa');
         return;
       }
     }
 
     if (calcMethod === 'TIERED_PERCENTAGE') {
-      if (!values.valueFrom || !values.valueTo || !values.rate) {
+      if (!valueFrom || !valueTo || !rate) {
         toast.error('Escalonado porcentaje requiere rango y tasa');
         return;
       }
-      if (values.amount) {
+      if (amount) {
         toast.error('Escalonado porcentaje no usa valor fijo');
         return;
       }
@@ -187,10 +205,10 @@ export function BillingConceptRulesForm() {
 
     const normalized: BillingConceptRuleInput = {
       ...values,
-      amount: values.amount || null,
-      rate: values.rate || null,
-      valueFrom: isTieredMethod ? values.valueFrom || null : null,
-      valueTo: isTieredMethod ? values.valueTo || null : null,
+      amount: usesAmount ? amount : null,
+      rate: usesRate ? rate : null,
+      valueFrom: isTieredMethod ? valueFrom : null,
+      valueTo: isTieredMethod ? valueTo : null,
     };
 
     if (!isTieredMethod && normalized.isActive) {
@@ -271,39 +289,43 @@ export function BillingConceptRulesForm() {
 
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <Controller
-                  name="amount"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="amount">Valor</FieldLabel>
-                      <Input
-                        id="amount"
-                        value={field.value ?? ''}
-                        onChange={(event) => field.onChange(event.target.value || null)}
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
+                {usesAmount ? (
+                  <Controller
+                    name="amount"
+                    control={dialogForm.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid} className={cn(!usesRate && 'col-span-2')}>
+                        <FieldLabel htmlFor="amount">Valor</FieldLabel>
+                        <Input
+                          id="amount"
+                          value={field.value ?? ''}
+                          onChange={(event) => field.onChange(event.target.value || null)}
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.error && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+                ) : null}
 
-                <Controller
-                  name="rate"
-                  control={dialogForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="rate">Tasa</FieldLabel>
-                      <Input
-                        id="rate"
-                        value={field.value ?? ''}
-                        onChange={(event) => field.onChange(event.target.value || null)}
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
+                {usesRate ? (
+                  <Controller
+                    name="rate"
+                    control={dialogForm.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid} className={cn(!usesAmount && 'col-span-2')}>
+                        <FieldLabel htmlFor="rate">Tasa</FieldLabel>
+                        <Input
+                          id="rate"
+                          value={field.value ?? ''}
+                          onChange={(event) => field.onChange(event.target.value || null)}
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.error && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+                ) : null}
               </div>
 
               {isTieredMethod && (

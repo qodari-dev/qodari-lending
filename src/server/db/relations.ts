@@ -66,6 +66,7 @@ import {
   loanApplicationStatusHistory,
   loanApplicationEvents,
   creditProductRefinancePolicies,
+  creditProductChargeOffPolicies,
   agingProfiles,
   agingBuckets,
   portfolioProvisionSnapshots,
@@ -442,6 +443,10 @@ export const creditProductsRelations = relations(creditProducts, ({ one, many })
   creditProductRefinancePolicy: one(creditProductRefinancePolicies, {
     fields: [creditProducts.id],
     references: [creditProductRefinancePolicies.creditProductId],
+  }),
+  creditProductChargeOffPolicy: one(creditProductChargeOffPolicies, {
+    fields: [creditProducts.id],
+    references: [creditProductChargeOffPolicies.creditProductId],
   }),
   creditProductCategories: many(creditProductCategories),
   creditProductDocuments: many(creditProductDocuments),
@@ -1103,6 +1108,19 @@ export const creditProductRefinancePoliciesRelations = relations(
   ({ one }) => ({
     creditProduct: one(creditProducts, {
       fields: [creditProductRefinancePolicies.creditProductId],
+      references: [creditProducts.id],
+    }),
+  })
+);
+
+// ---------------------------------------------------------------------
+// Politicas de castigo de cartera por producto
+// ---------------------------------------------------------------------
+export const creditProductChargeOffPoliciesRelations = relations(
+  creditProductChargeOffPolicies,
+  ({ one }) => ({
+    creditProduct: one(creditProducts, {
+      fields: [creditProductChargeOffPolicies.creditProductId],
       references: [creditProducts.id],
     }),
   })

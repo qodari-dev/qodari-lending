@@ -127,6 +127,13 @@
       "when": 1771300000000,
       "tag": "0017_credit_settings_first_collection_min_days",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1771400000000,
+      "tag": "0018_credit_product_charge_off_policies",
+      "breakpoints": true
     }
   ]
 }

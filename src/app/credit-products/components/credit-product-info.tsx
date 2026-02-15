@@ -265,6 +265,7 @@ export function CreditProductInfo({
               <TabsTrigger value="accounts">Cuentas</TabsTrigger>
               <TabsTrigger value="billingConcepts">Conceptos</TabsTrigger>
               <TabsTrigger value="refinance">Refinanciacion</TabsTrigger>
+              <TabsTrigger value="chargeOff">Castigo cartera</TabsTrigger>
             </TabsList>
 
             <TabsContent value="product">
@@ -470,71 +471,162 @@ export function CreditProductInfo({
             <TabsContent value="refinance" className="space-y-2">
               <h3 className="text-sm font-semibold">Politica de refinanciacion</h3>
               {creditProduct.creditProductRefinancePolicy ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Refinancia</TableHead>
-                      <TableHead>Consolida</TableHead>
-                      <TableHead>Max cons.</TableHead>
-                      <TableHead>Min edad</TableHead>
-                      <TableHead>Max mora</TableHead>
-                      <TableHead>Min pagadas</TableHead>
-                      <TableHead>Max refi.</TableHead>
-                      <TableHead>Cap mora</TableHead>
-                      <TableHead>Req aprob.</TableHead>
-                      <TableHead>Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>
-                        {creditProduct.creditProductRefinancePolicy.allowRefinance ? 'Si' : 'No'}
-                      </TableCell>
-                      <TableCell>
-                        {creditProduct.creditProductRefinancePolicy.allowConsolidation
-                          ? 'Si'
-                          : 'No'}
-                      </TableCell>
-                      <TableCell>
-                        {creditProduct.creditProductRefinancePolicy.maxLoansToConsolidate}
-                      </TableCell>
-                      <TableCell>
-                        {creditProduct.creditProductRefinancePolicy.minLoanAgeDays}
-                      </TableCell>
-                      <TableCell>
-                        {creditProduct.creditProductRefinancePolicy.maxDaysPastDue}
-                      </TableCell>
-                      <TableCell>
-                        {creditProduct.creditProductRefinancePolicy.minPaidInstallments}
-                      </TableCell>
-                      <TableCell>
-                        {creditProduct.creditProductRefinancePolicy.maxRefinanceCount}
-                      </TableCell>
-                      <TableCell>
-                        {creditProduct.creditProductRefinancePolicy.capitalizeArrears ? 'Si' : 'No'}
-                      </TableCell>
-                      <TableCell>
-                        {creditProduct.creditProductRefinancePolicy.requireApproval ? 'Si' : 'No'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            creditProduct.creditProductRefinancePolicy.isActive
-                              ? 'default'
-                              : 'outline'
-                          }
-                        >
-                          {creditProduct.creditProductRefinancePolicy.isActive
-                            ? 'Activo'
-                            : 'Inactivo'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+                <DescriptionList
+                  columns={2}
+                  sections={[
+                    {
+                      title: 'Configuracion',
+                      columns: 2,
+                      items: [
+                        {
+                          label: 'Permite refinanciacion',
+                          value: (
+                            <Badge
+                              variant={
+                                creditProduct.creditProductRefinancePolicy.allowRefinance
+                                  ? 'default'
+                                  : 'outline'
+                              }
+                            >
+                              {creditProduct.creditProductRefinancePolicy.allowRefinance
+                                ? 'Si'
+                                : 'No'}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          label: 'Permite consolidacion',
+                          value: (
+                            <Badge
+                              variant={
+                                creditProduct.creditProductRefinancePolicy.allowConsolidation
+                                  ? 'default'
+                                  : 'outline'
+                              }
+                            >
+                              {creditProduct.creditProductRefinancePolicy.allowConsolidation
+                                ? 'Si'
+                                : 'No'}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          label: 'Maximo creditos a consolidar',
+                          value:
+                            creditProduct.creditProductRefinancePolicy.maxLoansToConsolidate,
+                        },
+                        {
+                          label: 'Minimo edad credito (dias)',
+                          value: creditProduct.creditProductRefinancePolicy.minLoanAgeDays,
+                        },
+                        {
+                          label: 'Maximo mora permitida (dias)',
+                          value: creditProduct.creditProductRefinancePolicy.maxDaysPastDue,
+                        },
+                        {
+                          label: 'Minimo cuotas pagadas',
+                          value: creditProduct.creditProductRefinancePolicy.minPaidInstallments,
+                        },
+                        {
+                          label: 'Maximo refinanciaciones',
+                          value: creditProduct.creditProductRefinancePolicy.maxRefinanceCount,
+                        },
+                        {
+                          label: 'Capitaliza mora',
+                          value: (
+                            <Badge
+                              variant={
+                                creditProduct.creditProductRefinancePolicy.capitalizeArrears
+                                  ? 'default'
+                                  : 'outline'
+                              }
+                            >
+                              {creditProduct.creditProductRefinancePolicy.capitalizeArrears
+                                ? 'Si'
+                                : 'No'}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          label: 'Requiere aprobacion',
+                          value: (
+                            <Badge
+                              variant={
+                                creditProduct.creditProductRefinancePolicy.requireApproval
+                                  ? 'default'
+                                  : 'outline'
+                              }
+                            >
+                              {creditProduct.creditProductRefinancePolicy.requireApproval
+                                ? 'Si'
+                                : 'No'}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          label: 'Estado',
+                          value: (
+                            <Badge
+                              variant={
+                                creditProduct.creditProductRefinancePolicy.isActive
+                                  ? 'default'
+                                  : 'outline'
+                              }
+                            >
+                              {creditProduct.creditProductRefinancePolicy.isActive
+                                ? 'Activo'
+                                : 'Inactivo'}
+                            </Badge>
+                          ),
+                        },
+                      ],
+                    },
+                  ]}
+                />
               ) : (
                 <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
                   No hay politica configurada.
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="chargeOff" className="space-y-2">
+              <h3 className="text-sm font-semibold">Politica de castigo de cartera</h3>
+              {creditProduct.creditProductChargeOffPolicy ? (
+                <DescriptionList
+                  columns={2}
+                  sections={[
+                    {
+                      title: 'Configuracion',
+                      columns: 2,
+                      items: [
+                        {
+                          label: 'Permite castigo',
+                          value: (
+                            <Badge
+                              variant={
+                                creditProduct.creditProductChargeOffPolicy.allowChargeOff
+                                  ? 'default'
+                                  : 'outline'
+                              }
+                            >
+                              {creditProduct.creditProductChargeOffPolicy.allowChargeOff
+                                ? 'Si'
+                                : 'No'}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          label: 'Minimo mora (dias)',
+                          value: creditProduct.creditProductChargeOffPolicy.minDaysPastDue,
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              ) : (
+                <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                  No hay politica de castigo configurada.
                 </div>
               )}
             </TabsContent>

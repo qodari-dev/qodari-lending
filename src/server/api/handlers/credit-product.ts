@@ -6,6 +6,7 @@ import {
   creditProductDocuments,
   creditProductAccounts,
   creditProductRefinancePolicies,
+  creditProductChargeOffPolicies,
   creditProductBillingConcepts,
 } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
@@ -78,6 +79,10 @@ const CREDIT_PRODUCT_INCLUDES = createIncludeMap<typeof db.query.creditProducts>
   },
   creditProductRefinancePolicy: {
     relation: 'creditProductRefinancePolicy',
+    config: true,
+  },
+  creditProductChargeOffPolicy: {
+    relation: 'creditProductChargeOffPolicy',
     config: true,
   },
   creditProductCategories: {
@@ -212,6 +217,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
 
       const {
         creditProductRefinancePolicy: refinancePolicyData,
+        creditProductChargeOffPolicy: chargeOffPolicyData,
         creditProductCategories: categoriesData,
         creditProductLateInterestRules: lateInterestRulesData,
         creditProductRequiredDocuments: requiredDocumentsData,
@@ -275,6 +281,13 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           });
         }
 
+        if (chargeOffPolicyData) {
+          await tx.insert(creditProductChargeOffPolicies).values({
+            ...chargeOffPolicyData,
+            creditProductId: product.id,
+          });
+        }
+
         return [product];
       });
 
@@ -294,6 +307,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductAccounts: accountsData ?? [],
           _creditProductBillingConcepts: billingConceptsData ?? [],
           _creditProductRefinancePolicy: refinancePolicyData ?? null,
+          _creditProductChargeOffPolicy: chargeOffPolicyData ?? null,
         },
         ipAddress,
         userAgent,
@@ -357,6 +371,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         existingAccounts,
         existingBillingConcepts,
         existingRefinancePolicy,
+        existingChargeOffPolicy,
       ] = await Promise.all([
         db.query.creditProductCategories.findMany({
           where: eq(creditProductCategories.creditProductId, id),
@@ -376,10 +391,14 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         db.query.creditProductRefinancePolicies.findFirst({
           where: eq(creditProductRefinancePolicies.creditProductId, id),
         }),
+        db.query.creditProductChargeOffPolicies.findFirst({
+          where: eq(creditProductChargeOffPolicies.creditProductId, id),
+        }),
       ]);
 
       const {
         creditProductRefinancePolicy: refinancePolicyData,
+        creditProductChargeOffPolicy: chargeOffPolicyData,
         creditProductCategories: categoriesData,
         creditProductLateInterestRules: lateInterestRulesData,
         creditProductRequiredDocuments: requiredDocumentsData,
@@ -483,6 +502,19 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           }
         }
 
+        if (chargeOffPolicyData !== undefined) {
+          await tx
+            .delete(creditProductChargeOffPolicies)
+            .where(eq(creditProductChargeOffPolicies.creditProductId, id));
+
+          if (chargeOffPolicyData) {
+            await tx.insert(creditProductChargeOffPolicies).values({
+              ...chargeOffPolicyData,
+              creditProductId: id,
+            });
+          }
+        }
+
         return [productUpdated];
       });
 
@@ -500,7 +532,9 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductLateInterestRules: existingLateInterestRules,
           _creditProductRequiredDocuments: existingDocuments,
           _creditProductAccounts: existingAccounts,
+          _creditProductBillingConcepts: existingBillingConcepts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
+          _creditProductChargeOffPolicy: existingChargeOffPolicy ?? null,
         },
         afterValue: {
           ...updated,
@@ -515,6 +549,10 @@ export const creditProduct = tsr.router(contract.creditProduct, {
             refinancePolicyData !== undefined
               ? (refinancePolicyData ?? null)
               : (existingRefinancePolicy ?? null),
+          _creditProductChargeOffPolicy:
+            chargeOffPolicyData !== undefined
+              ? (chargeOffPolicyData ?? null)
+              : (existingChargeOffPolicy ?? null),
         },
         ipAddress,
         userAgent,
@@ -579,6 +617,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         existingAccounts,
         existingBillingConcepts,
         existingRefinancePolicy,
+        existingChargeOffPolicy,
       ] = await Promise.all([
         db.query.creditProductCategories.findMany({
           where: eq(creditProductCategories.creditProductId, id),
@@ -597,6 +636,9 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         }),
         db.query.creditProductRefinancePolicies.findFirst({
           where: eq(creditProductRefinancePolicies.creditProductId, id),
+        }),
+        db.query.creditProductChargeOffPolicies.findFirst({
+          where: eq(creditProductChargeOffPolicies.creditProductId, id),
         }),
       ]);
 
@@ -618,6 +660,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductAccounts: existingAccounts,
           _creditProductBillingConcepts: existingBillingConcepts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
+          _creditProductChargeOffPolicy: existingChargeOffPolicy ?? null,
         },
         afterValue: {
           ...deleted,
@@ -627,6 +670,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductAccounts: existingAccounts,
           _creditProductBillingConcepts: existingBillingConcepts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
+          _creditProductChargeOffPolicy: existingChargeOffPolicy ?? null,
         },
         ipAddress,
         userAgent,

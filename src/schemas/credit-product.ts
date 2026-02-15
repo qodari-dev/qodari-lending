@@ -150,6 +150,7 @@ const CREDIT_PRODUCT_INCLUDE_OPTIONS = [
   'lateInterestDistribution',
   'costCenter',
   'creditProductRefinancePolicy',
+  'creditProductChargeOffPolicy',
   'creditProductCategories',
   'creditProductLateInterestRules',
   'creditProductRequiredDocuments',
@@ -253,6 +254,15 @@ export type CreditProductRefinancePolicyInput = z.infer<
   typeof CreditProductRefinancePolicyInputSchema
 >;
 
+export const CreditProductChargeOffPolicyInputSchema = z.object({
+  allowChargeOff: z.boolean(),
+  minDaysPastDue: z.number().int().min(0),
+});
+
+export type CreditProductChargeOffPolicyInput = z.infer<
+  typeof CreditProductChargeOffPolicyInputSchema
+>;
+
 const CreditProductBaseSchema = z.object({
   name: z.string().min(1).max(100),
   creditFundId: z.number().int().positive(),
@@ -279,6 +289,7 @@ const CreditProductBaseSchema = z.object({
   insuranceAccrualMethod: z.enum(INSURANCE_ACCRUAL_METHOD_OPTIONS),
   isActive: z.boolean(),
   creditProductRefinancePolicy: CreditProductRefinancePolicyInputSchema.nullable().optional(),
+  creditProductChargeOffPolicy: CreditProductChargeOffPolicyInputSchema.nullable().optional(),
   creditProductCategories: CreditProductCategoryInputSchema.array().optional(),
   creditProductLateInterestRules: CreditProductLateInterestRuleInputSchema.array().optional(),
   creditProductRequiredDocuments: CreditProductRequiredDocumentInputSchema.array().optional(),
@@ -295,6 +306,10 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
         maxLoansToConsolidate: number;
         maxRefinanceCount: number;
         isActive: boolean;
+      } | null;
+      creditProductChargeOffPolicy?: {
+        allowChargeOff: boolean;
+        minDaysPastDue: number;
       } | null;
       creditProductCategories?: {
         categoryCode: string;
@@ -440,6 +455,17 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
           code: 'custom',
           message: 'La politica activa debe permitir refinanciacion o consolidacion',
           path: ['creditProductRefinancePolicy'],
+        });
+      }
+    }
+
+    const chargeOffPolicy = data.creditProductChargeOffPolicy;
+    if (chargeOffPolicy) {
+      if (chargeOffPolicy.allowChargeOff && chargeOffPolicy.minDaysPastDue < 1) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Dias minimos de mora debe ser mayor a 0 cuando se permite castigo',
+          path: ['creditProductChargeOffPolicy'],
         });
       }
     }

@@ -2933,6 +2933,32 @@ export const creditProductRefinancePolicies = pgTable(
   ]
 );
 
+// ---------------------------------------------------------------------
+// Politicas de castigo de cartera por producto
+// Nota:
+// Permite definir si un producto admite castigo y desde cuántos días de mora.
+// ---------------------------------------------------------------------
+export const creditProductChargeOffPolicies = pgTable(
+  'credit_product_charge_off_policies',
+  {
+    id: serial('id').primaryKey(),
+
+    creditProductId: integer('credit_product_id')
+      .notNull()
+      .references(() => creditProducts.id, { onDelete: 'cascade' }),
+
+    allowChargeOff: boolean('allow_charge_off').notNull().default(false),
+    minDaysPastDue: integer('min_days_past_due').notNull().default(180),
+
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_charge_off_policy_product').on(t.creditProductId),
+    index('idx_charge_off_policy_allow').on(t.allowChargeOff),
+    check('chk_charge_off_policy_min_dpd', sql`${t.minDaysPastDue} >= 0`),
+  ]
+);
+
 export const agingProfiles = pgTable(
   'aging_profiles',
   {

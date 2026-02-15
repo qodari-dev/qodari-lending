@@ -74,6 +74,7 @@ import { z } from 'zod';
 import { CreditProductAccountsForm } from './credit-product-accounts-form';
 import { CreditProductBillingConceptsForm } from './credit-product-billing-concepts-form';
 import { CreditProductCategoriesForm } from './credit-product-categories-form';
+import { CreditProductChargeOffPolicyForm } from './credit-product-charge-off-policy-form';
 import { CreditProductLateInterestRulesForm } from './credit-product-late-interest-rules-form';
 import { CreditProductRefinancePolicyForm } from './credit-product-refinance-policy-form';
 import { CreditProductRequiredDocumentsForm } from './credit-product-required-documents-form';
@@ -130,6 +131,10 @@ export function CreditProductForm({
         capitalizeArrears: false,
         requireApproval: false,
         isActive: false,
+      },
+      creditProductChargeOffPolicy: {
+        allowChargeOff: false,
+        minDaysPastDue: 180,
       },
       creditProductCategories: [],
       creditProductLateInterestRules: [],
@@ -260,6 +265,15 @@ export function CreditProductForm({
               requireApproval: false,
               isActive: false,
             },
+        creditProductChargeOffPolicy: creditProduct?.creditProductChargeOffPolicy
+          ? {
+              allowChargeOff: creditProduct.creditProductChargeOffPolicy.allowChargeOff,
+              minDaysPastDue: creditProduct.creditProductChargeOffPolicy.minDaysPastDue,
+            }
+          : {
+              allowChargeOff: false,
+              minDaysPastDue: 180,
+            },
         creditProductCategories:
           creditProduct?.creditProductCategories?.map((category) => ({
             categoryCode: category.categoryCode,
@@ -336,6 +350,7 @@ export function CreditProductForm({
                 <TabsTrigger value="lateInterestRules">Reglas mora</TabsTrigger>
                 <TabsTrigger value="requiredDocuments">Documentos</TabsTrigger>
                 <TabsTrigger value="refinancePolicy">Refinanciacion</TabsTrigger>
+                <TabsTrigger value="chargeOffPolicy">Castigo cartera</TabsTrigger>
                 <TabsTrigger value="accounts">Cuentas</TabsTrigger>
                 <TabsTrigger value="billingConcepts">Conceptos</TabsTrigger>
               </TabsList>
@@ -1090,6 +1105,10 @@ export function CreditProductForm({
 
               <TabsContent value="refinancePolicy" className="pt-2">
                 <CreditProductRefinancePolicyForm />
+              </TabsContent>
+
+              <TabsContent value="chargeOffPolicy" className="pt-2">
+                <CreditProductChargeOffPolicyForm />
               </TabsContent>
 
               <TabsContent value="accounts" className="pt-2">

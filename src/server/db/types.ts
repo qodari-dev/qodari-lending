@@ -66,6 +66,7 @@ import type {
   loanApplicationStatusHistory,
   loanApplicationEvents,
   creditProductRefinancePolicies,
+  creditProductChargeOffPolicies,
   agingProfiles,
   agingBuckets,
   portfolioProvisionSnapshots,
@@ -354,6 +355,7 @@ export type CreditProducts = typeof creditProducts.$inferSelect & {
   lateInterestDistribution?: AccountingDistributions;
   costCenter?: CostCenters | null;
   creditProductRefinancePolicy?: CreditProductRefinancePolicies | null;
+  creditProductChargeOffPolicy?: CreditProductChargeOffPolicies | null;
   creditProductCategories?: CreditProductCategories[];
   creditProductDocuments?: CreditProductDocuments[];
   creditProductAccounts?: CreditProductAccounts[];
@@ -731,6 +733,14 @@ export type CreditProductRefinancePolicies = typeof creditProductRefinancePolici
   creditProduct?: CreditProducts;
 };
 export type NewCreditProductRefinancePolicies = typeof creditProductRefinancePolicies.$inferInsert;
+
+// ---------------------------------------------------------------------
+// Politicas de castigo de cartera por producto
+// ---------------------------------------------------------------------
+export type CreditProductChargeOffPolicies = typeof creditProductChargeOffPolicies.$inferSelect & {
+  creditProduct?: CreditProducts;
+};
+export type NewCreditProductChargeOffPolicies = typeof creditProductChargeOffPolicies.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Aging Profiles - Perfiles de edades de cartera

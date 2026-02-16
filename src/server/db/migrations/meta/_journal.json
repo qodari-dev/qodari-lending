@@ -134,6 +134,13 @@
       "when": 1771400000000,
       "tag": "0018_credit_product_charge_off_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1771247433853,
+      "tag": "0019_whole_felicia_hardy",
+      "breakpoints": true
     }
   ]
 }

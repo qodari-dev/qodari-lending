@@ -203,7 +203,6 @@ export const glAccountsRelations = relations(glAccounts, ({ many }) => ({
 export const costCentersRelations = relations(costCenters, ({ many }) => ({
   accountingDistributionLines: many(accountingDistributionLines),
   creditProducts: many(creditProducts),
-  creditsSettings: many(creditsSettings),
   accountingEntries: many(accountingEntries),
 }));
 
@@ -921,10 +920,6 @@ export const creditsSettingsRelations = relations(creditsSettings, ({ one }) => 
     fields: [creditsSettings.writeOffGlAccountId],
     references: [glAccounts.id],
     relationName: 'writeOffGlAccount',
-  }),
-  defaultCostCenter: one(costCenters, {
-    fields: [creditsSettings.defaultCostCenterId],
-    references: [costCenters.id],
   }),
 }));
 

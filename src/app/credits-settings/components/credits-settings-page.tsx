@@ -25,8 +25,6 @@ import {
   useUpdateCreditsSettings,
 } from '@/hooks/queries/use-credits-settings-queries';
 import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
-import { useCostCenters } from '@/hooks/queries/use-cost-center-queries';
-import type { CostCenter } from '@/schemas/cost-center';
 import { UpdateCreditsSettingsBodySchema } from '@/schemas/credits-settings';
 import type { GlAccount } from '@/schemas/gl-account';
 import { useHasPermission } from '@/stores/auth-store-provider';
@@ -56,27 +54,20 @@ export function CreditsSettingsPage() {
       'excessGlAccount',
       'pledgeSubsidyGlAccount',
       'writeOffGlAccount',
-      'defaultCostCenter',
     ],
   });
 
-  // Fetch GL accounts and cost centers for selects
+  // Fetch GL accounts for selects
   const { data: glAccountsData, isLoading: isLoadingGlAccounts } = useGlAccounts({ limit: 500 });
-  const { data: costCentersData, isLoading: isLoadingCostCenters } = useCostCenters({ limit: 500 });
 
   const glAccounts = React.useMemo(() => glAccountsData?.body?.data ?? [], [glAccountsData]);
-  const costCenters = React.useMemo(() => costCentersData?.body?.data ?? [], [costCentersData]);
   const settings = settingsData?.body;
   const findGlAccount = React.useCallback(
     (id: number | null | undefined) => glAccounts.find((item) => item.id === id) ?? null,
     [glAccounts]
   );
-  const findCostCenter = React.useCallback(
-    (id: number | null | undefined) => costCenters.find((item) => item.id === id) ?? null,
-    [costCenters]
-  );
 
-  const isLoadingSelects = isLoadingGlAccounts || isLoadingCostCenters;
+  const isLoadingSelects = isLoadingGlAccounts;
   const [isFormReady, setIsFormReady] = React.useState(false);
 
   const form = useForm<FormValues>({
@@ -99,7 +90,6 @@ export function CreditsSettingsPage() {
         excessGlAccountId: settings.excessGlAccountId ?? undefined,
         pledgeSubsidyGlAccountId: settings.pledgeSubsidyGlAccountId ?? undefined,
         writeOffGlAccountId: settings.writeOffGlAccountId ?? undefined,
-        defaultCostCenterId: settings.defaultCostCenterId ?? undefined,
         creditManagerName: settings.creditManagerName ?? '',
         creditManagerTitle: settings.creditManagerTitle ?? '',
         adminManagerName: settings.adminManagerName ?? '',
@@ -222,56 +212,6 @@ export function CreditsSettingsPage() {
                             }
                             disabled={!canUpdate}
                           />
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-                    <Controller
-                      name="defaultCostCenterId"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel>Centro de Costo por Defecto</FieldLabel>
-                          <Combobox
-                            items={costCenters}
-                            value={findCostCenter(field.value)}
-                            onValueChange={(value: CostCenter | null) =>
-                              field.onChange(value?.id ?? null)
-                            }
-                            itemToStringValue={(item: CostCenter) => String(item.id)}
-                            itemToStringLabel={(item: CostCenter) => `${item.code} - ${item.name}`}
-                          >
-                            <ComboboxTrigger
-                              render={
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="w-full justify-between font-normal"
-                                  disabled={!canUpdate}
-                                >
-                                  <ComboboxValue placeholder="Seleccione..." />
-                                  <ChevronDownIcon className="text-muted-foreground size-4" />
-                                </Button>
-                              }
-                            />
-                            <ComboboxContent>
-                              <ComboboxInput
-                                placeholder="Buscar centro..."
-                                showClear
-                                showTrigger={false}
-                              />
-                              <ComboboxList>
-                                <ComboboxEmpty>No se encontraron centros</ComboboxEmpty>
-                                <ComboboxCollection>
-                                  {(item: CostCenter) => (
-                                    <ComboboxItem key={item.id} value={item}>
-                                      {item.code} - {item.name}
-                                    </ComboboxItem>
-                                  )}
-                                </ComboboxCollection>
-                              </ComboboxList>
-                            </ComboboxContent>
-                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}

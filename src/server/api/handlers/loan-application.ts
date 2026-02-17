@@ -1312,6 +1312,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const today = formatDateOnly(new Date());
 
       const [
+        affiliationOffice,
         repaymentMethod,
         paymentGuaranteeType,
         agreement,
@@ -1321,6 +1322,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         actNumber,
         settings,
       ] = await Promise.all([
+        db.query.affiliationOffices.findFirst({
+          where: eq(affiliationOffices.id, existing.affiliationOfficeId),
+        }),
         db.query.repaymentMethods.findFirst({
           where: and(
             eq(repaymentMethods.id, body.repaymentMethodId),
@@ -1366,6 +1370,14 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           where: eq(creditsSettings.appSlug, env.IAM_APP_SLUG),
         }),
       ]);
+
+      if (!affiliationOffice) {
+        throwHttpError({
+          status: 404,
+          message: 'Oficina de afiliacion no encontrada',
+          code: 'NOT_FOUND',
+        });
+      }
 
       if (!repaymentMethod) {
         throwHttpError({
@@ -1628,7 +1640,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             insuranceCompanyId: existing.insuranceCompanyId,
             insuranceValue: toDecimalString(schedule.summary.totalInsurance),
             discountStudyCredit: toNumber(existing.creditStudyFee) > 0,
-            costCenterId: product.costCenterId ?? null,
+            costCenterId: affiliationOffice.costCenterId ?? null,
             repaymentMethodId: body.repaymentMethodId,
             paymentGuaranteeTypeId: body.paymentGuaranteeTypeId,
             guaranteeDocument: existing.creditNumber,

@@ -2303,11 +2303,6 @@ export const creditsSettings = pgTable('credits_settings', {
     onDelete: 'restrict',
   }),
 
-  // Centro de costo por defecto (Concr19)
-  defaultCostCenterId: integer('default_cost_center_id').references(() => costCenters.id, {
-    onDelete: 'restrict',
-  }),
-
   // Firmas/cargos
   creditManagerName: varchar('credit_manager_name', { length: 50 }),
   creditManagerTitle: varchar('credit_manager_title', { length: 80 }),

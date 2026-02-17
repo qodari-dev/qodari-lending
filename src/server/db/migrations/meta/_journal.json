@@ -141,6 +141,13 @@
       "when": 1771247433853,
       "tag": "0019_whole_felicia_hardy",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1771292010993,
+      "tag": "0020_perpetual_the_fury",
+      "breakpoints": true
     }
   ]
 }

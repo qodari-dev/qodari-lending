@@ -13,7 +13,6 @@ const CREDITS_SETTINGS_INCLUDE_OPTIONS = [
   'excessGlAccount',
   'pledgeSubsidyGlAccount',
   'writeOffGlAccount',
-  'defaultCostCenter',
 ] as const;
 
 const CreditsSettingsIncludeSchema = createIncludeSchema(CREDITS_SETTINGS_INCLUDE_OPTIONS);
@@ -57,9 +56,6 @@ export const UpdateCreditsSettingsBodySchema = z.object({
   excessGlAccountId: z.number().nullable().optional(),
   pledgeSubsidyGlAccountId: z.number().nullable().optional(),
   writeOffGlAccountId: z.number().nullable().optional(),
-
-  // Cost Center
-  defaultCostCenterId: z.number().nullable().optional(),
 
   // Signatures
   creditManagerName: z.string().max(50).nullable().optional(),

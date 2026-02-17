@@ -611,7 +611,6 @@ export type CreditsSettings = typeof creditsSettings.$inferSelect & {
   excessGlAccount?: GlAccounts;
   pledgeSubsidyGlAccount?: GlAccounts;
   writeOffGlAccount?: GlAccounts;
-  defaultCostCenter?: CostCenters;
 };
 export type NewCreditsSettings = typeof creditsSettings.$inferInsert;
 

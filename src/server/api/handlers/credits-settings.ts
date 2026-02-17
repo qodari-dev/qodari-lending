@@ -36,10 +36,6 @@ const CREDITS_SETTINGS_INCLUDES = createIncludeMap<typeof db.query.creditsSettin
     relation: 'writeOffGlAccount',
     config: true,
   },
-  defaultCostCenter: {
-    relation: 'defaultCostCenter',
-    config: true,
-  },
 });
 
 // App slug por defecto para la configuración

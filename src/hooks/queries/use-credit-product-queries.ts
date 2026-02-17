@@ -25,7 +25,6 @@ function defaultQuery(filters?: Partial<ListCreditProductsQuery>) {
       'capitalDistribution',
       'interestDistribution',
       'lateInterestDistribution',
-      'costCenter',
       'creditProductRefinancePolicy',
       'creditProductChargeOffPolicy',
       'creditProductCategories',

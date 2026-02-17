@@ -42,10 +42,6 @@ const COST_CENTER_INCLUDES = createIncludeMap<typeof db.query.costCenters>()({
     relation: 'accountingDistributionLines',
     config: true,
   },
-  creditProducts: {
-    relation: 'creditProducts',
-    config: true,
-  },
   accountingEntries: {
     relation: 'accountingEntries',
     config: true,

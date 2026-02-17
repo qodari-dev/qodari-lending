@@ -34,7 +34,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAccountingDistributions } from '@/hooks/queries/use-accounting-distribution-queries';
-import { useCostCenters } from '@/hooks/queries/use-cost-center-queries';
 import {
   useCreateCreditProduct,
   useUpdateCreditProduct,
@@ -42,7 +41,6 @@ import {
 import { useCreditFunds } from '@/hooks/queries/use-credit-fund-queries';
 import { usePaymentAllocationPolicies } from '@/hooks/queries/use-payment-allocation-policy-queries';
 import { AccountingDistribution } from '@/schemas/accounting-distribution';
-import { CostCenter } from '@/schemas/cost-center';
 import { CreditFund } from '@/schemas/credit-fund';
 import { PaymentAllocationPolicy } from '@/schemas/payment-allocation-policy';
 import {
@@ -108,7 +106,6 @@ export function CreditProductForm({
       lateInterestDistributionId: undefined,
       reportsToCreditBureau: false,
       maxInstallments: null,
-      costCenterId: null,
       riskEvaluationMode: 'NONE',
       riskMinScore: null,
       ageBasis: 'OLDEST_OVERDUE_INSTALLMENT',
@@ -166,13 +163,6 @@ export function CreditProductForm({
     [accountingDistributionsData]
   );
 
-  const { data: costCentersData } = useCostCenters({
-    limit: 1000,
-    where: { and: [{ isActive: true }] },
-    sort: [{ field: 'name', order: 'asc' }],
-  });
-  const costCenters = useMemo(() => costCentersData?.body?.data ?? [], [costCentersData]);
-
   const { data: paymentAllocationPoliciesData } = usePaymentAllocationPolicies({
     limit: 1000,
     sort: [{ field: 'name', order: 'asc' }],
@@ -190,11 +180,6 @@ export function CreditProductForm({
   const findAccountingDistribution = useCallback(
     (id: number | undefined) => accountingDistributions.find((item) => item.id === id) ?? null,
     [accountingDistributions]
-  );
-
-  const findCostCenter = useCallback(
-    (id: number | null | undefined) => costCenters.find((item) => item.id === id) ?? null,
-    [costCenters]
   );
 
   const findPaymentAllocationPolicy = useCallback(
@@ -226,7 +211,6 @@ export function CreditProductForm({
         lateInterestDistributionId: creditProduct?.lateInterestDistributionId ?? undefined,
         reportsToCreditBureau: creditProduct?.reportsToCreditBureau ?? false,
         maxInstallments: creditProduct?.maxInstallments ?? null,
-        costCenterId: creditProduct?.costCenterId ?? null,
         riskEvaluationMode: creditProduct?.riskEvaluationMode ?? 'NONE',
         riskMinScore: creditProduct?.riskMinScore ?? null,
         ageBasis: creditProduct?.ageBasis ?? 'OLDEST_OVERDUE_INSTALLMENT',
@@ -945,56 +929,6 @@ export function CreditProductForm({
                             }
                             aria-invalid={fieldState.invalid}
                           />
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-
-                    <Controller
-                      name="costCenterId"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="costCenterId">Centro costo</FieldLabel>
-                          <Combobox
-                            items={costCenters}
-                            value={findCostCenter(field.value)}
-                            onValueChange={(value: CostCenter | null) =>
-                              field.onChange(value?.id ?? null)
-                            }
-                            itemToStringValue={(item: CostCenter) => String(item.id)}
-                            itemToStringLabel={(item: CostCenter) => `${item.code} - ${item.name}`}
-                          >
-                            <ComboboxTrigger
-                              render={
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="w-full justify-between font-normal"
-                                >
-                                  <ComboboxValue placeholder="Seleccione..." />
-                                  <ChevronDownIcon className="text-muted-foreground size-4" />
-                                </Button>
-                              }
-                            />
-                            <ComboboxContent portalContainer={sheetContentRef}>
-                              <ComboboxInput
-                                placeholder="Buscar centro..."
-                                showClear
-                                showTrigger={false}
-                              />
-                              <ComboboxList>
-                                <ComboboxEmpty>No se encontraron centros</ComboboxEmpty>
-                                <ComboboxCollection>
-                                  {(item: CostCenter) => (
-                                    <ComboboxItem key={item.id} value={item}>
-                                      {item.code} - {item.name}
-                                    </ComboboxItem>
-                                  )}
-                                </ComboboxCollection>
-                              </ComboboxList>
-                            </ComboboxContent>
-                          </Combobox>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}

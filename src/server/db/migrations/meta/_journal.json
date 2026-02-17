@@ -148,6 +148,13 @@
       "when": 1771292010993,
       "tag": "0020_perpetual_the_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1771292461984,
+      "tag": "0021_smiling_blue_shield",
+      "breakpoints": true
     }
   ]
 }

@@ -202,13 +202,6 @@ export function CreditProductInfo({
       items: [
         { label: 'Maximo cuotas', value: creditProduct.maxInstallments ?? '-' },
         {
-          label: 'Centro costo',
-          value:
-            creditProduct.costCenter
-              ? `${creditProduct.costCenter.code} - ${creditProduct.costCenter.name}`
-              : '-',
-        },
-        {
           label: 'Modo riesgo',
           value:
             riskEvaluationModeLabels[creditProduct.riskEvaluationMode] ??

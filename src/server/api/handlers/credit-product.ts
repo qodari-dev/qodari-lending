@@ -73,10 +73,6 @@ const CREDIT_PRODUCT_INCLUDES = createIncludeMap<typeof db.query.creditProducts>
     relation: 'lateInterestDistribution',
     config: true,
   },
-  costCenter: {
-    relation: 'costCenter',
-    config: true,
-  },
   creditProductRefinancePolicy: {
     relation: 'creditProductRefinancePolicy',
     config: true,

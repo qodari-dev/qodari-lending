@@ -910,7 +910,6 @@ export const insuranceAccrualMethodEnum = pgEnum('insurance_accrual_method', [
 // - *DistributionId: define la distribución contable para capital/interés/mora.
 // - maxInstallments: número máximo de cuotas permitidas.
 // - studyFeeAmount + studyGlAccountId: costo y auxiliar del estudio.
-// - costCenterId: centro de costo asociado al producto (si aplica).
 // ---------------------------------------------------------------------
 export const creditProducts = pgTable(
   'credit_products',
@@ -948,10 +947,6 @@ export const creditProducts = pgTable(
     reportsToCreditBureau: boolean('reports_to_credit_bureau').notNull().default(false),
     // Concr07.numcuo (max cuotas)
     maxInstallments: integer('max_installments'),
-    // Concr07.codcen -> centro de costo
-    costCenterId: integer('cost_center_id').references(() => costCenters.id, {
-      onDelete: 'set null',
-    }),
     riskEvaluationMode: riskEvaluationModeEnum('risk_evaluation_mode').notNull().default('NONE'),
 
     riskMinScore: decimal('risk_min_score', {
@@ -991,10 +986,7 @@ export const creditProducts = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
-  (t) => [
-    index('idx_credit_products_fund').on(t.creditFundId),
-    index('idx_credit_products_cost_center').on(t.costCenterId),
-  ]
+  (t) => [index('idx_credit_products_fund').on(t.creditFundId)]
 );
 
 // =====================================================================

@@ -39,7 +39,7 @@ const COST_CENTER_SORT_FIELDS = ['id', 'code', 'name', 'isActive', 'createdAt', 
 // INCLUDE
 // ============================================
 
-const COST_CENTER_INCLUDE_OPTIONS = ['accountingDistributionLines', 'creditProducts', 'accountingEntries'] as const;
+const COST_CENTER_INCLUDE_OPTIONS = ['accountingDistributionLines', 'accountingEntries'] as const;
 const CostCenterIncludeSchema = createIncludeSchema(COST_CENTER_INCLUDE_OPTIONS);
 
 // ============================================

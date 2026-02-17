@@ -196,7 +196,6 @@ export type NewGlAccounts = typeof glAccounts.$inferInsert;
 // ---------------------------------------------------------------------
 export type CostCenters = typeof costCenters.$inferSelect & {
   accountingDistributionLines?: AccountingDistributionLines[];
-  creditProducts?: CreditProducts[];
   creditsSettings?: CreditsSettings[];
   accountingEntries?: AccountingEntries[];
 };
@@ -353,7 +352,6 @@ export type CreditProducts = typeof creditProducts.$inferSelect & {
   capitalDistribution?: AccountingDistributions;
   interestDistribution?: AccountingDistributions;
   lateInterestDistribution?: AccountingDistributions;
-  costCenter?: CostCenters | null;
   creditProductRefinancePolicy?: CreditProductRefinancePolicies | null;
   creditProductChargeOffPolicy?: CreditProductChargeOffPolicies | null;
   creditProductCategories?: CreditProductCategories[];

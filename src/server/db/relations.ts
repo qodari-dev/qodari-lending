@@ -202,8 +202,8 @@ export const glAccountsRelations = relations(glAccounts, ({ many }) => ({
 // ---------------------------------------------------------------------
 export const costCentersRelations = relations(costCenters, ({ many }) => ({
   accountingDistributionLines: many(accountingDistributionLines),
-  creditProducts: many(creditProducts),
   accountingEntries: many(accountingEntries),
+  affiliationOffices: many(affiliationOffices),
 }));
 
 // ---------------------------------------------------------------------
@@ -434,10 +434,6 @@ export const creditProductsRelations = relations(creditProducts, ({ one, many })
     relationName: 'lateInterestDistribution',
     fields: [creditProducts.lateInterestDistributionId],
     references: [accountingDistributions.id],
-  }),
-  costCenter: one(costCenters, {
-    fields: [creditProducts.costCenterId],
-    references: [costCenters.id],
   }),
   creditProductRefinancePolicy: one(creditProductRefinancePolicies, {
     fields: [creditProducts.id],

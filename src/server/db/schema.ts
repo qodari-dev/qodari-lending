@@ -392,12 +392,11 @@ export const entryNatureEnum = pgEnum('entry_nature', ['DEBIT', 'CREDIT']);
 // ---------------------------------------------------------------------
 // Concr06 - Auxiliares por distribuciones contables
 // Nota:
-// Detalle de una distribución contable: define a qué auxiliar (cuenta) y centro de costo se imputa,
+// Detalle de una distribución contable: define a qué auxiliar (cuenta) se imputa,
 // qué porcentaje aplica y con qué naturaleza (débito/crédito).
 // Campos clave:
 // - accountingDistributionId: distribución a la que pertenece.
 // - glAccountId: auxiliar/cuenta contable a afectar.
-// - costCenterId: centro de costo de la imputación.
 // - percentage: porcentaje de la distribución.
 // - nature: naturaleza contable (DEBIT/CREDIT).
 // ---------------------------------------------------------------------
@@ -411,19 +410,12 @@ export const accountingDistributionLines = pgTable(
     glAccountId: integer('gl_account_id')
       .notNull()
       .references(() => glAccounts.id, { onDelete: 'restrict' }),
-    costCenterId: integer('cost_center_id').references(() => costCenters.id, {
-      onDelete: 'restrict',
-    }),
     percentage: decimal('percentage', { precision: 5, scale: 2 }).notNull(),
     nature: entryNatureEnum('nature').notNull(),
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_distribution_line').on(
-      t.accountingDistributionId,
-      t.glAccountId,
-      t.costCenterId
-    ),
+    uniqueIndex('uniq_distribution_line').on(t.accountingDistributionId, t.glAccountId),
   ]
 );
 

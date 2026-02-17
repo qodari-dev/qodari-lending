@@ -61,7 +61,6 @@ export function AccountingDistributionForm({
         accountingDistributionLines:
           accountingDistribution?.accountingDistributionLines?.map((line) => ({
             glAccountId: line.glAccountId,
-            costCenterId: line.costCenterId,
             percentage: line.percentage,
             nature: line.nature,
           })) ?? [],
@@ -118,7 +117,7 @@ export function AccountingDistributionForm({
               : 'Nueva Distribucion Contable'}
           </SheetTitle>
           <SheetDescription>
-            Define como se reparte un valor entre auxiliares y centros de costo.
+            Define como se reparte un valor entre auxiliares.
           </SheetDescription>
         </SheetHeader>
         <FormProvider {...form}>

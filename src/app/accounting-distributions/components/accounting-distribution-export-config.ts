@@ -22,10 +22,7 @@ function formatLinesByNature(row: AccountingDistribution, nature: 'DEBIT' | 'CRE
       const account = line.glAccount
         ? `${line.glAccount.code}-${line.glAccount.name}`
         : String(line.glAccountId);
-      const center = line.costCenter
-        ? `${line.costCenter.code}-${line.costCenter.name}`
-        : '-';
-      return `${account} [CC:${center}] ${formatPercent(line.percentage, 2)}`;
+      return `${account} ${formatPercent(line.percentage, 2)}`;
     })
     .join(' | ');
 }

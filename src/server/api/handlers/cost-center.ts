@@ -38,10 +38,6 @@ const COST_CENTER_QUERY_CONFIG: QueryConfig = {
 };
 
 const COST_CENTER_INCLUDES = createIncludeMap<typeof db.query.costCenters>()({
-  accountingDistributionLines: {
-    relation: 'accountingDistributionLines',
-    config: true,
-  },
   accountingEntries: {
     relation: 'accountingEntries',
     config: true,

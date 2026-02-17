@@ -195,7 +195,6 @@ export type NewGlAccounts = typeof glAccounts.$inferInsert;
 // Concr19 - Centros de costos
 // ---------------------------------------------------------------------
 export type CostCenters = typeof costCenters.$inferSelect & {
-  accountingDistributionLines?: AccountingDistributionLines[];
   creditsSettings?: CreditsSettings[];
   accountingEntries?: AccountingEntries[];
 };
@@ -221,7 +220,6 @@ export type NewAccountingDistributions = typeof accountingDistributions.$inferIn
 export type AccountingDistributionLines = typeof accountingDistributionLines.$inferSelect & {
   accountingDistribution?: AccountingDistributions;
   glAccount?: GlAccounts;
-  costCenter?: CostCenters;
 };
 export type NewAccountingDistributionLines = typeof accountingDistributionLines.$inferInsert;
 

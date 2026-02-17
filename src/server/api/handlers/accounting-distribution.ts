@@ -49,7 +49,6 @@ const ACCOUNTING_DISTRIBUTION_INCLUDES = createIncludeMap<
     config: {
       with: {
         glAccount: true,
-        costCenter: true,
       },
     },
   },

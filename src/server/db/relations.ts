@@ -201,7 +201,6 @@ export const glAccountsRelations = relations(glAccounts, ({ many }) => ({
 // Concr19 - Centros de costos
 // ---------------------------------------------------------------------
 export const costCentersRelations = relations(costCenters, ({ many }) => ({
-  accountingDistributionLines: many(accountingDistributionLines),
   accountingEntries: many(accountingEntries),
   affiliationOffices: many(affiliationOffices),
 }));
@@ -242,10 +241,6 @@ export const accountingDistributionLinesRelations = relations(
     glAccount: one(glAccounts, {
       fields: [accountingDistributionLines.glAccountId],
       references: [glAccounts.id],
-    }),
-    costCenter: one(costCenters, {
-      fields: [accountingDistributionLines.costCenterId],
-      references: [costCenters.id],
     }),
   })
 );

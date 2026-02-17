@@ -1010,7 +1010,7 @@ export const loan = tsr.router(contract.loan, {
             sequence,
             entryDate,
             glAccountId: line.glAccountId,
-            costCenterId: line.costCenterId,
+            costCenterId: existingLoan.costCenterId ?? null,
             thirdPartyId: existingLoan.thirdPartyId,
             description: `Liquidacion credito ${existingLoan.creditNumber} cuota ${installment.installmentNumber}`.slice(
               0,
@@ -1054,7 +1054,7 @@ export const loan = tsr.router(contract.loan, {
             sequence,
             entryDate,
             glAccountId: line.glAccountId,
-            costCenterId: line.costCenterId,
+            costCenterId: existingLoan.costCenterId ?? null,
             thirdPartyId: existingLoan.thirdPartyId,
             description: `Liquidacion credito ${existingLoan.creditNumber} cuota ${installment.installmentNumber}`.slice(
               0,
@@ -1123,7 +1123,7 @@ export const loan = tsr.router(contract.loan, {
             sequence,
             entryDate,
             glAccountId: line.glAccountId,
-            costCenterId: line.costCenterId,
+            costCenterId: existingLoan.costCenterId ?? null,
             thirdPartyId: existingLoan.thirdPartyId,
             description: `Liquidacion concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
               0,

@@ -118,7 +118,6 @@ export function AccountingDistributionInfo({
                   <TableRow>
                     <TableHead>#</TableHead>
                     <TableHead>Cuenta</TableHead>
-                    <TableHead>Centro de Costo</TableHead>
                     <TableHead>Naturaleza</TableHead>
                     <TableHead>Porcentaje</TableHead>
                   </TableRow>
@@ -131,11 +130,6 @@ export function AccountingDistributionInfo({
                         {line.glAccount
                           ? `${line.glAccount.code} - ${line.glAccount.name}`
                           : line.glAccountId}
-                      </TableCell>
-                      <TableCell>
-                        {line.costCenter
-                          ? `${line.costCenter.code} - ${line.costCenter.name}`
-                          : (line.costCenterId ?? '-')}
                       </TableCell>
                       <TableCell>
                         {entryNatureLabels[line.nature as EntryNature] ?? line.nature}

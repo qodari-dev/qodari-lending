@@ -48,9 +48,7 @@ import {
   EntryNature,
 } from '@/schemas/accounting-distribution';
 import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
-import { useCostCenters } from '@/hooks/queries/use-cost-center-queries';
 import { GlAccount } from '@/schemas/gl-account';
-import { CostCenter } from '@/schemas/cost-center';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -76,7 +74,6 @@ export function AccountingDistributionLinesForm() {
     resolver: zodResolver(AccountingDistributionLineInputSchema),
     defaultValues: {
       glAccountId: undefined,
-      costCenterId: null,
       percentage: '',
       nature: 'DEBIT',
     },
@@ -89,21 +86,10 @@ export function AccountingDistributionLinesForm() {
   });
   const glAccounts = useMemo(() => glAccountsData?.body?.data ?? [], [glAccountsData]);
 
-  const { data: costCentersData } = useCostCenters({
-    limit: 500,
-    where: { and: [{ isActive: true }] },
-    sort: [{ field: 'code', order: 'asc' }],
-  });
-  const costCenters = useMemo(() => costCentersData?.body?.data ?? [], [costCentersData]);
-
   // Helpers para encontrar objetos por ID
   const findGlAccount = useCallback(
     (id: number | undefined) => glAccounts.find((acc) => acc.id === id) ?? null,
     [glAccounts]
-  );
-  const findCostCenter = useCallback(
-    (id: number | null | undefined) => costCenters.find((center) => center.id === id) ?? null,
-    [costCenters]
   );
 
   const glAccountLabelMap = useMemo(() => {
@@ -113,14 +99,6 @@ export function AccountingDistributionLinesForm() {
     });
     return map;
   }, [glAccounts]);
-
-  const costCenterLabelMap = useMemo(() => {
-    const map = new Map<number, string>();
-    costCenters.forEach((center) => {
-      map.set(center.id, `${center.code} - ${center.name}`);
-    });
-    return map;
-  }, [costCenters]);
 
   const hasLines = useMemo(() => fields.length > 0, [fields.length]);
 
@@ -135,7 +113,6 @@ export function AccountingDistributionLinesForm() {
   const handleAddClick = () => {
     dialogForm.reset({
       glAccountId: undefined,
-      costCenterId: null,
       percentage: '',
       nature: 'DEBIT',
     });
@@ -147,7 +124,6 @@ export function AccountingDistributionLinesForm() {
     const current = fields[index];
     dialogForm.reset({
       glAccountId: current?.glAccountId ?? undefined,
-      costCenterId: current?.costCenterId ?? null,
       percentage: current?.percentage ?? '',
       nature: current?.nature ?? 'DEBIT',
     });
@@ -157,14 +133,11 @@ export function AccountingDistributionLinesForm() {
 
   const onSave = (values: AccountingDistributionLineInput) => {
     const isDuplicate = fields.some(
-      (f, idx) =>
-        f.glAccountId === values.glAccountId &&
-        (f.costCenterId ?? null) === (values.costCenterId ?? null) &&
-        idx !== editingIndex
+      (f, idx) => f.glAccountId === values.glAccountId && idx !== editingIndex
     );
 
     if (isDuplicate) {
-      toast.error('Ya existe una linea con esa cuenta y centro de costo');
+      toast.error('Ya existe una linea con esa cuenta');
       return;
     }
 
@@ -181,18 +154,13 @@ export function AccountingDistributionLinesForm() {
     return glAccountLabelMap.get(id) ?? String(id);
   };
 
-  const getCostCenterLabel = (id: number | null | undefined) => {
-    if (!id) return '-';
-    return costCenterLabelMap.get(id) ?? String(id);
-  };
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm font-medium">Lineas de distribucion</p>
           <p className="text-muted-foreground text-sm">
-            Define los auxiliares, centros de costo y porcentaje de cada linea.
+            Define los auxiliares y porcentaje de cada linea.
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
@@ -244,55 +212,6 @@ export function AccountingDistributionLinesForm() {
                           <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
                           <ComboboxCollection>
                             {(item: GlAccount) => (
-                              <ComboboxItem key={item.id} value={item}>
-                                {item.code} - {item.name}
-                              </ComboboxItem>
-                            )}
-                          </ComboboxCollection>
-                        </ComboboxList>
-                      </ComboboxContent>
-                    </Combobox>
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="costCenterId"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="costCenterId">Centro de costo (opcional)</FieldLabel>
-                    <Combobox
-                      items={costCenters}
-                      value={findCostCenter(field.value)}
-                      onValueChange={(val: CostCenter | null) =>
-                        field.onChange(val?.id ?? null)
-                      }
-                      itemToStringValue={(item: CostCenter) => String(item.id)}
-                      itemToStringLabel={(item: CostCenter) => `${item.code} - ${item.name}`}
-                    >
-                      <ComboboxTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full justify-between font-normal"
-                          >
-                            <ComboboxValue placeholder="Seleccione..." />
-                            <ChevronDownIcon className="text-muted-foreground size-4" />
-                          </Button>
-                        }
-                      />
-                      <ComboboxContent portalContainer={dialogContentRef}>
-                        <ComboboxInput
-                          placeholder="Buscar centro..."
-                          showClear
-                          showTrigger={false}
-                        />
-                        <ComboboxList>
-                          <ComboboxEmpty>No se encontraron centros</ComboboxEmpty>
-                          <ComboboxCollection>
-                            {(item: CostCenter) => (
                               <ComboboxItem key={item.id} value={item}>
                                 {item.code} - {item.name}
                               </ComboboxItem>
@@ -366,7 +285,6 @@ export function AccountingDistributionLinesForm() {
           <TableHeader>
             <TableRow>
               <TableHead>Cuenta</TableHead>
-              <TableHead>Centro de Costo</TableHead>
               <TableHead>Naturaleza</TableHead>
               <TableHead>Porcentaje</TableHead>
               <TableHead className="w-30 text-right">Acciones</TableHead>
@@ -376,7 +294,6 @@ export function AccountingDistributionLinesForm() {
             {fields.map((field, index) => (
               <TableRow key={field.id}>
                 <TableCell>{getGlAccountLabel(field.glAccountId)}</TableCell>
-                <TableCell>{getCostCenterLabel(field.costCenterId)}</TableCell>
                 <TableCell>
                   {entryNatureLabels[field.nature as EntryNature] ?? field.nature}
                 </TableCell>

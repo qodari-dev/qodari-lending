@@ -193,7 +193,10 @@ export const paymentFrequencies = pgTable(
   (t) => [
     uniqueIndex('uniq_payment_frequencies_name').on(t.name),
     check('chk_pf_interval_days_min', sql`${t.intervalDays} IS NULL OR ${t.intervalDays} >= 1`),
-    check('chk_pf_day_of_month_range', sql`${t.dayOfMonth} IS NULL OR ${t.dayOfMonth} BETWEEN 1 AND 31`),
+    check(
+      'chk_pf_day_of_month_range',
+      sql`${t.dayOfMonth} IS NULL OR ${t.dayOfMonth} BETWEEN 1 AND 31`
+    ),
     check(
       'chk_pf_semi_month_day1_range',
       sql`${t.semiMonthDay1} IS NULL OR ${t.semiMonthDay1} BETWEEN 1 AND 31`
@@ -414,9 +417,7 @@ export const accountingDistributionLines = pgTable(
     nature: entryNatureEnum('nature').notNull(),
     ...timestamps,
   },
-  (t) => [
-    uniqueIndex('uniq_distribution_line').on(t.accountingDistributionId, t.glAccountId),
-  ]
+  (t) => [uniqueIndex('uniq_distribution_line').on(t.accountingDistributionId, t.glAccountId)]
 );
 
 export const paymentReceiptMovementTypeEnum = pgEnum('payment_receipt_movement_type', [
@@ -1618,9 +1619,6 @@ export const loanInstallments = pgTable(
       .notNull()
       .references(() => loans.id, { onDelete: 'cascade' }),
 
-    // Para soportar cambios del plan (abonos extra, refinanciaciones, etc.)
-    scheduleVersion: integer('schedule_version').notNull().default(1),
-
     installmentNumber: integer('installment_number').notNull(),
 
     dueDate: date('due_date').notNull(),
@@ -1634,7 +1632,7 @@ export const loanInstallments = pgTable(
       .notNull()
       .default('0'),
 
-    // Estado del registro del plan (no confundir con “pagada/vencida”)
+    // Estado del registro del plan
     status: installmentRecordStatusEnum('status').notNull().default('GENERATED'),
 
     remainingPrincipal: decimal('remaining_principal', {
@@ -1645,13 +1643,9 @@ export const loanInstallments = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_loan_installment_version_number').on(
-      t.loanId,
-      t.scheduleVersion,
-      t.installmentNumber
-    ),
+    uniqueIndex('uniq_loan_installment_version_number').on(t.loanId, t.installmentNumber),
 
-    index('idx_installments_loan_version_due').on(t.loanId, t.scheduleVersion, t.dueDate),
+    index('idx_installments_loan_version_due').on(t.loanId, t.dueDate),
     index('idx_installments_loan_status_due').on(t.loanId, t.status, t.dueDate),
 
     check(
@@ -2260,9 +2254,7 @@ export const creditsSettings = pgTable('credits_settings', {
   accountingEnabled: boolean('accounting_enabled').notNull().default(true),
 
   // Días mínimos entre la fecha de aprobación/desembolso y el primer recaudo.
-  minDaysBeforeFirstCollection: integer('min_days_before_first_collection')
-    .notNull()
-    .default(7),
+  minDaysBeforeFirstCollection: integer('min_days_before_first_collection').notNull().default(7),
 
   // Auxiliares (glAccounts)
   cashGlAccountId: integer('cash_gl_account_id').references(() => glAccounts.id, {

@@ -27,15 +27,12 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
 import { useLoanBalanceSummary, useLoans } from '@/hooks/queries/use-loan-queries';
 import { useCreateLoanPayment } from '@/hooks/queries/use-loan-payment-queries';
 import { usePaymentTenderTypes } from '@/hooks/queries/use-payment-tender-type-queries';
 import { loanStatusLabels, Loan, LoanStatus } from '@/schemas/loan';
-import {
-  AvailableUserReceiptType,
-  CreateLoanPaymentBodySchema,
-  paymentReceiptMovementTypeLabels,
-} from '@/schemas/loan-payment';
+import { AvailableUserReceiptType, CreateLoanPaymentBodySchema } from '@/schemas/loan-payment';
 import { PaymentTenderType } from '@/schemas/payment-tender-type';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { parseDecimalString, roundMoney } from '@/utils/number-utils';
@@ -50,6 +47,7 @@ import { z } from 'zod';
 import { LoanPaymentAllocationsForm } from './loan-payment-allocations-form';
 
 type FormValues = z.infer<typeof CreateLoanPaymentBodySchema>;
+type GlAccountOption = { id: number; code: string; name: string };
 
 function getBorrowerLabel(loan: Loan): string {
   const borrower = loan.borrower;
@@ -92,6 +90,7 @@ export function LoanPaymentForm({
       loanId: undefined,
       description: '',
       amount: '0',
+      glAccountId: undefined,
       overpaidAmount: 0,
       note: null,
       loanPaymentMethodAllocations: [],
@@ -117,6 +116,32 @@ export function LoanPaymentForm({
     [collectionMethodsData]
   );
 
+  const { data: glAccountsData } = useGlAccounts({
+    limit: 1000,
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'code', order: 'asc' }],
+  });
+  const glAccountOptions = useMemo<GlAccountOption[]>(() => {
+    const fetched = (glAccountsData?.body?.data ?? []).map((item) => ({
+      id: item.id,
+      code: item.code,
+      name: item.name,
+    }));
+    if (fetched.length) return fetched;
+
+    const mapped = new Map<number, GlAccountOption>();
+    for (const item of availableReceiptTypes) {
+      if (!mapped.has(item.glAccountId)) {
+        mapped.set(item.glAccountId, {
+          id: item.glAccountId,
+          code: String(item.glAccountId),
+          name: item.glAccountName,
+        });
+      }
+    }
+    return [...mapped.values()].sort((a, b) => a.code.localeCompare(b.code));
+  }, [glAccountsData, availableReceiptTypes]);
+
   const findLoan = useCallback(
     (id: number | undefined) => loans.find((item) => item.id === id) ?? null,
     [loans]
@@ -126,6 +151,10 @@ export function LoanPaymentForm({
     (id: number | undefined) =>
       availableReceiptTypes.find((item) => item.paymentReceiptTypeId === id) ?? null,
     [availableReceiptTypes]
+  );
+  const findGlAccount = useCallback(
+    (id: number | undefined) => glAccountOptions.find((item) => item.id === id) ?? null,
+    [glAccountOptions]
   );
 
   useEffect(() => {
@@ -137,6 +166,7 @@ export function LoanPaymentForm({
       loanId: undefined,
       description: '',
       amount: '0',
+      glAccountId: availableReceiptTypes[0]?.glAccountId,
       overpaidAmount: 0,
       note: null,
       loanPaymentMethodAllocations: collectionMethods[0]
@@ -150,16 +180,6 @@ export function LoanPaymentForm({
         : [],
     });
   }, [opened, form, availableReceiptTypes, collectionMethods]);
-
-  const selectedReceiptTypeId = useWatch({
-    control: form.control,
-    name: 'receiptTypeId',
-  });
-
-  const selectedReceiptType = useMemo(
-    () => findReceiptType(selectedReceiptTypeId),
-    [findReceiptType, selectedReceiptTypeId]
-  );
 
   const selectedLoanId = useWatch({
     control: form.control,
@@ -405,9 +425,13 @@ export function LoanPaymentForm({
                         <Combobox
                           items={availableReceiptTypes}
                           value={findReceiptType(field.value)}
-                          onValueChange={(value: AvailableUserReceiptType | null) =>
-                            field.onChange(value?.paymentReceiptTypeId ?? undefined)
-                          }
+                          onValueChange={(value: AvailableUserReceiptType | null) => {
+                            field.onChange(value?.paymentReceiptTypeId ?? undefined);
+                            form.setValue('glAccountId', value?.glAccountId ?? undefined, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          }}
                           itemToStringValue={(item: AvailableUserReceiptType) =>
                             String(item.paymentReceiptTypeId)
                           }
@@ -465,18 +489,6 @@ export function LoanPaymentForm({
                     )}
                   />
 
-                  <Field>
-                    <FieldLabel>Tipo de movimiento</FieldLabel>
-                    <Input
-                      value={
-                        selectedReceiptType?.movementType
-                          ? paymentReceiptMovementTypeLabels[selectedReceiptType.movementType]
-                          : '-'
-                      }
-                      readOnly
-                    />
-                  </Field>
-
                   <Controller
                     name="amount"
                     control={form.control}
@@ -509,17 +521,55 @@ export function LoanPaymentForm({
                     )}
                   />
 
-                  <Field>
-                    <FieldLabel>Cuenta contable</FieldLabel>
-                    <Input
-                      value={
-                        selectedReceiptType
-                          ? `${selectedReceiptType.glAccountName} (#${selectedReceiptType.glAccountId})`
-                          : '-'
-                      }
-                      readOnly
-                    />
-                  </Field>
+                  <Controller
+                    name="glAccountId"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid}>
+                        <FieldLabel htmlFor="glAccountId">Auxiliar contable</FieldLabel>
+                        <Combobox
+                          items={glAccountOptions}
+                          value={findGlAccount(field.value)}
+                          onValueChange={(value: GlAccountOption | null) =>
+                            field.onChange(value?.id ?? undefined)
+                          }
+                          itemToStringValue={(item: GlAccountOption) => String(item.id)}
+                          itemToStringLabel={(item: GlAccountOption) => `${item.code} - ${item.name}`}
+                        >
+                          <ComboboxTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-between font-normal"
+                              >
+                                <ComboboxValue placeholder="Seleccione..." />
+                                <ChevronDownIcon className="text-muted-foreground size-4" />
+                              </Button>
+                            }
+                          />
+                          <ComboboxContent portalContainer={sheetContentRef}>
+                            <ComboboxInput
+                              placeholder="Buscar cuenta..."
+                              showClear
+                              showTrigger={false}
+                            />
+                            <ComboboxList>
+                              <ComboboxEmpty>No se encontraron auxiliares</ComboboxEmpty>
+                              <ComboboxCollection>
+                                {(item: GlAccountOption) => (
+                                  <ComboboxItem key={item.id} value={item}>
+                                    {item.code} - {item.name}
+                                  </ComboboxItem>
+                                )}
+                              </ComboboxCollection>
+                            </ComboboxList>
+                          </ComboboxContent>
+                        </Combobox>
+                        {fieldState.error && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
 
                   <Controller
                     name="description"

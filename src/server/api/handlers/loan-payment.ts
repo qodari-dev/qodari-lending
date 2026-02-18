@@ -1,6 +1,7 @@
 import {
   accountingEntries,
   db,
+  glAccounts,
   loanPaymentMethodAllocations,
   loanPayments,
   loanStatusHistory,
@@ -145,7 +146,10 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           limit: queryLimit,
           offset,
         }),
-        db.select({ count: sql<number>`count(*)::int` }).from(loanPayments).where(whereClause),
+        db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(loanPayments)
+          .where(whereClause),
       ]);
 
       const totalCount = countResult[0]?.count ?? 0;
@@ -198,7 +202,8 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           isDefault: row.isDefault,
           glAccountId: row.paymentReceiptType?.glAccountId ?? 0,
           glAccountName:
-            row.paymentReceiptType?.glAccount?.name ?? String(row.paymentReceiptType?.glAccountId ?? ''),
+            row.paymentReceiptType?.glAccount?.name ??
+            String(row.paymentReceiptType?.glAccountId ?? ''),
         }))
         .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name));
 
@@ -316,6 +321,29 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         throwHttpError({
           status: 400,
           message: 'El tipo de recibo seleccionado no tiene codigo configurado',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const selectedGlAccountId =
+        body.glAccountId ?? availableReceiptType.paymentReceiptType.glAccountId;
+      if (!selectedGlAccountId) {
+        throwHttpError({
+          status: 400,
+          message: 'Debe seleccionar un auxiliar contable',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const selectedGlAccount = await db.query.glAccounts.findFirst({
+        where: and(eq(glAccounts.id, selectedGlAccountId), eq(glAccounts.isActive, true)),
+        columns: { id: true },
+      });
+
+      if (!selectedGlAccount) {
+        throwHttpError({
+          status: 400,
+          message: 'El auxiliar contable seleccionado es invalido o esta inactivo',
           code: 'BAD_REQUEST',
         });
       }
@@ -454,7 +482,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
             createdByUserId: userId,
             createdByUserName: userName,
             note: body.note?.trim() ? body.note.trim() : null,
-            glAccountId: availableReceiptType.paymentReceiptType?.glAccountId,
+            glAccountId: selectedGlAccountId,
           })
           .returning();
 
@@ -480,10 +508,13 @@ export const loanPayment = tsr.router(contract.loanPayment, {
             documentCode: accountingDocumentCode,
             sequence,
             entryDate: paymentDate,
-            glAccountId: availableReceiptType.paymentReceiptType.glAccountId,
+            glAccountId: selectedGlAccountId,
             costCenterId: existingLoan.costCenterId ?? null,
             thirdPartyId: existingLoan.thirdPartyId,
-            description: `Abono ${paymentNumber} credito ${existingLoan.creditNumber}`.slice(0, 255),
+            description: `Abono ${paymentNumber} credito ${existingLoan.creditNumber}`.slice(
+              0,
+              255
+            ),
             nature: 'DEBIT',
             amount: toDecimalString(appliedPaymentAmount),
             loanId: existingLoan.id,
@@ -504,10 +535,11 @@ export const loanPayment = tsr.router(contract.loanPayment, {
             glAccountId: row.glAccountId,
             costCenterId: null,
             thirdPartyId: existingLoan.thirdPartyId,
-            description: `Abono ${paymentNumber} credito ${existingLoan.creditNumber} cuota ${row.installmentNumber}`.slice(
-              0,
-              255
-            ),
+            description:
+              `Abono ${paymentNumber} credito ${existingLoan.creditNumber} cuota ${row.installmentNumber}`.slice(
+                0,
+                255
+              ),
             nature: 'CREDIT',
             amount: toDecimalString(row.amount),
             loanId: existingLoan.id,
@@ -542,6 +574,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
 
         await tx.insert(accountingEntries).values(accountingPayload);
 
+        console.log('Portfolio application', portfolioApplications);
         await applyPortfolioDeltas(tx, {
           movementDate: paymentDate,
           deltas: portfolioApplications.map((row) => ({

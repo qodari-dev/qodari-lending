@@ -50,6 +50,7 @@ export async function applyPortfolioDeltas(
   }
 ) {
   const mergedDeltas = mergePortfolioDeltas(args.deltas);
+  console.log('mergedDeltas', mergedDeltas);
 
   for (const item of mergedDeltas) {
     const hasNegative = item.chargeDelta < 0 || item.paymentDelta < 0;

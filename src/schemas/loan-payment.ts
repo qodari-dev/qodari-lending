@@ -1,4 +1,5 @@
 import { Contract } from '@/server/api/contracts';
+import { parseDecimalString } from '@/utils/number-utils';
 import {
   createIncludeSchema,
   createListQuerySchema,
@@ -88,9 +89,7 @@ export const GetLoanPaymentQuerySchema = z.object({
 
 function isValidDecimal(value: string | null | undefined): boolean {
   if (value === null || value === undefined) return false;
-  if (value.trim() === '') return false;
-  const parsed = Number(value);
-  return Number.isFinite(parsed);
+  return parseDecimalString(value) !== null;
 }
 
 function decimalStringField(message: string) {
@@ -103,9 +102,12 @@ function decimalStringField(message: string) {
 export const LoanPaymentMethodAllocationInputSchema = z.object({
   collectionMethodId: z.number().int().positive(),
   tenderReference: z.string().max(50).nullable().optional(),
-  amount: decimalStringField('Valor de forma de pago es requerido').refine((value) => Number(value) > 0, {
-    message: 'El valor debe ser mayor a cero',
-  }),
+  amount: decimalStringField('Valor de forma de pago es requerido').refine(
+    (value) => (parseDecimalString(value) ?? 0) > 0,
+    {
+      message: 'El valor debe ser mayor a cero',
+    }
+  ),
 });
 
 export const CreateLoanPaymentBodySchema = z
@@ -114,9 +116,13 @@ export const CreateLoanPaymentBodySchema = z
     paymentDate: z.coerce.date(),
     loanId: z.number().int().positive(),
     description: z.string().min(1).max(1000),
-    amount: decimalStringField('Valor del abono es requerido').refine((value) => Number(value) > 0, {
-      message: 'El valor debe ser mayor a cero',
-    }),
+    amount: decimalStringField('Valor del abono es requerido').refine(
+      (value) => (parseDecimalString(value) ?? 0) > 0,
+      {
+        message: 'El valor debe ser mayor a cero',
+      }
+    ),
+    glAccountId: z.number().int().positive().optional(),
     overpaidAmount: z.number().int().min(0).optional().default(0),
     note: z.string().max(1000).nullable().optional(),
     loanPaymentMethodAllocations: LoanPaymentMethodAllocationInputSchema.array().min(1),
@@ -137,8 +143,8 @@ export const CreateLoanPaymentBodySchema = z
       seen.add(method.collectionMethodId);
     }
 
-    const expected = Number(value.amount) + Number(value.overpaidAmount ?? 0);
-    const total = methods.reduce((acc, method) => acc + Number(method.amount), 0);
+    const expected = (parseDecimalString(value.amount) ?? 0) + Number(value.overpaidAmount ?? 0);
+    const total = methods.reduce((acc, method) => acc + (parseDecimalString(method.amount) ?? 0), 0);
 
     if (Math.abs(total - expected) > 0.01) {
       ctx.addIssue({

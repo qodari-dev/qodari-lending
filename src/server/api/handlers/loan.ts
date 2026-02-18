@@ -21,7 +21,11 @@ import {
   buildLiquidationDocumentCode,
   calculateOneTimeConceptAmount,
 } from '@/server/utils/accounting-utils';
-import { ensureLoanExists, getLoanBalanceSummary, getLoanStatement } from '@/server/utils/loan-statement';
+import {
+  ensureLoanExists,
+  getLoanBalanceSummary,
+  getLoanStatement,
+} from '@/server/utils/loan-statement';
 import { applyPortfolioDeltas } from '@/server/utils/portfolio-utils';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { getRequiredUserContext } from '@/server/utils/required-user-context';
@@ -586,7 +590,9 @@ export const loan = tsr.router(contract.loan, {
         errorMessage: error.body.message,
         metadata: {
           requestedHasLegalProcess: body.hasLegalProcess,
-          requestedLegalProcessDate: body.legalProcessDate ? formatDateOnly(body.legalProcessDate) : null,
+          requestedLegalProcessDate: body.legalProcessDate
+            ? formatDateOnly(body.legalProcessDate)
+            : null,
         },
         ipAddress,
         userAgent,
@@ -846,31 +852,15 @@ export const loan = tsr.router(contract.loan, {
         });
       }
 
-      const installmentsByVersion = await db.query.loanInstallments.findMany({
+      const installments = await db.query.loanInstallments.findMany({
         where: eq(loanInstallments.loanId, id),
-        orderBy: [desc(loanInstallments.scheduleVersion), asc(loanInstallments.installmentNumber)],
+        orderBy: [asc(loanInstallments.installmentNumber)],
       });
-
-      if (!installmentsByVersion.length) {
-        throwHttpError({
-          status: 400,
-          message: 'El credito no tiene cuotas para liquidar',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const currentScheduleVersion = installmentsByVersion[0].scheduleVersion;
-      const installments = installmentsByVersion.filter(
-        (item) =>
-          item.scheduleVersion === currentScheduleVersion &&
-          item.status !== 'VOID' &&
-          item.status !== 'INACTIVE'
-      );
 
       if (!installments.length) {
         throwHttpError({
           status: 400,
-          message: 'No hay cuotas activas para liquidar',
+          message: 'El credito no tiene cuotas para liquidar',
           code: 'BAD_REQUEST',
         });
       }
@@ -932,9 +922,8 @@ export const loan = tsr.router(contract.loan, {
 
       const alreadyLiquidatedEntry = await db.query.accountingEntries.findFirst({
         where: and(
+          eq(accountingEntries.processType, 'CREDIT'),
           eq(accountingEntries.loanId, existingLoan.id),
-          eq(accountingEntries.sourceType, 'LOAN_APPROVAL'),
-          eq(accountingEntries.sourceId, String(existingLoan.id)),
           inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
         ),
         columns: {
@@ -954,6 +943,7 @@ export const loan = tsr.router(contract.loan, {
         where: eq(loanBillingConcepts.loanId, existingLoan.id),
         with: {
           glAccount: true,
+          billingConcept: true,
         },
       });
       const oneTimeFinancedConcepts = loanConceptSnapshots.filter(
@@ -1012,10 +1002,11 @@ export const loan = tsr.router(contract.loan, {
             glAccountId: line.glAccountId,
             costCenterId: existingLoan.costCenterId ?? null,
             thirdPartyId: existingLoan.thirdPartyId,
-            description: `Liquidacion credito ${existingLoan.creditNumber} cuota ${installment.installmentNumber}`.slice(
-              0,
-              255
-            ),
+            description:
+              `Liquidacion credito ${existingLoan.creditNumber} cuota ${installment.installmentNumber}`.slice(
+                0,
+                255
+              ),
             nature: 'DEBIT',
             amount: toDecimalString(amount),
             loanId: existingLoan.id,
@@ -1056,10 +1047,11 @@ export const loan = tsr.router(contract.loan, {
             glAccountId: line.glAccountId,
             costCenterId: existingLoan.costCenterId ?? null,
             thirdPartyId: existingLoan.thirdPartyId,
-            description: `Liquidacion credito ${existingLoan.creditNumber} cuota ${installment.installmentNumber}`.slice(
-              0,
-              255
-            ),
+            description:
+              `Liquidacion credito ${existingLoan.creditNumber} cuota ${installment.installmentNumber}`.slice(
+                0,
+                255
+              ),
             nature: 'CREDIT',
             amount: toDecimalString(amount),
             loanId: existingLoan.id,
@@ -1078,14 +1070,14 @@ export const loan = tsr.router(contract.loan, {
         if (!concept.glAccountId) {
           throwHttpError({
             status: 400,
-            message: `Concepto #${concept.billingConceptId} no tiene auxiliar configurado para liquidacion`,
+            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name} no tiene auxiliar configurado para liquidacion`,
             code: 'BAD_REQUEST',
           });
         }
         if (concept.glAccount?.detailType === 'RECEIVABLE') {
           throwHttpError({
             status: 400,
-            message: `Concepto #${concept.billingConceptId} no puede acreditar una cuenta de cartera`,
+            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name} no puede acreditar una cuenta de cartera`,
             code: 'BAD_REQUEST',
           });
         }
@@ -1125,10 +1117,11 @@ export const loan = tsr.router(contract.loan, {
             glAccountId: line.glAccountId,
             costCenterId: existingLoan.costCenterId ?? null,
             thirdPartyId: existingLoan.thirdPartyId,
-            description: `Liquidacion concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
-              0,
-              255
-            ),
+            description:
+              `Liquidacion concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
+                0,
+                255
+              ),
             nature: 'DEBIT',
             amount: toDecimalString(amount),
             loanId: existingLoan.id,
@@ -1167,10 +1160,11 @@ export const loan = tsr.router(contract.loan, {
           glAccountId: concept.glAccountId,
           costCenterId: existingLoan.costCenterId ?? null,
           thirdPartyId: existingLoan.thirdPartyId,
-          description: `Liquidacion concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
-            0,
-            255
-          ),
+          description:
+            `Liquidacion concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
+              0,
+              255
+            ),
           nature: 'CREDIT',
           amount: toDecimalString(conceptAmount),
           loanId: existingLoan.id,
@@ -1229,13 +1223,7 @@ export const loan = tsr.router(contract.loan, {
         await tx
           .update(loanInstallments)
           .set({ status: 'ACCOUNTED' })
-          .where(
-            and(
-              eq(loanInstallments.loanId, id),
-              eq(loanInstallments.scheduleVersion, currentScheduleVersion),
-              eq(loanInstallments.status, 'GENERATED')
-            )
-          );
+          .where(and(eq(loanInstallments.loanId, id), eq(loanInstallments.status, 'GENERATED')));
 
         const [loanUpdated] = await tx
           .update(loans)
@@ -1269,7 +1257,6 @@ export const loan = tsr.router(contract.loan, {
             entriesGenerated: accountingEntriesPayload.length,
             oneTimeConceptsCount: oneTimeFinancedConcepts.length,
             oneTimeConceptsAmount: toDecimalString(oneTimeConceptAmountTotal),
-            scheduleVersion: currentScheduleVersion,
           },
         });
 
@@ -1292,7 +1279,6 @@ export const loan = tsr.router(contract.loan, {
           oneTimeConceptsCount: oneTimeFinancedConcepts.length,
           oneTimeConceptsAmount: toDecimalString(oneTimeConceptAmountTotal),
           portfolioRows: portfolioDelta.size,
-          scheduleVersion: currentScheduleVersion,
         },
         ipAddress,
         userAgent,

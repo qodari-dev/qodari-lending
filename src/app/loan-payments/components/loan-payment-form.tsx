@@ -39,7 +39,7 @@ import { parseDecimalString, roundMoney } from '@/utils/number-utils';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Controller, FormProvider, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useDebounce } from 'use-debounce';
@@ -100,10 +100,17 @@ export function LoanPaymentForm({
   });
 
   const { mutateAsync: create, isPending: isCreating } = useCreateLoanPayment();
+  const [loanSearchValue, setLoanSearchValue] = useState('');
+  const [selectedLoanSnapshot, setSelectedLoanSnapshot] = useState<Loan | null>(null);
+  const [debouncedLoanSearch] = useDebounce(loanSearchValue.trim(), 350);
 
   const { data: loansData } = useLoans({
-    limit: 1000,
+    limit: 25,
     include: ['borrower', 'agreement', 'paymentFrequency', 'loanApplication'],
+    where: {
+      and: [{ status: { in: ['ACTIVE', 'ACCOUNTED'] } }],
+    },
+    search: debouncedLoanSearch || undefined,
     sort: [{ field: 'createdAt', order: 'desc' }],
   });
   const loans = useMemo(() => loansData?.body?.data ?? [], [loansData]);
@@ -144,11 +151,6 @@ export function LoanPaymentForm({
     return [...mapped.values()].sort((a, b) => a.code.localeCompare(b.code));
   }, [glAccountsData, availableReceiptTypes]);
 
-  const findLoan = useCallback(
-    (id: number | undefined) => loans.find((item) => item.id === id) ?? null,
-    [loans]
-  );
-
   const findReceiptType = useCallback(
     (id: number | undefined) =>
       availableReceiptTypes.find((item) => item.paymentReceiptTypeId === id) ?? null,
@@ -162,6 +164,8 @@ export function LoanPaymentForm({
   useEffect(() => {
     if (!opened) return;
 
+    setLoanSearchValue('');
+    setSelectedLoanSnapshot(null);
     form.reset({
       receiptTypeId: availableReceiptTypes[0]?.paymentReceiptTypeId,
       paymentDate: new Date(),
@@ -188,7 +192,24 @@ export function LoanPaymentForm({
     name: 'loanId',
   });
 
-  const selectedLoan = useMemo(() => findLoan(selectedLoanId), [findLoan, selectedLoanId]);
+  const selectedLoan = useMemo(() => {
+    if (!selectedLoanId) return null;
+
+    const fromResults = loans.find((item) => item.id === selectedLoanId);
+    if (fromResults) return fromResults;
+
+    if (selectedLoanSnapshot?.id === selectedLoanId) {
+      return selectedLoanSnapshot;
+    }
+
+    return null;
+  }, [selectedLoanId, loans, selectedLoanSnapshot]);
+
+  const loanOptions = useMemo(() => {
+    if (!selectedLoan) return loans;
+    if (loans.some((item) => item.id === selectedLoan.id)) return loans;
+    return [selectedLoan, ...loans];
+  }, [loans, selectedLoan]);
 
   const { data: balanceSummaryData, isLoading: isLoadingBalanceSummary } = useLoanBalanceSummary(
     selectedLoanId ?? 0,
@@ -354,9 +375,23 @@ export function LoanPaymentForm({
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="loanId">Credito</FieldLabel>
                         <Combobox
-                          items={loans}
-                          value={findLoan(field.value)}
+                          items={loanOptions}
+                          value={selectedLoan}
+                          filter={null}
+                          onOpenChange={(isOpen) => {
+                            if (!isOpen) setLoanSearchValue('');
+                          }}
+                          onInputValueChange={(value, details) => {
+                            if (
+                              details.reason === 'input-change' ||
+                              details.reason === 'input-clear'
+                            ) {
+                              setLoanSearchValue(value);
+                            }
+                          }}
                           onValueChange={(value: Loan | null) => {
+                            setSelectedLoanSnapshot(value);
+                            setLoanSearchValue('');
                             field.onChange(value?.id ?? undefined);
                             form.setValue('amount', '0', {
                               shouldValidate: false,

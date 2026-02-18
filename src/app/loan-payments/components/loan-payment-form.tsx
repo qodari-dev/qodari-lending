@@ -84,6 +84,8 @@ export function LoanPaymentForm({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(CreateLoanPaymentBodySchema) as Resolver<FormValues>,
+    mode: 'onChange',
+    reValidateMode: 'onChange',
     defaultValues: {
       receiptTypeId: undefined,
       paymentDate: new Date(),
@@ -357,13 +359,14 @@ export function LoanPaymentForm({
                           onValueChange={(value: Loan | null) => {
                             field.onChange(value?.id ?? undefined);
                             form.setValue('amount', '0', {
-                              shouldValidate: true,
+                              shouldValidate: false,
                               shouldDirty: true,
                             });
                             form.setValue('overpaidAmount', 0, {
-                              shouldValidate: true,
+                              shouldValidate: false,
                               shouldDirty: true,
                             });
+                            form.clearErrors(['amount', 'overpaidAmount', 'loanPaymentMethodAllocations']);
 
                             const currentAllocations =
                               form.getValues('loanPaymentMethodAllocations') ?? [];
@@ -373,7 +376,7 @@ export function LoanPaymentForm({
                                 ...item,
                                 amount: '0',
                               })),
-                              { shouldValidate: true, shouldDirty: true }
+                              { shouldValidate: false, shouldDirty: true }
                             );
                           }}
                           itemToStringValue={(item: Loan) => String(item.id)}
@@ -500,7 +503,13 @@ export function LoanPaymentForm({
                           inputMode="decimal"
                           value={field.value ?? ''}
                           onChange={(event) => {
-                            field.onChange(event.target.value);
+                            const nextValue = event.target.value;
+                            field.onChange(nextValue);
+
+                            if ((parseDecimalString(nextValue) ?? 0) > 0) {
+                              form.clearErrors('amount');
+                            }
+
                             if (Number(currentOverpaidAmount ?? 0) > 0) {
                               form.setValue('overpaidAmount', 0, {
                                 shouldValidate: true,

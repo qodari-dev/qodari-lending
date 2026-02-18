@@ -1,12 +1,10 @@
 import {
   accountingEntries,
+  agreements,
   db,
-  glAccounts,
-  loanPaymentMethodAllocations,
   loanPayments,
   loanStatusHistory,
   loans,
-  paymentTenderTypes,
   portfolioEntries,
   userPaymentReceiptTypes,
 } from '@/server/db';
@@ -15,11 +13,10 @@ import { UnifiedAuthContext } from '@/server/utils/auth-context';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getClientIp } from '@/server/utils/get-client-ip';
 import {
-  buildPaymentDocumentCode,
   buildPaymentVoidDocumentCode,
-  mapPaymentMovementTypeToProcessType,
 } from '@/server/utils/accounting-utils';
 import { buildTypedIncludes, createIncludeMap } from '@/server/utils/query/include-builder';
+import { createLoanPaymentTx } from '@/server/utils/loan-payment-create';
 import { applyPortfolioDeltas } from '@/server/utils/portfolio-utils';
 import {
   buildPaginationMeta,
@@ -29,7 +26,7 @@ import {
 } from '@/server/utils/query/query-builder';
 import { getRequiredUserContext } from '@/server/utils/required-user-context';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { formatDateOnly, roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
@@ -85,43 +82,27 @@ const LOAN_PAYMENT_INCLUDES = createIncludeMap<typeof db.query.loanPayments>()({
   },
 });
 
-function buildPaymentNumber(prefix: string): string {
-  const now = new Date();
-  const yy = String(now.getUTCFullYear()).slice(-2);
-  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(now.getUTCDate()).padStart(2, '0');
-  const hh = String(now.getUTCHours()).padStart(2, '0');
-  const mi = String(now.getUTCMinutes()).padStart(2, '0');
-  const ss = String(now.getUTCSeconds()).padStart(2, '0');
-  const rnd = String(Math.floor(Math.random() * 900) + 100);
-  const normalizedPrefix = prefix.trim().toUpperCase();
-  return `${normalizedPrefix}${yy}${mm}${dd}${hh}${mi}${ss}${rnd}`;
+function normalizeDocumentNumber(value: string): string {
+  return value.trim().replace(/[^\dA-Za-z]/g, '').toUpperCase();
 }
 
-async function ensureUniquePaymentNumber(args: {
-  receiptTypeId: number;
-  prefix: string;
-}): Promise<string> {
-  for (let index = 0; index < 10; index += 1) {
-    const paymentNumber = buildPaymentNumber(args.prefix);
-    const exists = await db.query.loanPayments.findFirst({
-      where: and(
-        eq(loanPayments.receiptTypeId, args.receiptTypeId),
-        eq(loanPayments.paymentNumber, paymentNumber)
-      ),
-      columns: { id: true },
-    });
+function normalizeCreditNumber(value: string): string {
+  return value.trim().toUpperCase();
+}
 
-    if (!exists) {
-      return paymentNumber;
+function extractUnknownErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) {
+      return message.trim();
     }
   }
 
-  throwHttpError({
-    status: 500,
-    message: 'No fue posible generar consecutivo del abono',
-    code: 'INTERNAL_SERVER_ERROR',
-  });
+  return fallback;
 }
 
 export const loanPayment = tsr.router(contract.loanPayment, {
@@ -262,388 +243,21 @@ export const loanPayment = tsr.router(contract.loanPayment, {
       }
 
       const { userId, userName } = getRequiredUserContext(session);
-
-      const existingLoan = await db.query.loans.findFirst({
-        where: eq(loans.id, body.loanId),
-        columns: {
-          id: true,
-          creditNumber: true,
-          thirdPartyId: true,
-          costCenterId: true,
-          status: true,
-        },
-      });
-
-      if (!existingLoan) {
-        throwHttpError({
-          status: 404,
-          message: `Credito con ID ${body.loanId} no encontrado`,
-          code: 'NOT_FOUND',
-        });
-      }
-
-      if (!['ACTIVE', 'ACCOUNTED'].includes(existingLoan.status)) {
-        throwHttpError({
-          status: 400,
-          message: 'El credito debe estar activo para recibir abonos',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const availableReceiptType = await db.query.userPaymentReceiptTypes.findFirst({
-        where: and(
-          eq(userPaymentReceiptTypes.userId, userId),
-          eq(userPaymentReceiptTypes.paymentReceiptTypeId, body.receiptTypeId)
-        ),
-        with: {
-          paymentReceiptType: true,
-        },
-      });
-
-      if (!availableReceiptType || !availableReceiptType.paymentReceiptType) {
-        throwHttpError({
-          status: 400,
-          message: 'El tipo de recibo seleccionado no esta habilitado para el usuario actual',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      if (!availableReceiptType.paymentReceiptType.isActive) {
-        throwHttpError({
-          status: 400,
-          message: 'El tipo de recibo seleccionado esta inactivo',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const receiptTypeCode = availableReceiptType.paymentReceiptType.code?.trim().toUpperCase();
-      if (!receiptTypeCode) {
-        throwHttpError({
-          status: 400,
-          message: 'El tipo de recibo seleccionado no tiene codigo configurado',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const selectedGlAccountId =
-        body.glAccountId ?? availableReceiptType.paymentReceiptType.glAccountId;
-      if (!selectedGlAccountId) {
-        throwHttpError({
-          status: 400,
-          message: 'Debe seleccionar un auxiliar contable',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const selectedGlAccount = await db.query.glAccounts.findFirst({
-        where: and(eq(glAccounts.id, selectedGlAccountId), eq(glAccounts.isActive, true)),
-        columns: { id: true },
-      });
-
-      if (!selectedGlAccount) {
-        throwHttpError({
-          status: 400,
-          message: 'El auxiliar contable seleccionado es invalido o esta inactivo',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const collectionMethodIds = [
-        ...new Set(body.loanPaymentMethodAllocations.map((item) => item.collectionMethodId)),
-      ];
-
-      if (!collectionMethodIds.length) {
-        throwHttpError({
-          status: 400,
-          message: 'Debe registrar al menos una forma de pago',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const activeCollectionMethods = await db.query.paymentTenderTypes.findMany({
-        where: and(
-          inArray(paymentTenderTypes.id, collectionMethodIds),
-          eq(paymentTenderTypes.isActive, true)
-        ),
-        columns: {
-          id: true,
-        },
-      });
-
-      if (activeCollectionMethods.length !== collectionMethodIds.length) {
-        throwHttpError({
-          status: 400,
-          message: 'Una o mas formas de pago son invalidas o estan inactivas',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const paymentDate = formatDateOnly(body.paymentDate);
-      const requestedPaymentAmount = roundMoney(toNumber(body.amount));
-      if (!Number.isFinite(requestedPaymentAmount) || requestedPaymentAmount <= 0) {
-        throwHttpError({
-          status: 400,
-          message: 'El valor del abono es invalido',
-          code: 'BAD_REQUEST',
-        });
-      }
-      const providedOverpaidAmount = roundMoney(Number(body.overpaidAmount ?? 0));
-
-      const openPortfolio = await db.query.portfolioEntries.findMany({
-        where: and(
-          eq(portfolioEntries.loanId, body.loanId),
-          eq(portfolioEntries.status, 'OPEN'),
-          sql`${portfolioEntries.balance} > 0`
-        ),
-        orderBy: [
-          asc(portfolioEntries.dueDate),
-          asc(portfolioEntries.installmentNumber),
-          asc(portfolioEntries.id),
-        ],
-      });
-
-      if (!openPortfolio.length) {
-        throwHttpError({
-          status: 400,
-          message: 'El credito no tiene saldo de cartera para aplicar abonos',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const totalOutstanding = roundMoney(
-        openPortfolio.reduce((acc, row) => acc + toNumber(row.balance), 0)
+      const created = await db.transaction((tx) =>
+        createLoanPaymentTx(tx, {
+          userId,
+          userName,
+          receiptTypeId: body.receiptTypeId,
+          paymentDate: body.paymentDate,
+          loanId: body.loanId,
+          description: body.description,
+          amount: body.amount,
+          glAccountId: body.glAccountId,
+          overpaidAmount: body.overpaidAmount,
+          note: body.note,
+          loanPaymentMethodAllocations: body.loanPaymentMethodAllocations,
+        })
       );
-
-      const appliedPaymentAmount = roundMoney(Math.min(requestedPaymentAmount, totalOutstanding));
-      const overflowByCap = roundMoney(Math.max(0, requestedPaymentAmount - appliedPaymentAmount));
-      const overpaidAmount = roundMoney(Math.max(0, providedOverpaidAmount) + overflowByCap);
-
-      if (!Number.isFinite(appliedPaymentAmount) || appliedPaymentAmount <= 0) {
-        throwHttpError({
-          status: 400,
-          message: 'No hay saldo pendiente para aplicar al abono',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const portfolioApplications: Array<{
-        glAccountId: number;
-        installmentNumber: number;
-        dueDate: string;
-        amount: number;
-      }> = [];
-
-      let remainingAmount = appliedPaymentAmount;
-      for (const row of openPortfolio) {
-        if (remainingAmount <= 0.01) break;
-        const rowBalance = roundMoney(toNumber(row.balance));
-        if (rowBalance <= 0) continue;
-        const appliedAmount = roundMoney(Math.min(remainingAmount, rowBalance));
-        if (appliedAmount <= 0) continue;
-
-        portfolioApplications.push({
-          glAccountId: row.glAccountId,
-          installmentNumber: row.installmentNumber,
-          dueDate: row.dueDate,
-          amount: appliedAmount,
-        });
-        remainingAmount = roundMoney(remainingAmount - appliedAmount);
-      }
-
-      if (remainingAmount > 0.01) {
-        throwHttpError({
-          status: 400,
-          message: 'No fue posible aplicar completamente el valor del abono',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const paymentNumber = await ensureUniquePaymentNumber({
-        receiptTypeId: body.receiptTypeId,
-        prefix: receiptTypeCode,
-      });
-      const nowDate = formatDateOnly(new Date());
-
-      const [created] = await db.transaction(async (tx) => {
-        const [createdLoanPayment] = await tx
-          .insert(loanPayments)
-          .values({
-            receiptTypeId: body.receiptTypeId,
-            paymentNumber,
-            movementType: availableReceiptType.paymentReceiptType?.movementType,
-            paymentDate,
-            issuedDate: nowDate,
-            loanId: body.loanId,
-            description: body.description,
-            amount: toDecimalString(appliedPaymentAmount),
-            overpaidAmount: overpaidAmount > 0 ? Math.round(overpaidAmount) : null,
-            status: 'PAID',
-            statusDate: nowDate,
-            createdByUserId: userId,
-            createdByUserName: userName,
-            note: body.note?.trim() ? body.note.trim() : null,
-            glAccountId: selectedGlAccountId,
-          })
-          .returning();
-
-        await tx.insert(loanPaymentMethodAllocations).values(
-          body.loanPaymentMethodAllocations.map((item, index) => ({
-            loanPaymentId: createdLoanPayment.id,
-            collectionMethodId: item.collectionMethodId,
-            lineNumber: index + 1,
-            tenderReference: item.tenderReference?.trim() ? item.tenderReference.trim() : null,
-            amount: toDecimalString(item.amount),
-          }))
-        );
-
-        const accountingDocumentCode = buildPaymentDocumentCode(createdLoanPayment.id);
-        const processType = mapPaymentMovementTypeToProcessType(
-          availableReceiptType.paymentReceiptType.movementType
-        );
-
-        let sequence = 1;
-        const accountingPayload: Array<typeof accountingEntries.$inferInsert> = [
-          {
-            processType,
-            documentCode: accountingDocumentCode,
-            sequence,
-            entryDate: paymentDate,
-            glAccountId: selectedGlAccountId,
-            costCenterId: existingLoan.costCenterId ?? null,
-            thirdPartyId: existingLoan.thirdPartyId,
-            description: `Abono ${paymentNumber} credito ${existingLoan.creditNumber}`.slice(
-              0,
-              255
-            ),
-            nature: 'DEBIT',
-            amount: toDecimalString(appliedPaymentAmount),
-            loanId: existingLoan.id,
-            status: 'DRAFT',
-            statusDate: nowDate,
-            sourceType: 'LOAN_PAYMENT',
-            sourceId: String(createdLoanPayment.id),
-          },
-        ];
-        sequence += 1;
-
-        for (const row of portfolioApplications) {
-          accountingPayload.push({
-            processType,
-            documentCode: accountingDocumentCode,
-            sequence,
-            entryDate: paymentDate,
-            glAccountId: row.glAccountId,
-            costCenterId: null,
-            thirdPartyId: existingLoan.thirdPartyId,
-            description:
-              `Abono ${paymentNumber} credito ${existingLoan.creditNumber} cuota ${row.installmentNumber}`.slice(
-                0,
-                255
-              ),
-            nature: 'CREDIT',
-            amount: toDecimalString(row.amount),
-            loanId: existingLoan.id,
-            installmentNumber: row.installmentNumber,
-            dueDate: row.dueDate,
-            status: 'DRAFT',
-            statusDate: nowDate,
-            sourceType: 'LOAN_PAYMENT',
-            sourceId: String(createdLoanPayment.id),
-          });
-          sequence += 1;
-        }
-
-        const debitTotal = roundMoney(
-          accountingPayload
-            .filter((entry) => entry.nature === 'DEBIT')
-            .reduce((acc, entry) => acc + toNumber(entry.amount), 0)
-        );
-        const creditTotal = roundMoney(
-          accountingPayload
-            .filter((entry) => entry.nature === 'CREDIT')
-            .reduce((acc, entry) => acc + toNumber(entry.amount), 0)
-        );
-
-        if (Math.abs(debitTotal - creditTotal) > 0.01) {
-          throwHttpError({
-            status: 400,
-            message: 'El abono no cuadra contablemente',
-            code: 'BAD_REQUEST',
-          });
-        }
-
-        await tx.insert(accountingEntries).values(accountingPayload);
-
-        console.log('Portfolio application', portfolioApplications);
-        await applyPortfolioDeltas(tx, {
-          movementDate: paymentDate,
-          deltas: portfolioApplications.map((row) => ({
-            glAccountId: row.glAccountId,
-            thirdPartyId: existingLoan.thirdPartyId,
-            loanId: existingLoan.id,
-            installmentNumber: row.installmentNumber,
-            dueDate: row.dueDate,
-            chargeDelta: 0,
-            paymentDelta: row.amount,
-          })),
-        });
-
-        await tx
-          .update(loans)
-          .set({
-            lastPaymentDate: paymentDate,
-          })
-          .where(eq(loans.id, existingLoan.id));
-
-        const remaining = await tx
-          .select({
-            balance: sql<string>`coalesce(sum(${portfolioEntries.balance}), 0)`,
-          })
-          .from(portfolioEntries)
-          .where(
-            and(
-              eq(portfolioEntries.loanId, existingLoan.id),
-              eq(portfolioEntries.status, 'OPEN'),
-              sql`${portfolioEntries.balance} > 0`
-            )
-          );
-
-        const remainingBalance = roundMoney(toNumber(remaining[0]?.balance ?? '0'));
-        if (remainingBalance <= 0.01 && existingLoan.status !== 'PAID') {
-          await tx
-            .update(loans)
-            .set({
-              status: 'PAID',
-              statusDate: nowDate,
-              statusChangedByUserId: userId,
-              statusChangedByUserName: userName || userId,
-            })
-            .where(eq(loans.id, existingLoan.id));
-
-          await tx.insert(loanStatusHistory).values({
-            loanId: existingLoan.id,
-            fromStatus: existingLoan.status,
-            toStatus: 'PAID',
-            changedByUserId: userId,
-            changedByUserName: userName || userId,
-            note: `Credito pagado con abono ${paymentNumber}`.slice(0, 255),
-            metadata: {
-              loanPaymentId: createdLoanPayment.id,
-              accountingDocumentCode,
-            },
-          });
-        }
-
-        const [updatedPayment] = await tx
-          .update(loanPayments)
-          .set({
-            accountingDocumentCode,
-          })
-          .where(eq(loanPayments.id, createdLoanPayment.id))
-          .returning();
-
-        return [updatedPayment];
-      });
 
       await logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -685,6 +299,594 @@ export const loanPayment = tsr.router(contract.loanPayment, {
       });
 
       return error;
+    }
+  },
+
+  processPayroll: async ({ body }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const { userId, userName } = getRequiredUserContext(session);
+
+      const rowsToProcess = body.rows.filter(
+        (row) => roundMoney(row.paymentAmount + row.overpaidAmount) > 0
+      );
+      if (!rowsToProcess.length) {
+        throwHttpError({
+          status: 400,
+          message: 'Debe registrar al menos una fila con valor a pagar',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const totalPaymentAmount = roundMoney(
+        rowsToProcess.reduce((acc, row) => acc + row.paymentAmount, 0)
+      );
+      const totalOverpaidAmount = roundMoney(
+        rowsToProcess.reduce((acc, row) => acc + row.overpaidAmount, 0)
+      );
+      const totalAssigned = roundMoney(totalPaymentAmount + totalOverpaidAmount);
+      const expectedCollectionAmount = roundMoney(body.collectionAmount);
+
+      if (Math.abs(totalAssigned - expectedCollectionAmount) > 0.01) {
+        throwHttpError({
+          status: 400,
+          message: 'La suma de filas debe ser igual al valor del recaudo',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const payrollReceiptType = await db.query.userPaymentReceiptTypes.findFirst({
+        where: and(
+          eq(userPaymentReceiptTypes.userId, userId),
+          eq(userPaymentReceiptTypes.paymentReceiptTypeId, body.receiptTypeId)
+        ),
+        with: {
+          paymentReceiptType: {
+            columns: {
+              movementType: true,
+              isActive: true,
+            },
+          },
+        },
+      });
+
+      if (!payrollReceiptType?.paymentReceiptType || !payrollReceiptType.paymentReceiptType.isActive) {
+        throwHttpError({
+          status: 400,
+          message: 'El tipo de recibo seleccionado no esta habilitado para el usuario actual',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      if (payrollReceiptType.paymentReceiptType.movementType !== 'PAYROLL') {
+        throwHttpError({
+          status: 400,
+          message: 'El tipo de recibo seleccionado no corresponde a libranza',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      if (body.agreementId) {
+        const agreement = await db.query.agreements.findFirst({
+          where: eq(agreements.id, body.agreementId),
+          columns: { id: true },
+        });
+
+        if (!agreement) {
+          throwHttpError({
+            status: 404,
+            message: `Convenio con ID ${body.agreementId} no encontrado`,
+            code: 'NOT_FOUND',
+          });
+        }
+      }
+
+      const normalizedCompanyDocument = body.companyDocumentNumber?.trim()
+        ? normalizeDocumentNumber(body.companyDocumentNumber)
+        : '';
+
+      const loanIds = [...new Set(rowsToProcess.map((row) => row.loanId))];
+      const loanRows = await db.query.loans.findMany({
+        where: inArray(loans.id, loanIds),
+        columns: {
+          id: true,
+          creditNumber: true,
+          agreementId: true,
+          status: true,
+        },
+        with: {
+          borrower: {
+            columns: {
+              employerDocumentNumber: true,
+            },
+          },
+        },
+      });
+      const loanMap = new Map(loanRows.map((item) => [item.id, item]));
+
+      for (const row of rowsToProcess) {
+        const loanItem = loanMap.get(row.loanId);
+        if (!loanItem) {
+          throwHttpError({
+            status: 404,
+            message: `Credito con ID ${row.loanId} no encontrado`,
+            code: 'NOT_FOUND',
+          });
+        }
+
+        if (loanItem.creditNumber.trim().toUpperCase() !== row.creditNumber.trim().toUpperCase()) {
+          throwHttpError({
+            status: 400,
+            message: `La fila del credito ${row.creditNumber} no coincide con el ID ${row.loanId}`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        if (body.agreementId && loanItem.agreementId !== body.agreementId) {
+          throwHttpError({
+            status: 400,
+            message: `El credito ${row.creditNumber} no pertenece al convenio seleccionado`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        if (normalizedCompanyDocument) {
+          const employerDocument = normalizeDocumentNumber(
+            loanItem.borrower?.employerDocumentNumber ?? ''
+          );
+          if (!employerDocument || employerDocument !== normalizedCompanyDocument) {
+            throwHttpError({
+              status: 400,
+              message: `El credito ${row.creditNumber} no pertenece al documento empresa indicado`,
+              code: 'BAD_REQUEST',
+            });
+          }
+        }
+
+        if (!['ACTIVE', 'ACCOUNTED'].includes(loanItem.status)) {
+          throwHttpError({
+            status: 400,
+            message: `El credito ${row.creditNumber} no esta activo para registrar abonos`,
+            code: 'BAD_REQUEST',
+          });
+        }
+      }
+
+      const createdPayments = await db.transaction(async (tx) => {
+        const created: Array<typeof loanPayments.$inferSelect> = [];
+
+        for (const row of rowsToProcess) {
+          const rowTotal = roundMoney(row.paymentAmount + row.overpaidAmount);
+          const payment = await createLoanPaymentTx(tx, {
+            userId,
+            userName,
+            receiptTypeId: body.receiptTypeId,
+            paymentDate: body.collectionDate,
+            loanId: row.loanId,
+            description: `Abono por libranza ref ${body.referenceNumber} credito ${row.creditNumber}`.slice(
+              0,
+              1000
+            ),
+            amount: row.paymentAmount,
+            glAccountId: body.glAccountId,
+            overpaidAmount: row.overpaidAmount,
+            note: `Lote libranza referencia ${body.referenceNumber}`.slice(0, 1000),
+            payrollReferenceNumber: body.referenceNumber,
+            payrollPayerDocumentNumber: body.companyDocumentNumber?.trim() || null,
+            loanPaymentMethodAllocations: [
+              {
+                collectionMethodId: body.collectionMethodId,
+                tenderReference: body.referenceNumber,
+                amount: rowTotal,
+              },
+            ],
+          });
+          created.push(payment);
+        }
+
+        return created;
+      });
+
+      const responseBody = {
+        agreementId: body.agreementId ?? null,
+        companyDocumentNumber: body.companyDocumentNumber?.trim() || null,
+        receiptTypeId: body.receiptTypeId,
+        collectionAmount: body.collectionAmount,
+        receivedRows: body.rows.length,
+        processedRows: createdPayments.length,
+        totalPaymentAmount,
+        totalOverpaidAmount,
+        message: `Lote de libranza procesado. Se registraron ${createdPayments.length} abonos.`,
+      };
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'create',
+        functionName: 'processPayroll',
+        status: 'success',
+        metadata: {
+          ...responseBody,
+          rowsToProcess: rowsToProcess.length,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return {
+        status: 200 as const,
+        body: responseBody,
+      };
+    } catch (e) {
+      const error = genericTsRestErrorResponse(e, {
+        genericMsg: 'Error al procesar abono por libranza',
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'create',
+        functionName: 'processPayroll',
+        status: 'failure',
+        errorMessage: error.body.message,
+        metadata: {
+          body,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return error;
+    }
+  },
+
+  processFile: async ({ body }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+
+    const totalPaymentAmount = roundMoney(
+      body.records.reduce((acc, row) => acc + row.paymentAmount, 0)
+    );
+
+    const buildFailureResponse = (
+      message: string,
+      errors: Array<{
+        rowNumber: number | null;
+        creditNumber: string | null;
+        documentNumber: string | null;
+        reason: string;
+      }>
+    ) => ({
+      fileName: body.fileName,
+      processed: false,
+      receivedRecords: body.records.length,
+      totalPaymentAmount,
+      processedRecords: 0,
+      failedRecords: body.records.length,
+      message,
+      errors,
+    });
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const { userId, userName } = getRequiredUserContext(session);
+      const normalizedRows = body.records.map((row) => ({
+        ...row,
+        normalizedCreditNumber: normalizeCreditNumber(row.creditNumber),
+        normalizedDocumentNumber: normalizeDocumentNumber(row.documentNumber),
+      }));
+      const creditOccurrences = normalizedRows.reduce<Map<string, number>>((acc, row) => {
+        const current = acc.get(row.normalizedCreditNumber) ?? 0;
+        acc.set(row.normalizedCreditNumber, current + 1);
+        return acc;
+      }, new Map());
+
+      const creditNumbers = [...new Set(normalizedRows.map((row) => row.normalizedCreditNumber))].filter(
+        Boolean
+      );
+
+      const loanRows = creditNumbers.length
+        ? await db.query.loans.findMany({
+            where: sql`upper(${loans.creditNumber}) in (${sql.join(
+              creditNumbers.map((value) => sql`${value}`),
+              sql`, `
+            )})`,
+            columns: {
+              id: true,
+              creditNumber: true,
+              status: true,
+            },
+            with: {
+              borrower: {
+                columns: {
+                  documentNumber: true,
+                },
+              },
+            },
+          })
+        : [];
+
+      const loanByCredit = new Map(loanRows.map((loan) => [normalizeCreditNumber(loan.creditNumber), loan]));
+      const loanIds = loanRows.map((loan) => loan.id);
+
+      const balancesByLoanId = new Map<number, number>();
+      if (loanIds.length) {
+        const openBalances = await db
+          .select({
+            loanId: portfolioEntries.loanId,
+            balance: sql<string>`coalesce(sum(${portfolioEntries.balance}), 0)`,
+          })
+          .from(portfolioEntries)
+          .where(
+            and(
+              inArray(portfolioEntries.loanId, loanIds),
+              eq(portfolioEntries.status, 'OPEN'),
+              sql`${portfolioEntries.balance} > 0`
+            )
+          )
+          .groupBy(portfolioEntries.loanId);
+
+        openBalances.forEach((row) => {
+          balancesByLoanId.set(row.loanId, roundMoney(toNumber(row.balance)));
+        });
+      }
+
+      const validationErrors: Array<{
+        rowNumber: number | null;
+        creditNumber: string | null;
+        documentNumber: string | null;
+        reason: string;
+      }> = [];
+      const rowsToProcess: Array<(typeof normalizedRows)[number] & { loanId: number }> = [];
+
+      normalizedRows.forEach((row) => {
+        if ((creditOccurrences.get(row.normalizedCreditNumber) ?? 0) > 1) {
+          validationErrors.push({
+            rowNumber: row.rowNumber,
+            creditNumber: row.creditNumber,
+            documentNumber: row.documentNumber,
+            reason: 'El credito esta repetido en el archivo',
+          });
+          return;
+        }
+
+        const loan = loanByCredit.get(row.normalizedCreditNumber);
+        if (!loan) {
+          validationErrors.push({
+            rowNumber: row.rowNumber,
+            creditNumber: row.creditNumber,
+            documentNumber: row.documentNumber,
+            reason: 'Credito no encontrado',
+          });
+          return;
+        }
+
+        if (!['ACTIVE', 'ACCOUNTED'].includes(loan.status)) {
+          validationErrors.push({
+            rowNumber: row.rowNumber,
+            creditNumber: row.creditNumber,
+            documentNumber: row.documentNumber,
+            reason: 'El credito no esta activo para registrar abonos',
+          });
+          return;
+        }
+
+        const borrowerDocument = normalizeDocumentNumber(loan.borrower?.documentNumber ?? '');
+        if (!borrowerDocument || borrowerDocument !== row.normalizedDocumentNumber) {
+          validationErrors.push({
+            rowNumber: row.rowNumber,
+            creditNumber: row.creditNumber,
+            documentNumber: row.documentNumber,
+            reason: 'El documento no coincide con el titular del credito',
+          });
+          return;
+        }
+
+        const openBalance = balancesByLoanId.get(loan.id) ?? 0;
+        if (openBalance <= 0) {
+          validationErrors.push({
+            rowNumber: row.rowNumber,
+            creditNumber: row.creditNumber,
+            documentNumber: row.documentNumber,
+            reason: 'El credito no tiene saldo pendiente para aplicar',
+          });
+          return;
+        }
+
+        rowsToProcess.push({
+          ...row,
+          loanId: loan.id,
+        });
+      });
+
+      if (validationErrors.length) {
+        const responseBody = buildFailureResponse(
+          'No se proceso el archivo. Revise las filas con error.',
+          validationErrors
+        );
+
+        await logAudit(session, {
+          resourceKey: appRoute.metadata.permissionKey.resourceKey,
+          actionKey: appRoute.metadata.permissionKey.actionKey,
+          action: 'create',
+          functionName: 'processFile',
+          status: 'failure',
+          errorMessage: responseBody.message,
+          metadata: {
+            fileName: body.fileName,
+            errors: validationErrors,
+          },
+          ipAddress,
+          userAgent,
+        });
+
+        return {
+          status: 200 as const,
+          body: responseBody,
+        };
+      }
+
+      const createdPayments = await db.transaction(async (tx) => {
+        const created: Array<typeof loanPayments.$inferSelect> = [];
+
+        for (const row of rowsToProcess) {
+          try {
+            const payment = await createLoanPaymentTx(tx, {
+              userId,
+              userName,
+              receiptTypeId: body.receiptTypeId,
+              paymentDate: new Date(`${row.paymentDate}T00:00:00`),
+              loanId: row.loanId,
+              description: `Abono por archivo ${body.fileName} fila ${row.rowNumber} credito ${row.creditNumber}`.slice(
+                0,
+                1000
+              ),
+              amount: row.paymentAmount,
+              glAccountId: body.glAccountId,
+              overpaidAmount: 0,
+              note: `Lote archivo ${body.fileName}`.slice(0, 1000),
+              loanPaymentMethodAllocations: [
+                {
+                  collectionMethodId: body.collectionMethodId,
+                  tenderReference: body.fileName.slice(0, 50),
+                  amount: row.paymentAmount,
+                },
+              ],
+            });
+            created.push(payment);
+          } catch (error) {
+            throw {
+              status: 400,
+              message: `Fila ${row.rowNumber} (${row.creditNumber}): ${extractUnknownErrorMessage(
+                error,
+                'No fue posible crear el abono'
+              )}`,
+              code: 'BAD_REQUEST',
+              rowNumber: row.rowNumber,
+              creditNumber: row.creditNumber,
+              documentNumber: row.documentNumber,
+            };
+          }
+        }
+
+        return created;
+      });
+
+      const responseBody = {
+        fileName: body.fileName,
+        processed: true,
+        receivedRecords: body.records.length,
+        totalPaymentAmount,
+        processedRecords: createdPayments.length,
+        failedRecords: 0,
+        message: `Archivo procesado correctamente. Se registraron ${createdPayments.length} abonos.`,
+        errors: [],
+      };
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'create',
+        functionName: 'processFile',
+        status: 'success',
+        metadata: {
+          ...responseBody,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return {
+        status: 200 as const,
+        body: responseBody,
+      };
+    } catch (e) {
+      const errorStatus =
+        typeof (e as { status?: unknown })?.status === 'number'
+          ? (e as { status: number }).status
+          : null;
+      if (errorStatus === 401 || errorStatus === 403) {
+        const error = genericTsRestErrorResponse(e, {
+          genericMsg: 'Error al procesar archivo de abonos',
+        });
+
+        await logAudit(session, {
+          resourceKey: appRoute.metadata.permissionKey.resourceKey,
+          actionKey: appRoute.metadata.permissionKey.actionKey,
+          action: 'create',
+          functionName: 'processFile',
+          status: 'failure',
+          errorMessage: error.body.message,
+          metadata: {
+            fileName: body.fileName,
+          },
+          ipAddress,
+          userAgent,
+        });
+
+        return error;
+      }
+
+      const contextualError = e as {
+        rowNumber?: unknown;
+        creditNumber?: unknown;
+        documentNumber?: unknown;
+      };
+
+      const failureBody = buildFailureResponse(
+        'No se proceso el archivo. No se registraron abonos.',
+        [
+          {
+            rowNumber: typeof contextualError.rowNumber === 'number' ? contextualError.rowNumber : null,
+            creditNumber:
+              typeof contextualError.creditNumber === 'string' ? contextualError.creditNumber : null,
+            documentNumber:
+              typeof contextualError.documentNumber === 'string' ? contextualError.documentNumber : null,
+            reason: extractUnknownErrorMessage(e, 'Error inesperado al procesar el archivo'),
+          },
+        ]
+      );
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'create',
+        functionName: 'processFile',
+        status: 'failure',
+        errorMessage: failureBody.message,
+        metadata: {
+          fileName: body.fileName,
+          reason: failureBody.errors[0]?.reason,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return {
+        status: 200 as const,
+        body: failureBody,
+      };
     }
   },
 

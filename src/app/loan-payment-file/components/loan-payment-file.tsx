@@ -3,7 +3,15 @@
 import { PageContent, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Table,
@@ -13,7 +21,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
 import { useProcessLoanPaymentFile } from '@/hooks/queries/use-loan-payment-file-queries';
+import { useAvailableLoanPaymentReceiptTypes } from '@/hooks/queries/use-loan-payment-queries';
+import { usePaymentTenderTypes } from '@/hooks/queries/use-payment-tender-type-queries';
 import { ProcessLoanPaymentFileResult } from '@/schemas/loan-payment-file';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import React from 'react';
@@ -176,6 +187,58 @@ export function LoanPaymentFile() {
   const [fileName, setFileName] = React.useState('');
   const [parsedRows, setParsedRows] = React.useState<ParsedRow[]>([]);
   const [processResponse, setProcessResponse] = React.useState<ProcessLoanPaymentFileResult | null>(null);
+  const [receiptTypeId, setReceiptTypeId] = React.useState<number | undefined>(undefined);
+  const [glAccountId, setGlAccountId] = React.useState<number | undefined>(undefined);
+  const [collectionMethodId, setCollectionMethodId] = React.useState<number | undefined>(undefined);
+
+  const { data: receiptTypesData, isLoading: isLoadingReceiptTypes } =
+    useAvailableLoanPaymentReceiptTypes();
+  const { data: glAccountsData } = useGlAccounts({
+    limit: 1000,
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'code', order: 'asc' }],
+  });
+  const { data: collectionMethodsData, isLoading: isLoadingCollectionMethods } = usePaymentTenderTypes({
+    limit: 1000,
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'name', order: 'asc' }],
+  });
+
+  const receiptTypeOptions = React.useMemo(() => receiptTypesData?.body ?? [], [receiptTypesData]);
+  const glAccountOptions = React.useMemo(() => {
+    const fetched = glAccountsData?.body?.data ?? [];
+    if (fetched.length) return fetched;
+
+    const mapped = new Map<number, { id: number; code: string; name: string }>();
+    receiptTypeOptions.forEach((item) => {
+      if (!mapped.has(item.glAccountId)) {
+        mapped.set(item.glAccountId, {
+          id: item.glAccountId,
+          code: String(item.glAccountId),
+          name: item.glAccountName,
+        });
+      }
+    });
+
+    return [...mapped.values()];
+  }, [glAccountsData, receiptTypeOptions]);
+  const collectionMethodOptions = React.useMemo(
+    () => collectionMethodsData?.body?.data ?? [],
+    [collectionMethodsData]
+  );
+
+  React.useEffect(() => {
+    if (!receiptTypeOptions.length || receiptTypeId) return;
+
+    const defaultReceiptType = receiptTypeOptions[0];
+    setReceiptTypeId(defaultReceiptType.paymentReceiptTypeId);
+    setGlAccountId(defaultReceiptType.glAccountId);
+  }, [receiptTypeId, receiptTypeOptions]);
+
+  React.useEffect(() => {
+    if (!collectionMethodOptions.length || collectionMethodId) return;
+    setCollectionMethodId(collectionMethodOptions[0].id);
+  }, [collectionMethodId, collectionMethodOptions]);
 
   const validRows = React.useMemo(() => parsedRows.filter((row) => row.isValid), [parsedRows]);
   const invalidRows = React.useMemo(() => parsedRows.filter((row) => !row.isValid), [parsedRows]);
@@ -222,8 +285,26 @@ export function LoanPaymentFile() {
       return;
     }
 
+    if (invalidRows.length) {
+      toast.error('El archivo tiene filas invalidas. Corrija antes de procesar.');
+      return;
+    }
+
+    if (!receiptTypeId) {
+      toast.error('Debe seleccionar tipo de recibo de pago');
+      return;
+    }
+
+    if (!collectionMethodId) {
+      toast.error('Debe seleccionar forma de pago');
+      return;
+    }
+
     const response = await processFile({
       body: {
+        receiptTypeId,
+        glAccountId,
+        collectionMethodId,
         fileName,
         records: validRows.map((row) => ({
           rowNumber: row.rowNumber,
@@ -236,8 +317,23 @@ export function LoanPaymentFile() {
     });
 
     setProcessResponse(response.body);
-    toast.success('Archivo enviado al backend');
-  }, [fileName, processFile, validRows]);
+    if (response.body.processed) {
+      setFileName('');
+      setParsedRows([]);
+      toast.success('Archivo procesado correctamente');
+      return;
+    }
+
+    toast.error(response.body.message);
+  }, [
+    collectionMethodId,
+    fileName,
+    glAccountId,
+    invalidRows.length,
+    processFile,
+    receiptTypeId,
+    validRows,
+  ]);
 
   return (
     <>
@@ -246,6 +342,87 @@ export function LoanPaymentFile() {
         description="Cargue archivo con la estructura: Numero Credito - Cedula - Fecha Abono - Valor Abono."
       />
       <PageContent>
+        <Card>
+          <CardHeader>
+            <CardTitle>Encabezado de procesamiento</CardTitle>
+            <CardDescription>Defina tipo de pago, auxiliar y forma de recaudo.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup className="grid gap-4 md:grid-cols-3">
+              <Field data-invalid={!receiptTypeId}>
+                <FieldLabel htmlFor="receiptTypeId">Tipo de recibo de pago</FieldLabel>
+                <Select
+                  onValueChange={(value) => {
+                    const nextId = value ? Number(value) : undefined;
+                    setReceiptTypeId(nextId);
+
+                    const selectedReceiptType = receiptTypeOptions.find(
+                      (item) => item.paymentReceiptTypeId === nextId
+                    );
+                    if (selectedReceiptType) {
+                      setGlAccountId(selectedReceiptType.glAccountId);
+                    }
+                  }}
+                  value={receiptTypeId ? String(receiptTypeId) : ''}
+                  disabled={isLoadingReceiptTypes}
+                >
+                  <SelectTrigger id="receiptTypeId">
+                    <SelectValue placeholder="Seleccione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {receiptTypeOptions.map((item) => (
+                      <SelectItem key={item.paymentReceiptTypeId} value={String(item.paymentReceiptTypeId)}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!receiptTypeId ? <FieldError errors={[{ message: 'Campo requerido' }]} /> : null}
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="glAccountId">Auxiliar contable</FieldLabel>
+                <Select
+                  onValueChange={(value) => setGlAccountId(value ? Number(value) : undefined)}
+                  value={glAccountId ? String(glAccountId) : ''}
+                >
+                  <SelectTrigger id="glAccountId">
+                    <SelectValue placeholder="Seleccione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {glAccountOptions.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.code} - {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field data-invalid={!collectionMethodId}>
+                <FieldLabel htmlFor="collectionMethodId">Forma de pago</FieldLabel>
+                <Select
+                  onValueChange={(value) => setCollectionMethodId(value ? Number(value) : undefined)}
+                  value={collectionMethodId ? String(collectionMethodId) : ''}
+                  disabled={isLoadingCollectionMethods}
+                >
+                  <SelectTrigger id="collectionMethodId">
+                    <SelectValue placeholder="Seleccione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {collectionMethodOptions.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!collectionMethodId ? <FieldError errors={[{ message: 'Campo requerido' }]} /> : null}
+              </Field>
+            </FieldGroup>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Archivo</CardTitle>
@@ -296,7 +473,7 @@ export function LoanPaymentFile() {
             <CardHeader>
               <CardTitle>Detalle del archivo</CardTitle>
               <CardDescription>
-                Revise la informacion antes de procesar.
+                Revise toda la informacion. Si una fila tiene error no se procesa ningun abono.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -328,13 +505,17 @@ export function LoanPaymentFile() {
               </Table>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" disabled={!validRows.length || isProcessing} onClick={onProcessFile}>
+                <Button
+                  type="button"
+                  disabled={!validRows.length || Boolean(invalidRows.length) || isProcessing}
+                  onClick={onProcessFile}
+                >
                   {isProcessing ? <Spinner /> : null}
                   Procesar archivo
                 </Button>
                 {invalidRows.length ? (
                   <p className="text-muted-foreground text-xs">
-                    {invalidRows.length} registro(s) no se enviaran por errores de formato.
+                    Corrija {invalidRows.length} fila(s) con error para poder procesar.
                   </p>
                 ) : null}
               </div>
@@ -345,21 +526,56 @@ export function LoanPaymentFile() {
         {processResponse ? (
           <Card>
             <CardHeader>
-              <CardTitle>Respuesta del backend</CardTitle>
+              <CardTitle>Resultado del procesamiento</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-3">
-              <div>
-                <p className="text-muted-foreground text-xs">Registros recibidos</p>
-                <p className="font-medium">{processResponse.receivedRecords}</p>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-4">
+                <div>
+                  <p className="text-muted-foreground text-xs">Estado</p>
+                  <p className={`font-medium ${processResponse.processed ? '' : 'text-destructive'}`}>
+                    {processResponse.processed ? 'Procesado' : 'No procesado'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Registros recibidos</p>
+                  <p className="font-medium">{processResponse.receivedRecords}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Registros procesados</p>
+                  <p className="font-medium">{processResponse.processedRecords}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Valor total recibido</p>
+                  <p className="font-medium">{formatCurrency(processResponse.totalPaymentAmount)}</p>
+                </div>
+                <div className="md:col-span-4">
+                  <p className="text-muted-foreground text-xs">Mensaje</p>
+                  <p className="font-medium">{processResponse.message}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Valor total recibido</p>
-                <p className="font-medium">{formatCurrency(processResponse.totalPaymentAmount)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Mensaje</p>
-                <p className="font-medium">{processResponse.message}</p>
-              </div>
+
+              {!processResponse.processed && processResponse.errors.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fila</TableHead>
+                      <TableHead>Credito</TableHead>
+                      <TableHead>Cedula</TableHead>
+                      <TableHead>Motivo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {processResponse.errors.map((error, index) => (
+                      <TableRow key={`${error.rowNumber ?? 'global'}-${index}`}>
+                        <TableCell>{error.rowNumber ?? '-'}</TableCell>
+                        <TableCell>{error.creditNumber ?? '-'}</TableCell>
+                        <TableCell>{error.documentNumber ?? '-'}</TableCell>
+                        <TableCell className="text-destructive">{error.reason}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : null}
             </CardContent>
           </Card>
         ) : null}

@@ -24,8 +24,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAgreements } from '@/hooks/queries/use-agreement-queries';
+import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
 import { useAvailableLoanPaymentReceiptTypes } from '@/hooks/queries/use-loan-payment-queries';
 import { useProcessLoanPaymentPayroll } from '@/hooks/queries/use-loan-payment-payroll-queries';
+import { usePaymentTenderTypes } from '@/hooks/queries/use-payment-tender-type-queries';
 import { Loan, LoanBalanceSummaryResponse } from '@/schemas/loan';
 import { ProcessLoanPaymentPayrollResult } from '@/schemas/loan-payment-payroll';
 import { getTsRestErrorMessage } from '@/utils/get-ts-rest-error-message';
@@ -53,10 +55,12 @@ type ImportedFileInfo = {
 
 const FormSchema = z.object({
   agreementId: z.number().int().positive().nullable().optional(),
-  companyDocumentNumber: z.string().trim().max(30).nullable().optional(),
+  companyDocumentNumber: z.string().trim().max(15).nullable().optional(),
   receiptTypeId: z.number().int().positive(),
+  glAccountId: z.number().int().positive().optional(),
+  collectionMethodId: z.number().int().positive(),
   collectionDate: z.coerce.date(),
-  referenceNumber: z.string().trim().min(1).max(50),
+  referenceNumber: z.string().trim().min(1).max(7),
   collectionAmount: z.number().positive(),
 }).superRefine((value, ctx) => {
   const hasAgreement = Boolean(value.agreementId);
@@ -182,6 +186,8 @@ export function LoanPaymentPayroll() {
       agreementId: undefined,
       companyDocumentNumber: '',
       receiptTypeId: undefined,
+      glAccountId: undefined,
+      collectionMethodId: undefined,
       collectionDate: new Date(),
       referenceNumber: '',
       collectionAmount: 0,
@@ -201,6 +207,16 @@ export function LoanPaymentPayroll() {
 
   const { data: receiptTypesData, isLoading: isLoadingReceiptTypes } =
     useAvailableLoanPaymentReceiptTypes();
+  const { data: glAccountsData } = useGlAccounts({
+    limit: 1000,
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'code', order: 'asc' }],
+  });
+  const { data: collectionMethodsData, isLoading: isLoadingCollectionMethods } = usePaymentTenderTypes({
+    limit: 1000,
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'name', order: 'asc' }],
+  });
 
   const agreements = React.useMemo(() => agreementsData?.body.data ?? [], [agreementsData]);
   const receiptTypeOptions = React.useMemo(() => {
@@ -208,6 +224,45 @@ export function LoanPaymentPayroll() {
     const payroll = options.filter((item) => item.movementType === 'PAYROLL');
     return payroll.length ? payroll : options;
   }, [receiptTypesData]);
+  const glAccountOptions = React.useMemo(() => {
+    const fetched = glAccountsData?.body?.data ?? [];
+    if (fetched.length) return fetched;
+
+    const mapped = new Map<number, { id: number; code: string; name: string }>();
+    receiptTypeOptions.forEach((item) => {
+      if (!mapped.has(item.glAccountId)) {
+        mapped.set(item.glAccountId, {
+          id: item.glAccountId,
+          code: String(item.glAccountId),
+          name: item.glAccountName,
+        });
+      }
+    });
+
+    return [...mapped.values()];
+  }, [glAccountsData, receiptTypeOptions]);
+  const collectionMethodOptions = React.useMemo(
+    () => collectionMethodsData?.body?.data ?? [],
+    [collectionMethodsData]
+  );
+
+  React.useEffect(() => {
+    if (!receiptTypeOptions.length) return;
+    const currentReceiptTypeId = form.getValues('receiptTypeId');
+    if (currentReceiptTypeId) return;
+
+    const defaultReceiptType = receiptTypeOptions[0];
+    form.setValue('receiptTypeId', defaultReceiptType.paymentReceiptTypeId);
+    form.setValue('glAccountId', defaultReceiptType.glAccountId);
+  }, [form, receiptTypeOptions]);
+
+  React.useEffect(() => {
+    if (!collectionMethodOptions.length) return;
+    const currentCollectionMethodId = form.getValues('collectionMethodId');
+    if (currentCollectionMethodId) return;
+
+    form.setValue('collectionMethodId', collectionMethodOptions[0].id);
+  }, [form, collectionMethodOptions]);
 
   const rowsToProcess = React.useMemo(
     () => rows.filter((row) => row.paymentAmount > 0 || row.overpaidAmount > 0),
@@ -230,7 +285,14 @@ export function LoanPaymentPayroll() {
   }, [collectionAmount, rowsToProcess]);
 
   const handleConsultLoans = React.useCallback(async () => {
-    const valid = await form.trigger();
+    const valid = await form.trigger([
+      'agreementId',
+      'companyDocumentNumber',
+      'receiptTypeId',
+      'collectionDate',
+      'referenceNumber',
+      'collectionAmount',
+    ]);
     if (!valid) return;
 
     const values = form.getValues();
@@ -411,6 +473,8 @@ export function LoanPaymentPayroll() {
         agreementId: values.agreementId ?? null,
         companyDocumentNumber: values.companyDocumentNumber?.trim() || null,
         receiptTypeId: values.receiptTypeId,
+        glAccountId: values.glAccountId,
+        collectionMethodId: values.collectionMethodId,
         collectionDate: values.collectionDate,
         referenceNumber: values.referenceNumber,
         collectionAmount: values.collectionAmount,
@@ -424,6 +488,27 @@ export function LoanPaymentPayroll() {
     });
 
     setProcessResponse(response.body);
+    if (response.body.processedRows > 0) {
+      const currentReceiptTypeId = form.getValues('receiptTypeId');
+      const currentGlAccountId = form.getValues('glAccountId');
+      const currentCollectionMethodId = form.getValues('collectionMethodId');
+
+      setRows([]);
+      setFileName('');
+      setFileInfo(null);
+
+      form.reset({
+        agreementId: undefined,
+        companyDocumentNumber: '',
+        receiptTypeId: currentReceiptTypeId,
+        glAccountId: currentGlAccountId,
+        collectionMethodId: currentCollectionMethodId,
+        collectionDate: new Date(),
+        referenceNumber: '',
+        collectionAmount: 0,
+      });
+    }
+
     toast.success('Lote enviado al backend');
   }, [form, processPayroll, rowsToProcess, totals.difference]);
 
@@ -494,7 +579,20 @@ export function LoanPaymentPayroll() {
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="receiptTypeId">Tipo de recibo de pago</FieldLabel>
                     <Select
-                      onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                      onValueChange={(value) => {
+                        const selectedId = value ? Number(value) : undefined;
+                        field.onChange(selectedId);
+
+                        const selectedReceiptType = receiptTypeOptions.find(
+                          (item) => item.paymentReceiptTypeId === selectedId
+                        );
+                        if (selectedReceiptType) {
+                          form.setValue('glAccountId', selectedReceiptType.glAccountId, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }
+                      }}
                       value={field.value ? String(field.value) : ''}
                       disabled={isLoadingReceiptTypes}
                     >
@@ -504,6 +602,59 @@ export function LoanPaymentPayroll() {
                       <SelectContent>
                         {receiptTypeOptions.map((item) => (
                           <SelectItem key={item.paymentReceiptTypeId} value={String(item.paymentReceiptTypeId)}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+
+              <Controller
+                name="glAccountId"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="glAccountId">Auxiliar contable</FieldLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                      value={field.value ? String(field.value) : ''}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {glAccountOptions.map((item) => (
+                          <SelectItem key={item.id} value={String(item.id)}>
+                            {item.code} - {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+
+              <Controller
+                name="collectionMethodId"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="collectionMethodId">Forma de pago</FieldLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                      value={field.value ? String(field.value) : ''}
+                      disabled={isLoadingCollectionMethods}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {collectionMethodOptions.map((item) => (
+                          <SelectItem key={item.id} value={String(item.id)}>
                             {item.name}
                           </SelectItem>
                         ))}

@@ -11,10 +11,12 @@ export const LoanPaymentPayrollRowSchema = z.object({
 
 export const ProcessLoanPaymentPayrollBodySchema = z.object({
   agreementId: z.number().int().positive().nullable().optional(),
-  companyDocumentNumber: z.string().trim().max(30).nullable().optional(),
+  companyDocumentNumber: z.string().trim().max(15).nullable().optional(),
   receiptTypeId: z.number().int().positive(),
+  glAccountId: z.number().int().positive().optional(),
+  collectionMethodId: z.number().int().positive(),
   collectionDate: z.coerce.date(),
-  referenceNumber: z.string().trim().min(1).max(50),
+  referenceNumber: z.string().trim().min(1).max(7),
   collectionAmount: z.number().positive(),
   rows: z.array(LoanPaymentPayrollRowSchema).min(1),
 }).superRefine((value, ctx) => {
@@ -48,6 +50,6 @@ export const ProcessLoanPaymentPayrollResponseSchema = z.object({
 });
 
 export type ProcessLoanPaymentPayrollResult = ClientInferResponseBody<
-  Contract['loanPaymentPayroll']['process'],
+  Contract['loanPayment']['processPayroll'],
   200
 >;

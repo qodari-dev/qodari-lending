@@ -29,8 +29,6 @@ import { insuranceReport } from './insurance-report';
 import { investmentType } from './investment-type';
 import { loan } from './loan';
 import { loanApplication } from './loan-application';
-import { loanPaymentFile } from './loan-payment-file';
-import { loanPaymentPayroll } from './loan-payment-payroll';
 import { loanRefinancing } from './loan-refinancing';
 import { loanPayment } from './loan-payment';
 import { loanWriteOff } from './loan-write-off';
@@ -82,8 +80,6 @@ export const contract = c.router(
     investmentType,
     loan,
     loanApplication,
-    loanPaymentFile,
-    loanPaymentPayroll,
     loanRefinancing,
     loanPayment,
     loanWriteOff,

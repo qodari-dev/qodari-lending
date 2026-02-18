@@ -5,6 +5,14 @@ import {
   ListLoanPaymentsQuerySchema,
   VoidLoanPaymentBodySchema,
 } from '@/schemas/loan-payment';
+import {
+  ProcessLoanPaymentFileBodySchema,
+  ProcessLoanPaymentFileResponseSchema,
+} from '@/schemas/loan-payment-file';
+import {
+  ProcessLoanPaymentPayrollBodySchema,
+  ProcessLoanPaymentPayrollResponseSchema,
+} from '@/schemas/loan-payment-payroll';
 import { IdParamSchema } from '@/schemas/shared';
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
 import { LoanPayments } from '@/server/db';
@@ -94,6 +102,46 @@ export const loanPayment = c.router(
         403: TsRestErrorSchema,
         404: TsRestErrorSchema,
         409: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    processPayroll: {
+      method: 'POST',
+      path: '/payroll/process',
+      body: ProcessLoanPaymentPayrollBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'create',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: ProcessLoanPaymentPayrollResponseSchema,
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    processFile: {
+      method: 'POST',
+      path: '/file/process',
+      body: ProcessLoanPaymentFileBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'create',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: ProcessLoanPaymentFileResponseSchema,
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
         500: TsRestErrorSchema,
       },
     },

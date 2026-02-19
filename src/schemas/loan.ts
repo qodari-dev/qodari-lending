@@ -133,8 +133,11 @@ const LOAN_INCLUDE_OPTIONS = [
   'disbursementParty',
   'bank',
   'channel',
+  'loanProcessStates',
   'loanInstallments',
   'loanPayments',
+  'portfolioEntries',
+  'accountingEntries',
   'loanAgreementHistory',
   'loanStatusHistory',
   'loanBillingConcepts',
@@ -193,6 +196,9 @@ export const UpdateLoanBankInfoBodySchema = z.object({
   bankId: z.number().int().positive(),
   bankAccountType: z.enum(BANK_ACCOUNT_TYPE_OPTIONS),
   bankAccountNumber: z.string().trim().min(1).max(25),
+});
+export const UpdateLoanAgreementBodySchema = z.object({
+  agreementId: z.number().int().positive(),
 });
 export const GetLoanStatementQuerySchema = z.object({
   from: z.coerce.date().optional(),

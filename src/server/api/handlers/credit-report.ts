@@ -1,4 +1,5 @@
 import {
+  CreditExtractReportResponse,
   CancelledRejectedCreditsReportRow,
   GenerateCancelledRejectedCreditsReportBodySchema,
   GenerateCreditClearancePdfBodySchema,
@@ -10,6 +11,7 @@ import {
   GenerateSettledCreditsReportBodySchema,
   GenerateSuperintendenciaReportBodySchema,
   GenerateThirdPartyClearancePdfBodySchema,
+  GetCreditExtractReportQuerySchema,
   LiquidatedCreditsReportRow,
   MovementVoucherReportRow,
   NonLiquidatedCreditsReportRow,
@@ -17,11 +19,15 @@ import {
   SettledCreditsReportRow,
   SuperintendenciaReportRow,
 } from '@/schemas/credit-report';
-import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
+import { db, loans } from '@/server/db';
+import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
+import { getLoanBalanceSummary, getLoanStatement } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { buildCreditExtractClientStatement } from '@/utils/credit-extract-client';
 import { roundMoney } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { differenceInCalendarDays, format } from 'date-fns';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { contract } from '../contracts';
 
@@ -39,6 +45,7 @@ type GenerateSuperintendenciaReportBody = z.infer<typeof GenerateSuperintendenci
 type GenerateMinutesPdfBody = z.infer<typeof GenerateMinutesPdfBodySchema>;
 type GenerateCreditClearancePdfBody = z.infer<typeof GenerateCreditClearancePdfBodySchema>;
 type GenerateThirdPartyClearancePdfBody = z.infer<typeof GenerateThirdPartyClearancePdfBodySchema>;
+type GetExtractQuery = z.infer<typeof GetCreditExtractReportQuerySchema>;
 
 type PermissionRequest = Parameters<typeof getAuthContextAndValidatePermission>[0];
 type PermissionMetadata = Parameters<typeof getAuthContextAndValidatePermission>[1];
@@ -95,6 +102,181 @@ function buildDemoPdfBase64(title: string, lines: string[]) {
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
 
   return Buffer.from(pdf, 'utf8').toString('base64');
+}
+
+function getBorrowerName(borrower: {
+  personType: 'NATURAL' | 'LEGAL';
+  businessName: string | null;
+  firstName: string | null;
+  secondName: string | null;
+  firstLastName: string | null;
+  secondLastName: string | null;
+  documentNumber: string;
+} | null): string {
+  if (!borrower) return '-';
+  if (borrower.personType === 'LEGAL') {
+    return borrower.businessName ?? borrower.documentNumber;
+  }
+
+  const fullName = [borrower.firstName, borrower.secondName, borrower.firstLastName, borrower.secondLastName]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  return fullName || borrower.documentNumber;
+}
+
+export async function getCreditExtractReportData(
+  creditNumberRaw: string
+): Promise<CreditExtractReportResponse> {
+  const creditNumber = creditNumberRaw.trim();
+
+  const loan = await db.query.loans.findFirst({
+    where: eq(loans.creditNumber, creditNumber),
+    columns: {
+      id: true,
+      creditNumber: true,
+      status: true,
+      recordDate: true,
+      creditStartDate: true,
+      maturityDate: true,
+      firstCollectionDate: true,
+    },
+    with: {
+      borrower: {
+        columns: {
+          personType: true,
+          businessName: true,
+          firstName: true,
+          secondName: true,
+          firstLastName: true,
+          secondLastName: true,
+          documentNumber: true,
+        },
+      },
+      affiliationOffice: {
+        columns: {
+          name: true,
+        },
+      },
+      agreement: {
+        columns: {
+          agreementCode: true,
+          businessName: true,
+        },
+      },
+    },
+  });
+
+  if (!loan) {
+    throwHttpError({
+      status: 404,
+      message: `No se encontro credito con numero ${creditNumber}`,
+      code: 'NOT_FOUND',
+    });
+  }
+
+  const [balanceSummary, statement] = await Promise.all([
+    getLoanBalanceSummary(loan.id),
+    getLoanStatement(loan.id, {}),
+  ]);
+  const clientStatement = buildCreditExtractClientStatement(statement);
+
+  return {
+    loan: {
+      id: loan.id,
+      creditNumber: loan.creditNumber,
+      status: loan.status,
+      recordDate: loan.recordDate,
+      creditStartDate: loan.creditStartDate,
+      maturityDate: loan.maturityDate,
+      firstCollectionDate: loan.firstCollectionDate,
+      borrowerDocumentNumber: loan.borrower?.documentNumber ?? null,
+      borrowerName: getBorrowerName(loan.borrower),
+      affiliationOfficeName: loan.affiliationOffice?.name ?? null,
+      agreementLabel: loan.agreement
+        ? `${loan.agreement.agreementCode} - ${loan.agreement.businessName}`
+        : null,
+    },
+    balanceSummary,
+    statement,
+    clientStatement,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function getCreditExtractReportDataByLoanId(loanId: number): Promise<CreditExtractReportResponse> {
+  const loan = await db.query.loans.findFirst({
+    where: eq(loans.id, loanId),
+    columns: {
+      id: true,
+      creditNumber: true,
+      status: true,
+      recordDate: true,
+      creditStartDate: true,
+      maturityDate: true,
+      firstCollectionDate: true,
+    },
+    with: {
+      borrower: {
+        columns: {
+          personType: true,
+          businessName: true,
+          firstName: true,
+          secondName: true,
+          firstLastName: true,
+          secondLastName: true,
+          documentNumber: true,
+        },
+      },
+      affiliationOffice: {
+        columns: {
+          name: true,
+        },
+      },
+      agreement: {
+        columns: {
+          agreementCode: true,
+          businessName: true,
+        },
+      },
+    },
+  });
+
+  if (!loan) {
+    throwHttpError({
+      status: 404,
+      message: `No se encontro credito con ID ${loanId}`,
+      code: 'NOT_FOUND',
+    });
+  }
+
+  const [balanceSummary, statement] = await Promise.all([
+    getLoanBalanceSummary(loan.id),
+    getLoanStatement(loan.id, {}),
+  ]);
+  const clientStatement = buildCreditExtractClientStatement(statement);
+
+  return {
+    loan: {
+      id: loan.id,
+      creditNumber: loan.creditNumber,
+      status: loan.status,
+      recordDate: loan.recordDate,
+      creditStartDate: loan.creditStartDate,
+      maturityDate: loan.maturityDate,
+      firstCollectionDate: loan.firstCollectionDate,
+      borrowerDocumentNumber: loan.borrower?.documentNumber ?? null,
+      borrowerName: getBorrowerName(loan.borrower),
+      affiliationOfficeName: loan.affiliationOffice?.name ?? null,
+      agreementLabel: loan.agreement
+        ? `${loan.agreement.agreementCode} - ${loan.agreement.businessName}`
+        : null,
+    },
+    balanceSummary,
+    statement,
+    clientStatement,
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 function buildPaidInstallmentsRows(count: number): PaidInstallmentsReportRow[] {
@@ -458,6 +640,40 @@ async function generateThirdPartyClearancePdf(
   }
 }
 
+async function getExtract(query: GetExtractQuery, context: HandlerContext) {
+  const { request, appRoute } = context;
+  try {
+    await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const report = await getCreditExtractReportData(query.creditNumber);
+
+    return {
+      status: 200 as const,
+      body: report,
+    };
+  } catch (e) {
+    return genericTsRestErrorResponse(e, {
+      genericMsg: 'Error al generar extracto de credito',
+    });
+  }
+}
+
+async function getExtractByLoanId(params: { id: number }, context: HandlerContext) {
+  const { request, appRoute } = context;
+  try {
+    await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const report = await getCreditExtractReportDataByLoanId(params.id);
+
+    return {
+      status: 200 as const,
+      body: report,
+    };
+  } catch (e) {
+    return genericTsRestErrorResponse(e, {
+      genericMsg: `Error al generar extracto para credito ${params.id}`,
+    });
+  }
+}
+
 export const creditReport = tsr.router(contract.creditReport, {
   generatePaidInstallments: ({ body }, context) => generatePaidInstallments(body, context),
   generateLiquidatedCredits: ({ body }, context) => generateLiquidatedCredits(body, context),
@@ -471,4 +687,6 @@ export const creditReport = tsr.router(contract.creditReport, {
   generateCreditClearancePdf: ({ body }, context) => generateCreditClearancePdf(body, context),
   generateThirdPartyClearancePdf: ({ body }, context) =>
     generateThirdPartyClearancePdf(body, context),
+  getExtract: ({ query }, context) => getExtract(query, context),
+  getExtractByLoanId: ({ params }, context) => getExtractByLoanId(params, context),
 });

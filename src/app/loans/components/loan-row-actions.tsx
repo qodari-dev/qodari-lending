@@ -4,7 +4,7 @@ import { DataTableRowActions, type RowAction, type RowActionGroup } from '@/comp
 import { Loan } from '@/schemas/loan';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { Row, Table } from '@tanstack/react-table';
-import { Ban, CheckCircle2, Eye, Handshake, Landmark, Scale } from 'lucide-react';
+import { Ban, Building2, CheckCircle2, Eye, Handshake, Landmark, Scale } from 'lucide-react';
 
 interface LoanRowActionsProps {
   row: Row<Loan>;
@@ -48,6 +48,12 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
       icon: Handshake,
       onClick: meta?.onRowPaymentAgreement,
       hidden: !(canUpdate && loan.status === 'ACTIVE'),
+    },
+    {
+      label: 'Cambiar convenio',
+      icon: Building2,
+      onClick: meta?.onRowAgreement,
+      hidden: !canUpdate,
     },
     {
       label: 'Datos bancarios',

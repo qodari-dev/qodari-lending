@@ -303,7 +303,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 title: 'Creditos',
                 icon: BarChart3,
                 items: [
-                  { title: 'Extracto', url: `/report-credits/extract` },
+                  { title: 'Extracto', url: `/credit-reports/extract` },
                   { title: 'Cuotas Pagadas', url: `/credit-reports/paid-installments` },
                   { title: 'Creditos Liquidados', url: `/credit-reports/liquidated-credits` },
                   {

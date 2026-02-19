@@ -20,6 +20,7 @@ import { Loan, LoanInclude, LOAN_STATUS_OPTIONS, LoanSortField, LoanStatus } fro
 import { RowData, TableMeta } from '@tanstack/react-table';
 import React from 'react';
 import { loanColumns } from './loan-columns';
+import { LoanAgreementDialog } from './loan-agreement-dialog';
 import { LoanBankInfoDialog } from './loan-bank-info-dialog';
 import { LoanInfo } from './loan-info';
 import { loanExportConfig } from './loan-export-config';
@@ -34,6 +35,7 @@ declare module '@tanstack/table-core' {
     onRowVoid?: (row: TData) => void;
     onRowLegalProcess?: (row: TData) => void;
     onRowPaymentAgreement?: (row: TData) => void;
+    onRowAgreement?: (row: TData) => void;
     onRowBankInfo?: (row: TData) => void;
   }
 }
@@ -44,6 +46,7 @@ export function Loans() {
   const [loanToVoid, setLoanToVoid] = React.useState<Loan>();
   const [loanToUpdateLegalProcess, setLoanToUpdateLegalProcess] = React.useState<Loan>();
   const [loanToUpdatePaymentAgreement, setLoanToUpdatePaymentAgreement] = React.useState<Loan>();
+  const [loanToUpdateAgreement, setLoanToUpdateAgreement] = React.useState<Loan>();
   const [loanToUpdateBankInfo, setLoanToUpdateBankInfo] = React.useState<Loan>();
 
   const {
@@ -148,6 +151,12 @@ export function Loans() {
     setLoanToUpdatePaymentAgreement(row);
     setOpenedPaymentAgreementDialog(true);
   }, []);
+  const [openedAgreementDialog, setOpenedAgreementDialog] = React.useState(false);
+
+  const handleRowAgreement = React.useCallback((row: Loan) => {
+    setLoanToUpdateAgreement(row);
+    setOpenedAgreementDialog(true);
+  }, []);
   const [openedBankInfoDialog, setOpenedBankInfoDialog] = React.useState(false);
 
   const handleRowBankInfo = React.useCallback((row: Loan) => {
@@ -194,6 +203,7 @@ export function Loans() {
       onRowVoid: handleRowVoid,
       onRowLegalProcess: handleRowLegalProcess,
       onRowPaymentAgreement: handleRowPaymentAgreement,
+      onRowAgreement: handleRowAgreement,
       onRowBankInfo: handleRowBankInfo,
     }),
     [
@@ -202,6 +212,7 @@ export function Loans() {
       handleRowVoid,
       handleRowLegalProcess,
       handleRowPaymentAgreement,
+      handleRowAgreement,
       handleRowBankInfo,
     ]
   );
@@ -293,6 +304,16 @@ export function Loans() {
           setOpenedBankInfoDialog(open);
           if (!open) {
             setLoanToUpdateBankInfo(undefined);
+          }
+        }}
+      />
+      <LoanAgreementDialog
+        loan={loanToUpdateAgreement}
+        opened={openedAgreementDialog}
+        onOpened={(open) => {
+          setOpenedAgreementDialog(open);
+          if (!open) {
+            setLoanToUpdateAgreement(undefined);
           }
         }}
       />

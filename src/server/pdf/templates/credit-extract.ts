@@ -1,6 +1,5 @@
 import React from 'react';
-import { CreditExtractReportResponse } from '@/schemas/report-credit';
-import { LoanBalanceByAccount, LoanStatementEntry } from '@/schemas/loan';
+import { CreditExtractReportResponse } from '@/schemas/credit-report';
 import { PdfTemplateBuilder } from '../types';
 import { createBaseStyles } from '../theme';
 import { formatCurrency, formatDate } from '../format';
@@ -8,84 +7,46 @@ import { PageShell, MetaLines, SummaryGrid, PdfTable, TableColumn } from '../com
 
 const h = React.createElement;
 
-const balanceColumns: TableColumn<LoanBalanceByAccount>[] = [
+const movementColumns: TableColumn<CreditExtractReportResponse['clientStatement']['movements'][number]>[] = [
   {
-    header: 'Auxiliar',
-    width: '40%',
-    paddingRight: 4,
-    getValue: (r) => [r.glAccountCode, r.glAccountName].filter(Boolean).join(' - ') || '-',
+    header: 'Fecha',
+    width: '12%',
+    getValue: (r) => formatDate(r.entryDate),
   },
   {
-    header: 'Cargos',
-    width: '20%',
+    header: 'Movimiento',
+    width: '16%',
+    paddingRight: 4,
+    getValue: (r) => r.movement,
+  },
+  {
+    header: 'Referencia',
+    width: '16%',
+    getValue: (r) => r.reference,
+  },
+  {
+    header: 'Concepto',
+    width: '24%',
+    paddingRight: 4,
+    getValue: (r) => r.concept,
+  },
+  {
+    header: 'Cargo',
+    width: '10%',
     textAlign: 'right',
     getValue: (r) => formatCurrency(r.chargeAmount),
   },
   {
-    header: 'Pagos',
-    width: '20%',
+    header: 'Abono',
+    width: '10%',
     textAlign: 'right',
     getValue: (r) => formatCurrency(r.paymentAmount),
-  },
-  {
-    header: 'Saldo',
-    width: '20%',
-    textAlign: 'right',
-    getValue: (r) => formatCurrency(r.balance),
-  },
-];
-
-const movementColumns: TableColumn<LoanStatementEntry>[] = [
-  {
-    header: 'Fecha',
-    width: '10%',
-    getValue: (r) => formatDate(r.entryDate),
-  },
-  {
-    header: 'Fuente',
-    width: '15%',
-    paddingRight: 4,
-    getValue: (r) =>
-      r.relatedPaymentNumber ? `${r.sourceLabel} (${r.relatedPaymentNumber})` : r.sourceLabel,
-  },
-  {
-    header: 'Doc',
-    width: '8%',
-    getValue: (r) => `${r.documentCode}-${r.sequence}`,
-  },
-  {
-    header: 'Cuenta',
-    width: '20%',
-    paddingRight: 4,
-    getValue: (r) => [r.glAccountCode, r.glAccountName].filter(Boolean).join(' - ') || '-',
-  },
-  {
-    header: 'Nat',
-    width: '6%',
-    getValue: (r) => r.nature,
-  },
-  {
-    header: 'Valor',
-    width: '12%',
-    textAlign: 'right',
-    getValue: (r) => formatCurrency(r.amount),
-  },
-  {
-    header: 'Delta',
-    width: '12%',
-    textAlign: 'right',
-    getValue: (r) => formatCurrency(r.receivableDelta),
   },
   {
     header: 'Saldo',
     width: '12%',
     textAlign: 'right',
     getValue: (r) => formatCurrency(r.runningBalance),
-  },
-  {
-    header: 'Estado',
-    width: '9%',
-    getValue: (r) => r.status,
   },
 ];
 
@@ -108,29 +69,27 @@ export const creditExtractTemplate: PdfTemplateBuilder<CreditExtractReportRespon
         { label: 'Oficina', value: data.loan.affiliationOfficeName ?? '-' },
         { label: 'Convenio', value: data.loan.agreementLabel ?? '-' },
       ]),
-      h(Text, { style: styles.sectionTitle, key: 'sec-summary' }, 'Resumen de saldo'),
+      h(Text, { style: styles.sectionTitle, key: 'sec-summary' }, 'Situacion actual del credito'),
       SummaryGrid(rpdf, styles, [
         { label: 'Saldo actual', value: formatCurrency(data.balanceSummary.currentBalance) },
         { label: 'Saldo vencido', value: formatCurrency(data.balanceSummary.overdueBalance) },
+        { label: 'Saldo al dia', value: formatCurrency(data.balanceSummary.currentDueBalance) },
         { label: 'Cuotas abiertas', value: String(data.balanceSummary.openInstallments) },
-        { label: 'Total causado', value: formatCurrency(data.balanceSummary.totalCharged) },
-        { label: 'Total pagado', value: formatCurrency(data.balanceSummary.totalPaid) },
         { label: 'Proximo vencimiento', value: formatDate(data.balanceSummary.nextDueDate) },
       ]),
-      h(Text, { style: styles.sectionTitle, key: 'sec-balance' }, 'Saldo por auxiliar'),
-      PdfTable(rpdf, styles, {
-        columns: balanceColumns,
-        rows: data.balanceSummary.byAccount,
-        emptyMessage: 'Sin informacion de cartera por auxiliar.',
-        keyExtractor: (r) => `bal-${r.glAccountId}`,
-        tableKey: 'balance',
-      }),
-      h(Text, { style: styles.sectionTitle, key: 'sec-movements' }, 'Movimientos'),
+      h(Text, { style: styles.sectionTitle, key: 'sec-period' }, 'Resumen del periodo del extracto'),
+      SummaryGrid(rpdf, styles, [
+        { label: 'Saldo inicial', value: formatCurrency(data.clientStatement.openingBalance) },
+        { label: 'Cargos del periodo', value: formatCurrency(data.clientStatement.totalCharges) },
+        { label: 'Abonos del periodo', value: formatCurrency(data.clientStatement.totalPayments) },
+        { label: 'Saldo final', value: formatCurrency(data.clientStatement.closingBalance) },
+      ]),
+      h(Text, { style: styles.sectionTitle, key: 'sec-movements' }, 'Movimientos del extracto'),
       PdfTable(rpdf, styles, {
         columns: movementColumns,
-        rows: data.statement.entries,
+        rows: data.clientStatement.movements,
         emptyMessage: 'Sin movimientos.',
-        keyExtractor: (r) => `mov-${r.id}`,
+        keyExtractor: (r) => r.id,
         tableKey: 'movements',
       }),
     ],

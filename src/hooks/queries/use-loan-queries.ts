@@ -149,6 +149,22 @@ export function useUpdateLoanBankInfo() {
   });
 }
 
+export function useUpdateLoanAgreement() {
+  const queryClient = api.useQueryClient();
+
+  return api.loan.updateAgreement.useMutation({
+    onSuccess: (_, variables) => {
+      const id = variables.params.id as number;
+      queryClient.invalidateQueries({ queryKey: loansKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loansKeys.detail(id) });
+      toast.success('Convenio actualizado');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
 export function useLoanBalanceSummary(id: number, options?: { enabled?: boolean }) {
   return api.loan.getBalanceSummary.useQuery({
     queryKey: loansKeys.balanceSummary(id),

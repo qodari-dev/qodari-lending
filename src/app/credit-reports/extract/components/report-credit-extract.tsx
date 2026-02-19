@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useCreditExtractReport } from '@/hooks/queries/use-report-credit-queries';
+import { useCreditExtractReport } from '@/hooks/queries/use-credit-report-queries';
 import { getTsRestErrorMessage } from '@/utils/get-ts-rest-error-message';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { AlertTriangle, FileDown, Search } from 'lucide-react';
@@ -62,7 +62,7 @@ export function ReportCreditExtract() {
       try {
         setIsGeneratingPdf(true);
         const params = new URLSearchParams({ creditNumber: report.loan.creditNumber });
-        const response = await fetch(`/api/v1/report-credits/extract/pdf?${params.toString()}`, {
+        const response = await fetch(`/api/v1/credit-reports/extract/pdf?${params.toString()}`, {
           method: 'GET',
           credentials: 'include',
         });
@@ -184,7 +184,7 @@ export function ReportCreditExtract() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Resumen de saldo</CardTitle>
+                <CardTitle>Situacion actual del credito</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-3">
                 <div>
@@ -200,99 +200,77 @@ export function ReportCreditExtract() {
                   <p className="font-medium">{report.balanceSummary.openInstallments}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Total causado</p>
-                  <p className="font-medium">{formatCurrency(report.balanceSummary.totalCharged)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Total pagado</p>
-                  <p className="font-medium">{formatCurrency(report.balanceSummary.totalPaid)}</p>
+                  <p className="text-muted-foreground text-xs">Saldo al dia</p>
+                  <p className="font-medium">{formatCurrency(report.balanceSummary.currentDueBalance)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Proximo vencimiento</p>
                   <p className="font-medium">{formatDate(report.balanceSummary.nextDueDate)}</p>
                 </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Fecha de corte</p>
+                  <p className="font-medium">{formatDate(report.generatedAt)}</p>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Saldo por auxiliar</CardTitle>
+                <CardTitle>Resumen del periodo del extracto</CardTitle>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Auxiliar</TableHead>
-                      <TableHead>Cargos</TableHead>
-                      <TableHead>Pagos</TableHead>
-                      <TableHead>Saldo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {report.balanceSummary.byAccount.length ? (
-                      report.balanceSummary.byAccount.map((row) => (
-                        <TableRow key={row.glAccountId}>
-                          <TableCell>
-                            {[row.glAccountCode, row.glAccountName].filter(Boolean).join(' - ') || '-'}
-                          </TableCell>
-                          <TableCell>{formatCurrency(row.chargeAmount)}</TableCell>
-                          <TableCell>{formatCurrency(row.paymentAmount)}</TableCell>
-                          <TableCell>{formatCurrency(row.balance)}</TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4}>Sin informacion</TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+              <CardContent className="grid gap-3 md:grid-cols-4">
+                <div>
+                  <p className="text-muted-foreground text-xs">Saldo inicial</p>
+                  <p className="font-medium">{formatCurrency(report.clientStatement.openingBalance)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Cargos del periodo</p>
+                  <p className="font-medium">{formatCurrency(report.clientStatement.totalCharges)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Abonos del periodo</p>
+                  <p className="font-medium">{formatCurrency(report.clientStatement.totalPayments)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Saldo final</p>
+                  <p className="font-medium">{formatCurrency(report.clientStatement.closingBalance)}</p>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Movimientos</CardTitle>
+                <CardTitle>Movimientos del extracto</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Fecha</TableHead>
-                      <TableHead>Fuente</TableHead>
-                      <TableHead>Documento</TableHead>
-                      <TableHead>Cuenta</TableHead>
-                      <TableHead>Naturaleza</TableHead>
-                      <TableHead>Valor</TableHead>
-                      <TableHead>Delta cartera</TableHead>
-                      <TableHead>Saldo cartera</TableHead>
-                      <TableHead>Estado</TableHead>
+                      <TableHead>Movimiento</TableHead>
+                      <TableHead>Referencia</TableHead>
+                      <TableHead>Concepto</TableHead>
+                      <TableHead>Cargo</TableHead>
+                      <TableHead>Abono</TableHead>
+                      <TableHead>Saldo</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {report.statement.entries.length ? (
-                      report.statement.entries.map((row) => (
+                    {report.clientStatement.movements.length ? (
+                      report.clientStatement.movements.map((row) => (
                         <TableRow key={row.id}>
                           <TableCell>{formatDate(row.entryDate)}</TableCell>
-                          <TableCell>
-                            {row.relatedPaymentNumber
-                              ? `${row.sourceLabel} (${row.relatedPaymentNumber})`
-                              : row.sourceLabel}
-                          </TableCell>
-                          <TableCell>{`${row.documentCode}-${row.sequence}`}</TableCell>
-                          <TableCell>
-                            {[row.glAccountCode, row.glAccountName].filter(Boolean).join(' - ') || '-'}
-                          </TableCell>
-                          <TableCell>{row.nature}</TableCell>
-                          <TableCell>{formatCurrency(row.amount)}</TableCell>
-                          <TableCell>{formatCurrency(row.receivableDelta)}</TableCell>
+                          <TableCell>{row.movement}</TableCell>
+                          <TableCell>{row.reference}</TableCell>
+                          <TableCell>{row.concept}</TableCell>
+                          <TableCell>{formatCurrency(row.chargeAmount)}</TableCell>
+                          <TableCell>{formatCurrency(row.paymentAmount)}</TableCell>
                           <TableCell>{formatCurrency(row.runningBalance)}</TableCell>
-                          <TableCell>{row.status}</TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={9}>Sin movimientos</TableCell>
+                        <TableCell colSpan={7}>Sin movimientos</TableCell>
                       </TableRow>
                     )}
                   </TableBody>

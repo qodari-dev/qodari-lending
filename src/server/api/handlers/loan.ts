@@ -1,14 +1,18 @@
 import {
+  agreements,
   accountingDistributionLines,
   accountingEntries,
   banks,
   db,
   loanApplications,
+  loanApplicationRiskAssessments,
+  loanApplicationStatusHistory,
   loanAgreementHistory,
   loanBillingConcepts,
   loanInstallments,
   loanPayments,
   loanRefinancingLinks,
+  portfolioEntries,
   loans,
   loanStatusHistory,
 } from '@/server/db';
@@ -107,6 +111,12 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
           },
         },
         loanApplicationPledges: true,
+        loanApplicationStatusHistory: {
+          orderBy: [desc(loanApplicationStatusHistory.changedAt)],
+        },
+        loanApplicationRiskAssessments: {
+          orderBy: [desc(loanApplicationRiskAssessments.executedAt)],
+        },
       },
     },
   },
@@ -164,6 +174,14 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
       orderBy: [asc(loanInstallments.installmentNumber)],
     },
   },
+  loanProcessStates: {
+    relation: 'loanProcessStates',
+    config: {
+      with: {
+        lastProcessRun: true,
+      },
+    },
+  },
   loanPayments: {
     relation: 'loanPayments',
     config: {
@@ -177,6 +195,24 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
         },
       },
       orderBy: [desc(loanPayments.paymentDate), desc(loanPayments.id)],
+    },
+  },
+  portfolioEntries: {
+    relation: 'portfolioEntries',
+    config: {
+      with: {
+        glAccount: true,
+      },
+      orderBy: [asc(portfolioEntries.dueDate), asc(portfolioEntries.installmentNumber)],
+    },
+  },
+  accountingEntries: {
+    relation: 'accountingEntries',
+    config: {
+      with: {
+        glAccount: true,
+      },
+      orderBy: [desc(accountingEntries.entryDate), desc(accountingEntries.documentCode), desc(accountingEntries.sequence)],
     },
   },
   loanAgreementHistory: {
@@ -793,6 +829,143 @@ export const loan = tsr.router(contract.loan, {
           requestedBankId: body.bankId,
           requestedBankAccountType: body.bankAccountType,
           requestedBankAccountNumber: body.bankAccountNumber,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return error;
+    }
+  },
+
+  updateAgreement: async ({ params: { id }, body }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const existingLoan = await db.query.loans.findFirst({
+        where: eq(loans.id, id),
+      });
+
+      if (!existingLoan) {
+        throwHttpError({
+          status: 404,
+          message: `Credito con ID ${id} no encontrado`,
+          code: 'NOT_FOUND',
+        });
+      }
+
+      if (existingLoan.agreementId === body.agreementId) {
+        throwHttpError({
+          status: 400,
+          message: 'El credito ya tiene asignado ese convenio',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const agreement = await db.query.agreements.findFirst({
+        where: and(eq(agreements.id, body.agreementId), eq(agreements.isActive, true)),
+        columns: {
+          id: true,
+          agreementCode: true,
+          businessName: true,
+        },
+      });
+
+      if (!agreement) {
+        throwHttpError({
+          status: 400,
+          message: 'Convenio invalido o inactivo',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const { userId, userName } = getRequiredUserContext(session);
+      const effectiveDate = formatDateOnly(new Date());
+      const [updatedLoan] = await db.transaction(async (tx) => {
+        const [loanUpdated] = await tx
+          .update(loans)
+          .set({
+            agreementId: body.agreementId,
+          })
+          .where(eq(loans.id, id))
+          .returning();
+
+        if (!loanUpdated) {
+          throwHttpError({
+            status: 404,
+            message: `Credito con ID ${id} no encontrado`,
+            code: 'NOT_FOUND',
+          });
+        }
+
+        await tx.insert(loanAgreementHistory).values({
+          loanId: id,
+          agreementId: body.agreementId,
+          effectiveDate,
+          changedByUserId: userId,
+          changedByUserName: userName || userId,
+          note: 'Convenio actualizado desde captura de creditos',
+          metadata: {
+            operation: 'UPDATE_LOAN_AGREEMENT',
+            previousAgreementId: existingLoan.agreementId,
+            newAgreementId: body.agreementId,
+          },
+        });
+
+        return [loanUpdated];
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'updateAgreement',
+        resourceId: id.toString(),
+        resourceLabel: existingLoan.creditNumber,
+        status: 'success',
+        beforeValue: existingLoan,
+        afterValue: updatedLoan,
+        metadata: {
+          previousAgreementId: existingLoan.agreementId,
+          newAgreementId: updatedLoan.agreementId,
+          agreementCode: agreement.agreementCode,
+          agreementName: agreement.businessName,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return {
+        status: 200 as const,
+        body: updatedLoan,
+      };
+    } catch (e) {
+      const error = genericTsRestErrorResponse(e, {
+        genericMsg: `Error al actualizar convenio del credito ${id}`,
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'updateAgreement',
+        resourceId: id.toString(),
+        status: 'failure',
+        errorMessage: error.body.message,
+        metadata: {
+          previousAgreementId: null,
+          requestedAgreementId: body.agreementId,
         },
         ipAddress,
         userAgent,

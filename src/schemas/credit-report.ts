@@ -1,4 +1,5 @@
 import { Contract } from '@/server/api/contracts';
+import { LoanBalanceSummary, LoanStatement } from '@/schemas/loan';
 import { ClientInferResponseBody } from '@ts-rest/core';
 import { z } from 'zod';
 
@@ -33,6 +34,53 @@ function buildDateRangeResponse<
     message: z.string(),
   });
 }
+
+export const GetCreditExtractReportQuerySchema = z.object({
+  creditNumber: z.string().trim().min(1).max(20),
+});
+
+export type CreditExtractReportLoan = {
+  id: number;
+  creditNumber: string;
+  status: string;
+  recordDate: string;
+  creditStartDate: string;
+  maturityDate: string;
+  firstCollectionDate: string | null;
+  borrowerDocumentNumber: string | null;
+  borrowerName: string;
+  affiliationOfficeName: string | null;
+  agreementLabel: string | null;
+};
+
+export type CreditExtractClientMovement = {
+  id: string;
+  entryDate: string;
+  movement: string;
+  reference: string;
+  concept: string;
+  chargeAmount: string;
+  paymentAmount: string;
+  runningBalance: string;
+};
+
+export type CreditExtractClientStatement = {
+  from: string | null;
+  to: string | null;
+  openingBalance: string;
+  closingBalance: string;
+  totalCharges: string;
+  totalPayments: string;
+  movements: CreditExtractClientMovement[];
+};
+
+export type CreditExtractReportResponse = {
+  loan: CreditExtractReportLoan;
+  balanceSummary: LoanBalanceSummary;
+  statement: LoanStatement;
+  clientStatement: CreditExtractClientStatement;
+  generatedAt: string;
+};
 
 // Cuotas pagadas
 export const GeneratePaidInstallmentsReportBodySchema = buildDateRangeBodySchema();
@@ -215,5 +263,15 @@ export const GenerateThirdPartyClearancePdfResponseSchema = z.object({
 });
 export type GenerateThirdPartyClearancePdfResult = ClientInferResponseBody<
   Contract['creditReport']['generateThirdPartyClearancePdf'],
+  200
+>;
+
+export type GetCreditExtractReportResult = ClientInferResponseBody<
+  Contract['creditReport']['getExtract'],
+  200
+>;
+
+export type GetCreditExtractByLoanIdReportResult = ClientInferResponseBody<
+  Contract['creditReport']['getExtractByLoanId'],
   200
 >;

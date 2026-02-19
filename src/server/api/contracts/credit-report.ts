@@ -1,4 +1,5 @@
 import {
+  CreditExtractReportResponse,
   GenerateCancelledRejectedCreditsReportBodySchema,
   GenerateCancelledRejectedCreditsReportResponseSchema,
   GenerateCreditClearancePdfBodySchema,
@@ -19,7 +20,9 @@ import {
   GenerateSuperintendenciaReportResponseSchema,
   GenerateThirdPartyClearancePdfBodySchema,
   GenerateThirdPartyClearancePdfResponseSchema,
+  GetCreditExtractReportQuerySchema,
 } from '@/schemas/credit-report';
+import { IdParamSchema } from '@/schemas/shared';
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
 import { initContract } from '@ts-rest/core';
 
@@ -113,6 +116,27 @@ export const creditReport = c.router(
       body: GenerateThirdPartyClearancePdfBodySchema,
       metadata,
       responses: { 200: GenerateThirdPartyClearancePdfResponseSchema, ...errorResponses },
+    },
+    getExtract: {
+      method: 'GET',
+      path: '/extract',
+      query: GetCreditExtractReportQuerySchema,
+      metadata,
+      responses: { 200: c.type<CreditExtractReportResponse>(), ...errorResponses },
+    },
+    getExtractByLoanId: {
+      method: 'GET',
+      path: '/extract/by-loan/:id',
+      pathParams: IdParamSchema,
+      query: c.type<Record<string, never>>(),
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey: 'loans',
+          actionKey: 'read',
+        },
+      } satisfies TsRestMetaData,
+      responses: { 200: c.type<CreditExtractReportResponse>(), ...errorResponses },
     },
   },
   { pathPrefix: '/credit-reports' }

@@ -21,11 +21,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  useLoan,
-  useLoanBalanceSummary,
-  useLoanStatement,
-} from '@/hooks/queries/use-loan-queries';
+import { useCreditExtractReportByLoanId } from '@/hooks/queries/use-credit-report-queries';
+import { useLoan } from '@/hooks/queries/use-loan-queries';
 import {
   billingConceptCalcMethodLabels,
   billingConceptFinancingModeLabels,
@@ -66,15 +63,20 @@ const loanDocumentLabels: Record<LoanDocumentType, string> = {
   libranza: 'Libranza',
 };
 
-function getPartyLabel(party: {
-  personType: 'NATURAL' | 'LEGAL';
-  businessName?: string | null;
-  firstName?: string | null;
-  secondName?: string | null;
-  firstLastName?: string | null;
-  secondLastName?: string | null;
-  documentNumber: string;
-} | null | undefined): string {
+function getPartyLabel(
+  party:
+    | {
+        personType: 'NATURAL' | 'LEGAL';
+        businessName?: string | null;
+        firstName?: string | null;
+        secondName?: string | null;
+        firstLastName?: string | null;
+        secondLastName?: string | null;
+        documentNumber: string;
+      }
+    | null
+    | undefined
+): string {
   if (!party) return '-';
 
   if (party.personType === 'LEGAL') {
@@ -89,7 +91,9 @@ function getPartyLabel(party: {
 }
 
 function StatusBadge({ status }: { status: LoanStatus }) {
-  return <Badge variant={status === 'ACTIVE' ? 'default' : 'outline'}>{loanStatusLabels[status]}</Badge>;
+  return (
+    <Badge variant={status === 'ACTIVE' ? 'default' : 'outline'}>{loanStatusLabels[status]}</Badge>
+  );
 }
 
 function LoanDocumentsTab({ loanId, creditNumber }: { loanId: number; creditNumber: string }) {
@@ -103,7 +107,7 @@ function LoanDocumentsTab({ loanId, creditNumber }: { loanId: number; creditNumb
         const dateStr = format(printDate, 'yyyy-MM-dd');
         const response = await fetch(
           `/api/v1/loans/${loanId}/documents/${docType}/pdf?printDate=${dateStr}`,
-          { method: 'GET', credentials: 'include' },
+          { method: 'GET', credentials: 'include' }
         );
 
         if (!response.ok) {
@@ -133,7 +137,7 @@ function LoanDocumentsTab({ loanId, creditNumber }: { loanId: number; creditNumb
         setDownloading(null);
       }
     },
-    [loanId, creditNumber, printDate],
+    [loanId, creditNumber, printDate]
   );
 
   return (
@@ -173,7 +177,11 @@ function LoanDocumentsTab({ loanId, creditNumber }: { loanId: number; creditNumb
             disabled={downloading !== null}
             onClick={() => handleDownload(docType)}
           >
-            {downloading === docType ? <Spinner className="mr-2" /> : <FileDown className="mr-2 size-4" />}
+            {downloading === docType ? (
+              <Spinner className="mr-2" />
+            ) : (
+              <FileDown className="mr-2 size-4" />
+            )}
             {loanDocumentLabels[docType]}
           </Button>
         ))}
@@ -195,8 +203,11 @@ const LOAN_DETAIL_INCLUDES: LoanInclude[] = [
   'insuranceCompany',
   'costCenter',
   'channel',
+  'loanProcessStates',
   'loanInstallments',
   'loanPayments',
+  'portfolioEntries',
+  'accountingEntries',
   'loanAgreementHistory',
   'loanStatusHistory',
   'loanBillingConcepts',
@@ -220,18 +231,34 @@ export function LoanInfo({
     include: LOAN_DETAIL_INCLUDES,
     enabled: opened && Boolean(loanId),
   });
-  const { data: balanceData, isLoading: isLoadingBalance } = useLoanBalanceSummary(loanId, {
-    enabled: opened && Boolean(loanId),
-  });
-  const { data: statementData, isLoading: isLoadingStatement } = useLoanStatement(
-    loanId,
-    {},
-    { enabled: opened && Boolean(loanId) }
-  );
+  const {
+    data: extractReportData,
+    isLoading: isLoadingExtract,
+    isFetching: isFetchingExtract,
+  } = useCreditExtractReportByLoanId(loanId, opened && Boolean(loanId));
 
   const detail = detailData?.body ?? loan;
-  const balanceSummary = balanceData?.body;
-  const statement = statementData?.body;
+  const extractReport = extractReportData?.body;
+  const loanProcessStatesRaw = (detail as { loanProcessStates?: unknown } | undefined)
+    ?.loanProcessStates;
+  const loanProcessStatesRows = (
+    Array.isArray(loanProcessStatesRaw)
+      ? loanProcessStatesRaw
+      : loanProcessStatesRaw
+        ? [loanProcessStatesRaw]
+        : []
+  ) as Array<{
+    processType: string;
+    lastProcessedDate: string;
+    lastProcessRunId: number;
+    lastError?: string | null;
+    lastProcessRun?: {
+      processDate: string;
+      transactionDate: string;
+      status: string;
+      triggerSource: string;
+    } | null;
+  }>;
 
   if (!loan) return null;
 
@@ -379,6 +406,7 @@ export function LoanInfo({
                 <TabsTrigger value="loan">Credito</TabsTrigger>
                 <TabsTrigger value="installments">Cuotas</TabsTrigger>
                 <TabsTrigger value="payments">Abonos</TabsTrigger>
+                <TabsTrigger value="movements">Movimientos</TabsTrigger>
                 <TabsTrigger value="statement">Extracto</TabsTrigger>
                 <TabsTrigger value="history">Historial</TabsTrigger>
                 <TabsTrigger value="concepts">Conceptos</TabsTrigger>
@@ -453,7 +481,9 @@ export function LoanInfo({
                       {detail.loanPayments.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell>{item.paymentNumber}</TableCell>
-                          <TableCell>{item.paymentReceiptType?.name ?? item.receiptTypeId}</TableCell>
+                          <TableCell>
+                            {item.paymentReceiptType?.name ?? item.receiptTypeId}
+                          </TableCell>
                           <TableCell>{formatDate(item.paymentDate)}</TableCell>
                           <TableCell>{formatCurrency(item.amount)}</TableCell>
                           <TableCell>{loanPaymentStatusLabels[item.status]}</TableCell>
@@ -469,8 +499,102 @@ export function LoanInfo({
                 )}
               </TabsContent>
 
+              <TabsContent value="movements" className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Movimientos de cartera</h3>
+                  {detail.portfolioEntries?.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Vencimiento</TableHead>
+                          <TableHead>Cuota</TableHead>
+                          <TableHead>Auxiliar</TableHead>
+                          <TableHead>Cargo</TableHead>
+                          <TableHead>Abono</TableHead>
+                          <TableHead>Saldo</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Ult. movimiento</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detail.portfolioEntries.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{formatDate(item.dueDate)}</TableCell>
+                            <TableCell>{item.installmentNumber}</TableCell>
+                            <TableCell>
+                              {[item.glAccount?.code, item.glAccount?.name]
+                                .filter(Boolean)
+                                .join(' - ') || '-'}
+                            </TableCell>
+                            <TableCell>{formatCurrency(item.chargeAmount)}</TableCell>
+                            <TableCell>{formatCurrency(item.paymentAmount)}</TableCell>
+                            <TableCell>{formatCurrency(item.balance)}</TableCell>
+                            <TableCell>{item.status}</TableCell>
+                            <TableCell>{formatDate(item.lastMovementDate)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                      No hay movimientos de cartera para este credito.
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Movimientos contables</h3>
+                  {detail.accountingEntries?.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Proceso</TableHead>
+                          <TableHead>Documento</TableHead>
+                          <TableHead>Sec</TableHead>
+                          <TableHead>Origen</TableHead>
+                          <TableHead>Naturaleza</TableHead>
+                          <TableHead>Auxiliar</TableHead>
+                          <TableHead>Descripcion</TableHead>
+                          <TableHead>Valor</TableHead>
+                          <TableHead>Cuota</TableHead>
+                          <TableHead>Vencimiento</TableHead>
+                          <TableHead>Estado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detail.accountingEntries.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{formatDate(item.entryDate)}</TableCell>
+                            <TableCell>{item.processType}</TableCell>
+                            <TableCell>{item.documentCode}</TableCell>
+                            <TableCell>{item.sequence}</TableCell>
+                            <TableCell>{`${item.sourceType} (${item.sourceId})`}</TableCell>
+                            <TableCell>{item.nature === 'DEBIT' ? 'Debito' : 'Credito'}</TableCell>
+                            <TableCell>
+                              {[item.glAccount?.code, item.glAccount?.name]
+                                .filter(Boolean)
+                                .join(' - ') || '-'}
+                            </TableCell>
+                            <TableCell>{item.description}</TableCell>
+                            <TableCell>{formatCurrency(item.amount)}</TableCell>
+                            <TableCell>{item.installmentNumber ?? '-'}</TableCell>
+                            <TableCell>{formatDate(item.dueDate)}</TableCell>
+                            <TableCell>{item.status}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                      No hay movimientos contables para este credito.
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
               <TabsContent value="statement" className="space-y-4 pt-2">
-                {isLoadingBalance || isLoadingStatement ? (
+                {isLoadingExtract || isFetchingExtract ? (
                   <div className="flex items-center justify-center py-8">
                     <Spinner />
                   </div>
@@ -480,111 +604,95 @@ export function LoanInfo({
                       <div className="rounded-lg border p-3">
                         <div className="text-muted-foreground text-xs">Saldo actual</div>
                         <div className="text-base font-semibold">
-                          {formatCurrency(balanceSummary?.currentBalance ?? '0')}
+                          {formatCurrency(extractReport?.balanceSummary.currentBalance ?? '0')}
                         </div>
                       </div>
                       <div className="rounded-lg border p-3">
                         <div className="text-muted-foreground text-xs">Saldo vencido</div>
                         <div className="text-base font-semibold">
-                          {formatCurrency(balanceSummary?.overdueBalance ?? '0')}
+                          {formatCurrency(extractReport?.balanceSummary.overdueBalance ?? '0')}
                         </div>
                       </div>
                       <div className="rounded-lg border p-3">
                         <div className="text-muted-foreground text-xs">Cuotas abiertas</div>
-                        <div className="text-base font-semibold">{balanceSummary?.openInstallments ?? 0}</div>
+                        <div className="text-base font-semibold">
+                          {extractReport?.balanceSummary.openInstallments ?? 0}
+                        </div>
                       </div>
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-3">
                       <div className="rounded-lg border p-3">
-                        <div className="text-muted-foreground text-xs">Total causado</div>
+                        <div className="text-muted-foreground text-xs">Saldo al dia</div>
                         <div className="text-base font-semibold">
-                          {formatCurrency(balanceSummary?.totalCharged ?? '0')}
+                          {formatCurrency(extractReport?.balanceSummary.currentDueBalance ?? '0')}
                         </div>
                       </div>
                       <div className="rounded-lg border p-3">
-                        <div className="text-muted-foreground text-xs">Total pagado</div>
+                        <div className="text-muted-foreground text-xs">Saldo inicial</div>
                         <div className="text-base font-semibold">
-                          {formatCurrency(balanceSummary?.totalPaid ?? '0')}
+                          {formatCurrency(extractReport?.clientStatement.openingBalance ?? '0')}
                         </div>
                       </div>
                       <div className="rounded-lg border p-3">
                         <div className="text-muted-foreground text-xs">Proximo vencimiento</div>
                         <div className="text-base font-semibold">
-                          {formatDate(balanceSummary?.nextDueDate ?? null)}
+                          {formatDate(extractReport?.balanceSummary.nextDueDate ?? null)}
                         </div>
                       </div>
                     </div>
 
-                    {balanceSummary?.byAccount?.length ? (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Auxiliar</TableHead>
-                            <TableHead>Cargos</TableHead>
-                            <TableHead>Pagos</TableHead>
-                            <TableHead>Saldo</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {balanceSummary.byAccount.map((item) => (
-                            <TableRow key={item.glAccountId}>
-                              <TableCell>
-                                {[item.glAccountCode, item.glAccountName].filter(Boolean).join(' - ') || '-'}
-                              </TableCell>
-                              <TableCell>{formatCurrency(item.chargeAmount)}</TableCell>
-                              <TableCell>{formatCurrency(item.paymentAmount)}</TableCell>
-                              <TableCell>{formatCurrency(item.balance)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    ) : (
-                      <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
-                        No hay saldo de cartera para este credito.
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Cargos del periodo</div>
+                        <div className="text-base font-semibold">
+                          {formatCurrency(extractReport?.clientStatement.totalCharges ?? '0')}
+                        </div>
                       </div>
-                    )}
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Abonos del periodo</div>
+                        <div className="text-base font-semibold">
+                          {formatCurrency(extractReport?.clientStatement.totalPayments ?? '0')}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Saldo final</div>
+                        <div className="text-base font-semibold">
+                          {formatCurrency(extractReport?.clientStatement.closingBalance ?? '0')}
+                        </div>
+                      </div>
+                    </div>
 
-                    {statement?.entries?.length ? (
+                    {extractReport?.clientStatement.movements?.length ? (
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Fecha</TableHead>
-                            <TableHead>Fuente</TableHead>
-                            <TableHead>Documento</TableHead>
-                            <TableHead>Cuenta</TableHead>
-                            <TableHead>Naturaleza</TableHead>
-                            <TableHead>Valor</TableHead>
-                            <TableHead>Delta cartera</TableHead>
-                            <TableHead>Saldo cartera</TableHead>
-                            <TableHead>Estado</TableHead>
+                            <TableHead>Movimiento</TableHead>
+                            <TableHead>Referencia</TableHead>
+                            <TableHead>Concepto</TableHead>
+                            <TableHead>Cargo</TableHead>
+                            <TableHead>Abono</TableHead>
+                            <TableHead>Saldo</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {statement.entries.map((item) => (
+                          {extractReport.clientStatement.movements.map((item) => (
                             <TableRow key={item.id}>
                               <TableCell>{formatDate(item.entryDate)}</TableCell>
-                              <TableCell>
-                                {item.relatedPaymentNumber
-                                  ? `${item.sourceLabel} (${item.relatedPaymentNumber})`
-                                  : item.sourceLabel}
-                              </TableCell>
-                              <TableCell>{`${item.documentCode}-${item.sequence}`}</TableCell>
-                              <TableCell>
-                                {[item.glAccountCode, item.glAccountName].filter(Boolean).join(' - ') || '-'}
-                              </TableCell>
-                              <TableCell>{item.nature}</TableCell>
-                              <TableCell>{formatCurrency(item.amount)}</TableCell>
-                              <TableCell>{formatCurrency(item.receivableDelta)}</TableCell>
+                              <TableCell>{item.movement}</TableCell>
+                              <TableCell>{item.reference}</TableCell>
+                              <TableCell>{item.concept}</TableCell>
+                              <TableCell>{formatCurrency(item.chargeAmount)}</TableCell>
+                              <TableCell>{formatCurrency(item.paymentAmount)}</TableCell>
                               <TableCell>{formatCurrency(item.runningBalance)}</TableCell>
-                              <TableCell>{item.status}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     ) : (
                       <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
-                        No hay movimientos para el rango seleccionado.
+                        No hay movimientos para este credito.
                       </div>
                     )}
                   </>
@@ -611,13 +719,16 @@ export function LoanInfo({
                             <TableCell>{formatDateTime(item.changedAt)}</TableCell>
                             <TableCell>
                               {item.fromStatus
-                                ? (loanStatusLabels[item.fromStatus as LoanStatus] ?? item.fromStatus)
+                                ? (loanStatusLabels[item.fromStatus as LoanStatus] ??
+                                  item.fromStatus)
                                 : '-'}
                             </TableCell>
                             <TableCell>
                               {loanStatusLabels[item.toStatus as LoanStatus] ?? item.toStatus}
                             </TableCell>
-                            <TableCell>{item.changedByUserName ?? item.changedByUserId ?? '-'}</TableCell>
+                            <TableCell>
+                              {item.changedByUserName ?? item.changedByUserId ?? '-'}
+                            </TableCell>
                             <TableCell>{item.note ?? '-'}</TableCell>
                           </TableRow>
                         ))}
@@ -625,7 +736,54 @@ export function LoanInfo({
                     </Table>
                   ) : (
                     <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
-                      No hay cambios de estado registrados.
+                      No hay cambios de estado registrados en loan_status_history.
+                      <div className="mt-2">
+                        Estado actual:{' '}
+                        {loanStatusLabels[detail.status as LoanStatus] ?? detail.status} (
+                        {formatDate(detail.statusDate)})
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Estado de procesos</h3>
+                  {loanProcessStatesRows.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tipo proceso</TableHead>
+                          <TableHead>Ult. fecha procesada</TableHead>
+                          <TableHead>Process run</TableHead>
+                          <TableHead>Fecha corrida</TableHead>
+                          <TableHead>Fecha mov.</TableHead>
+                          <TableHead>Estado corrida</TableHead>
+                          <TableHead>Origen</TableHead>
+                          <TableHead>Error</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {loanProcessStatesRows.map((item) => (
+                          <TableRow key={`${item.processType}:${item.lastProcessRunId}`}>
+                            <TableCell>{item.processType}</TableCell>
+                            <TableCell>{formatDate(item.lastProcessedDate)}</TableCell>
+                            <TableCell>{item.lastProcessRunId}</TableCell>
+                            <TableCell>
+                              {formatDate(item.lastProcessRun?.processDate ?? null)}
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(item.lastProcessRun?.transactionDate ?? null)}
+                            </TableCell>
+                            <TableCell>{item.lastProcessRun?.status ?? '-'}</TableCell>
+                            <TableCell>{item.lastProcessRun?.triggerSource ?? '-'}</TableCell>
+                            <TableCell>{item.lastError ?? '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                      No hay registros en loan_process_states para este credito.
                     </div>
                   )}
                 </div>
@@ -653,7 +811,9 @@ export function LoanInfo({
                                 ? `${item.agreement.agreementCode} - ${item.agreement.businessName}`
                                 : item.agreementId}
                             </TableCell>
-                            <TableCell>{item.changedByUserName ?? item.changedByUserId ?? '-'}</TableCell>
+                            <TableCell>
+                              {item.changedByUserName ?? item.changedByUserId ?? '-'}
+                            </TableCell>
                             <TableCell>{item.note ?? '-'}</TableCell>
                           </TableRow>
                         ))}
@@ -690,15 +850,22 @@ export function LoanInfo({
                               ? `${item.billingConcept.code} - ${item.billingConcept.name}`
                               : item.billingConceptId}
                           </TableCell>
-                          <TableCell>{billingConceptFrequencyLabels[item.frequency] ?? item.frequency}</TableCell>
                           <TableCell>
-                            {billingConceptFinancingModeLabels[item.financingMode] ?? item.financingMode}
+                            {billingConceptFrequencyLabels[item.frequency] ?? item.frequency}
                           </TableCell>
-                          <TableCell>{billingConceptCalcMethodLabels[item.calcMethod] ?? item.calcMethod}</TableCell>
+                          <TableCell>
+                            {billingConceptFinancingModeLabels[item.financingMode] ??
+                              item.financingMode}
+                          </TableCell>
+                          <TableCell>
+                            {billingConceptCalcMethodLabels[item.calcMethod] ?? item.calcMethod}
+                          </TableCell>
                           <TableCell>{item.rate ? formatPercent(item.rate, 6) : '-'}</TableCell>
                           <TableCell>{item.amount ? formatCurrency(item.amount) : '-'}</TableCell>
                           <TableCell>
-                            {[item.glAccount?.code, item.glAccount?.name].filter(Boolean).join(' - ') || '-'}
+                            {[item.glAccount?.code, item.glAccount?.name]
+                              .filter(Boolean)
+                              .join(' - ') || '-'}
                           </TableCell>
                           <TableCell>{item.sourceRuleId ?? '-'}</TableCell>
                         </TableRow>
@@ -746,9 +913,7 @@ export function LoanInfo({
                 </div>
 
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold">
-                    Creditos que refinanciaron este credito
-                  </h3>
+                  <h3 className="text-sm font-semibold">Creditos que refinanciaron este credito</h3>
                   {detail.loanRefinancingLinksReference?.length ? (
                     <Table>
                       <TableHeader>
@@ -762,7 +927,9 @@ export function LoanInfo({
                       <TableBody>
                         {detail.loanRefinancingLinksReference.map((item) => (
                           <TableRow key={item.id}>
-                            <TableCell>{item.refinancedLoan?.creditNumber ?? item.loanId}</TableCell>
+                            <TableCell>
+                              {item.refinancedLoan?.creditNumber ?? item.loanId}
+                            </TableCell>
                             <TableCell>{formatCurrency(item.payoffAmount)}</TableCell>
                             <TableCell>{item.createdByUserName ?? item.createdByUserId}</TableCell>
                             <TableCell>{formatDateTime(item.createdAt)}</TableCell>
@@ -825,7 +992,9 @@ export function LoanInfo({
             </Tabs>
           </div>
         ) : (
-          <div className="text-muted-foreground px-4 py-6 text-sm">No fue posible cargar la informacion.</div>
+          <div className="text-muted-foreground px-4 py-6 text-sm">
+            No fue posible cargar la informacion.
+          </div>
         )}
       </SheetContent>
     </Sheet>

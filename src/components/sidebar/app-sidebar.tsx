@@ -203,6 +203,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Interes mora', url: `/causation-current-interest-late` },
                   { title: 'Otros conceptos', url: `/causation-billing-concepts` },
                   { title: 'Cierre de periodo', url: `/causation-period-closing` },
+                  { title: 'Corridas', url: `/process-runs` },
                 ],
               },
               {

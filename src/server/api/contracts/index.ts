@@ -38,6 +38,7 @@ import { paymentAllocationPolicy } from './payment-allocation-policy';
 import { paymentReceiptType } from './payment-receipt-type';
 import { paymentTenderType } from './payment-tender-type';
 import { portfolioReport } from './portfolio-report';
+import { processRun } from './process-run';
 import { rejectionReason } from './rejection-reason';
 import { riskCenterReport } from './risk-center-report';
 import { repaymentMethod } from './repayment-method';
@@ -88,6 +89,7 @@ export const contract = c.router(
     paymentReceiptType,
     paymentTenderType,
     portfolioReport,
+    processRun,
     rejectionReason,
     riskCenterReport,
     repaymentMethod,

@@ -10,6 +10,22 @@ export function useProcessCausationCurrentInterest() {
   });
 }
 
+export function useCurrentInterestRunStatus(runId: number | null, enabled = true) {
+  return api.causation.getCurrentInterestRun.useQuery({
+    queryKey: ['causation', 'current-interest', 'run', runId],
+    queryData: {
+      params: { id: runId ?? 0 },
+      query: {},
+    },
+    enabled: enabled && Boolean(runId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.body?.status;
+      if (!status) return false;
+      return status === 'QUEUED' || status === 'RUNNING' ? 3000 : false;
+    },
+  });
+}
+
 export function useProcessCausationLateInterest() {
   return api.causation.processLateInterest.useMutation({
     onError: (error) => {

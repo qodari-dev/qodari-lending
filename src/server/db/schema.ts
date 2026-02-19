@@ -1884,10 +1884,22 @@ export const loanRefinancingLinks = pgTable(
 );
 
 export const processRunStatusEnum = pgEnum('process_status', [
+  'QUEUED',
   'RUNNING',
   'COMPLETED',
   'FAILED',
   'CANCELED',
+]);
+
+export const processRunScopeTypeEnum = pgEnum('process_run_scope_type', [
+  'GENERAL',
+  'CREDIT_PRODUCT',
+  'LOAN',
+]);
+
+export const processRunTriggerSourceEnum = pgEnum('process_run_trigger_source', [
+  'MANUAL',
+  'CRON',
 ]);
 
 // ---------------------------------------------------------------------
@@ -1901,21 +1913,43 @@ export const processRuns = pgTable(
   {
     id: serial('id').primaryKey(),
     processType: processTypeEnum('process_type').notNull(),
+    scopeType: processRunScopeTypeEnum('scope_type').notNull().default('GENERAL'),
+    scopeId: integer('scope_id').notNull().default(0),
     accountingPeriodId: integer('accounting_period_id')
       .references(() => accountingPeriods.id, { onDelete: 'restrict' })
       .notNull(),
     processDate: date('process_date').notNull(),
+    transactionDate: date('transaction_date').notNull(),
+    triggerSource: processRunTriggerSourceEnum('trigger_source').notNull().default('MANUAL'),
     executedByUserId: uuid('executed_by_user_id').notNull(),
     executedByUserName: varchar('executed_by_user_name', { length: 255 }).notNull(),
     executedAt: timestamp('executed_at', { withTimezone: false }).notNull(),
-    status: processRunStatusEnum('status').notNull().default('COMPLETED'),
+    startedAt: timestamp('started_at', { withTimezone: false }),
+    finishedAt: timestamp('finished_at', { withTimezone: false }),
+    status: processRunStatusEnum('status').notNull().default('QUEUED'),
+    summary: jsonb('summary').$type<Record<string, unknown> | null>(),
     note: text('note'),
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('uniq_process_run').on(t.processType, t.processDate),
+    uniqueIndex('uniq_process_run').on(t.processType, t.processDate, t.scopeType, t.scopeId),
     index('idx_process_run_type_date').on(t.processType, t.processDate),
     index('idx_process_run_period').on(t.accountingPeriodId),
+    index('idx_process_run_status').on(t.status),
+    check(
+      'chk_process_run_scope_id_by_scope_type',
+      sql`
+        (
+          ${t.scopeType} = 'GENERAL'
+          AND ${t.scopeId} = 0
+        )
+        OR
+        (
+          ${t.scopeType} IN ('CREDIT_PRODUCT', 'LOAN')
+          AND ${t.scopeId} > 0
+        )
+      `
+    ),
   ]
 );
 

@@ -32,6 +32,19 @@ export function buildPaymentVoidDocumentCode(loanPaymentId: number): string {
   return buildNumericDocumentCode('V', loanPaymentId);
 }
 
+export function buildProcessRunDocumentCode(
+  processType: 'INTEREST' | 'LATE_INTEREST' | 'INSURANCE',
+  processRunId: number
+): string {
+  const prefixByProcessType = {
+    INTEREST: 'I',
+    LATE_INTEREST: 'M',
+    INSURANCE: 'S',
+  } as const;
+
+  return buildNumericDocumentCode(prefixByProcessType[processType], processRunId);
+}
+
 export function allocateAmountByPercentage(args: {
   totalAmount: number;
   lines: Array<{ id: number; percentage: string }>;

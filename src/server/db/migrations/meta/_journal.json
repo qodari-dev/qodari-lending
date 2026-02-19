@@ -169,6 +169,13 @@
       "when": 1771440453137,
       "tag": "0023_sloppy_titanium_man",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1771467033083,
+      "tag": "0024_plain_bill_hollister",
+      "breakpoints": true
     }
   ]
 }

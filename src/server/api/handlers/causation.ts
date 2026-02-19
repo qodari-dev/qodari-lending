@@ -5,7 +5,12 @@ import {
   ProcessCausationLateInterestBodySchema,
 } from '@/schemas/causation';
 import { accountingPeriods, db } from '@/server/db';
+import {
+  createAndQueueCurrentInterestRun,
+  getCurrentInterestRunStatus,
+} from '@/server/causation/current-interest-run-service';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
+import { getRequiredUserContext } from '@/server/utils/required-user-context';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { roundMoney } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
@@ -48,27 +53,60 @@ async function processCurrentInterest(body: ProcessCurrentInterestBody, context:
   const { request, appRoute } = context;
 
   try {
-    await getAuthContextAndValidatePermission(request, appRoute.metadata);
-    const summary = buildCausationSummary(body.startDate, body.endDate, 32, 14_500);
+    const session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    if (!session) {
+      throwHttpError({
+        status: 401,
+        message: 'Not authenticated',
+        code: 'UNAUTHENTICATED',
+      });
+    }
 
-    // TODO(causation-current-interest): implementar causacion real de interes corriente:
-    // - calcular interes corriente por credito en el rango de fechas
-    // - registrar movimientos de causacion por fecha de transaccion
-    // - persistir lote de ejecucion para trazabilidad y reproceso controlado
+    const { userId, userName } = getRequiredUserContext(session);
+    const run = await createAndQueueCurrentInterestRun({
+      processDate: body.processDate,
+      transactionDate: body.transactionDate,
+      scopeType: body.scopeType,
+      creditProductId: body.creditProductId,
+      loanId: body.loanId,
+      executedByUserId: userId,
+      executedByUserName: userName || userId,
+      triggerSource: 'MANUAL',
+    });
+
     return {
       status: 200 as const,
       body: {
+        processRunId: run.id,
         processType: 'CURRENT_INTEREST' as const,
-        periodStartDate: toDateOnly(body.startDate),
-        periodEndDate: toDateOnly(body.endDate),
-        transactionDate: toDateOnly(body.transactionDate),
-        ...summary,
-        message: 'Causacion de interes corriente recibida. Pendiente implementacion.',
+        status: 'QUEUED' as const,
+        message: `Corrida encolada correctamente. Run #${run.id}`,
       },
     };
   } catch (e) {
     return genericTsRestErrorResponse(e, {
       genericMsg: 'Error al procesar causacion de interes corriente',
+    });
+  }
+}
+
+async function getCurrentInterestRun(
+  params: { id: number },
+  context: HandlerContext
+) {
+  const { request, appRoute } = context;
+
+  try {
+    await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const status = await getCurrentInterestRunStatus(params.id);
+
+    return {
+      status: 200 as const,
+      body: status,
+    };
+  } catch (e) {
+    return genericTsRestErrorResponse(e, {
+      genericMsg: `Error al consultar corrida de interes corriente ${params.id}`,
     });
   }
 }
@@ -176,6 +214,7 @@ async function closePeriod(body: ClosePeriodBody, context: HandlerContext) {
 
 export const causation = tsr.router(contract.causation, {
   processCurrentInterest: ({ body }, context) => processCurrentInterest(body, context),
+  getCurrentInterestRun: ({ params }, context) => getCurrentInterestRun(params, context),
   processLateInterest: ({ body }, context) => processLateInterest(body, context),
   processCurrentInsurance: ({ body }, context) => processCurrentInsurance(body, context),
   closePeriod: ({ body }, context) => closePeriod(body, context),

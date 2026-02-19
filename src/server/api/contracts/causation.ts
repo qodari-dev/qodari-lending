@@ -1,4 +1,5 @@
 import {
+  CausationCurrentInterestRunStatusResponseSchema,
   CloseCausationPeriodBodySchema,
   CloseCausationPeriodResponseSchema,
   ProcessCausationCurrentInsuranceBodySchema,
@@ -8,6 +9,7 @@ import {
   ProcessCausationLateInterestBodySchema,
   ProcessCausationLateInterestResponseSchema,
 } from '@/schemas/causation';
+import { IdParamSchema } from '@/schemas/shared';
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
 import { initContract } from '@ts-rest/core';
 
@@ -39,6 +41,17 @@ export const causation = c.router(
       metadata,
       responses: {
         200: ProcessCausationCurrentInterestResponseSchema,
+        ...errorResponses,
+      },
+    },
+    getCurrentInterestRun: {
+      method: 'GET',
+      path: '/current-interest/runs/:id',
+      pathParams: IdParamSchema,
+      query: c.type<Record<string, never>>(),
+      metadata,
+      responses: {
+        200: CausationCurrentInterestRunStatusResponseSchema,
         ...errorResponses,
       },
     },

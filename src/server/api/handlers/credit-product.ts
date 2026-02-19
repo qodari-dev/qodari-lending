@@ -8,6 +8,8 @@ import {
   creditProductRefinancePolicies,
   creditProductChargeOffPolicies,
   creditProductBillingConcepts,
+  loanApplications,
+  portfolioAgingSnapshots,
 } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
@@ -360,6 +362,35 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         });
       }
 
+      const [existingLoanApplication, existingPortfolioAgingSnapshot] = await Promise.all([
+        db.query.loanApplications.findFirst({
+          columns: { id: true },
+          where: eq(loanApplications.creditProductId, id),
+        }),
+        db.query.portfolioAgingSnapshots.findFirst({
+          columns: { id: true },
+          where: eq(portfolioAgingSnapshots.creditProductId, id),
+        }),
+      ]);
+
+      if (existingLoanApplication) {
+        throwHttpError({
+          status: 409,
+          message:
+            'No se puede eliminar la linea de credito porque tiene solicitudes o creditos asociados',
+          code: 'CONFLICT',
+        });
+      }
+
+      if (existingPortfolioAgingSnapshot) {
+        throwHttpError({
+          status: 409,
+          message:
+            'No se puede eliminar la linea de credito porque tiene historial de cartera asociado',
+          code: 'CONFLICT',
+        });
+      }
+
       const [
         existingCategories,
         existingLateInterestRules,
@@ -638,7 +669,24 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         }),
       ]);
 
-      const [deleted] = await db.delete(creditProducts).where(eq(creditProducts.id, id)).returning();
+      const [deleted] = await db.transaction(async (tx) => {
+        await tx.delete(creditProductCategories).where(eq(creditProductCategories.creditProductId, id));
+        await tx
+          .delete(creditProductLateInterestRules)
+          .where(eq(creditProductLateInterestRules.creditProductId, id));
+        await tx.delete(creditProductDocuments).where(eq(creditProductDocuments.creditProductId, id));
+        await tx.delete(creditProductAccounts).where(eq(creditProductAccounts.creditProductId, id));
+        await tx
+          .delete(creditProductBillingConcepts)
+          .where(eq(creditProductBillingConcepts.creditProductId, id));
+        await tx
+          .delete(creditProductRefinancePolicies)
+          .where(eq(creditProductRefinancePolicies.creditProductId, id));
+        await tx
+          .delete(creditProductChargeOffPolicies)
+          .where(eq(creditProductChargeOffPolicies.creditProductId, id));
+        return tx.delete(creditProducts).where(eq(creditProducts.id, id)).returning();
+      });
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,

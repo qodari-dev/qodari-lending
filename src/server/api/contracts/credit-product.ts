@@ -116,6 +116,7 @@ export const creditProduct = c.router(
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,
         404: TsRestErrorSchema,
+        409: TsRestErrorSchema,
         500: TsRestErrorSchema,
       },
     },

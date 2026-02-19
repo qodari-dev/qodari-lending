@@ -169,10 +169,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 ],
               },
               {
-                title: 'Solicitudes y Creditos',
+                title: 'Colocacion de Creditos',
                 icon: FileText,
                 items: [
-                  { title: 'Solicitud de crédito', url: `/loan-applications` },
+                  { title: 'Colocacion de crédito', url: `/loan-applications` },
                   { title: 'Creditos', url: `/loans` },
                   { title: 'Refinanciacion', url: `/loan-refinancing` },
                 ],

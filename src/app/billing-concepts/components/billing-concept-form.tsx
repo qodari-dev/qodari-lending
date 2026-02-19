@@ -102,13 +102,12 @@ export function BillingConceptForm({
     },
   });
   const calcMethod = useWatch({ control: form.control, name: 'calcMethod' });
-  const isTieredMethod =
-    calcMethod === 'TIERED_FIXED_AMOUNT' || calcMethod === 'TIERED_PERCENTAGE';
+  const isTieredMethod = calcMethod === 'TIERED_FIXED_AMOUNT' || calcMethod === 'TIERED_PERCENTAGE';
   const requiresBaseAmount = calcMethod === 'PERCENTAGE' || calcMethod === 'TIERED_PERCENTAGE';
 
   const { data: glAccountsData } = useGlAccounts({
     limit: 1000,
-    where: { and: [{ detailType: 'RECEIVABLE', isActive: true }] },
+    where: { and: [{ isActive: true }] },
     sort: [{ field: 'code', order: 'asc' }],
   });
   const glAccounts = useMemo(() => glAccountsData?.body?.data ?? [], [glAccountsData]);
@@ -209,9 +208,7 @@ export function BillingConceptForm({
                             maxLength={50}
                             onChange={(event) =>
                               field.onChange(
-                                event.target.value
-                                  .toUpperCase()
-                                  .replace(/[^A-Z0-9_]/g, '')
+                                event.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '')
                               )
                             }
                             aria-invalid={fieldState.invalid}

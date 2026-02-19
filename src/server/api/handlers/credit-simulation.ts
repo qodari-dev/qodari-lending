@@ -9,15 +9,19 @@ import {
   db,
   identificationTypes,
   insuranceCompanies,
+  loanApplications,
+  loans,
   paymentFrequencies,
+  thirdParties,
 } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
+import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { calculatePaymentCapacity } from '@/utils/payment-capacity';
 import { resolvePaymentFrequencyIntervalDays } from '@/utils/payment-frequency';
 import { roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, eq, lte, gte } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 export const creditSimulation = tsr.router(contract.creditSimulation, {
@@ -234,6 +238,164 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         });
       }
 
+      const documentNumber = body.documentNumber.trim();
+      const normalizedDocumentNumber = documentNumber.replace(/\D/g, '');
+
+      let workerThirdParty = await db.query.thirdParties.findFirst({
+        where: and(
+          eq(thirdParties.identificationTypeId, body.identificationTypeId),
+          eq(thirdParties.documentNumber, documentNumber)
+        ),
+      });
+
+      if (!workerThirdParty && normalizedDocumentNumber.length >= 3) {
+        workerThirdParty = await db.query.thirdParties.findFirst({
+          where: and(
+            eq(thirdParties.identificationTypeId, body.identificationTypeId),
+            sql`regexp_replace(${thirdParties.documentNumber}, '[^0-9]', '', 'g') = ${normalizedDocumentNumber}`
+          ),
+        });
+      }
+
+      let loanApplicationRows: Array<{
+        id: number;
+        creditNumber: string;
+        applicationDate: string;
+        status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
+        requestedAmount: string;
+        approvedAmount: string | null;
+        creditProduct: { name: string } | null;
+      }> = [];
+      let creditRows: Array<{
+        id: number;
+        creditNumber: string;
+        loanApplicationId: number;
+        recordDate: string;
+        creditStartDate: string;
+        status:
+          | 'ACTIVE'
+          | 'GENERATED'
+          | 'INACTIVE'
+          | 'ACCOUNTED'
+          | 'VOID'
+          | 'RELIQUIDATED'
+          | 'FINISHED'
+          | 'PAID';
+        disbursementStatus: 'LIQUIDATED' | 'SENT_TO_ACCOUNTING' | 'SENT_TO_BANK' | 'DISBURSED';
+        principalAmount: string;
+        loanApplication: {
+          creditProduct: { name: string } | null;
+        } | null;
+      }> = [];
+
+      if (workerThirdParty) {
+        [loanApplicationRows, creditRows] = await Promise.all([
+          db.query.loanApplications.findMany({
+            where: eq(loanApplications.thirdPartyId, workerThirdParty.id),
+            columns: {
+              id: true,
+              creditNumber: true,
+              applicationDate: true,
+              status: true,
+              requestedAmount: true,
+              approvedAmount: true,
+            },
+            with: {
+              creditProduct: {
+                columns: {
+                  name: true,
+                },
+              },
+            },
+            orderBy: [desc(loanApplications.applicationDate), desc(loanApplications.id)],
+          }),
+          db.query.loans.findMany({
+            where: eq(loans.thirdPartyId, workerThirdParty.id),
+            columns: {
+              id: true,
+              creditNumber: true,
+              loanApplicationId: true,
+              recordDate: true,
+              creditStartDate: true,
+              status: true,
+              disbursementStatus: true,
+              principalAmount: true,
+            },
+            with: {
+              loanApplication: {
+                with: {
+                  creditProduct: {
+                    columns: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: [desc(loans.recordDate), desc(loans.id)],
+          }),
+        ]);
+      }
+
+      const creditBalances = await Promise.all(
+        creditRows.map((credit) => getLoanBalanceSummary(credit.id))
+      );
+
+      const studiedLoanApplications = loanApplicationRows.map((item) => ({
+        id: item.id,
+        creditNumber: item.creditNumber,
+        applicationDate: item.applicationDate,
+        status: item.status,
+        requestedAmount: toNumber(item.requestedAmount),
+        approvedAmount: item.approvedAmount ? toNumber(item.approvedAmount) : null,
+        creditProductName: item.creditProduct?.name ?? null,
+      }));
+
+      const studiedCredits = creditRows.map((item, index) => {
+        const summary = creditBalances[index];
+        const currentBalance = toNumber(summary.currentBalance);
+        const overdueBalance = toNumber(summary.overdueBalance);
+
+        const paymentBehavior: 'PAID' | 'CURRENT' | 'OVERDUE' =
+          item.status === 'PAID' || currentBalance <= 0.01
+            ? 'PAID'
+            : overdueBalance > 0.01
+              ? 'OVERDUE'
+              : 'CURRENT';
+
+        return {
+          id: item.id,
+          creditNumber: item.creditNumber,
+          loanApplicationId: item.loanApplicationId,
+          recordDate: item.recordDate,
+          creditStartDate: item.creditStartDate,
+          status: item.status,
+          disbursementStatus: item.disbursementStatus,
+          principalAmount: toNumber(item.principalAmount),
+          currentBalance,
+          overdueBalance,
+          totalPaid: toNumber(summary.totalPaid),
+          openInstallments: summary.openInstallments,
+          nextDueDate: summary.nextDueDate,
+          paymentBehavior,
+          creditProductName: item.loanApplication?.creditProduct?.name ?? null,
+        };
+      });
+
+      const workerFullName = workerThirdParty
+        ? workerThirdParty.personType === 'LEGAL'
+          ? workerThirdParty.businessName?.trim() || 'Afiliado demo'
+          : [
+              workerThirdParty.firstName,
+              workerThirdParty.secondName,
+              workerThirdParty.firstLastName,
+              workerThirdParty.secondLastName,
+            ]
+              .filter((value): value is string => Boolean(value?.trim()))
+              .join(' ')
+              .trim() || 'Afiliado demo'
+        : 'Afiliado demo';
+
       // TODO(worker-study): conectar con el modulo de subsidio para consultar data real:
       // - historial de aportes del afiliado
       // - historial de empresas aportantes
@@ -250,11 +412,11 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         status: 200 as const,
         body: {
           worker: {
-            fullName: 'Afiliado demo',
+            fullName: workerFullName,
             identificationTypeId: identificationType.id,
             identificationTypeCode: identificationType.code,
             identificationTypeName: identificationType.name,
-            documentNumber: body.documentNumber.trim(),
+            documentNumber: workerThirdParty?.documentNumber ?? documentNumber,
           },
           salary: {
             currentSalary,
@@ -263,8 +425,10 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
           },
           trajectory: {
             totalContributionMonths: 92,
-            currentCompanyName: 'Servicios Integrales SAS',
-            previousCompanyName: 'Comercial Andina LTDA',
+            currentCompanyName: workerThirdParty?.employerBusinessName ?? 'Servicios Integrales SAS',
+            previousCompanyName: workerThirdParty?.employerBusinessName
+              ? null
+              : 'Comercial Andina LTDA',
           },
           contributions: [
             {
@@ -318,7 +482,11 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
               contributionMonths: 50,
             },
           ],
-          notes: 'Sin observaciones.',
+          loanApplications: studiedLoanApplications,
+          credits: studiedCredits,
+          notes: workerThirdParty
+            ? `Solicitudes encontradas: ${studiedLoanApplications.length}. Creditos encontrados: ${studiedCredits.length}.`
+            : 'No se encontro un tercero registrado para este documento. Se muestran datos demo de trayectoria y salario.',
           generatedAt: new Date().toISOString(),
         },
       };

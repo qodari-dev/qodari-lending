@@ -25,6 +25,13 @@ import {
 import { useWorkerStudy } from '@/hooks/queries/use-credit-simulation-queries';
 import { useIdentificationTypes } from '@/hooks/queries/use-identification-type-queries';
 import { WorkerStudyBodySchema, WorkerStudyResult } from '@/schemas/credit-simulation';
+import { loanApplicationStatusLabels, LoanApplicationStatus } from '@/schemas/loan-application';
+import {
+  loanDisbursementStatusLabels,
+  LoanDisbursementStatus,
+  loanStatusLabels,
+  LoanStatus,
+} from '@/schemas/loan';
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from '@/utils/formatters';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FileDown, Search } from 'lucide-react';
@@ -38,6 +45,26 @@ type WorkerStudyExportRow = {
   detail: string;
   value: string;
 };
+
+const paymentBehaviorLabels: Record<WorkerStudyResult['credits'][number]['paymentBehavior'], string> = {
+  PAID: 'Pagado',
+  CURRENT: 'Al dia',
+  OVERDUE: 'Con mora',
+};
+
+function getLoanApplicationStatusLabel(status: WorkerStudyResult['loanApplications'][number]['status']) {
+  return loanApplicationStatusLabels[status as LoanApplicationStatus] ?? status;
+}
+
+function getLoanStatusLabel(status: WorkerStudyResult['credits'][number]['status']) {
+  return loanStatusLabels[status as LoanStatus] ?? status;
+}
+
+function getLoanDisbursementStatusLabel(
+  status: WorkerStudyResult['credits'][number]['disbursementStatus']
+) {
+  return loanDisbursementStatusLabels[status as LoanDisbursementStatus] ?? status;
+}
 
 const FormSchema = WorkerStudyBodySchema;
 type FormValues = z.infer<typeof FormSchema>;
@@ -115,6 +142,16 @@ export function WorkerStudy() {
         section: 'Empresas',
         detail: item.companyName,
         value: `${formatDate(item.fromDate)} a ${item.toDate ? formatDate(item.toDate) : 'Actual'}`,
+      })),
+      ...result.loanApplications.map((item) => ({
+        section: 'Solicitudes',
+        detail: `${item.creditNumber} (${getLoanApplicationStatusLabel(item.status)})`,
+        value: `${formatDate(item.applicationDate)} / ${formatCurrency(item.requestedAmount)} / ${item.approvedAmount !== null ? formatCurrency(item.approvedAmount) : '-'}`,
+      })),
+      ...result.credits.map((item) => ({
+        section: 'Creditos',
+        detail: `${item.creditNumber} (${getLoanStatusLabel(item.status)})`,
+        value: `${formatCurrency(item.principalAmount)} / Saldo ${formatCurrency(item.currentBalance)} / Mora ${formatCurrency(item.overdueBalance)} / ${paymentBehaviorLabels[item.paymentBehavior]}`,
       })),
     ];
 
@@ -353,6 +390,96 @@ export function WorkerStudy() {
                     ) : (
                       <TableRow>
                         <TableCell colSpan={4}>Sin informacion</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Solicitudes de credito</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Solicitud</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Valor solicitado</TableHead>
+                      <TableHead>Valor aprobado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {result.loanApplications.length ? (
+                      result.loanApplications.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.creditNumber}</TableCell>
+                          <TableCell>{formatDate(item.applicationDate)}</TableCell>
+                          <TableCell>{item.creditProductName ?? '-'}</TableCell>
+                          <TableCell>{getLoanApplicationStatusLabel(item.status)}</TableCell>
+                          <TableCell>{formatCurrency(item.requestedAmount)}</TableCell>
+                          <TableCell>
+                            {item.approvedAmount !== null ? formatCurrency(item.approvedAmount) : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6}>Sin informacion</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Creditos y cartera</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Credito</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Desembolso</TableHead>
+                      <TableHead>Capital</TableHead>
+                      <TableHead>Saldo actual</TableHead>
+                      <TableHead>Saldo vencido</TableHead>
+                      <TableHead>Abonado</TableHead>
+                      <TableHead>Proximo vencimiento</TableHead>
+                      <TableHead>Comportamiento</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {result.credits.length ? (
+                      result.credits.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.creditNumber}</TableCell>
+                          <TableCell>{item.creditProductName ?? '-'}</TableCell>
+                          <TableCell>{getLoanStatusLabel(item.status)}</TableCell>
+                          <TableCell>
+                            {getLoanDisbursementStatusLabel(item.disbursementStatus)}
+                          </TableCell>
+                          <TableCell>{formatCurrency(item.principalAmount)}</TableCell>
+                          <TableCell>{formatCurrency(item.currentBalance)}</TableCell>
+                          <TableCell>{formatCurrency(item.overdueBalance)}</TableCell>
+                          <TableCell>{formatCurrency(item.totalPaid)}</TableCell>
+                          <TableCell>
+                            {item.nextDueDate ? formatDate(item.nextDueDate) : '-'}
+                          </TableCell>
+                          <TableCell>{paymentBehaviorLabels[item.paymentBehavior]}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={10}>Sin informacion</TableCell>
                       </TableRow>
                     )}
                   </TableBody>

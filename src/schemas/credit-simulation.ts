@@ -81,6 +81,61 @@ export const WorkerStudyCompanyHistorySchema = z.object({
   contributionMonths: z.number().int().nonnegative(),
 });
 
+export const WORKER_STUDY_LOAN_APPLICATION_STATUS_OPTIONS = [
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'CANCELED',
+] as const;
+
+export const WORKER_STUDY_CREDIT_STATUS_OPTIONS = [
+  'ACTIVE',
+  'GENERATED',
+  'INACTIVE',
+  'ACCOUNTED',
+  'VOID',
+  'RELIQUIDATED',
+  'FINISHED',
+  'PAID',
+] as const;
+
+export const WORKER_STUDY_CREDIT_DISBURSEMENT_STATUS_OPTIONS = [
+  'LIQUIDATED',
+  'SENT_TO_ACCOUNTING',
+  'SENT_TO_BANK',
+  'DISBURSED',
+] as const;
+
+export const WORKER_STUDY_CREDIT_PAYMENT_BEHAVIOR_OPTIONS = ['PAID', 'CURRENT', 'OVERDUE'] as const;
+
+export const WorkerStudyLoanApplicationSchema = z.object({
+  id: z.number().int().positive(),
+  creditNumber: z.string(),
+  applicationDate: z.string(),
+  status: z.enum(WORKER_STUDY_LOAN_APPLICATION_STATUS_OPTIONS),
+  requestedAmount: z.number().nonnegative(),
+  approvedAmount: z.number().nonnegative().nullable(),
+  creditProductName: z.string().nullable(),
+});
+
+export const WorkerStudyCreditSchema = z.object({
+  id: z.number().int().positive(),
+  creditNumber: z.string(),
+  loanApplicationId: z.number().int().positive(),
+  recordDate: z.string(),
+  creditStartDate: z.string(),
+  status: z.enum(WORKER_STUDY_CREDIT_STATUS_OPTIONS),
+  disbursementStatus: z.enum(WORKER_STUDY_CREDIT_DISBURSEMENT_STATUS_OPTIONS),
+  principalAmount: z.number().nonnegative(),
+  currentBalance: z.number().nonnegative(),
+  overdueBalance: z.number().nonnegative(),
+  totalPaid: z.number().nonnegative(),
+  openInstallments: z.number().int().nonnegative(),
+  nextDueDate: z.string().nullable(),
+  paymentBehavior: z.enum(WORKER_STUDY_CREDIT_PAYMENT_BEHAVIOR_OPTIONS),
+  creditProductName: z.string().nullable(),
+});
+
 export const WorkerStudyResponseSchema = z.object({
   worker: z.object({
     fullName: z.string(),
@@ -101,6 +156,8 @@ export const WorkerStudyResponseSchema = z.object({
   }),
   contributions: z.array(WorkerStudyContributionSchema),
   companyHistory: z.array(WorkerStudyCompanyHistorySchema),
+  loanApplications: z.array(WorkerStudyLoanApplicationSchema),
+  credits: z.array(WorkerStudyCreditSchema),
   notes: z.string().nullable(),
   generatedAt: z.string(),
 });

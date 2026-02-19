@@ -11,7 +11,7 @@ import { GenerateMinutesPdfBodySchema, GenerateMinutesPdfResult } from '@/schema
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FileDown } from 'lucide-react';
 import React from 'react';
-import { type Resolver, useForm } from 'react-hook-form';
+import { type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { downloadPdfFromBase64 } from '../../components/pdf-download';
@@ -28,7 +28,10 @@ export function MinutesReport() {
   });
 
   const { mutateAsync: generatePdf, isPending: isGenerating } = useGenerateMinutesPdf();
-  const minutesNumberValue = form.watch('minutesNumber') ?? '';
+  const minutesNumberValue = useWatch({
+    control: form.control,
+    name: 'minutesNumber',
+  });
 
   const onSubmit = async (values: FormValues) => {
     const response = await generatePdf({ body: values });

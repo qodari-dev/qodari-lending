@@ -164,8 +164,6 @@ export function LoanPaymentForm({
   useEffect(() => {
     if (!opened) return;
 
-    setLoanSearchValue('');
-    setSelectedLoanSnapshot(null);
     form.reset({
       receiptTypeId: availableReceiptTypes[0]?.paymentReceiptTypeId,
       paymentDate: new Date(),
@@ -286,13 +284,26 @@ export function LoanPaymentForm({
       }
 
       await create({ body: values });
+      setLoanSearchValue('');
+      setSelectedLoanSnapshot(null);
       onOpened(false);
     },
     [availableReceiptTypes.length, collectionMethods.length, create, onOpened]
   );
 
+  const handleSheetOpenChange = useCallback(
+    (nextOpened: boolean) => {
+      if (!nextOpened) {
+        setLoanSearchValue('');
+        setSelectedLoanSnapshot(null);
+      }
+      onOpened(nextOpened);
+    },
+    [onOpened]
+  );
+
   return (
-    <Sheet open={opened} onOpenChange={onOpened}>
+    <Sheet open={opened} onOpenChange={handleSheetOpenChange}>
       <SheetContent ref={sheetContentRef} className="overflow-y-scroll sm:max-w-4xl">
         <SheetHeader>
           <SheetTitle>Nuevo abono</SheetTitle>

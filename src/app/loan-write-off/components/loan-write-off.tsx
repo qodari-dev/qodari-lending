@@ -87,7 +87,7 @@ export function LoanWriteOff() {
     },
   });
 
-  const reviewedRows = review?.rows ?? [];
+  const reviewedRows = React.useMemo(() => review?.rows ?? [], [review]);
   const selectedCreditNumbersSet = React.useMemo(
     () => new Set(selectedCreditNumbers.map((creditNumber) => creditNumber.toUpperCase())),
     [selectedCreditNumbers]

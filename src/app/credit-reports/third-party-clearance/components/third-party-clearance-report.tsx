@@ -14,7 +14,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FileDown } from 'lucide-react';
 import React from 'react';
-import { type Resolver, useForm } from 'react-hook-form';
+import { type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { downloadPdfFromBase64 } from '../../components/pdf-download';
@@ -31,7 +31,10 @@ export function ThirdPartyClearanceReport() {
   });
 
   const { mutateAsync: generatePdf, isPending: isGenerating } = useGenerateThirdPartyClearancePdf();
-  const thirdPartyDocumentNumberValue = form.watch('thirdPartyDocumentNumber') ?? '';
+  const thirdPartyDocumentNumberValue = useWatch({
+    control: form.control,
+    name: 'thirdPartyDocumentNumber',
+  });
 
   const onSubmit = async (values: FormValues) => {
     const response = await generatePdf({ body: values });

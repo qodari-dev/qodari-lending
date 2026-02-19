@@ -360,6 +360,12 @@ export function LoanApplicationForm({
       semiMonthDay2: selectedPaymentFrequency.semiMonthDay2,
     });
   }, [selectedPaymentFrequency]);
+  const selectedPaymentFrequencyScheduleMode = selectedPaymentFrequency?.scheduleMode;
+  const selectedPaymentFrequencyDayOfMonth = selectedPaymentFrequency?.dayOfMonth ?? null;
+  const selectedPaymentFrequencySemiMonthDay1 = selectedPaymentFrequency?.semiMonthDay1 ?? null;
+  const selectedPaymentFrequencySemiMonthDay2 = selectedPaymentFrequency?.semiMonthDay2 ?? null;
+  const selectedPaymentFrequencyUseEndOfMonthFallback =
+    selectedPaymentFrequency?.useEndOfMonthFallback;
   const selectedInsuranceCompany = useMemo(
     () => insuranceCompanies.find((item) => item.id === selectedInsuranceCompanyId) ?? null,
     [insuranceCompanies, selectedInsuranceCompanyId]
@@ -442,11 +448,11 @@ export function LoanApplicationForm({
       installments,
       firstPaymentDate,
       daysInterval: selectedPaymentFrequencyIntervalDays,
-      paymentScheduleMode: selectedPaymentFrequency?.scheduleMode,
-      dayOfMonth: selectedPaymentFrequency?.dayOfMonth ?? null,
-      semiMonthDay1: selectedPaymentFrequency?.semiMonthDay1 ?? null,
-      semiMonthDay2: selectedPaymentFrequency?.semiMonthDay2 ?? null,
-      useEndOfMonthFallback: selectedPaymentFrequency?.useEndOfMonthFallback,
+      paymentScheduleMode: selectedPaymentFrequencyScheduleMode,
+      dayOfMonth: selectedPaymentFrequencyDayOfMonth,
+      semiMonthDay1: selectedPaymentFrequencySemiMonthDay1,
+      semiMonthDay2: selectedPaymentFrequencySemiMonthDay2,
+      useEndOfMonthFallback: selectedPaymentFrequencyUseEndOfMonthFallback,
       insuranceAccrualMethod: selectedCreditProduct.insuranceAccrualMethod,
       insuranceRatePercent,
       insuranceFixedAmount,
@@ -459,7 +465,12 @@ export function LoanApplicationForm({
     requestedAmountValue,
     selectedCategoryConfig,
     selectedCreditProduct,
+    selectedPaymentFrequencyDayOfMonth,
     selectedPaymentFrequencyIntervalDays,
+    selectedPaymentFrequencyScheduleMode,
+    selectedPaymentFrequencySemiMonthDay1,
+    selectedPaymentFrequencySemiMonthDay2,
+    selectedPaymentFrequencyUseEndOfMonthFallback,
   ]);
 
   const paymentCapacityAssessment = useMemo(() => {

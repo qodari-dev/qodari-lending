@@ -21,7 +21,7 @@ import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { applyPortfolioDeltas } from '@/server/utils/portfolio-utils';
 import { roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
 import { addDays } from 'date-fns';
-import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { BillingConceptsRunSummary } from './types';
 
 type LoanCandidate = {

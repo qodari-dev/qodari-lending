@@ -201,6 +201,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Interes corriente', url: `/causation-current-interest` },
                   { title: 'Seguro', url: `/causation-current-insurance` },
                   { title: 'Interes mora', url: `/causation-current-interest-late` },
+                  { title: 'Otros conceptos', url: `/causation-billing-concepts` },
                   { title: 'Cierre de periodo', url: `/causation-period-closing` },
                 ],
               },

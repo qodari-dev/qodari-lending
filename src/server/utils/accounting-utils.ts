@@ -33,13 +33,14 @@ export function buildPaymentVoidDocumentCode(loanPaymentId: number): string {
 }
 
 export function buildProcessRunDocumentCode(
-  processType: 'INTEREST' | 'LATE_INTEREST' | 'INSURANCE',
+  processType: 'INTEREST' | 'LATE_INTEREST' | 'INSURANCE' | 'OTHER',
   processRunId: number
 ): string {
   const prefixByProcessType = {
     INTEREST: 'I',
     LATE_INTEREST: 'M',
     INSURANCE: 'S',
+    OTHER: 'O',
   } as const;
 
   return buildNumericDocumentCode(prefixByProcessType[processType], processRunId);
@@ -98,16 +99,34 @@ export function calculateOneTimeConceptAmount(args: {
   principal: number;
   firstInstallmentAmount: number;
 }) {
-  let base = 0;
-  if (args.concept.baseAmount === 'INSTALLMENT_AMOUNT') {
-    base = args.firstInstallmentAmount;
-  } else if (
-    args.concept.baseAmount === 'DISBURSED_AMOUNT' ||
-    args.concept.baseAmount === 'PRINCIPAL' ||
-    args.concept.baseAmount === 'OUTSTANDING_BALANCE'
-  ) {
-    base = args.principal;
-  }
+  return calculateBillingConceptAmount({
+    concept: args.concept,
+    baseValues: {
+      DISBURSED_AMOUNT: args.principal,
+      PRINCIPAL: args.principal,
+      OUTSTANDING_BALANCE: args.principal,
+      INSTALLMENT_AMOUNT: args.firstInstallmentAmount,
+    },
+  });
+}
+
+export function calculateBillingConceptAmount(args: {
+  concept: {
+    calcMethod: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'TIERED_FIXED_AMOUNT' | 'TIERED_PERCENTAGE';
+    baseAmount: 'DISBURSED_AMOUNT' | 'PRINCIPAL' | 'OUTSTANDING_BALANCE' | 'INSTALLMENT_AMOUNT' | null;
+    rate: string | null;
+    amount: string | null;
+    minAmount: string | null;
+    maxAmount: string | null;
+    roundingMode: 'NEAREST' | 'UP' | 'DOWN';
+    roundingDecimals: number;
+  };
+  baseValues: Partial<
+    Record<'DISBURSED_AMOUNT' | 'PRINCIPAL' | 'OUTSTANDING_BALANCE' | 'INSTALLMENT_AMOUNT', number>
+  >;
+}) {
+  const base =
+    args.concept.baseAmount !== null ? toNumber(args.baseValues[args.concept.baseAmount] ?? 0) : 0;
 
   const rate = toNumber(args.concept.rate);
   const amountValue = toNumber(args.concept.amount);

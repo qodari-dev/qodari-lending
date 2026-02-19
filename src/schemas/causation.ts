@@ -4,24 +4,6 @@ import { z } from 'zod';
 
 export const CAUSATION_SCOPE_TYPE_OPTIONS = ['GENERAL', 'CREDIT_PRODUCT', 'LOAN'] as const;
 
-function buildCausationProcessBodySchema() {
-  return z
-    .object({
-      startDate: z.coerce.date(),
-      endDate: z.coerce.date(),
-      transactionDate: z.coerce.date(),
-    })
-    .superRefine((value, ctx) => {
-      if (value.endDate < value.startDate) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['endDate'],
-          message: 'La fecha final debe ser mayor o igual a la fecha inicial',
-        });
-      }
-    });
-}
-
 export const ProcessCausationCurrentInterestBodySchema = z
   .object({
     processDate: z.coerce.date(),
@@ -93,16 +75,30 @@ export type CausationCurrentInterestRunStatusResult = ClientInferResponseBody<
   200
 >;
 
-export const ProcessCausationLateInterestBodySchema = buildCausationProcessBodySchema();
+export const ProcessCausationLateInterestBodySchema = ProcessCausationCurrentInterestBodySchema;
 
 export const ProcessCausationLateInterestResponseSchema = z.object({
+  processRunId: z.number().int().positive(),
   processType: z.literal('LATE_INTEREST'),
-  periodStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  periodEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  status: z.enum(['QUEUED', 'RUNNING']),
+  message: z.string(),
+});
+
+export const CausationLateInterestRunStatusResponseSchema = z.object({
+  id: z.number().int().positive(),
+  processType: z.literal('LATE_INTEREST'),
+  status: z.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELED']),
+  scopeType: z.enum(CAUSATION_SCOPE_TYPE_OPTIONS),
+  scopeId: z.number().int().nonnegative(),
+  processDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reviewedCredits: z.number().int().nonnegative(),
   accruedCredits: z.number().int().nonnegative(),
+  failedCredits: z.number().int().nonnegative(),
   totalAccruedAmount: z.number().nonnegative(),
+  errors: z.array(CausationRunErrorSchema),
+  startedAt: z.string().nullable(),
+  finishedAt: z.string().nullable(),
   message: z.string(),
 });
 
@@ -111,21 +107,82 @@ export type ProcessCausationLateInterestResult = ClientInferResponseBody<
   200
 >;
 
-export const ProcessCausationCurrentInsuranceBodySchema = buildCausationProcessBodySchema();
+export type CausationLateInterestRunStatusResult = ClientInferResponseBody<
+  Contract['causation']['getLateInterestRun'],
+  200
+>;
+
+export const ProcessCausationCurrentInsuranceBodySchema = ProcessCausationCurrentInterestBodySchema;
 
 export const ProcessCausationCurrentInsuranceResponseSchema = z.object({
+  processRunId: z.number().int().positive(),
   processType: z.literal('CURRENT_INSURANCE'),
-  periodStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  periodEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  status: z.enum(['QUEUED', 'RUNNING']),
+  message: z.string(),
+});
+
+export const CausationCurrentInsuranceRunStatusResponseSchema = z.object({
+  id: z.number().int().positive(),
+  processType: z.literal('CURRENT_INSURANCE'),
+  status: z.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELED']),
+  scopeType: z.enum(CAUSATION_SCOPE_TYPE_OPTIONS),
+  scopeId: z.number().int().nonnegative(),
+  processDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reviewedCredits: z.number().int().nonnegative(),
   accruedCredits: z.number().int().nonnegative(),
+  failedCredits: z.number().int().nonnegative(),
   totalAccruedAmount: z.number().nonnegative(),
+  errors: z.array(CausationRunErrorSchema),
+  startedAt: z.string().nullable(),
+  finishedAt: z.string().nullable(),
   message: z.string(),
 });
 
 export type ProcessCausationCurrentInsuranceResult = ClientInferResponseBody<
   Contract['causation']['processCurrentInsurance'],
+  200
+>;
+
+export type CausationCurrentInsuranceRunStatusResult = ClientInferResponseBody<
+  Contract['causation']['getCurrentInsuranceRun'],
+  200
+>;
+
+export const ProcessCausationBillingConceptsBodySchema = ProcessCausationCurrentInterestBodySchema;
+
+export const ProcessCausationBillingConceptsResponseSchema = z.object({
+  processRunId: z.number().int().positive(),
+  processType: z.literal('BILLING_CONCEPTS'),
+  status: z.enum(['QUEUED', 'RUNNING']),
+  message: z.string(),
+});
+
+export const CausationBillingConceptsRunStatusResponseSchema = z.object({
+  id: z.number().int().positive(),
+  processType: z.literal('BILLING_CONCEPTS'),
+  status: z.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELED']),
+  scopeType: z.enum(CAUSATION_SCOPE_TYPE_OPTIONS),
+  scopeId: z.number().int().nonnegative(),
+  processDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reviewedCredits: z.number().int().nonnegative(),
+  accruedCredits: z.number().int().nonnegative(),
+  failedCredits: z.number().int().nonnegative(),
+  totalAccruedAmount: z.number().nonnegative(),
+  errors: z.array(CausationRunErrorSchema),
+  startedAt: z.string().nullable(),
+  finishedAt: z.string().nullable(),
+  message: z.string(),
+});
+
+export type ProcessCausationBillingConceptsResult = ClientInferResponseBody<
+  Contract['causation']['processBillingConcepts'],
+  200
+>;
+
+export type CausationBillingConceptsRunStatusResult = ClientInferResponseBody<
+  Contract['causation']['getBillingConceptsRun'],
   200
 >;
 

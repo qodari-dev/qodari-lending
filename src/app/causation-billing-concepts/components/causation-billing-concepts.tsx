@@ -22,12 +22,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  useLateInterestRunStatus,
-  useProcessCausationLateInterest,
+  useBillingConceptsRunStatus,
+  useProcessCausationBillingConcepts,
 } from '@/hooks/queries/use-causation-queries';
 import { useCreditProducts } from '@/hooks/queries/use-credit-product-queries';
 import { useLoans } from '@/hooks/queries/use-loan-queries';
-import { ProcessCausationLateInterestBodySchema } from '@/schemas/causation';
+import { ProcessCausationBillingConceptsBodySchema } from '@/schemas/causation';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,7 +36,7 @@ import { Controller, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const FormSchema = ProcessCausationLateInterestBodySchema;
+const FormSchema = ProcessCausationBillingConceptsBodySchema;
 type FormValues = z.infer<typeof FormSchema>;
 
 const scopeLabels: Record<FormValues['scopeType'], string> = {
@@ -45,7 +45,7 @@ const scopeLabels: Record<FormValues['scopeType'], string> = {
   LOAN: 'Credito',
 };
 
-export function CausationCurrentInterestLate() {
+export function CausationBillingConcepts() {
   const [runId, setRunId] = React.useState<number | null>(null);
   const [lastNotifiedStatus, setLastNotifiedStatus] = React.useState<string | null>(null);
 
@@ -99,8 +99,9 @@ export function CausationCurrentInterestLate() {
     form.setValue('creditProductId', undefined);
   }, [form, scopeType]);
 
-  const { mutateAsync: processLateInterest, isPending: isProcessing } = useProcessCausationLateInterest();
-  const { data: runStatusData, isFetching: isFetchingRunStatus } = useLateInterestRunStatus(runId);
+  const { mutateAsync: processBillingConcepts, isPending: isProcessing } =
+    useProcessCausationBillingConcepts();
+  const { data: runStatusData, isFetching: isFetchingRunStatus } = useBillingConceptsRunStatus(runId);
   const runStatus = runStatusData?.body;
 
   React.useEffect(() => {
@@ -120,7 +121,7 @@ export function CausationCurrentInterestLate() {
   }, [lastNotifiedStatus, runStatus]);
 
   const onSubmit = async (values: FormValues) => {
-    const response = await processLateInterest({
+    const response = await processBillingConcepts({
       body: {
         ...values,
         creditProductId: values.scopeType === 'CREDIT_PRODUCT' ? values.creditProductId : undefined,
@@ -136,14 +137,14 @@ export function CausationCurrentInterestLate() {
   return (
     <>
       <PageHeader
-        title="Causacion - Interes mora"
-        description="Defina alcance, fecha de proceso y fecha de movimiento para ejecutar la causacion."
+        title="Causacion - Otros conceptos"
+        description="Defina alcance, fecha de proceso y fecha de movimiento para causar conceptos mensuales y por cuota."
       />
       <PageContent>
         <Card>
           <CardHeader>
             <CardTitle>Parametros</CardTitle>
-            <CardDescription>Capture los datos para procesar causacion de interes de mora.</CardDescription>
+            <CardDescription>Capture los datos para procesar causacion de otros conceptos.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

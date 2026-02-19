@@ -1,7 +1,12 @@
 import {
+  CausationBillingConceptsRunStatusResponseSchema,
+  CausationCurrentInsuranceRunStatusResponseSchema,
   CausationCurrentInterestRunStatusResponseSchema,
+  CausationLateInterestRunStatusResponseSchema,
   CloseCausationPeriodBodySchema,
   CloseCausationPeriodResponseSchema,
+  ProcessCausationBillingConceptsBodySchema,
+  ProcessCausationBillingConceptsResponseSchema,
   ProcessCausationCurrentInsuranceBodySchema,
   ProcessCausationCurrentInsuranceResponseSchema,
   ProcessCausationCurrentInterestBodySchema,
@@ -65,6 +70,17 @@ export const causation = c.router(
         ...errorResponses,
       },
     },
+    getLateInterestRun: {
+      method: 'GET',
+      path: '/late-interest/runs/:id',
+      pathParams: IdParamSchema,
+      query: c.type<Record<string, never>>(),
+      metadata,
+      responses: {
+        200: CausationLateInterestRunStatusResponseSchema,
+        ...errorResponses,
+      },
+    },
     processCurrentInsurance: {
       method: 'POST',
       path: '/current-insurance/process',
@@ -72,6 +88,38 @@ export const causation = c.router(
       metadata,
       responses: {
         200: ProcessCausationCurrentInsuranceResponseSchema,
+        ...errorResponses,
+      },
+    },
+    getCurrentInsuranceRun: {
+      method: 'GET',
+      path: '/current-insurance/runs/:id',
+      pathParams: IdParamSchema,
+      query: c.type<Record<string, never>>(),
+      metadata,
+      responses: {
+        200: CausationCurrentInsuranceRunStatusResponseSchema,
+        ...errorResponses,
+      },
+    },
+    processBillingConcepts: {
+      method: 'POST',
+      path: '/billing-concepts/process',
+      body: ProcessCausationBillingConceptsBodySchema,
+      metadata,
+      responses: {
+        200: ProcessCausationBillingConceptsResponseSchema,
+        ...errorResponses,
+      },
+    },
+    getBillingConceptsRun: {
+      method: 'GET',
+      path: '/billing-concepts/runs/:id',
+      pathParams: IdParamSchema,
+      query: c.type<Record<string, never>>(),
+      metadata,
+      responses: {
+        200: CausationBillingConceptsRunStatusResponseSchema,
         ...errorResponses,
       },
     },

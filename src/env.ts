@@ -26,7 +26,10 @@ export const env = createEnv({
     PAUSE_SCHEDULER: z
       .union([z.literal('true'), z.literal('false'), z.literal('1'), z.literal('0')])
       .optional(),
+    BILLING_CONCEPTS_CRON: z.string().optional().default('13 0 * * *'),
     CURRENT_INTEREST_CRON: z.string().optional().default('15 0 * * *'),
+    CURRENT_INSURANCE_CRON: z.string().optional().default('17 0 * * *'),
+    LATE_INTEREST_CRON: z.string().optional().default('20 0 * * *'),
     SCHEDULER_TIMEZONE: z.string().optional().default('America/Bogota'),
     // DigitalOcean Spaces
     DO_SPACES_ENDPOINT: z.string().url(),
@@ -74,7 +77,10 @@ export const env = createEnv({
     IAM_M2M_CLIENT_SECRET: process.env.IAM_M2M_CLIENT_SECRET,
     REDIS_URL: process.env.REDIS_URL,
     PAUSE_SCHEDULER: process.env.PAUSE_SCHEDULER,
+    BILLING_CONCEPTS_CRON: process.env.BILLING_CONCEPTS_CRON,
     CURRENT_INTEREST_CRON: process.env.CURRENT_INTEREST_CRON,
+    CURRENT_INSURANCE_CRON: process.env.CURRENT_INSURANCE_CRON,
+    LATE_INTEREST_CRON: process.env.LATE_INTEREST_CRON,
     SCHEDULER_TIMEZONE: process.env.SCHEDULER_TIMEZONE,
     // DigitalOcean Spaces
     DO_SPACES_ENDPOINT: process.env.DO_SPACES_ENDPOINT,

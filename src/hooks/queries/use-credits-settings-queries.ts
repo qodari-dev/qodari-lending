@@ -1,6 +1,7 @@
 import { api } from '@/clients/api';
 import type { CreditsSettingsInclude } from '@/schemas/credits-settings';
 import { getTsRestErrorMessage } from '@/utils/get-ts-rest-error-message';
+import { toast } from 'sonner';
 
 export const creditsSettingsKeys = {
   all: ['credits-settings'] as const,
@@ -30,7 +31,7 @@ export function useUpdateCreditsSettings() {
       queryClient.invalidateQueries({ queryKey: creditsSettingsKeys.all });
     },
     onError: (error) => {
-      throw new Error(getTsRestErrorMessage(error));
+      toast.error(getTsRestErrorMessage(error));
     },
   });
 }

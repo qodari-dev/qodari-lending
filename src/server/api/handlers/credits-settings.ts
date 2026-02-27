@@ -4,7 +4,6 @@ import { getAuthContextAndValidatePermission } from '@/server/utils/require-perm
 import { tsr } from '@ts-rest/serverless/next';
 import { eq } from 'drizzle-orm';
 import { contract } from '../contracts';
-
 import { logAudit } from '@/server/utils/audit-logger';
 import { UnifiedAuthContext } from '@/server/utils/auth-context';
 import { getClientIp } from '@/server/utils/get-client-ip';
@@ -38,8 +37,20 @@ const CREDITS_SETTINGS_INCLUDES = createIncludeMap<typeof db.query.creditsSettin
   },
 });
 
-// App slug por defecto para la configuración
 const DEFAULT_APP_SLUG = env.IAM_APP_SLUG;
+
+async function getOrCreateSettings() {
+  const existing = await db.query.creditsSettings.findFirst({
+    where: eq(creditsSettings.appSlug, DEFAULT_APP_SLUG),
+  });
+  if (existing) return existing;
+
+  const [created] = await db
+    .insert(creditsSettings)
+    .values({ appSlug: DEFAULT_APP_SLUG, accountingSystemCode: '01' })
+    .returning();
+  return created;
+}
 
 // ============================================
 // HANDLER
@@ -53,26 +64,12 @@ export const creditsSettingsHandler = tsr.router(contract.creditsSettings, {
     try {
       await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-      let settings = await db.query.creditsSettings.findFirst({
-        where: eq(creditsSettings.appSlug, DEFAULT_APP_SLUG),
+      const base = await getOrCreateSettings();
+
+      const settings = await db.query.creditsSettings.findFirst({
+        where: eq(creditsSettings.id, base.id),
         with: buildTypedIncludes(query?.include, CREDITS_SETTINGS_INCLUDES),
       });
-
-      // Si no existe, crear uno por defecto
-      if (!settings) {
-        const [newSettings] = await db
-          .insert(creditsSettings)
-          .values({
-            appSlug: DEFAULT_APP_SLUG,
-            accountingSystemCode: '01',
-          })
-          .returning();
-
-        settings = await db.query.creditsSettings.findFirst({
-          where: eq(creditsSettings.id, newSettings.id),
-          with: buildTypedIncludes(query?.include, CREDITS_SETTINGS_INCLUDES),
-        });
-      }
 
       if (!settings) {
         throwHttpError({
@@ -99,32 +96,9 @@ export const creditsSettingsHandler = tsr.router(contract.creditsSettings, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      // Buscar configuración existente
-      let existing = await db.query.creditsSettings.findFirst({
-        where: eq(creditsSettings.appSlug, DEFAULT_APP_SLUG),
-      });
+      const existing = await getOrCreateSettings();
 
-      // Si no existe, crear una
-      if (!existing) {
-        const [newSettings] = await db
-          .insert(creditsSettings)
-          .values({
-            appSlug: DEFAULT_APP_SLUG,
-            accountingSystemCode: '01',
-          })
-          .returning();
-        existing = newSettings;
-      }
-
-      // Actualizar
       const [updated] = await db
         .update(creditsSettings)
         .set(body)

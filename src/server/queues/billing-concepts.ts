@@ -1,5 +1,5 @@
-import { executeBillingConceptsProcessRun } from '@/server/causation/billing-concepts-run';
-import type { BillingConceptsJobData } from '@/server/causation/types';
+import { executeBillingConceptsProcessRun } from '@/server/services/causation/billing-concepts-run';
+import type { BillingConceptsJobData } from '@/server/services/causation/types';
 import { redisConnection } from '@/server/clients/redis';
 import { db, processRuns } from '@/server/db';
 import { Queue, Worker } from 'bullmq';

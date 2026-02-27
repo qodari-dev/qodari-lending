@@ -1,4 +1,4 @@
-import { processAgreementBillingEmailDispatch } from '@/server/billing-emails/agreement-billing-email-service';
+import { processAgreementBillingEmailDispatch } from '@/server/services/billing-emails/agreement-billing-email-service';
 import { redisConnection } from '@/server/clients/redis';
 import { Queue, Worker } from 'bullmq';
 

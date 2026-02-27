@@ -1,5 +1,5 @@
-import { executeCurrentInsuranceProcessRun } from '@/server/causation/current-insurance-run';
-import type { CurrentInsuranceJobData } from '@/server/causation/types';
+import { executeCurrentInsuranceProcessRun } from '@/server/services/causation/current-insurance-run';
+import type { CurrentInsuranceJobData } from '@/server/services/causation/types';
 import { redisConnection } from '@/server/clients/redis';
 import { db, processRuns } from '@/server/db';
 import { Queue, Worker } from 'bullmq';

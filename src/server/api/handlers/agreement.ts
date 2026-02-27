@@ -7,7 +7,7 @@ import {
   enqueueAgreementBillingEmails,
   listAgreementBillingEmailDispatches,
   retryAgreementBillingEmailDispatch,
-} from '@/server/billing-emails/agreement-billing-email-service';
+} from '@/server/services/billing-emails/agreement-billing-email-service';
 import { logAudit } from '@/server/utils/audit-logger';
 import { UnifiedAuthContext } from '@/server/utils/auth-context';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';

@@ -76,7 +76,7 @@ import {
   recordRejectedOrCanceled,
   resolveTargetApprovalLevel,
   assignInitialApproval,
-} from '@/server/loan-applications/loan-application-approval-service';
+} from '@/server/services/loan-applications/loan-application-approval-service';
 
 type LoanApplicationColumn = keyof typeof loanApplications.$inferSelect;
 

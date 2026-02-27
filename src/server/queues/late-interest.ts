@@ -1,5 +1,5 @@
-import { executeLateInterestProcessRun } from '@/server/causation/late-interest-run';
-import type { LateInterestJobData } from '@/server/causation/types';
+import { executeLateInterestProcessRun } from '@/server/services/causation/late-interest-run';
+import type { LateInterestJobData } from '@/server/services/causation/types';
 import { redisConnection } from '@/server/clients/redis';
 import { db, processRuns } from '@/server/db';
 import { Queue, Worker } from 'bullmq';

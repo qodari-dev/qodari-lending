@@ -1,5 +1,5 @@
-import { executeCurrentInterestProcessRun } from '@/server/causation/current-interest-run';
-import type { CurrentInterestJobData } from '@/server/causation/types';
+import { executeCurrentInterestProcessRun } from '@/server/services/causation/current-interest-run';
+import type { CurrentInterestJobData } from '@/server/services/causation/types';
 import { redisConnection } from '@/server/clients/redis';
 import { db, processRuns } from '@/server/db';
 import { Queue, Worker } from 'bullmq';

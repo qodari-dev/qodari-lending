@@ -6,9 +6,8 @@ import {
 } from '@/schemas/loan-write-off';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { roundMoney } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { format } from 'date-fns';
 import { z } from 'zod';
 import { contract } from '../contracts';
 
@@ -24,16 +23,12 @@ type HandlerContext = {
   appRoute: { metadata: PermissionMetadata };
 };
 
-function toDateOnly(value: Date) {
-  return format(value, 'yyyy-MM-dd');
-}
-
 function proposalSeed(proposalId: string) {
   return proposalId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 }
 
 function buildProposalId(cutoffDate: Date) {
-  return `WO-${toDateOnly(cutoffDate).replace(/-/g, '')}`;
+  return `WO-${formatDateOnly(cutoffDate).replace(/-/g, '')}`;
 }
 
 function buildMockRows(proposalId: string): LoanWriteOffProposalRow[] {
@@ -91,7 +86,7 @@ async function generateProposal(body: GenerateLoanWriteOffProposalBody, context:
       status: 200 as const,
       body: {
         proposalId,
-        cutoffDate: toDateOnly(body.cutoffDate),
+        cutoffDate: formatDateOnly(body.cutoffDate),
         ...summary,
         message: 'Propuesta de castiga cartera generada (demo).',
       },
@@ -160,7 +155,7 @@ async function execute(body: ExecuteLoanWriteOffBody, context: HandlerContext) {
         proposalId,
         executedCredits: selectedRows.length,
         totalWrittenOffAmount,
-        movementDate: toDateOnly(new Date()),
+        movementDate: formatDateOnly(new Date()),
         message: 'Ejecucion de castiga cartera recibida. Pendiente implementacion.',
       },
     };

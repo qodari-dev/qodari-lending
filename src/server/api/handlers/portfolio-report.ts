@@ -11,9 +11,8 @@ import {
 } from '@/schemas/portfolio-report';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { roundMoney } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { format } from 'date-fns';
 import { z } from 'zod';
 import { contract } from '../contracts';
 
@@ -63,10 +62,6 @@ type PortfolioReportRow = {
   note: string | null;
 };
 
-function toDateOnly(value: Date) {
-  return format(value, 'yyyy-MM-dd');
-}
-
 function reportTypeSeed(reportType: PortfolioReportType) {
   return reportType.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 }
@@ -109,7 +104,7 @@ function buildMockReport<TReportType extends PortfolioReportType>(
   rows: PortfolioReportRow[];
   message: string;
 } {
-  const cutoffDate = toDateOnly(cutoffDateValue);
+  const cutoffDate = formatDateOnly(cutoffDateValue);
   const seed = reportTypeSeed(reportType);
   const reviewedCredits = 70 + (seed % 30);
   const reportedCredits = Math.max(10, Math.floor(reviewedCredits * (0.62 + (seed % 4) * 0.07)));
@@ -271,7 +266,7 @@ async function generatePortfolioIndicators(
   const { request, appRoute } = context;
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
-    const cutoffDate = toDateOnly(body.cutoffDate);
+    const cutoffDate = formatDateOnly(body.cutoffDate);
     const rows = buildPortfolioIndicatorsRows(cutoffDate);
 
     // TODO(portfolio-report-indicators): calcular indicadores de cartera oficiales con reglas contables vigentes.

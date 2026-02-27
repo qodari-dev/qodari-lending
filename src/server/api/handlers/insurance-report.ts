@@ -1,14 +1,11 @@
 import { db, insuranceCompanies } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { formatDateOnly } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { differenceInCalendarDays, format } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns';
 import { and, eq } from 'drizzle-orm';
 import { contract } from '../contracts';
-
-function toDateOnly(value: Date) {
-  return format(value, 'yyyy-MM-dd');
-}
 
 function buildMockCounts(startDate: Date, endDate: Date) {
   const spanDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
@@ -39,7 +36,7 @@ function buildMockRows(
       creditNumber: `CR2502${String(sequence).padStart(6, '0')}`,
       borrowerDocumentNumber: `10${String(10000000 + sequence)}`,
       borrowerName: `Titular ${sequence}`,
-      liquidationDate: toDateOnly(startDate),
+      liquidationDate: formatDateOnly(startDate),
       principalAmount,
       insuredAmount: Math.round(principalAmount * 0.012),
     };
@@ -81,8 +78,8 @@ export const insuranceReport = tsr.router(contract.insuranceReport, {
         body: {
           insuranceCompanyId: insuranceCompany.id,
           insuranceCompanyName: insuranceCompany.businessName,
-          liquidatedCreditsStartDate: toDateOnly(body.liquidatedCreditsStartDate),
-          liquidatedCreditsEndDate: toDateOnly(body.liquidatedCreditsEndDate),
+          liquidatedCreditsStartDate: formatDateOnly(body.liquidatedCreditsStartDate),
+          liquidatedCreditsEndDate: formatDateOnly(body.liquidatedCreditsEndDate),
           reviewedCredits,
           reportedCredits,
           rows,

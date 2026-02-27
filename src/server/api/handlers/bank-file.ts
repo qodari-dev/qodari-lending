@@ -1,14 +1,10 @@
 import { db, banks } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { formatDateOnly } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { format } from 'date-fns';
 import { and, eq } from 'drizzle-orm';
 import { contract } from '../contracts';
-
-function toDateOnly(value: Date) {
-  return format(value, 'yyyy-MM-dd');
-}
 
 function buildMockTotals(bankId: number) {
   const reviewedCredits = 18 + (bankId % 9) * 4;
@@ -61,7 +57,7 @@ export const bankFile = tsr.router(contract.bankFile, {
       // - aplicar validaciones de desembolso por banco/cuenta
       // - construir archivo segun la estructura oficial de cada banco
       // - registrar lote generado y trazabilidad de envio
-      const liquidationDate = toDateOnly(body.liquidationDate);
+      const liquidationDate = formatDateOnly(body.liquidationDate);
       const { reviewedCredits, totalAmount } = buildMockTotals(bank.id);
       const fileName = `${(bank.asobancariaCode || bank.name).toLowerCase().replace(/\s+/g, '-')}-${liquidationDate}.txt`;
       const fileContent = buildBankFileContent(

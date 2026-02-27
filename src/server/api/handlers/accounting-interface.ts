@@ -8,6 +8,7 @@ import {
 } from '@/schemas/accounting-interface';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { formatDateOnly } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { z } from 'zod';
 import { contract } from '../contracts';
@@ -27,10 +28,6 @@ type HandlerContext = {
   appRoute: { metadata: PermissionMetadata };
 };
 
-function toDateOnly(value: Date) {
-  return value.toISOString().slice(0, 10);
-}
-
 async function processCredits(body: ProcessCreditsBody, context: HandlerContext) {
   const { request, appRoute } = context;
 
@@ -45,9 +42,9 @@ async function processCredits(body: ProcessCreditsBody, context: HandlerContext)
       status: 200 as const,
       body: {
         interfaceType: 'CREDITS' as const,
-        periodStartDate: toDateOnly(body.startDate),
-        periodEndDate: toDateOnly(body.endDate),
-        transactionDate: toDateOnly(body.transactionDate),
+        periodStartDate: formatDateOnly(body.startDate),
+        periodEndDate: formatDateOnly(body.endDate),
+        transactionDate: formatDateOnly(body.transactionDate),
         processedRecords: 0,
         message: 'Interfaz contable de Creditos recibida. Pendiente implementacion.',
       },
@@ -73,9 +70,9 @@ async function processCurrentInterest(body: ProcessCurrentInterestBody, context:
       status: 200 as const,
       body: {
         interfaceType: 'CURRENT_INTEREST' as const,
-        periodStartDate: toDateOnly(body.startDate),
-        periodEndDate: toDateOnly(body.endDate),
-        transactionDate: toDateOnly(body.transactionDate),
+        periodStartDate: formatDateOnly(body.startDate),
+        periodEndDate: formatDateOnly(body.endDate),
+        transactionDate: formatDateOnly(body.transactionDate),
         processedRecords: 0,
         message: 'Interfaz contable de Interes corriente recibida. Pendiente implementacion.',
       },
@@ -101,9 +98,9 @@ async function processLateInterest(body: ProcessLateInterestBody, context: Handl
       status: 200 as const,
       body: {
         interfaceType: 'LATE_INTEREST' as const,
-        periodStartDate: toDateOnly(body.startDate),
-        periodEndDate: toDateOnly(body.endDate),
-        transactionDate: toDateOnly(body.transactionDate),
+        periodStartDate: formatDateOnly(body.startDate),
+        periodEndDate: formatDateOnly(body.endDate),
+        transactionDate: formatDateOnly(body.transactionDate),
         processedRecords: 0,
         message: 'Interfaz contable de Interes mora recibida. Pendiente implementacion.',
       },
@@ -129,9 +126,9 @@ async function processPayments(body: ProcessPaymentsBody, context: HandlerContex
       status: 200 as const,
       body: {
         interfaceType: 'PAYMENTS' as const,
-        periodStartDate: toDateOnly(body.startDate),
-        periodEndDate: toDateOnly(body.endDate),
-        transactionDate: toDateOnly(body.transactionDate),
+        periodStartDate: formatDateOnly(body.startDate),
+        periodEndDate: formatDateOnly(body.endDate),
+        transactionDate: formatDateOnly(body.transactionDate),
         processedRecords: 0,
         message: 'Interfaz contable de Abonos recibida. Pendiente implementacion.',
       },
@@ -157,9 +154,9 @@ async function processWriteOff(body: ProcessWriteOffBody, context: HandlerContex
       status: 200 as const,
       body: {
         interfaceType: 'WRITE_OFF' as const,
-        periodStartDate: toDateOnly(body.startDate),
-        periodEndDate: toDateOnly(body.endDate),
-        transactionDate: toDateOnly(body.transactionDate),
+        periodStartDate: formatDateOnly(body.startDate),
+        periodEndDate: formatDateOnly(body.endDate),
+        transactionDate: formatDateOnly(body.transactionDate),
         processedRecords: 0,
         message: 'Interfaz contable de Castiga cartera recibida. Pendiente implementacion.',
       },
@@ -185,9 +182,9 @@ async function processProvision(body: ProcessProvisionBody, context: HandlerCont
       status: 200 as const,
       body: {
         interfaceType: 'PROVISION' as const,
-        periodStartDate: toDateOnly(body.startDate),
-        periodEndDate: toDateOnly(body.endDate),
-        transactionDate: toDateOnly(body.transactionDate),
+        periodStartDate: formatDateOnly(body.startDate),
+        periodEndDate: formatDateOnly(body.endDate),
+        transactionDate: formatDateOnly(body.transactionDate),
         processedRecords: 0,
         message: 'Interfaz contable de Provision recibida. Pendiente implementacion.',
       },

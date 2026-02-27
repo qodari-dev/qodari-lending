@@ -19,6 +19,7 @@ import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { calculatePaymentCapacity } from '@/utils/payment-capacity';
 import { resolvePaymentFrequencyIntervalDays } from '@/utils/payment-frequency';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import { roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
@@ -382,19 +383,8 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         };
       });
 
-      const workerFullName = workerThirdParty
-        ? workerThirdParty.personType === 'LEGAL'
-          ? workerThirdParty.businessName?.trim() || 'Afiliado demo'
-          : [
-              workerThirdParty.firstName,
-              workerThirdParty.secondName,
-              workerThirdParty.firstLastName,
-              workerThirdParty.secondLastName,
-            ]
-              .filter((value): value is string => Boolean(value?.trim()))
-              .join(' ')
-              .trim() || 'Afiliado demo'
-        : 'Afiliado demo';
+      const thirdPartyLabel = getThirdPartyLabel(workerThirdParty);
+      const workerFullName = thirdPartyLabel === '-' ? 'Afiliado demo' : thirdPartyLabel;
 
       // TODO(worker-study): conectar con el modulo de subsidio para consultar data real:
       // - historial de aportes del afiliado

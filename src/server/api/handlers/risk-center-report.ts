@@ -4,6 +4,7 @@ import {
 } from '@/schemas/risk-center-report';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { formatDateOnly } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { differenceInCalendarDays } from 'date-fns';
 import { z } from 'zod';
@@ -19,10 +20,6 @@ type HandlerContext = {
   request: PermissionRequest;
   appRoute: { metadata: PermissionMetadata };
 };
-
-function toDateOnly(value: Date) {
-  return value.toISOString().slice(0, 10);
-}
 
 function buildMockCounts(creditCutoffDate: Date, paymentCutoffDate: Date) {
   const spanDays = Math.max(1, differenceInCalendarDays(paymentCutoffDate, creditCutoffDate) + 1);
@@ -66,14 +63,14 @@ async function generateCifin(body: GenerateCifinBody, context: HandlerContext) {
       body.creditCutoffDate,
       body.paymentCutoffDate
     );
-    const fileName = `cifin-${toDateOnly(body.creditCutoffDate)}-${toDateOnly(body.paymentCutoffDate)}.txt`;
+    const fileName = `cifin-${formatDateOnly(body.creditCutoffDate)}-${formatDateOnly(body.paymentCutoffDate)}.txt`;
 
     return {
       status: 200 as const,
       body: {
         reportType: 'CIFIN' as const,
-        creditCutoffDate: toDateOnly(body.creditCutoffDate),
-        paymentCutoffDate: toDateOnly(body.paymentCutoffDate),
+        creditCutoffDate: formatDateOnly(body.creditCutoffDate),
+        paymentCutoffDate: formatDateOnly(body.paymentCutoffDate),
         reviewedCredits,
         reportedCredits,
         fileName,
@@ -102,14 +99,14 @@ async function generateDatacredito(body: GenerateDatacreditoBody, context: Handl
       body.creditCutoffDate,
       body.paymentCutoffDate
     );
-    const fileName = `datacredito-${toDateOnly(body.creditCutoffDate)}-${toDateOnly(body.paymentCutoffDate)}.txt`;
+    const fileName = `datacredito-${formatDateOnly(body.creditCutoffDate)}-${formatDateOnly(body.paymentCutoffDate)}.txt`;
 
     return {
       status: 200 as const,
       body: {
         reportType: 'DATACREDITO' as const,
-        creditCutoffDate: toDateOnly(body.creditCutoffDate),
-        paymentCutoffDate: toDateOnly(body.paymentCutoffDate),
+        creditCutoffDate: formatDateOnly(body.creditCutoffDate),
+        paymentCutoffDate: formatDateOnly(body.paymentCutoffDate),
         reviewedCredits,
         reportedCredits,
         fileName,

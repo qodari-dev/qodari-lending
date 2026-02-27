@@ -5,8 +5,8 @@ import {
 } from '@/schemas/subsidy';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { formatDateOnly } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { format } from 'date-fns';
 import { z } from 'zod';
 import { contract } from '../contracts';
 
@@ -23,10 +23,6 @@ type HandlerContext = {
   request: PermissionRequest;
   appRoute: { metadata: PermissionMetadata };
 };
-
-function toDateOnly(value: Date) {
-  return format(value, 'yyyy-MM-dd');
-}
 
 function normalizePeriod(period: string) {
   return period.trim().toUpperCase();
@@ -61,7 +57,7 @@ async function generatePledgePaymentVoucher(
       status: 200 as const,
       body: {
         period,
-        movementGenerationDate: toDateOnly(body.movementGenerationDate),
+        movementGenerationDate: formatDateOnly(body.movementGenerationDate),
         processedCredits,
         processedPayments,
         totalDiscountedAmount,

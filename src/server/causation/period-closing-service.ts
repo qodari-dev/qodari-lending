@@ -13,8 +13,8 @@ import {
   processRuns,
 } from '@/server/db';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
-import { roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
-import { differenceInCalendarDays, format, lastDayOfMonth } from 'date-fns';
+import { formatDateOnly, roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
+import { differenceInCalendarDays, lastDayOfMonth } from 'date-fns';
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 
 type CloseCausationPeriodInput = {
@@ -77,10 +77,6 @@ function parseDateOnly(value: string) {
   return new Date(`${value}T00:00:00`);
 }
 
-function toDateOnly(value: Date) {
-  return format(value, 'yyyy-MM-dd');
-}
-
 function resolveBucket(daysPastDue: number, buckets: ActiveBucket[]) {
   return (
     buckets.find(
@@ -116,7 +112,7 @@ export async function closeCausationPeriod(
 
     const periodLabel = `${period.year}-${String(period.month).padStart(2, '0')}`;
     const periodEndDate = lastDayOfMonth(new Date(period.year, period.month - 1, 1));
-    const periodEndDateOnly = toDateOnly(periodEndDate);
+    const periodEndDateOnly = formatDateOnly(periodEndDate);
 
     const pendingRun = await tx.query.processRuns.findFirst({
       where: and(
@@ -463,7 +459,7 @@ export async function closeCausationPeriod(
     return {
       accountingPeriodId: period.id,
       periodLabel,
-      closedAt: toDateOnly(closedPeriod.closedAt ?? new Date()),
+      closedAt: formatDateOnly(closedPeriod.closedAt ?? new Date()),
       insertedAgingSnapshots: insertedAgingRows.length,
       insertedProvisionSnapshots: provisionSnapshot ? 1 : 0,
       insertedAccrualSnapshots,

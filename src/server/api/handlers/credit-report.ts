@@ -24,9 +24,10 @@ import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/gener
 import { getLoanBalanceSummary, getLoanStatement } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { buildCreditExtractClientStatement } from '@/utils/credit-extract-client';
-import { roundMoney } from '@/server/utils/value-utils';
+import { getThirdPartyLabel } from '@/utils/third-party';
+import { formatDateOnly, roundMoney } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { differenceInCalendarDays, format } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { contract } from '../contracts';
@@ -54,10 +55,6 @@ type HandlerContext = {
   request: PermissionRequest;
   appRoute: { metadata: PermissionMetadata };
 };
-
-function toDateOnly(value: Date) {
-  return format(value, 'yyyy-MM-dd');
-}
 
 function buildRangeMeta(startDate: Date, endDate: Date, base: number) {
   const spanDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
@@ -102,27 +99,6 @@ function buildDemoPdfBase64(title: string, lines: string[]) {
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
 
   return Buffer.from(pdf, 'utf8').toString('base64');
-}
-
-function getBorrowerName(borrower: {
-  personType: 'NATURAL' | 'LEGAL';
-  businessName: string | null;
-  firstName: string | null;
-  secondName: string | null;
-  firstLastName: string | null;
-  secondLastName: string | null;
-  documentNumber: string;
-} | null): string {
-  if (!borrower) return '-';
-  if (borrower.personType === 'LEGAL') {
-    return borrower.businessName ?? borrower.documentNumber;
-  }
-
-  const fullName = [borrower.firstName, borrower.secondName, borrower.firstLastName, borrower.secondLastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fullName || borrower.documentNumber;
 }
 
 export async function getCreditExtractReportData(
@@ -191,7 +167,7 @@ export async function getCreditExtractReportData(
       maturityDate: loan.maturityDate,
       firstCollectionDate: loan.firstCollectionDate,
       borrowerDocumentNumber: loan.borrower?.documentNumber ?? null,
-      borrowerName: getBorrowerName(loan.borrower),
+      borrowerName: getThirdPartyLabel(loan.borrower),
       affiliationOfficeName: loan.affiliationOffice?.name ?? null,
       agreementLabel: loan.agreement
         ? `${loan.agreement.agreementCode} - ${loan.agreement.businessName}`
@@ -266,7 +242,7 @@ async function getCreditExtractReportDataByLoanId(loanId: number): Promise<Credi
       maturityDate: loan.maturityDate,
       firstCollectionDate: loan.firstCollectionDate,
       borrowerDocumentNumber: loan.borrower?.documentNumber ?? null,
-      borrowerName: getBorrowerName(loan.borrower),
+      borrowerName: getThirdPartyLabel(loan.borrower),
       affiliationOfficeName: loan.affiliationOffice?.name ?? null,
       agreementLabel: loan.agreement
         ? `${loan.agreement.agreementCode} - ${loan.agreement.businessName}`
@@ -299,7 +275,7 @@ function buildLiquidatedRows(count: number): LiquidatedCreditsReportRow[] {
       creditNumber: `CRLQ${String(sequence).padStart(6, '0')}`,
       thirdPartyDocumentNumber: `10${String(31000000 + sequence)}`,
       thirdPartyName: `Tercero ${sequence}`,
-      liquidatedAt: toDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
+      liquidatedAt: formatDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
       liquidatedAmount: roundMoney(1_400_000 + sequence * 82_000),
     };
   });
@@ -330,7 +306,7 @@ function buildCancelledRejectedRows(count: number): CancelledRejectedCreditsRepo
       thirdPartyName: `Tercero ${sequence}`,
       status: rejected ? 'RECHAZADO' : 'ANULADO',
       rejectionReason: rejected ? 'Capacidad de pago insuficiente' : 'Desistimiento',
-      statusDate: toDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
+      statusDate: formatDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
     };
   });
 }
@@ -340,7 +316,7 @@ function buildMovementVoucherRows(count: number): MovementVoucherReportRow[] {
     const sequence = index + 1;
     return {
       creditNumber: `CRMV${String(sequence).padStart(6, '0')}`,
-      movementDate: toDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
+      movementDate: formatDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
       voucherNumber: `CMP-${String(sequence).padStart(7, '0')}`,
       movementType: sequence % 2 === 0 ? 'ABONO' : 'CAUSACION',
       amount: roundMoney(120_000 + sequence * 11_500),
@@ -355,7 +331,7 @@ function buildSettledRows(count: number): SettledCreditsReportRow[] {
       creditNumber: `CRST${String(sequence).padStart(6, '0')}`,
       thirdPartyDocumentNumber: `10${String(34000000 + sequence)}`,
       thirdPartyName: `Tercero ${sequence}`,
-      settledDate: toDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
+      settledDate: formatDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
       settledAmount: roundMoney(1_000_000 + sequence * 76_000),
     };
   });
@@ -389,8 +365,8 @@ async function generatePaidInstallments(
       status: 200 as const,
       body: {
         reportType: 'PAID_INSTALLMENTS' as const,
-        startDate: toDateOnly(body.startDate),
-        endDate: toDateOnly(body.endDate),
+        startDate: formatDateOnly(body.startDate),
+        endDate: formatDateOnly(body.endDate),
         reviewedCredits: meta.reviewedCredits,
         reportedCredits: meta.reportedCredits,
         rows: buildPaidInstallmentsRows(meta.reportedCredits),
@@ -416,8 +392,8 @@ async function generateLiquidatedCredits(
       status: 200 as const,
       body: {
         reportType: 'LIQUIDATED_CREDITS' as const,
-        startDate: toDateOnly(body.startDate),
-        endDate: toDateOnly(body.endDate),
+        startDate: formatDateOnly(body.startDate),
+        endDate: formatDateOnly(body.endDate),
         reviewedCredits: meta.reviewedCredits,
         reportedCredits: meta.reportedCredits,
         rows: buildLiquidatedRows(meta.reportedCredits),
@@ -443,8 +419,8 @@ async function generateNonLiquidatedCredits(
       status: 200 as const,
       body: {
         reportType: 'NON_LIQUIDATED_CREDITS' as const,
-        startDate: toDateOnly(body.startDate),
-        endDate: toDateOnly(body.endDate),
+        startDate: formatDateOnly(body.startDate),
+        endDate: formatDateOnly(body.endDate),
         reviewedCredits: meta.reviewedCredits,
         reportedCredits: meta.reportedCredits,
         rows: buildNonLiquidatedRows(meta.reportedCredits),
@@ -472,8 +448,8 @@ async function generateCancelledRejectedCredits(
       status: 200 as const,
       body: {
         reportType: 'CANCELLED_REJECTED_CREDITS' as const,
-        startDate: toDateOnly(body.startDate),
-        endDate: toDateOnly(body.endDate),
+        startDate: formatDateOnly(body.startDate),
+        endDate: formatDateOnly(body.endDate),
         reviewedCredits: meta.reviewedCredits,
         reportedCredits: meta.reportedCredits,
         rows: buildCancelledRejectedRows(meta.reportedCredits),
@@ -501,8 +477,8 @@ async function generateMovementVoucher(
       status: 200 as const,
       body: {
         reportType: 'MOVEMENT_VOUCHER' as const,
-        startDate: toDateOnly(body.startDate),
-        endDate: toDateOnly(body.endDate),
+        startDate: formatDateOnly(body.startDate),
+        endDate: formatDateOnly(body.endDate),
         reviewedCredits: meta.reviewedCredits,
         reportedCredits: meta.reportedCredits,
         rows: buildMovementVoucherRows(meta.reportedCredits),
@@ -527,8 +503,8 @@ async function generateSettledCredits(body: GenerateSettledCreditsReportBody, co
       status: 200 as const,
       body: {
         reportType: 'SETTLED_CREDITS' as const,
-        startDate: toDateOnly(body.startDate),
-        endDate: toDateOnly(body.endDate),
+        startDate: formatDateOnly(body.startDate),
+        endDate: formatDateOnly(body.endDate),
         reviewedCredits: meta.reviewedCredits,
         reportedCredits: meta.reportedCredits,
         rows: buildSettledRows(meta.reportedCredits),
@@ -554,8 +530,8 @@ async function generateSuperintendencia(
       status: 200 as const,
       body: {
         reportType: 'SUPERINTENDENCIA' as const,
-        startDate: toDateOnly(body.startDate),
-        endDate: toDateOnly(body.endDate),
+        startDate: formatDateOnly(body.startDate),
+        endDate: formatDateOnly(body.endDate),
         reviewedCredits: meta.reviewedCredits,
         reportedCredits: meta.reportedCredits,
         rows: buildSuperintendenciaRows(meta.reportedCredits),

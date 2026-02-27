@@ -15,37 +15,11 @@ import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/gener
 import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { resolvePaymentFrequencyIntervalDays } from '@/utils/payment-frequency';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import { roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import { contract } from '../contracts';
-
-function resolveBorrowerName(borrower: {
-  personType?: string | null;
-  businessName?: string | null;
-  firstName?: string | null;
-  secondName?: string | null;
-  firstLastName?: string | null;
-  secondLastName?: string | null;
-  documentNumber?: string | null;
-} | null) {
-  if (!borrower) return '-';
-  if (borrower.personType === 'LEGAL') {
-    return borrower.businessName ?? borrower.documentNumber ?? '-';
-  }
-
-  const fullName = [
-    borrower.firstName,
-    borrower.secondName,
-    borrower.firstLastName,
-    borrower.secondLastName,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-
-  return fullName || borrower.documentNumber || '-';
-}
 
 export const loanRefinancing = tsr.router(contract.loanRefinancing, {
   simulate: async ({ body }, { request, appRoute }) => {
@@ -319,7 +293,7 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
         body: {
           borrower: {
             thirdPartyId: originLoan.thirdPartyId,
-            fullName: resolveBorrowerName(originLoan.borrower),
+            fullName: getThirdPartyLabel(originLoan.borrower),
             documentNumber: originLoan.borrower?.documentNumber ?? null,
           },
           selectedLoans: selectedLoanRows,

@@ -13,6 +13,10 @@ export const agreementsKeys = {
 
   details: () => [...agreementsKeys.all, 'detail'] as const,
   detail: (id: number) => [...agreementsKeys.details(), id] as const,
+
+  billingEmailDispatches: () => [...agreementsKeys.all, 'billing-email-dispatches'] as const,
+  billingEmailDispatchesByAgreement: (agreementId: number, limit: number) =>
+    [...agreementsKeys.billingEmailDispatches(), agreementId, limit] as const,
 };
 
 function defaultQuery(filters?: Partial<ListAgreementsQuery>) {
@@ -86,6 +90,63 @@ export function useDeleteAgreement() {
       queryClient.removeQueries({ queryKey: agreementsKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: agreementsKeys.lists() });
       toast.success('Convenio eliminado');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
+export function useRunAgreementBillingEmails() {
+  const queryClient = api.useQueryClient();
+
+  return api.agreement.runBillingEmails.useMutation({
+    onSuccess: (response, variables) => {
+      const agreementId = variables.body?.agreementId ?? null;
+      queryClient.invalidateQueries({ queryKey: agreementsKeys.lists() });
+      queryClient.invalidateQueries({
+        queryKey: agreementsKeys.billingEmailDispatches(),
+      });
+      if (agreementId) {
+        queryClient.invalidateQueries({ queryKey: agreementsKeys.detail(agreementId) });
+      }
+      toast.success(response.body.message);
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
+export function useAgreementBillingEmailDispatches(
+  agreementId: number,
+  limit = 20,
+  enabled = true
+) {
+  return api.agreement.listBillingEmailDispatches.useQuery({
+    queryKey: agreementsKeys.billingEmailDispatchesByAgreement(agreementId, limit),
+    queryData: {
+      params: { id: agreementId },
+      query: { limit },
+    },
+    enabled: enabled && Boolean(agreementId),
+    refetchInterval: (query) => {
+      const dispatches = query.state.data?.body?.data ?? [];
+      const hasRunningItems = dispatches.some(
+        (item) => item.status === 'QUEUED' || item.status === 'RUNNING'
+      );
+      return hasRunningItems ? 5000 : false;
+    },
+  });
+}
+
+export function useRetryAgreementBillingEmailDispatch() {
+  const queryClient = api.useQueryClient();
+
+  return api.agreement.retryBillingEmailDispatch.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: agreementsKeys.billingEmailDispatches() });
+      toast.success('Reintento encolado');
     },
     onError: (error) => {
       toast.error(getTsRestErrorMessage(error));

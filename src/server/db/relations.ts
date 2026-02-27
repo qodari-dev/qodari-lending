@@ -58,9 +58,11 @@ import {
   creditProductBillingConcepts,
   loanBillingConcepts,
   creditProductLateInterestRules,
+  billingEmailTemplates,
   agreements,
   billingCycleProfiles,
   billingCycleProfileCycles,
+  agreementBillingEmailDispatches,
   loanApplicationRiskAssessments,
   channels,
   loanApplicationStatusHistory,
@@ -1008,10 +1010,19 @@ export const agreementsRelations = relations(agreements, ({ many, one }) => ({
   loans: many(loans),
   loanAgreementHistory: many(loanAgreementHistory),
   billingCycleProfiles: many(billingCycleProfiles),
+  agreementBillingEmailDispatches: many(agreementBillingEmailDispatches),
   city: one(cities, {
     fields: [agreements.cityId],
     references: [cities.id],
   }),
+  billingEmailTemplate: one(billingEmailTemplates, {
+    fields: [agreements.billingEmailTemplateId],
+    references: [billingEmailTemplates.id],
+  }),
+}));
+
+export const billingEmailTemplatesRelations = relations(billingEmailTemplates, ({ many }) => ({
+  agreements: many(agreements),
 }));
 
 // ---------------------------------------------------------------------
@@ -1027,6 +1038,7 @@ export const billingCycleProfilesRelations = relations(billingCycleProfiles, ({ 
     references: [agreements.id],
   }),
   billingCycleProfileCycles: many(billingCycleProfileCycles),
+  agreementBillingEmailDispatches: many(agreementBillingEmailDispatches),
 }));
 
 // ---------------------------------------------------------------------
@@ -1034,10 +1046,29 @@ export const billingCycleProfilesRelations = relations(billingCycleProfiles, ({ 
 // ---------------------------------------------------------------------
 export const billingCycleProfileCyclesRelations = relations(
   billingCycleProfileCycles,
-  ({ one }) => ({
+  ({ one, many }) => ({
     billingCycleProfile: one(billingCycleProfiles, {
       fields: [billingCycleProfileCycles.billingCycleProfileId],
       references: [billingCycleProfiles.id],
+    }),
+    agreementBillingEmailDispatches: many(agreementBillingEmailDispatches),
+  })
+);
+
+export const agreementBillingEmailDispatchesRelations = relations(
+  agreementBillingEmailDispatches,
+  ({ one }) => ({
+    agreement: one(agreements, {
+      fields: [agreementBillingEmailDispatches.agreementId],
+      references: [agreements.id],
+    }),
+    billingCycleProfile: one(billingCycleProfiles, {
+      fields: [agreementBillingEmailDispatches.billingCycleProfileId],
+      references: [billingCycleProfiles.id],
+    }),
+    billingCycleProfileCycle: one(billingCycleProfileCycles, {
+      fields: [agreementBillingEmailDispatches.billingCycleProfileCycleId],
+      references: [billingCycleProfileCycles.id],
     }),
   })
 );

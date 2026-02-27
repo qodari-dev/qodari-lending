@@ -1,4 +1,9 @@
 import {
+  ListAgreementBillingEmailDispatchesQuerySchema,
+  ListAgreementBillingEmailDispatchesResponseSchema,
+  RetryAgreementBillingEmailDispatchResponseSchema,
+  RunAgreementBillingEmailsBodySchema,
+  RunAgreementBillingEmailsResponseSchema,
   CreateAgreementBodySchema,
   GetAgreementQuerySchema,
   ListAgreementsQuerySchema,
@@ -114,6 +119,68 @@ export const agreement = c.router(
         400: TsRestErrorSchema,
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    runBillingEmails: {
+      method: 'POST',
+      path: '/run-billing-emails',
+      body: RunAgreementBillingEmailsBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'run',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: RunAgreementBillingEmailsResponseSchema,
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    listBillingEmailDispatches: {
+      method: 'GET',
+      path: '/:id/billing-email-dispatches',
+      pathParams: IdParamSchema,
+      query: ListAgreementBillingEmailDispatchesQuerySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'read',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: ListAgreementBillingEmailDispatchesResponseSchema,
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    retryBillingEmailDispatch: {
+      method: 'POST',
+      path: '/billing-email-dispatches/:id/retry',
+      pathParams: IdParamSchema,
+      body: c.noBody(),
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'run',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: RetryAgreementBillingEmailDispatchResponseSchema,
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        409: TsRestErrorSchema,
         404: TsRestErrorSchema,
         500: TsRestErrorSchema,
       },

@@ -3,6 +3,7 @@ import { env } from '@/env';
 import { createAndQueueCurrentInsuranceRun } from '@/server/causation/current-insurance-run-service';
 import { createAndQueueCurrentInterestRun } from '@/server/causation/current-interest-run-service';
 import { createAndQueueLateInterestRun } from '@/server/causation/late-interest-run-service';
+import { enqueueAgreementBillingEmails } from '@/server/billing-emails/agreement-billing-email-service';
 import { CronJob } from 'cron';
 import { addDays } from 'date-fns';
 
@@ -10,6 +11,7 @@ const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 const SYSTEM_USER_NAME = 'SYSTEM_CRON';
 
 declare global {
+  var __agreementBillingEmailCronJob: CronJob | undefined;
   var __causationBillingConceptsCronJob: CronJob | undefined;
   var __causationCurrentInterestCronJob: CronJob | undefined;
   var __causationCurrentInsuranceCronJob: CronJob | undefined;
@@ -131,8 +133,20 @@ async function enqueueDailyLateInterestRun() {
   }
 }
 
+async function enqueueAgreementBillingEmailsRun() {
+  try {
+    await enqueueAgreementBillingEmails({
+      triggerSource: 'CRON',
+      runDate: new Date(),
+    });
+  } catch (error) {
+    console.error('[cron][agreement-billing-email]', error);
+  }
+}
+
 export function startCrons() {
   if (
+    globalThis.__agreementBillingEmailCronJob &&
     globalThis.__causationBillingConceptsCronJob &&
     globalThis.__causationCurrentInterestCronJob &&
     globalThis.__causationCurrentInsuranceCronJob &&
@@ -141,6 +155,13 @@ export function startCrons() {
     return;
   }
 
+  const agreementBillingEmailJob = new CronJob(
+    env.BILLING_AGREEMENT_EMAIL_CRON,
+    enqueueAgreementBillingEmailsRun,
+    null,
+    false,
+    env.SCHEDULER_TIMEZONE
+  );
   const billingConceptsJob = new CronJob(
     env.BILLING_CONCEPTS_CRON,
     enqueueDailyBillingConceptsRun,
@@ -171,12 +192,14 @@ export function startCrons() {
   );
 
   if (!isPausedScheduler()) {
+    agreementBillingEmailJob.start();
     billingConceptsJob.start();
     currentInterestJob.start();
     currentInsuranceJob.start();
     lateInterestJob.start();
   }
 
+  globalThis.__agreementBillingEmailCronJob = agreementBillingEmailJob;
   globalThis.__causationBillingConceptsCronJob = billingConceptsJob;
   globalThis.__causationCurrentInterestCronJob = currentInterestJob;
   globalThis.__causationCurrentInsuranceCronJob = currentInsuranceJob;

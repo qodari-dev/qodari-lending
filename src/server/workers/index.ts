@@ -1,3 +1,4 @@
+import { startAgreementBillingEmailWorker } from './agreement-billing-email-worker';
 import { startBillingConceptsWorker } from './billing-concepts-worker';
 import { startCurrentInterestWorker } from './current-interest-worker';
 import { startCurrentInsuranceWorker } from './current-insurance-worker';
@@ -10,6 +11,7 @@ declare global {
 export function startWorkers() {
   if (globalThis.__workersBootstrapDone) return;
 
+  startAgreementBillingEmailWorker();
   startBillingConceptsWorker();
   startCurrentInterestWorker();
   startCurrentInsuranceWorker();

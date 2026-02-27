@@ -15,8 +15,16 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   useAgreements,
   useDeleteAgreement,
+  useRunAgreementBillingEmails,
 } from '@/hooks/queries/use-agreement-queries';
 import { Agreement, AgreementInclude, AgreementSortField } from '@/schemas/agreement';
 import { RowData, TableMeta } from '@tanstack/react-table';
@@ -37,6 +45,7 @@ declare module '@tanstack/table-core' {
 
 export function Agreements() {
   const [agreement, setAgreement] = React.useState<Agreement>();
+  const [selectedRows, setSelectedRows] = React.useState<Agreement[]>([]);
 
   const {
     pageIndex,
@@ -54,8 +63,17 @@ export function Agreements() {
   });
 
   const { data, isLoading, isFetching, refetch } = useAgreements(queryParams);
+  const { data: agreementsForRunData } = useAgreements({
+    page: 1,
+    limit: 2000,
+    include: [],
+    sort: [{ field: 'businessName', order: 'asc' }],
+    where: { and: [{ isActive: true }] },
+  });
 
   const { mutateAsync: deleteAgreement, isPending: isDeleting } = useDeleteAgreement();
+  const { mutateAsync: runBillingEmails, isPending: isRunningBillingEmails } =
+    useRunAgreementBillingEmails();
 
   const [openedInfoSheet, setOpenedInfoSheet] = React.useState(false);
   const handleInfoSheetChange = React.useCallback(
@@ -105,6 +123,37 @@ export function Agreements() {
     setAgreement(row);
     setOpenedDeleteDialog(true);
   }, []);
+
+  const [openedRunDialog, setOpenedRunDialog] = React.useState(false);
+  const [runMode, setRunMode] = React.useState<'ALL' | 'AGREEMENT'>('ALL');
+  const [runAgreementId, setRunAgreementId] = React.useState<number | null>(null);
+
+  const handleOpenRunDialog = React.useCallback(() => {
+    if (selectedRows.length === 1) {
+      setRunMode('AGREEMENT');
+      setRunAgreementId(selectedRows[0].id);
+    } else {
+      setRunMode('ALL');
+      setRunAgreementId(null);
+    }
+    setOpenedRunDialog(true);
+  }, [selectedRows]);
+
+  const agreementsForRun = React.useMemo(
+    () => agreementsForRunData?.body?.data ?? [],
+    [agreementsForRunData]
+  );
+
+  const handleRunBillingEmails = React.useCallback(async () => {
+    await runBillingEmails({
+      body: {
+        agreementId: runMode === 'AGREEMENT' ? runAgreementId : null,
+        forceResend: false,
+      },
+    });
+    setOpenedRunDialog(false);
+  }, [runAgreementId, runBillingEmails, runMode]);
+
   const fetchAllData = React.useCallback(async () => {
     const res = await api.agreement.list.query({
       query: { ...queryParams, page: 1, limit: 10000 },
@@ -148,6 +197,8 @@ export function Agreements() {
               searchValue={searchValue}
               onSearchChange={handleSearchChange}
               onCreate={handleCreate}
+              onRunBillingEmails={handleOpenRunDialog}
+              isRunningBillingEmails={isRunningBillingEmails}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
               exportActions={
@@ -160,6 +211,7 @@ export function Agreements() {
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."
           meta={tableMeta}
+          onRowSelectionChange={setSelectedRows}
         />
       </PageContent>
 
@@ -182,6 +234,64 @@ export function Agreements() {
             <AlertDialogAction disabled={isDeleting} onClick={handleDelete}>
               {isDeleting && <Spinner />}
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={openedRunDialog} onOpenChange={setOpenedRunDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encolar correos de facturacion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se encolara un correo por convenio y ciclo seleccionado con archivo Excel adjunto.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Modo de ejecucion</p>
+              <Select value={runMode} onValueChange={(value) => setRunMode(value as 'ALL' | 'AGREEMENT')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos los convenios</SelectItem>
+                  <SelectItem value="AGREEMENT">Un convenio</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {runMode === 'AGREEMENT' ? (
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Convenio</p>
+                <Select
+                  value={runAgreementId ? String(runAgreementId) : undefined}
+                  onValueChange={(value) => setRunAgreementId(value ? Number(value) : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione convenio..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agreementsForRun.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.agreementCode} - {item.businessName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setOpenedRunDialog(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isRunningBillingEmails || (runMode === 'AGREEMENT' && !runAgreementId)}
+              onClick={handleRunBillingEmails}
+            >
+              {isRunningBillingEmails && <Spinner />}
+              Encolar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

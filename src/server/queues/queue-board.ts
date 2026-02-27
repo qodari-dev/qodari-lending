@@ -3,6 +3,7 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { HonoAdapter } from '@bull-board/hono';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
+import { getAgreementBillingEmailQueueInstance } from './agreement-billing-email-queue';
 import { getBillingConceptsQueueInstance } from './billing-concepts-queue';
 import { getCurrentInsuranceQueueInstance } from './current-insurance-queue';
 import { getCurrentInterestQueueInstance } from './current-interest-queue';
@@ -20,6 +21,7 @@ function buildQueueBoardApp() {
 
   createBullBoard({
     queues: [
+      new BullMQAdapter(getAgreementBillingEmailQueueInstance()),
       new BullMQAdapter(getBillingConceptsQueueInstance()),
       new BullMQAdapter(getCurrentInterestQueueInstance()),
       new BullMQAdapter(getCurrentInsuranceQueueInstance()),

@@ -58,9 +58,11 @@ import type {
   creditProductBillingConcepts,
   loanBillingConcepts,
   creditProductLateInterestRules,
+  billingEmailTemplates,
   agreements,
   billingCycleProfiles,
   billingCycleProfileCycles,
+  agreementBillingEmailDispatches,
   loanApplicationRiskAssessments,
   channels,
   loanApplicationStatusHistory,
@@ -660,6 +662,11 @@ export type CreditProductLateInterestRules = typeof creditProductLateInterestRul
 };
 export type NewCreditProductLateInterestRules = typeof creditProductLateInterestRules.$inferInsert;
 
+export type BillingEmailTemplates = typeof billingEmailTemplates.$inferSelect & {
+  agreements?: Agreements[];
+};
+export type NewBillingEmailTemplates = typeof billingEmailTemplates.$inferInsert;
+
 // ---------------------------------------------------------------------
 // Concr59 - Convenios / Pagadurías
 // ---------------------------------------------------------------------
@@ -667,7 +674,9 @@ export type Agreements = typeof agreements.$inferSelect & {
   loans?: Loans[];
   loanAgreementHistory?: LoanAgreementHistory[];
   billingCycleProfiles?: BillingCycleProfiles[];
+  agreementBillingEmailDispatches?: AgreementBillingEmailDispatches[];
   city?: Cities;
+  billingEmailTemplate?: BillingEmailTemplates | null;
 };
 export type NewAgreements = typeof agreements.$inferInsert;
 
@@ -678,6 +687,7 @@ export type BillingCycleProfiles = typeof billingCycleProfiles.$inferSelect & {
   creditProduct?: CreditProducts;
   agreement?: Agreements | null;
   billingCycleProfileCycles?: BillingCycleProfileCycles[];
+  agreementBillingEmailDispatches?: AgreementBillingEmailDispatches[];
 };
 export type NewBillingCycleProfiles = typeof billingCycleProfiles.$inferInsert;
 
@@ -686,8 +696,16 @@ export type NewBillingCycleProfiles = typeof billingCycleProfiles.$inferInsert;
 // ---------------------------------------------------------------------
 export type BillingCycleProfileCycles = typeof billingCycleProfileCycles.$inferSelect & {
   billingCycleProfile?: BillingCycleProfiles;
+  agreementBillingEmailDispatches?: AgreementBillingEmailDispatches[];
 };
 export type NewBillingCycleProfileCycles = typeof billingCycleProfileCycles.$inferInsert;
+
+export type AgreementBillingEmailDispatches = typeof agreementBillingEmailDispatches.$inferSelect & {
+  agreement?: Agreements;
+  billingCycleProfile?: BillingCycleProfiles;
+  billingCycleProfileCycle?: BillingCycleProfileCycles;
+};
+export type NewAgreementBillingEmailDispatches = typeof agreementBillingEmailDispatches.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Historial de evaluaciones de riesgo por solicitud

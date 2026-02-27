@@ -29,12 +29,14 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useCities } from '@/hooks/queries/use-city-queries';
+import { useBillingEmailTemplates } from '@/hooks/queries/use-billing-email-template-queries';
 import {
   useCreateAgreement,
   useUpdateAgreement,
 } from '@/hooks/queries/use-agreement-queries';
 import { cn } from '@/lib/utils';
 import { Agreement, CreateAgreementBodySchema } from '@/schemas/agreement';
+import { BillingEmailTemplate } from '@/schemas/billing-email-template';
 import { City } from '@/schemas/city';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -67,6 +69,9 @@ export function AgreementForm({
       cityId: undefined,
       address: null,
       phone: null,
+      billingEmailTo: null,
+      billingEmailCc: null,
+      billingEmailTemplateId: null,
       legalRepresentative: null,
       startDate: new Date(),
       endDate: null,
@@ -86,6 +91,20 @@ export function AgreementForm({
     (id: number | undefined) => cities.find((city) => city.id === id) ?? null,
     [cities]
   );
+  const { data: billingEmailTemplatesData } = useBillingEmailTemplates({
+    limit: 2000,
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'name', order: 'asc' }],
+  });
+  const billingEmailTemplates = useMemo(
+    () => billingEmailTemplatesData?.body?.data ?? [],
+    [billingEmailTemplatesData]
+  );
+  const findBillingEmailTemplate = useCallback(
+    (id: number | null | undefined) =>
+      billingEmailTemplates.find((item) => item.id === id) ?? null,
+    [billingEmailTemplates]
+  );
 
   useEffect(() => {
     if (opened) {
@@ -96,6 +115,9 @@ export function AgreementForm({
         cityId: agreement?.cityId ?? undefined,
         address: agreement?.address ?? null,
         phone: agreement?.phone ?? null,
+        billingEmailTo: agreement?.billingEmailTo ?? null,
+        billingEmailCc: agreement?.billingEmailCc ?? null,
+        billingEmailTemplateId: agreement?.billingEmailTemplateId ?? null,
         legalRepresentative: agreement?.legalRepresentative ?? null,
         startDate: agreement?.startDate ? new Date(agreement.startDate) : new Date(),
         endDate: agreement?.endDate ? new Date(agreement.endDate) : null,
@@ -119,6 +141,8 @@ export function AgreementForm({
         businessName: values.businessName.trim(),
         address: values.address?.trim() ? values.address.trim() : null,
         phone: values.phone?.trim() ? values.phone.trim() : null,
+        billingEmailTo: values.billingEmailTo?.trim() ? values.billingEmailTo.trim().toLowerCase() : null,
+        billingEmailCc: values.billingEmailCc?.trim() ? values.billingEmailCc.trim().toLowerCase() : null,
         legalRepresentative: values.legalRepresentative?.trim()
           ? values.legalRepresentative.trim()
           : null,
@@ -282,6 +306,94 @@ export function AgreementForm({
                       onChange={(event) => field.onChange(event.target.value || null)}
                       maxLength={80}
                       aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+
+              <Controller
+                name="billingEmailTemplateId"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="billingEmailTemplateId">Plantilla de correo</FieldLabel>
+                    <Combobox
+                      items={billingEmailTemplates}
+                      value={findBillingEmailTemplate(field.value)}
+                      onValueChange={(value: BillingEmailTemplate | null) =>
+                        field.onChange(value?.id ?? null)
+                      }
+                      itemToStringValue={(item: BillingEmailTemplate) => String(item.id)}
+                      itemToStringLabel={(item: BillingEmailTemplate) => item.name}
+                    >
+                      <ComboboxTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-between font-normal"
+                          >
+                            <ComboboxValue placeholder="Seleccione..." />
+                            <ChevronDownIcon className="text-muted-foreground size-4" />
+                          </Button>
+                        }
+                      />
+                      <ComboboxContent portalContainer={sheetContentRef}>
+                        <ComboboxInput
+                          placeholder="Buscar plantilla..."
+                          showClear
+                          showTrigger={false}
+                        />
+                        <ComboboxList>
+                          <ComboboxEmpty>No se encontraron plantillas</ComboboxEmpty>
+                          <ComboboxCollection>
+                            {(item: BillingEmailTemplate) => (
+                              <ComboboxItem key={item.id} value={item}>
+                                {item.name}
+                              </ComboboxItem>
+                            )}
+                          </ComboboxCollection>
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+
+              <Controller
+                name="billingEmailTo"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="billingEmailTo">Correo principal</FieldLabel>
+                    <Input
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(event.target.value || null)}
+                      maxLength={255}
+                      aria-invalid={fieldState.invalid}
+                      placeholder="principal@empresa.com"
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+
+              <Controller
+                name="billingEmailCc"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="billingEmailCc">Correo copia (opcional)</FieldLabel>
+                    <Input
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(event.target.value || null)}
+                      maxLength={255}
+                      aria-invalid={fieldState.invalid}
+                      placeholder="copia@empresa.com"
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>

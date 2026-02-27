@@ -2643,6 +2643,23 @@ export const creditProductLateInterestRules = pgTable(
 // - agreementCode: código del convenio (concr59.convenio).
 // - startDate/endDate + statusCode/isActive: vigencia/estado del convenio.
 // ---------------------------------------------------------------------
+export const billingEmailTemplates = pgTable(
+  'billing_email_templates',
+  {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 120 }).notNull(),
+    fromEmail: varchar('from_email', { length: 255 }).notNull(),
+    subject: varchar('subject', { length: 255 }).notNull(),
+    htmlContent: text('html_content').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_billing_email_templates_name').on(t.name),
+    index('idx_billing_email_templates_active').on(t.isActive),
+  ]
+);
+
 export const agreements = pgTable(
   'agreements',
   {
@@ -2656,6 +2673,14 @@ export const agreements = pgTable(
     address: varchar('address', { length: 120 }),
     phone: varchar('phone', { length: 20 }),
     legalRepresentative: varchar('legal_representative', { length: 80 }),
+    billingEmailTo: varchar('billing_email_to', { length: 255 }),
+    billingEmailCc: varchar('billing_email_cc', { length: 255 }),
+    billingEmailTemplateId: integer('billing_email_template_id').references(
+      () => billingEmailTemplates.id,
+      {
+        onDelete: 'set null',
+      }
+    ),
     startDate: date('start_date').notNull(),
     endDate: date('end_date'),
     note: varchar('note', { length: 255 }),
@@ -2755,6 +2780,65 @@ export const billingCycleProfileCycles = pgTable(
       'chk_billing_cycle_profile_cycles_expected_pay_day',
       sql`${t.expectedPayDay} IS NULL OR ${t.expectedPayDay} BETWEEN 1 AND 31`
     ),
+  ]
+);
+
+export const billingEmailDispatchStatusEnum = pgEnum('billing_email_dispatch_status', [
+  'QUEUED',
+  'RUNNING',
+  'SENT',
+  'FAILED',
+]);
+
+export const billingEmailDispatchTriggerSourceEnum = pgEnum('billing_email_dispatch_trigger_source', [
+  'CRON',
+  'MANUAL',
+  'RETRY',
+]);
+
+export const agreementBillingEmailDispatches = pgTable(
+  'agreement_billing_email_dispatches',
+  {
+    id: serial('id').primaryKey(),
+    agreementId: integer('agreement_id')
+      .notNull()
+      .references(() => agreements.id, { onDelete: 'cascade' }),
+    billingCycleProfileId: integer('billing_cycle_profile_id')
+      .notNull()
+      .references(() => billingCycleProfiles.id, { onDelete: 'cascade' }),
+    billingCycleProfileCycleId: integer('billing_cycle_profile_cycle_id')
+      .notNull()
+      .references(() => billingCycleProfileCycles.id, { onDelete: 'cascade' }),
+    period: varchar('period', { length: 7 }).notNull(),
+    scheduledDate: date('scheduled_date').notNull(),
+    status: billingEmailDispatchStatusEnum('status').notNull().default('QUEUED'),
+    triggerSource: billingEmailDispatchTriggerSourceEnum('trigger_source')
+      .notNull()
+      .default('MANUAL'),
+    attempts: integer('attempts').notNull().default(0),
+    queuedAt: timestamp('queued_at', { withTimezone: true }),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    failedAt: timestamp('failed_at', { withTimezone: true }),
+    resendMessageId: varchar('resend_message_id', { length: 255 }),
+    lastError: text('last_error'),
+    metadata: jsonb('metadata'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_agreement_billing_email_dispatch').on(
+      t.agreementId,
+      t.billingCycleProfileId,
+      t.billingCycleProfileCycleId,
+      t.period
+    ),
+    index('idx_agreement_billing_email_dispatch_agreement').on(t.agreementId, t.status),
+    index('idx_agreement_billing_email_dispatch_cycle').on(
+      t.billingCycleProfileId,
+      t.billingCycleProfileCycleId
+    ),
+    check('chk_agreement_billing_email_dispatch_period_format', sql`${t.period} ~ '^[0-9]{4}-[0-9]{2}$'`),
+    check('chk_agreement_billing_email_dispatch_attempts_min', sql`${t.attempts} >= 0`),
   ]
 );
 

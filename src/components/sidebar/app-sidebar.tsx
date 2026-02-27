@@ -140,6 +140,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Politicas de aplicacion', url: `/payment-allocation-policies` },
                   { title: 'Tipos de créditos', url: `/credit-products` },
                   { title: 'Convenios', url: `/agreements` },
+                  { title: 'Plantillas de correo', url: `/billing-email-templates` },
                   { title: 'Perfiles de facturacion', url: `/billing-cycle-profiles` },
                 ],
               },

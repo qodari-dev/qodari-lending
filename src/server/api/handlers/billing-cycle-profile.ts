@@ -12,7 +12,7 @@ import {
 } from '@/server/utils/query/query-builder';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { tsr } from '@ts-rest/serverless/next';
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 type BillingCycleProfileColumn = keyof typeof billingCycleProfiles.$inferSelect;
@@ -53,6 +53,34 @@ const BILLING_CYCLE_PROFILE_INCLUDES = createIncludeMap<typeof db.query.billingC
     },
   },
 });
+
+async function ensureSingleActiveProfilePerAgreement(params: {
+  agreementId?: number | null;
+  isActive?: boolean;
+  excludeProfileId?: number;
+}) {
+  if (!params.agreementId || params.isActive === false) return;
+
+  const existing = await db.query.billingCycleProfiles.findFirst({
+    where: and(
+      eq(billingCycleProfiles.agreementId, params.agreementId),
+      eq(billingCycleProfiles.isActive, true),
+      ...(params.excludeProfileId ? [ne(billingCycleProfiles.id, params.excludeProfileId)] : [])
+    ),
+    columns: {
+      id: true,
+      name: true,
+    },
+  });
+
+  if (!existing) return;
+
+  throwHttpError({
+    status: 400,
+    message: `El convenio ya tiene un perfil activo (${existing.name})`,
+    code: 'BAD_REQUEST',
+  });
+}
 
 export const billingCycleProfile = tsr.router(contract.billingCycleProfile, {
   list: async ({ query }, { request, appRoute }) => {
@@ -145,6 +173,11 @@ export const billingCycleProfile = tsr.router(contract.billingCycleProfile, {
         ...profileData,
         name: profileData.name.trim(),
       };
+
+      await ensureSingleActiveProfilePerAgreement({
+        agreementId: profilePayload.agreementId,
+        isActive: profilePayload.isActive,
+      });
 
       const [created] = await db.transaction(async (tx) => {
         const [profile] = await tx
@@ -242,6 +275,17 @@ export const billingCycleProfile = tsr.router(contract.billingCycleProfile, {
         ...profileData,
         ...(profileData.name !== undefined ? { name: profileData.name.trim() } : {}),
       };
+
+      const nextAgreementId =
+        profilePayload.agreementId !== undefined ? profilePayload.agreementId : existing.agreementId;
+      const nextIsActive =
+        profilePayload.isActive !== undefined ? profilePayload.isActive : existing.isActive;
+
+      await ensureSingleActiveProfilePerAgreement({
+        agreementId: nextAgreementId,
+        isActive: nextIsActive,
+        excludeProfileId: id,
+      });
 
       const [updated] = await db.transaction(async (tx) => {
         const [profileUpdated] = await tx

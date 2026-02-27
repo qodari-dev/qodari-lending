@@ -1,4 +1,13 @@
-import { db, agreements, billingCycleProfiles } from '@/server/db';
+import {
+  agreements,
+  billingCycleProfiles,
+  db,
+} from '@/server/db';
+import {
+  enqueueAgreementBillingEmails,
+  listAgreementBillingEmailDispatches,
+  retryAgreementBillingEmailDispatch,
+} from '@/server/billing-emails/agreement-billing-email-service';
 import { logAudit } from '@/server/utils/audit-logger';
 import { UnifiedAuthContext } from '@/server/utils/auth-context';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
@@ -26,6 +35,9 @@ const AGREEMENT_FIELDS: FieldMap = {
   cityId: agreements.cityId,
   address: agreements.address,
   phone: agreements.phone,
+  billingEmailTo: agreements.billingEmailTo,
+  billingEmailCc: agreements.billingEmailCc,
+  billingEmailTemplateId: agreements.billingEmailTemplateId,
   legalRepresentative: agreements.legalRepresentative,
   startDate: agreements.startDate,
   endDate: agreements.endDate,
@@ -55,6 +67,14 @@ const AGREEMENT_INCLUDES = createIncludeMap<typeof db.query.agreements>()({
       },
     },
   },
+  billingEmailTemplate: {
+    relation: 'billingEmailTemplate',
+    config: true,
+  },
+  agreementBillingEmailDispatches: {
+    relation: 'agreementBillingEmailDispatches',
+    config: true,
+  },
 });
 
 function normalizePayload(
@@ -65,6 +85,9 @@ function normalizePayload(
     cityId: number;
     address: string | null;
     phone: string | null;
+    billingEmailTo: string | null;
+    billingEmailCc: string | null;
+    billingEmailTemplateId: number | null;
     legalRepresentative: string | null;
     startDate: Date;
     endDate: Date | null;
@@ -79,6 +102,16 @@ function normalizePayload(
     businessName: payload.businessName?.trim(),
     address: payload.address === undefined ? undefined : payload.address?.trim() || null,
     phone: payload.phone === undefined ? undefined : payload.phone?.trim() || null,
+    billingEmailTo:
+      payload.billingEmailTo === undefined
+        ? undefined
+        : payload.billingEmailTo?.trim().toLowerCase() || null,
+    billingEmailCc:
+      payload.billingEmailCc === undefined
+        ? undefined
+        : payload.billingEmailCc?.trim().toLowerCase() || null,
+    billingEmailTemplateId:
+      payload.billingEmailTemplateId === undefined ? undefined : payload.billingEmailTemplateId,
     legalRepresentative:
       payload.legalRepresentative === undefined
         ? undefined
@@ -87,6 +120,12 @@ function normalizePayload(
     startDate: payload.startDate ? formatDateOnly(payload.startDate) : undefined,
     endDate: toDbDate(payload.endDate),
   };
+}
+
+function toIsoString(value: Date | string | null | undefined) {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  return value.toISOString();
 }
 
 export const agreement = tsr.router(contract.agreement, {
@@ -176,16 +215,12 @@ export const agreement = tsr.router(contract.agreement, {
       }
 
       const payload = {
+        ...normalizePayload(body),
         agreementCode: body.agreementCode.trim().toUpperCase(),
         documentNumber: body.documentNumber.trim(),
         businessName: body.businessName.trim(),
         cityId: body.cityId,
-        address: body.address?.trim() || null,
-        phone: body.phone?.trim() || null,
-        legalRepresentative: body.legalRepresentative?.trim() || null,
         startDate: formatDateOnly(body.startDate),
-        endDate: toDbDate(body.endDate),
-        note: body.note?.trim() || null,
         isActive: body.isActive,
         statusDate: formatDateOnly(new Date()),
       };
@@ -402,6 +437,96 @@ export const agreement = tsr.router(contract.agreement, {
       });
 
       return error;
+    }
+  },
+
+  runBillingEmails: async ({ body }, { request, appRoute }) => {
+    try {
+      await getAuthContextAndValidatePermission(request, appRoute.metadata);
+
+      const result = await enqueueAgreementBillingEmails({
+        agreementId: body.agreementId ?? null,
+        forceResend: body.forceResend ?? false,
+        triggerSource: 'MANUAL',
+      });
+
+      return {
+        status: 200 as const,
+        body: result,
+      };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: 'Error al encolar correos de facturacion de convenios',
+      });
+    }
+  },
+
+  listBillingEmailDispatches: async ({ params: { id }, query }, { request, appRoute }) => {
+    try {
+      await getAuthContextAndValidatePermission(request, appRoute.metadata);
+
+      const agreement = await db.query.agreements.findFirst({
+        where: eq(agreements.id, id),
+        columns: { id: true },
+      });
+
+      if (!agreement) {
+        throwHttpError({
+          status: 404,
+          message: `Convenio con ID ${id} no encontrado`,
+          code: 'NOT_FOUND',
+        });
+      }
+
+      const data = await listAgreementBillingEmailDispatches(id, query.limit ?? 50);
+
+      return {
+        status: 200 as const,
+        body: {
+          data: data.map((item) => ({
+            id: item.id,
+            agreementId: item.agreementId,
+            billingCycleProfileId: item.billingCycleProfileId,
+            billingCycleProfileCycleId: item.billingCycleProfileCycleId,
+            period: item.period,
+            scheduledDate: toIsoString(item.scheduledDate) ?? '',
+            status: item.status,
+            triggerSource: item.triggerSource,
+            attempts: item.attempts,
+            queuedAt: toIsoString(item.queuedAt),
+            startedAt: toIsoString(item.startedAt),
+            sentAt: toIsoString(item.sentAt),
+            failedAt: toIsoString(item.failedAt),
+            resendMessageId: item.resendMessageId,
+            lastError: item.lastError,
+            createdAt: toIsoString(item.createdAt) ?? '',
+          })),
+        },
+      };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: `Error al listar correos de facturacion del convenio ${id}`,
+      });
+    }
+  },
+
+  retryBillingEmailDispatch: async ({ params: { id } }, { request, appRoute }) => {
+    try {
+      await getAuthContextAndValidatePermission(request, appRoute.metadata);
+
+      const updated = await retryAgreementBillingEmailDispatch(id);
+      return {
+        status: 200 as const,
+        body: {
+          dispatchId: updated.id,
+          status: 'QUEUED' as const,
+          message: `Despacho #${updated.id} encolado para reintento`,
+        },
+      };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: `Error al reintentar despacho ${id}`,
+      });
     }
   },
 });

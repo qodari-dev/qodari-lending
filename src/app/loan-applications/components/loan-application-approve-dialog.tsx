@@ -31,7 +31,10 @@ import { usePaymentGuaranteeTypes } from '@/hooks/queries/use-payment-guarantee-
 import { useRepaymentMethods } from '@/hooks/queries/use-repayment-method-queries';
 import { useThirdParties } from '@/hooks/queries/use-third-party-queries';
 import { cn } from '@/lib/utils';
-import { ApproveLoanApplicationBodySchema, LoanApplication } from '@/schemas/loan-application';
+import {
+  FinalApproveLoanApplicationBodySchema,
+  LoanApplication,
+} from '@/schemas/loan-application';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { formatDate } from '@/utils/formatters';
 import { resolveSuggestedFirstCollectionDate } from '@/utils/payment-frequency';
@@ -42,7 +45,7 @@ import React from 'react';
 import { Controller, type Resolver, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-type ApproveFormValues = z.infer<typeof ApproveLoanApplicationBodySchema>;
+type ApproveFormValues = z.infer<typeof FinalApproveLoanApplicationBodySchema>;
 
 export function LoanApplicationApproveDialog({
   loanApplication,
@@ -57,9 +60,10 @@ export function LoanApplicationApproveDialog({
 }) {
   const canReadCreditsSettings = useHasPermission('credits-settings:read');
   const form = useForm<ApproveFormValues>({
-    resolver: zodResolver(ApproveLoanApplicationBodySchema) as Resolver<ApproveFormValues>,
+    resolver: zodResolver(FinalApproveLoanApplicationBodySchema) as Resolver<ApproveFormValues>,
     mode: 'onChange',
     defaultValues: {
+      mode: 'FINAL',
       repaymentMethodId: undefined,
       paymentGuaranteeTypeId: undefined,
       agreementId: null,
@@ -145,6 +149,7 @@ export function LoanApplicationApproveDialog({
     if (!opened || !loanApplication) return;
 
     form.reset({
+      mode: 'FINAL',
       repaymentMethodId: loanApplication.repaymentMethodId ?? undefined,
       paymentGuaranteeTypeId: loanApplication.paymentGuaranteeTypeId ?? undefined,
       agreementId: null,
@@ -180,6 +185,7 @@ export function LoanApplicationApproveDialog({
       params: { id: loanApplication.id },
       body: {
         ...values,
+        mode: 'FINAL',
         agreementId: values.agreementId ?? null,
         approvedAmount: values.approvedAmount.trim(),
         actNumber: values.actNumber.trim(),

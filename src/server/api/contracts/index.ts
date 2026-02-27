@@ -30,6 +30,7 @@ import { insuranceReport } from './insurance-report';
 import { investmentType } from './investment-type';
 import { loan } from './loan';
 import { loanApplication } from './loan-application';
+import { loanApprovalLevel } from './loan-approval-level';
 import { loanRefinancing } from './loan-refinancing';
 import { loanPayment } from './loan-payment';
 import { loanWriteOff } from './loan-write-off';
@@ -82,6 +83,7 @@ export const contract = c.router(
     investmentType,
     loan,
     loanApplication,
+    loanApprovalLevel,
     loanRefinancing,
     loanPayment,
     loanWriteOff,

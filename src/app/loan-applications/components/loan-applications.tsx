@@ -1,7 +1,7 @@
 'use client';
 
 import { api } from '@/clients/api';
-import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
+import { DataTable, ExportDropdown, useDataTable } from '@/components/data-table';
 import { PageContent, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,35 +22,32 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { useIamUsers } from '@/hooks/queries/use-iam-user-queries';
 import {
-  useCancelLoanApplication,
   useLoanApplications,
-  useRejectLoanApplication,
+  useReassignLoanApplication,
+  useReassignLoanApplications,
 } from '@/hooks/queries/use-loan-application-queries';
-import { useRejectionReasons } from '@/hooks/queries/use-rejection-reason-queries';
 import {
   LoanApplication,
   LoanApplicationInclude,
   LOAN_APPLICATION_STATUS_OPTIONS,
-  LoanApplicationStatus,
   LoanApplicationSortField,
+  LoanApplicationStatus,
 } from '@/schemas/loan-application';
 import { RowData, TableMeta } from '@tanstack/react-table';
 import React from 'react';
-import { LoanApplicationApproveDialog } from './loan-application-approve-dialog';
 import { loanApplicationColumns } from './loan-application-columns';
 import { LoanApplicationForm } from './loan-application-form';
-import { LoanApplicationInfo } from './loan-application-info';
 import { loanApplicationExportConfig } from './loan-application-export-config';
+import { LoanApplicationInfo } from './loan-application-info';
 import { LoanApplicationsToolbar } from './loan-application-toolbar';
 
 declare module '@tanstack/table-core' {
   interface TableMeta<TData extends RowData> {
     onRowView?: (row: TData) => void;
     onRowEdit?: (row: TData) => void;
-    onRowApprove?: (row: TData) => void;
-    onRowCancel?: (row: TData) => void;
-    onRowReject?: (row: TData) => void;
+    onRowReassign?: (row: TData) => void;
   }
 }
 
@@ -84,6 +81,9 @@ export function LoanApplications() {
       'loanApplicationCoDebtors',
       'loanApplicationDocuments',
       'loanApplicationPledges',
+      'currentApprovalLevel',
+      'targetApprovalLevel',
+      'loanApplicationApprovalHistory',
       'loanApplicationStatusHistory',
       'loanApplicationRiskAssessments',
     ],
@@ -91,6 +91,13 @@ export function LoanApplications() {
   });
 
   const { data, isLoading, isFetching, refetch } = useLoanApplications(queryParams);
+  const { mutateAsync: reassignLoanApplications, isPending: isReassigning } =
+    useReassignLoanApplications();
+  const { mutateAsync: reassignLoanApplication, isPending: isSingleReassigning } =
+    useReassignLoanApplication();
+
+  const { data: iamUsersData } = useIamUsers({ limit: 200 });
+  const iamUsers = React.useMemo(() => iamUsersData?.body?.data ?? [], [iamUsersData]);
 
   const rangeDateFilter = React.useMemo(() => {
     const applicationDate = filters.applicationDate as { gte?: Date; lte?: Date } | undefined;
@@ -109,15 +116,16 @@ export function LoanApplications() {
     }
     return undefined;
   }, [filters.status]);
-  const { mutateAsync: cancelLoanApplication, isPending: isCanceling } = useCancelLoanApplication();
-  const { mutateAsync: rejectLoanApplication, isPending: isRejecting } = useRejectLoanApplication();
 
-  const { data: rejectionReasonsData } = useRejectionReasons({
-    limit: 1000,
-    where: { and: [{ isActive: true }] },
-    sort: [{ field: 'name', order: 'asc' }],
-  });
-  const rejectionReasons = rejectionReasonsData?.body?.data ?? [];
+  const assignedUserFilter = React.useMemo(() => {
+    const assignedUserId = filters.assignedApprovalUserId;
+    return typeof assignedUserId === 'string' ? assignedUserId : undefined;
+  }, [filters.assignedApprovalUserId]);
+
+  const assignedUserOptions = React.useMemo(
+    () => iamUsers.map((user) => ({ label: user.displayName, value: user.id })),
+    [iamUsers]
+  );
 
   const [openedInfoSheet, setOpenedInfoSheet] = React.useState(false);
   const handleInfoSheetChange = React.useCallback(
@@ -141,16 +149,32 @@ export function LoanApplications() {
     [setLoanApplication, setOpenedFormSheet]
   );
 
-  const [openedCancelDialog, setOpenedCancelDialog] = React.useState(false);
-  const [cancelNote, setCancelNote] = React.useState('');
-  const [openedApproveDialog, setOpenedApproveDialog] = React.useState(false);
-  const [openedRejectDialog, setOpenedRejectDialog] = React.useState(false);
-  const [rejectNote, setRejectNote] = React.useState('');
-  const [rejectReasonId, setRejectReasonId] = React.useState<number | undefined>();
+  const [openedReassignDialog, setOpenedReassignDialog] = React.useState(false);
+  const [fromAssignedUserId, setFromAssignedUserId] = React.useState<string>('');
+  const [reassignStrategy, setReassignStrategy] = React.useState<'TO_USER' | 'ROUND_ROBIN'>('TO_USER');
+  const [toAssignedUserId, setToAssignedUserId] = React.useState<string>('');
+  const [reassignNote, setReassignNote] = React.useState('');
+
+  const [singleReassignLoanApplication, setSingleReassignLoanApplication] =
+    React.useState<LoanApplication>();
+  const [openedSingleReassignDialog, setOpenedSingleReassignDialog] = React.useState(false);
+  const [singleReassignStrategy, setSingleReassignStrategy] = React.useState<
+    'TO_USER' | 'ROUND_ROBIN'
+  >('TO_USER');
+  const [singleToAssignedUserId, setSingleToAssignedUserId] = React.useState<string>('');
+  const [singleReassignNote, setSingleReassignNote] = React.useState('');
 
   const handleCreate = React.useCallback(() => {
     setLoanApplication(undefined);
     setOpenedFormSheet(true);
+  }, []);
+
+  const handleOpenReassign = React.useCallback(() => {
+    setFromAssignedUserId('');
+    setReassignStrategy('TO_USER');
+    setToAssignedUserId('');
+    setReassignNote('');
+    setOpenedReassignDialog(true);
   }, []);
 
   const handleRowOpen = React.useCallback((row: LoanApplication) => {
@@ -163,53 +187,59 @@ export function LoanApplications() {
     setOpenedFormSheet(true);
   }, []);
 
-  const handleRowApprove = React.useCallback((row: LoanApplication) => {
-    setLoanApplication(row);
-    setOpenedApproveDialog(true);
+  const handleRowReassign = React.useCallback((row: LoanApplication) => {
+    setSingleReassignLoanApplication(row);
+    setSingleReassignStrategy('TO_USER');
+    setSingleToAssignedUserId('');
+    setSingleReassignNote('');
+    setOpenedSingleReassignDialog(true);
   }, []);
 
-  const handleRowCancel = React.useCallback((row: LoanApplication) => {
-    setLoanApplication(row);
-    setCancelNote('');
-    setOpenedCancelDialog(true);
-  }, []);
+  const handleSubmitReassign = React.useCallback(async () => {
+    if (!fromAssignedUserId) return;
+    if (reassignStrategy === 'TO_USER' && !toAssignedUserId) return;
 
-  const handleRowReject = React.useCallback((row: LoanApplication) => {
-    setLoanApplication(row);
-    setRejectNote('');
-    setRejectReasonId(undefined);
-    setOpenedRejectDialog(true);
-  }, []);
-
-  const submitCancel = React.useCallback(async () => {
-    if (!loanApplication?.id) return;
-    if (!cancelNote.trim()) return;
-
-    await cancelLoanApplication({
-      params: { id: loanApplication.id },
+    await reassignLoanApplications({
       body: {
-        statusNote: cancelNote.trim(),
+        fromAssignedUserId,
+        strategy: reassignStrategy,
+        toAssignedUserId: reassignStrategy === 'TO_USER' ? toAssignedUserId : undefined,
+        note: reassignNote.trim() || undefined,
       },
     });
 
-    setOpenedCancelDialog(false);
-    setLoanApplication(undefined);
-  }, [cancelLoanApplication, cancelNote, loanApplication]);
+    setOpenedReassignDialog(false);
+  }, [
+    fromAssignedUserId,
+    reassignLoanApplications,
+    reassignNote,
+    reassignStrategy,
+    toAssignedUserId,
+  ]);
 
-  const submitReject = React.useCallback(async () => {
-    if (!loanApplication?.id || !rejectReasonId || !rejectNote.trim()) return;
+  const handleSubmitSingleReassign = React.useCallback(async () => {
+    if (!singleReassignLoanApplication?.id) return;
+    if (singleReassignStrategy === 'TO_USER' && !singleToAssignedUserId) return;
 
-    await rejectLoanApplication({
-      params: { id: loanApplication.id },
+    await reassignLoanApplication({
+      params: { id: singleReassignLoanApplication.id },
       body: {
-        statusNote: rejectNote.trim(),
-        rejectionReasonId: rejectReasonId,
+        strategy: singleReassignStrategy,
+        toAssignedUserId: singleReassignStrategy === 'TO_USER' ? singleToAssignedUserId : undefined,
+        note: singleReassignNote.trim() || undefined,
       },
     });
 
-    setOpenedRejectDialog(false);
-    setLoanApplication(undefined);
-  }, [loanApplication, rejectLoanApplication, rejectReasonId, rejectNote]);
+    setOpenedSingleReassignDialog(false);
+    setSingleReassignLoanApplication(undefined);
+  }, [
+    reassignLoanApplication,
+    singleReassignLoanApplication,
+    singleReassignNote,
+    singleReassignStrategy,
+    singleToAssignedUserId,
+  ]);
+
   const fetchAllData = React.useCallback(async () => {
     const res = await api.loanApplication.list.query({
       query: { ...queryParams, page: 1, limit: 10000 },
@@ -221,12 +251,17 @@ export function LoanApplications() {
     () => ({
       onRowView: handleRowOpen,
       onRowEdit: handleRowEdit,
-      onRowApprove: handleRowApprove,
-      onRowCancel: handleRowCancel,
-      onRowReject: handleRowReject,
+      onRowReassign: handleRowReassign,
     }),
-    [handleRowOpen, handleRowEdit, handleRowApprove, handleRowCancel, handleRowReject]
+    [handleRowOpen, handleRowEdit, handleRowReassign]
   );
+
+  const isReassignDisabled =
+    !fromAssignedUserId || (reassignStrategy === 'TO_USER' && !toAssignedUserId) || isReassigning;
+  const isSingleReassignDisabled =
+    !singleReassignLoanApplication?.id ||
+    (singleReassignStrategy === 'TO_USER' && !singleToAssignedUserId) ||
+    isSingleReassigning;
 
   return (
     <>
@@ -254,6 +289,11 @@ export function LoanApplications() {
               onSearchChange={handleSearchChange}
               statusFilter={statusFilter}
               onStatusFilterChange={(value) => handleFilterChange('status', value)}
+              assignedUserFilter={assignedUserFilter}
+              assignedUserOptions={assignedUserOptions}
+              onAssignedUserFilterChange={(value) =>
+                handleFilterChange('assignedApprovalUserId', value)
+              }
               rangeDateFilter={rangeDateFilter}
               onRangeDateFilterChange={(value) => {
                 if (value?.from && value?.to) {
@@ -268,6 +308,7 @@ export function LoanApplications() {
               }}
               onReset={resetFilters}
               onCreate={handleCreate}
+              onReassign={handleOpenReassign}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
               exportActions={
@@ -284,8 +325,6 @@ export function LoanApplications() {
         loanApplication={loanApplication}
         opened={openedInfoSheet}
         onOpened={handleInfoSheetChange}
-        onApprove={handleRowApprove}
-        onReject={handleRowReject}
       />
       <LoanApplicationForm
         loanApplication={loanApplication}
@@ -293,66 +332,115 @@ export function LoanApplications() {
         onOpened={handleFormSheetChange}
       />
 
-      <LoanApplicationApproveDialog
-        loanApplication={loanApplication}
-        opened={openedApproveDialog}
-        onOpened={setOpenedApproveDialog}
-        onApproved={() => setLoanApplication(undefined)}
-      />
-
-      <Dialog open={openedCancelDialog} onOpenChange={setOpenedCancelDialog}>
+      <Dialog
+        open={openedSingleReassignDialog}
+        onOpenChange={(open) => {
+          setOpenedSingleReassignDialog(open);
+          if (!open) setSingleReassignLoanApplication(undefined);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancelar solicitud</DialogTitle>
+            <DialogTitle>Reasignar solicitud</DialogTitle>
             <DialogDescription>
-              Esta accion cambia el estado a cancelada y solicita una nota obligatoria.
+              Reasigne la solicitud {singleReassignLoanApplication?.creditNumber ?? ''} manteniendo
+              su nivel actual de aprobacion.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="cancelNote">Nota</Label>
+            <Label>Asignado actual</Label>
+            <div className="text-muted-foreground rounded-md border px-3 py-2 text-sm">
+              {singleReassignLoanApplication?.assignedApprovalUserName ??
+                singleReassignLoanApplication?.assignedApprovalUserId ??
+                '-'}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="singleReassignStrategy">Estrategia</Label>
+            <Select
+              value={singleReassignStrategy}
+              onValueChange={(value) =>
+                setSingleReassignStrategy(value as 'TO_USER' | 'ROUND_ROBIN')
+              }
+            >
+              <SelectTrigger id="singleReassignStrategy">
+                <SelectValue placeholder="Seleccione..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TO_USER">Mover a usuario</SelectItem>
+                <SelectItem value="ROUND_ROBIN">Round robin (mismo nivel)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {singleReassignStrategy === 'TO_USER' ? (
+            <div className="space-y-2">
+              <Label htmlFor="singleToAssignedUserId">Usuario destino</Label>
+              <Select value={singleToAssignedUserId} onValueChange={setSingleToAssignedUserId}>
+                <SelectTrigger id="singleToAssignedUserId">
+                  <SelectValue placeholder="Seleccione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {iamUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="singleReassignNote">Nota (opcional)</Label>
             <Textarea
-              id="cancelNote"
-              value={cancelNote}
-              onChange={(event) => setCancelNote(event.target.value)}
-              placeholder="Ingrese motivo de cancelacion..."
+              id="singleReassignNote"
+              value={singleReassignNote}
+              onChange={(event) => setSingleReassignNote(event.target.value)}
+              placeholder="Detalle de la reasignacion..."
             />
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenedCancelDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setOpenedSingleReassignDialog(false);
+                setSingleReassignLoanApplication(undefined);
+              }}
+            >
               Cerrar
             </Button>
-            <Button onClick={submitCancel} disabled={isCanceling || !cancelNote.trim()}>
-              {isCanceling && <Spinner />}
-              Cancelar solicitud
+            <Button onClick={handleSubmitSingleReassign} disabled={isSingleReassignDisabled}>
+              {isSingleReassigning ? <Spinner /> : null}
+              Reasignar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={openedRejectDialog} onOpenChange={setOpenedRejectDialog}>
+      <Dialog open={openedReassignDialog} onOpenChange={setOpenedReassignDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rechazar solicitud</DialogTitle>
+            <DialogTitle>Reasignar solicitudes</DialogTitle>
             <DialogDescription>
-              Debe seleccionar un motivo de rechazo e ingresar una nota.
+              Reasigne todas las solicitudes pendientes de un usuario a otro usuario o por round robin
+              en el mismo nivel.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="rejectReasonId">Motivo rechazo</Label>
-            <Select
-              value={rejectReasonId ? String(rejectReasonId) : ''}
-              onValueChange={(value) => setRejectReasonId(value ? Number(value) : undefined)}
-            >
-              <SelectTrigger id="rejectReasonId">
+            <Label htmlFor="fromAssignedUserId">Usuario origen</Label>
+            <Select value={fromAssignedUserId} onValueChange={setFromAssignedUserId}>
+              <SelectTrigger id="fromAssignedUserId">
                 <SelectValue placeholder="Seleccione..." />
               </SelectTrigger>
               <SelectContent>
-                {rejectionReasons.map((item) => (
-                  <SelectItem key={item.id} value={String(item.id)}>
-                    {item.name}
+                {iamUsers.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.displayName}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -360,26 +448,58 @@ export function LoanApplications() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="rejectNote">Nota</Label>
+            <Label htmlFor="reassignStrategy">Estrategia</Label>
+            <Select
+              value={reassignStrategy}
+              onValueChange={(value) =>
+                setReassignStrategy(value as 'TO_USER' | 'ROUND_ROBIN')
+              }
+            >
+              <SelectTrigger id="reassignStrategy">
+                <SelectValue placeholder="Seleccione..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TO_USER">Mover a usuario</SelectItem>
+                <SelectItem value="ROUND_ROBIN">Round robin (mismo nivel)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {reassignStrategy === 'TO_USER' ? (
+            <div className="space-y-2">
+              <Label htmlFor="toAssignedUserId">Usuario destino</Label>
+              <Select value={toAssignedUserId} onValueChange={setToAssignedUserId}>
+                <SelectTrigger id="toAssignedUserId">
+                  <SelectValue placeholder="Seleccione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {iamUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="reassignNote">Nota (opcional)</Label>
             <Textarea
-              id="rejectNote"
-              value={rejectNote}
-              onChange={(event) => setRejectNote(event.target.value)}
-              placeholder="Ingrese motivo de rechazo..."
+              id="reassignNote"
+              value={reassignNote}
+              onChange={(event) => setReassignNote(event.target.value)}
+              placeholder="Detalle de la reasignacion..."
             />
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenedRejectDialog(false)}>
+            <Button variant="outline" onClick={() => setOpenedReassignDialog(false)}>
               Cerrar
             </Button>
-            <Button
-              variant="destructive"
-              onClick={submitReject}
-              disabled={isRejecting || !rejectReasonId || !rejectNote.trim()}
-            >
-              {isRejecting && <Spinner />}
-              Rechazar solicitud
+            <Button onClick={handleSubmitReassign} disabled={isReassignDisabled}>
+              {isReassigning ? <Spinner /> : null}
+              Reasignar
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -4,22 +4,23 @@ import { DataTableRowActions, type RowAction, type RowActionGroup } from '@/comp
 import { LoanApplication } from '@/schemas/loan-application';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { Row, Table } from '@tanstack/react-table';
-import { Eye, Pencil, Repeat } from 'lucide-react';
+import { Ban, CheckCircle2, Eye, OctagonX } from 'lucide-react';
 
-interface LoanApplicationRowActionsProps {
+interface LoanApplicationApprovalRowActionsProps {
   row: Row<LoanApplication>;
   table: Table<LoanApplication>;
 }
 
-export function LoanApplicationRowActions({ row, table }: LoanApplicationRowActionsProps) {
+export function LoanApplicationApprovalRowActions({
+  row,
+  table,
+}: LoanApplicationApprovalRowActionsProps) {
   const application = row.original;
   const meta = table.options.meta;
-  const canUpdate = useHasPermission('loan-applications:update');
   const canApprove = useHasPermission('loan-applications:approve');
+  const canCancel = useHasPermission('loan-applications:cancel');
+  const canReject = useHasPermission('loan-applications:reject');
   const isPending = application.status === 'PENDING';
-  const hasApprovalProgress = application.loanApplicationApprovalHistory?.some(
-    (row) => row.action === 'APPROVED_FORWARD' || row.action === 'APPROVED_FINAL'
-  );
 
   const actions: (RowAction<LoanApplication> | RowActionGroup<LoanApplication>)[] = [
     {
@@ -28,16 +29,24 @@ export function LoanApplicationRowActions({ row, table }: LoanApplicationRowActi
       onClick: meta?.onRowView,
     },
     {
-      label: 'Editar',
-      icon: Pencil,
-      onClick: meta?.onRowEdit,
-      hidden: !(canUpdate && isPending && !hasApprovalProgress),
+      label: 'Aprobar',
+      icon: CheckCircle2,
+      onClick: meta?.onRowApprove,
+      hidden: !(canApprove && isPending),
     },
     {
-      label: 'Reasignar',
-      icon: Repeat,
-      onClick: meta?.onRowReassign,
-      hidden: !(canApprove && isPending),
+      label: 'Rechazar',
+      icon: OctagonX,
+      onClick: meta?.onRowReject,
+      hidden: !(canReject && isPending),
+      variant: 'destructive',
+    },
+    {
+      label: 'Cancelar',
+      icon: Ban,
+      onClick: meta?.onRowCancel,
+      hidden: !(canCancel && isPending),
+      variant: 'destructive',
     },
   ];
 

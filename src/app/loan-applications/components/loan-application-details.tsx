@@ -35,6 +35,18 @@ const riskDecisionLabels: Record<'PASS' | 'FAIL', string> = {
   FAIL: 'Rechazado',
 };
 
+const approvalActionLabels: Record<
+  'ASSIGNED' | 'REASSIGNED' | 'APPROVED_FORWARD' | 'APPROVED_FINAL' | 'REJECTED' | 'CANCELED',
+  string
+> = {
+  ASSIGNED: 'Asignada',
+  REASSIGNED: 'Reasignada',
+  APPROVED_FORWARD: 'Aprobada y enviada',
+  APPROVED_FINAL: 'Aprobada final',
+  REJECTED: 'Rechazada',
+  CANCELED: 'Cancelada',
+};
+
 function getApplicantLabel(application: LoanApplication): string {
   const person = application.thirdParty;
   if (!person) return String(application.thirdPartyId);
@@ -157,6 +169,18 @@ export function LoanApplicationDetails({
         { label: 'Canal', value: loanApplication.channel?.name ?? loanApplication.channelId },
         { label: 'Acta', value: loanApplication.actNumber ?? '-' },
         { label: 'Motivo rechazo', value: loanApplication.rejectionReason?.name ?? '-' },
+        {
+          label: 'Nivel actual',
+          value: loanApplication.currentApprovalLevel?.name ?? loanApplication.currentApprovalLevelId ?? '-',
+        },
+        {
+          label: 'Nivel objetivo',
+          value: loanApplication.targetApprovalLevel?.name ?? loanApplication.targetApprovalLevelId ?? '-',
+        },
+        {
+          label: 'Usuario asignado',
+          value: loanApplication.assignedApprovalUserName ?? loanApplication.assignedApprovalUserId ?? '-',
+        },
       ],
     },
     {
@@ -300,6 +324,40 @@ export function LoanApplicationDetails({
           ) : (
             <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
               No se pudo calcular la tabla de amortizacion (faltan datos de tasa o periodicidad).
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Historial de aprobacion por niveles</h3>
+          {loanApplication.loanApplicationApprovalHistory?.length ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Accion</TableHead>
+                  <TableHead>Nivel</TableHead>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>Asignado a</TableHead>
+                  <TableHead>Nota</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loanApplication.loanApplicationApprovalHistory.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{formatDateTime(row.occurredAt)}</TableCell>
+                    <TableCell>{approvalActionLabels[row.action] ?? row.action}</TableCell>
+                    <TableCell>{row.level?.name ?? '-'}</TableCell>
+                    <TableCell>{row.actorUserName ?? row.actorUserId ?? '-'}</TableCell>
+                    <TableCell>{row.assignedToUserName ?? row.assignedToUserId ?? '-'}</TableCell>
+                    <TableCell>{row.note ?? '-'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+              No hay historial de aprobacion registrado.
             </div>
           )}
         </div>

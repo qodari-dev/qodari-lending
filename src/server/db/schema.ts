@@ -1104,6 +1104,63 @@ export const riskStatusEnum = pgEnum('risk_status', [
   'ERROR',
 ]);
 
+export const loanApplicationApprovalActionEnum = pgEnum('loan_application_approval_action', [
+  'ASSIGNED',
+  'APPROVED_FORWARD',
+  'APPROVED_FINAL',
+  'REJECTED',
+  'CANCELED',
+  'REASSIGNED',
+]);
+
+// ---------------------------------------------------------------------
+// Niveles globales de aprobacion para solicitudes
+// ---------------------------------------------------------------------
+export const loanApprovalLevels = pgTable(
+  'loan_approval_levels',
+  {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 100 }).notNull(),
+    levelOrder: integer('level_order').notNull(),
+    maxApprovalAmount: decimal('max_approval_amount', { precision: 14, scale: 2 }),
+    roundRobinCursor: integer('round_robin_cursor').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_loan_approval_levels_order').on(t.levelOrder),
+    check(
+      'chk_loan_approval_levels_max_amount_positive',
+      sql`${t.maxApprovalAmount} IS NULL OR ${t.maxApprovalAmount} > 0`
+    ),
+    check('chk_loan_approval_levels_round_robin_cursor_min', sql`${t.roundRobinCursor} >= 0`),
+  ]
+);
+
+// ---------------------------------------------------------------------
+// Usuarios por nivel de aprobacion
+// ---------------------------------------------------------------------
+export const loanApprovalLevelUsers = pgTable(
+  'loan_approval_level_users',
+  {
+    id: serial('id').primaryKey(),
+    loanApprovalLevelId: integer('loan_approval_level_id')
+      .notNull()
+      .references(() => loanApprovalLevels.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    userName: varchar('user_name', { length: 255 }).notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_loan_approval_level_user').on(t.loanApprovalLevelId, t.userId),
+    index('idx_loan_approval_level_users_level').on(t.loanApprovalLevelId),
+    index('idx_loan_approval_level_users_level_active').on(t.loanApprovalLevelId, t.isActive),
+    check('chk_loan_approval_level_users_sort_order_min', sql`${t.sortOrder} >= 0`),
+  ]
+);
+
 // ------------------------------------------------------------
 // Concr39 - Solicitudes de créditos
 // Nota:
@@ -1215,6 +1272,20 @@ export const loanApplications = pgTable(
       }),
 
     status: loanApplicationStatusEnum('status').notNull().default('PENDING'),
+    assignedApprovalUserId: uuid('assigned_approval_user_id'),
+    assignedApprovalUserName: varchar('assigned_approval_user_name', { length: 255 }),
+    currentApprovalLevelId: integer('current_approval_level_id').references(
+      () => loanApprovalLevels.id,
+      {
+        onDelete: 'set null',
+      }
+    ),
+    targetApprovalLevelId: integer('target_approval_level_id').references(
+      () => loanApprovalLevels.id,
+      {
+        onDelete: 'set null',
+      }
+    ),
 
     // IAM externo
     statusChangedByUserId: uuid('status_changed_by_user_id'),
@@ -1241,6 +1312,9 @@ export const loanApplications = pgTable(
     index('idx_loan_applications_date_office').on(t.applicationDate, t.affiliationOfficeId),
     index('idx_loan_applications_office').on(t.affiliationOfficeId),
     index('idx_loan_applications_status').on(t.status),
+    index('idx_loan_applications_status_assigned_user').on(t.status, t.assignedApprovalUserId),
+    index('idx_loan_applications_current_level').on(t.currentApprovalLevelId),
+    index('idx_loan_applications_target_level').on(t.targetApprovalLevelId),
     index('idx_loan_applications_third_party').on(t.thirdPartyId),
     index('idx_loan_applications_product').on(t.creditProductId),
   ]
@@ -2897,6 +2971,37 @@ export const channels = pgTable(
     ...timestamps,
   },
   (t) => [uniqueIndex('uniq_channels_code').on(t.code), index('idx_channels_active').on(t.isActive)]
+);
+
+// ---------------------------------------------------------------------
+// Historial de aprobacion por niveles de solicitud
+// ---------------------------------------------------------------------
+export const loanApplicationApprovalHistory = pgTable(
+  'loan_application_approval_history',
+  {
+    id: serial('id').primaryKey(),
+    loanApplicationId: integer('loan_application_id')
+      .notNull()
+      .references(() => loanApplications.id, { onDelete: 'cascade' }),
+    levelId: integer('level_id').references(() => loanApprovalLevels.id, {
+      onDelete: 'set null',
+    }),
+    action: loanApplicationApprovalActionEnum('action').notNull(),
+    actorUserId: uuid('actor_user_id'),
+    actorUserName: varchar('actor_user_name', { length: 255 }),
+    assignedToUserId: uuid('assigned_to_user_id'),
+    assignedToUserName: varchar('assigned_to_user_name', { length: 255 }),
+    note: varchar('note', { length: 255 }),
+    metadata: jsonb('metadata'),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_loan_app_approval_history_application').on(t.loanApplicationId),
+    index('idx_loan_app_approval_history_level').on(t.levelId),
+    index('idx_loan_app_approval_history_action').on(t.action),
+    index('idx_loan_app_approval_history_occurred_at').on(t.occurredAt),
+  ]
 );
 
 // ---------------------------------------------------------------------

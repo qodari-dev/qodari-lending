@@ -13,7 +13,10 @@ import {
   loanApplicationCoDebtors,
   loanApplicationDocuments,
   loanApplicationPledges,
+  loanApplicationApprovalHistory,
   loanApplicationRiskAssessments,
+  loanApprovalLevels,
+  loanApprovalLevelUsers,
   loanApplications,
   loanAgreementHistory,
   loanBillingConcepts,
@@ -62,9 +65,19 @@ import {
   resolveSuggestedFirstCollectionDate,
 } from '@/utils/payment-frequency';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 import { env } from '@/env';
+import {
+  approveIntermediateLevel,
+  assertAssignedApprover,
+  ensurePendingAssignment,
+  reassignApplicationApproval,
+  recordFinalApproval,
+  recordRejectedOrCanceled,
+  resolveTargetApprovalLevel,
+  assignInitialApproval,
+} from '@/server/loan-applications/loan-application-approval-service';
 
 type LoanApplicationColumn = keyof typeof loanApplications.$inferSelect;
 
@@ -76,6 +89,7 @@ const LOAN_APPLICATION_FIELDS: FieldMap = {
   thirdPartyId: loanApplications.thirdPartyId,
   creditProductId: loanApplications.creditProductId,
   requestedAmount: loanApplications.requestedAmount,
+  assignedApprovalUserId: loanApplications.assignedApprovalUserId,
   createdAt: loanApplications.createdAt,
   updatedAt: loanApplications.updatedAt,
 } satisfies Partial<
@@ -169,6 +183,35 @@ const LOAN_APPLICATION_INCLUDES = createIncludeMap<typeof db.query.loanApplicati
   loanApplicationPledges: {
     relation: 'loanApplicationPledges',
     config: true,
+  },
+  currentApprovalLevel: {
+    relation: 'currentApprovalLevel',
+    config: {
+      with: {
+        users: {
+          orderBy: [asc(loanApprovalLevelUsers.sortOrder), asc(loanApprovalLevelUsers.id)],
+        },
+      },
+    },
+  },
+  targetApprovalLevel: {
+    relation: 'targetApprovalLevel',
+    config: {
+      with: {
+        users: {
+          orderBy: [asc(loanApprovalLevelUsers.sortOrder), asc(loanApprovalLevelUsers.id)],
+        },
+      },
+    },
+  },
+  loanApplicationApprovalHistory: {
+    relation: 'loanApplicationApprovalHistory',
+    config: {
+      with: {
+        level: true,
+      },
+      orderBy: [desc(loanApplicationApprovalHistory.occurredAt)],
+    },
   },
   loanApplicationStatusHistory: {
     relation: 'loanApplicationStatusHistory',
@@ -488,6 +531,98 @@ export const loanApplication = tsr.router(contract.loanApplication, {
     }
   },
 
+  inbox: async ({ query }, { request, appRoute }) => {
+    try {
+      const session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const { userId, userName } = getRequiredUserContext(session);
+
+      await db.transaction(async (tx) => {
+        const unassignedPending = await tx.query.loanApplications.findMany({
+          where: and(
+            eq(loanApplications.status, 'PENDING'),
+            or(
+              isNull(loanApplications.currentApprovalLevelId),
+              isNull(loanApplications.targetApprovalLevelId),
+              isNull(loanApplications.assignedApprovalUserId)
+            )
+          ),
+          columns: {
+            id: true,
+            status: true,
+            requestedAmount: true,
+            currentApprovalLevelId: true,
+            targetApprovalLevelId: true,
+            assignedApprovalUserId: true,
+            assignedApprovalUserName: true,
+          },
+          orderBy: [asc(loanApplications.createdAt), asc(loanApplications.id)],
+          limit: 250,
+        });
+
+        for (const application of unassignedPending) {
+          await ensurePendingAssignment(tx, application, {
+            userId,
+            userName: userName || userId,
+          });
+        }
+      });
+
+      const { page, limit, search, where, sort, include } = query;
+      const {
+        whereClause,
+        orderBy,
+        limit: queryLimit,
+        offset,
+      } = buildQuery({ page, limit, search, where, sort }, LOAN_APPLICATION_QUERY_CONFIG);
+
+      const inboxWhere = whereClause
+        ? and(
+            whereClause,
+            eq(loanApplications.status, 'PENDING'),
+            eq(loanApplications.assignedApprovalUserId, userId)
+          )
+        : and(
+            eq(loanApplications.status, 'PENDING'),
+            eq(loanApplications.assignedApprovalUserId, userId)
+          );
+
+      const [data, countResult] = await Promise.all([
+        db.query.loanApplications.findMany({
+          where: inboxWhere,
+          with: buildTypedIncludes(include, LOAN_APPLICATION_INCLUDES),
+          orderBy: orderBy.length ? orderBy : undefined,
+          limit: queryLimit,
+          offset,
+        }),
+        db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(loanApplications)
+          .where(inboxWhere),
+      ]);
+
+      const totalCount = countResult[0]?.count ?? 0;
+      return {
+        status: 200 as const,
+        body: {
+          data,
+          meta: buildPaginationMeta(totalCount, page, limit),
+        },
+      };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: 'Error al listar bandeja de aprobacion de solicitudes',
+      });
+    }
+  },
+
   listActNumbers: async ({ query }, { request, appRoute }) => {
     try {
       await getAuthContextAndValidatePermission(request, appRoute.metadata);
@@ -728,7 +863,30 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           note: 'Solicitud creada',
         });
 
-        return [application];
+        await assignInitialApproval(tx, {
+          loanApplicationId: application.id,
+          requestedAmount: application.requestedAmount,
+          actor: {
+            userId,
+            userName: userName || userId,
+          },
+          action: 'ASSIGNED',
+          note: 'Asignacion inicial al crear solicitud',
+        });
+
+        const withAssignment = await tx.query.loanApplications.findFirst({
+          where: eq(loanApplications.id, application.id),
+        });
+
+        if (!withAssignment) {
+          throwHttpError({
+            status: 500,
+            message: 'No fue posible obtener solicitud creada',
+            code: 'INTERNAL_SERVER_ERROR',
+          });
+        }
+
+        return [withAssignment];
       });
 
       await logAudit(session, {
@@ -803,6 +961,23 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
+      const hasApprovalProgress = await db.query.loanApplicationApprovalHistory.findFirst({
+        where: and(
+          eq(loanApplicationApprovalHistory.loanApplicationId, id),
+          inArray(loanApplicationApprovalHistory.action, ['APPROVED_FORWARD', 'APPROVED_FINAL'])
+        ),
+        columns: { id: true },
+      });
+
+      if (hasApprovalProgress) {
+        throwHttpError({
+          status: 400,
+          message:
+            'No se puede editar la solicitud porque ya tiene una aprobacion registrada en el flujo',
+          code: 'BAD_REQUEST',
+        });
+      }
+
       const targetCreditProductId = body.creditProductId ?? existing.creditProductId;
       const targetCategoryCode = body.categoryCode ?? existing.categoryCode;
       const targetInstallments = body.installments ?? existing.installments;
@@ -865,7 +1040,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      const { userId } = getRequiredUserContext(session);
+      const { userId, userName } = getRequiredUserContext(session);
 
       const [updated] = await db.transaction(async (tx) => {
         const [updatedApplication] = await tx
@@ -982,7 +1157,47 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           }
         }
 
-        return [updatedApplication];
+        const approvalState = await ensurePendingAssignment(
+          tx,
+          {
+            id: updatedApplication.id,
+            status: updatedApplication.status,
+            requestedAmount: updatedApplication.requestedAmount,
+            currentApprovalLevelId: updatedApplication.currentApprovalLevelId,
+            targetApprovalLevelId: updatedApplication.targetApprovalLevelId,
+            assignedApprovalUserId: updatedApplication.assignedApprovalUserId,
+            assignedApprovalUserName: updatedApplication.assignedApprovalUserName,
+          },
+          {
+          userId,
+          userName: userName || userId,
+          }
+        );
+
+        const { targetLevelId } = await resolveTargetApprovalLevel(tx, approvalState.requestedAmount);
+
+        if (approvalState.targetApprovalLevelId !== targetLevelId) {
+          await tx
+            .update(loanApplications)
+            .set({
+              targetApprovalLevelId: targetLevelId,
+            })
+            .where(eq(loanApplications.id, id));
+        }
+
+        const refreshed = await tx.query.loanApplications.findFirst({
+          where: eq(loanApplications.id, id),
+        });
+
+        if (!refreshed) {
+          throwHttpError({
+            status: 500,
+            message: 'No fue posible obtener solicitud actualizada',
+            code: 'INTERNAL_SERVER_ERROR',
+          });
+        }
+
+        return [refreshed];
       });
 
       await logAudit(session, {
@@ -1065,6 +1280,13 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const statusDate = formatDateOnly(new Date());
 
       const [updated] = await db.transaction(async (tx) => {
+        const pendingApplication = await ensurePendingAssignment(tx, existing, {
+          userId,
+          userName: userName || userId,
+        });
+
+        assertAssignedApprover(pendingApplication, userId);
+
         const [application] = await tx
           .update(loanApplications)
           .set({
@@ -1073,6 +1295,10 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             statusChangedByUserId: userId,
             statusNote: body.statusNote,
             rejectionReasonId: null,
+            assignedApprovalUserId: null,
+            assignedApprovalUserName: null,
+            currentApprovalLevelId: null,
+            targetApprovalLevelId: null,
           })
           .where(eq(loanApplications.id, id))
           .returning();
@@ -1084,6 +1310,17 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           changedByUserId: userId,
           changedByUserName: userName || userId,
           note: body.statusNote.slice(0, 255),
+        });
+
+        await recordRejectedOrCanceled(tx, {
+          loanApplicationId: id,
+          levelId: pendingApplication.currentApprovalLevelId ?? null,
+          action: 'CANCELED',
+          actor: {
+            userId,
+            userName: userName || userId,
+          },
+          note: body.statusNote,
         });
 
         return [application];
@@ -1180,6 +1417,13 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const statusDate = formatDateOnly(new Date());
 
       const [updated] = await db.transaction(async (tx) => {
+        const pendingApplication = await ensurePendingAssignment(tx, existing, {
+          userId,
+          userName: userName || userId,
+        });
+
+        assertAssignedApprover(pendingApplication, userId);
+
         const [application] = await tx
           .update(loanApplications)
           .set({
@@ -1188,6 +1432,10 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             statusChangedByUserId: userId,
             statusNote: body.statusNote,
             rejectionReasonId: body.rejectionReasonId,
+            assignedApprovalUserId: null,
+            assignedApprovalUserName: null,
+            currentApprovalLevelId: null,
+            targetApprovalLevelId: null,
           })
           .where(eq(loanApplications.id, id))
           .returning();
@@ -1199,6 +1447,20 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           changedByUserId: userId,
           changedByUserName: userName || userId,
           note: body.statusNote.slice(0, 255),
+          metadata: {
+            rejectionReasonId: body.rejectionReasonId,
+          },
+        });
+
+        await recordRejectedOrCanceled(tx, {
+          loanApplicationId: id,
+          levelId: pendingApplication.currentApprovalLevelId ?? null,
+          action: 'REJECTED',
+          actor: {
+            userId,
+            userName: userName || userId,
+          },
+          note: body.statusNote,
           metadata: {
             rejectionReasonId: body.rejectionReasonId,
           },
@@ -1292,6 +1554,111 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
+      const { userId, userName } = getRequiredUserContext(session);
+
+      if (body.mode === 'STEP') {
+        const [updated] = await db.transaction(async (tx) => {
+          const current = await tx.query.loanApplications.findFirst({
+            where: eq(loanApplications.id, id),
+            columns: {
+              id: true,
+              status: true,
+              requestedAmount: true,
+              currentApprovalLevelId: true,
+              targetApprovalLevelId: true,
+              assignedApprovalUserId: true,
+              assignedApprovalUserName: true,
+            },
+          });
+
+          if (!current) {
+            throwHttpError({
+              status: 404,
+              message: `Solicitud de credito con ID ${id} no encontrada`,
+              code: 'NOT_FOUND',
+            });
+          }
+
+          if (current.status !== 'PENDING') {
+            throwHttpError({
+              status: 400,
+              message: 'Solo se pueden aprobar solicitudes en estado pendiente',
+              code: 'BAD_REQUEST',
+            });
+          }
+
+          const pendingApplication = await ensurePendingAssignment(tx, current, {
+            userId,
+            userName: userName || userId,
+          });
+
+          assertAssignedApprover(pendingApplication, userId);
+
+          if (!pendingApplication.currentApprovalLevelId || !pendingApplication.targetApprovalLevelId) {
+            throwHttpError({
+              status: 409,
+              message: 'No fue posible determinar el nivel de aprobacion de la solicitud',
+              code: 'CONFLICT',
+            });
+          }
+
+          if (pendingApplication.currentApprovalLevelId === pendingApplication.targetApprovalLevelId) {
+            throwHttpError({
+              status: 400,
+              message: 'Esta solicitud requiere aprobacion final con los datos de desembolso',
+              code: 'BAD_REQUEST',
+            });
+          }
+
+          await approveIntermediateLevel(tx, {
+            loanApplicationId: id,
+            currentLevelId: pendingApplication.currentApprovalLevelId,
+            targetLevelId: pendingApplication.targetApprovalLevelId,
+            actor: {
+              userId,
+              userName: userName || userId,
+            },
+            note: body.approvalNote,
+          });
+
+          const refreshed = await tx.query.loanApplications.findFirst({
+            where: eq(loanApplications.id, id),
+          });
+
+          if (!refreshed) {
+            throwHttpError({
+              status: 500,
+              message: 'No fue posible obtener solicitud aprobada por nivel',
+              code: 'INTERNAL_SERVER_ERROR',
+            });
+          }
+
+          return [refreshed];
+        });
+
+        await logAudit(session, {
+          resourceKey: appRoute.metadata.permissionKey.resourceKey,
+          actionKey: appRoute.metadata.permissionKey.actionKey,
+          action: 'update',
+          functionName: 'approve',
+          resourceId: id.toString(),
+          resourceLabel: existing.creditNumber,
+          status: 'success',
+          beforeValue: existing,
+          afterValue: updated,
+          metadata: {
+            mode: body.mode,
+            body,
+          },
+          ipAddress,
+          userAgent,
+        });
+
+        return { status: 200 as const, body: updated };
+      }
+
+      const finalBody = body;
+
       if (!existing.paymentFrequencyId) {
         throwHttpError({
           status: 400,
@@ -1300,7 +1667,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      const approvedAmount = toNumber(body.approvedAmount);
+      const approvedAmount = toNumber(finalBody.approvedAmount);
       if (!Number.isFinite(approvedAmount) || approvedAmount <= 0) {
         throwHttpError({
           status: 400,
@@ -1308,7 +1675,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           code: 'BAD_REQUEST',
         });
       }
-      const approvedInstallments = body.approvedInstallments;
+      const approvedInstallments = finalBody.approvedInstallments;
       const today = formatDateOnly(new Date());
 
       const [
@@ -1327,24 +1694,24 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         }),
         db.query.repaymentMethods.findFirst({
           where: and(
-            eq(repaymentMethods.id, body.repaymentMethodId),
+            eq(repaymentMethods.id, finalBody.repaymentMethodId),
             eq(repaymentMethods.isActive, true)
           ),
         }),
         db.query.paymentGuaranteeTypes.findFirst({
           where: and(
-            eq(paymentGuaranteeTypes.id, body.paymentGuaranteeTypeId),
+            eq(paymentGuaranteeTypes.id, finalBody.paymentGuaranteeTypeId),
             eq(paymentGuaranteeTypes.isActive, true)
           ),
         }),
-        body.agreementId
+        finalBody.agreementId
           ? db.query.agreements.findFirst({
-              where: and(eq(agreements.id, body.agreementId), eq(agreements.isActive, true)),
+              where: and(eq(agreements.id, finalBody.agreementId), eq(agreements.isActive, true)),
               columns: { id: true },
             })
           : Promise.resolve(null),
         db.query.thirdParties.findFirst({
-          where: eq(thirdParties.id, body.payeeThirdPartyId),
+          where: eq(thirdParties.id, finalBody.payeeThirdPartyId),
           columns: { id: true },
         }),
         db.query.creditProducts.findFirst({
@@ -1363,7 +1730,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           where: and(
             eq(loanApplicationActNumbers.affiliationOfficeId, existing.affiliationOfficeId),
             eq(loanApplicationActNumbers.actDate, today),
-            eq(loanApplicationActNumbers.actNumber, body.actNumber)
+            eq(loanApplicationActNumbers.actNumber, finalBody.actNumber)
           ),
         }),
         db.query.creditsSettings.findFirst({
@@ -1395,7 +1762,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      if (body.agreementId && !agreement) {
+      if (finalBody.agreementId && !agreement) {
         throwHttpError({
           status: 404,
           message: 'Convenio no encontrado',
@@ -1467,7 +1834,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         semiMonthDay2: paymentFrequency.semiMonthDay2,
         useEndOfMonthFallback: paymentFrequency.useEndOfMonthFallback,
       });
-      const selectedFirstCollectionDate = new Date(body.firstCollectionDate);
+      const selectedFirstCollectionDate = new Date(finalBody.firstCollectionDate);
       selectedFirstCollectionDate.setHours(0, 0, 0, 0);
 
       if (selectedFirstCollectionDate < minimumAllowedFirstCollectionDate) {
@@ -1493,7 +1860,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         interestRateType: product.interestRateType,
         interestDayCountConvention: product.interestDayCountConvention,
         installments: approvedInstallments,
-        firstPaymentDate: body.firstCollectionDate,
+        firstPaymentDate: finalBody.firstCollectionDate,
         disbursementDate: new Date(`${today}T00:00:00`),
         daysInterval: paymentFrequencyIntervalDays,
         paymentScheduleMode: paymentFrequency.scheduleMode,
@@ -1518,9 +1885,8 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      const { userId, userName } = getRequiredUserContext(session);
       const statusDate = today;
-      const firstCollectionDate = formatDateOnly(body.firstCollectionDate);
+      const firstCollectionDate = formatDateOnly(finalBody.firstCollectionDate);
       const approvedDate = statusDate;
 
       const productBillingConceptRows = await db.query.creditProductBillingConcepts.findMany({
@@ -1600,18 +1966,74 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       });
 
       const [updated] = await db.transaction(async (tx) => {
+        const stateForApproval = await tx.query.loanApplications.findFirst({
+          where: eq(loanApplications.id, id),
+          columns: {
+            id: true,
+            status: true,
+            requestedAmount: true,
+            currentApprovalLevelId: true,
+            targetApprovalLevelId: true,
+            assignedApprovalUserId: true,
+            assignedApprovalUserName: true,
+          },
+        });
+
+        if (!stateForApproval) {
+          throwHttpError({
+            status: 404,
+            message: `Solicitud de credito con ID ${id} no encontrada`,
+            code: 'NOT_FOUND',
+          });
+        }
+
+        if (stateForApproval.status !== 'PENDING') {
+          throwHttpError({
+            status: 400,
+            message: 'Solo se pueden aprobar solicitudes en estado pendiente',
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        const pendingApplication = await ensurePendingAssignment(tx, stateForApproval, {
+          userId,
+          userName: userName || userId,
+        });
+
+        assertAssignedApprover(pendingApplication, userId);
+
+        if (!pendingApplication.currentApprovalLevelId || !pendingApplication.targetApprovalLevelId) {
+          throwHttpError({
+            status: 409,
+            message: 'No fue posible determinar el nivel de aprobacion de la solicitud',
+            code: 'CONFLICT',
+          });
+        }
+
+        if (pendingApplication.currentApprovalLevelId !== pendingApplication.targetApprovalLevelId) {
+          throwHttpError({
+            status: 400,
+            message: 'La solicitud aun no esta en el nivel final de aprobacion',
+            code: 'BAD_REQUEST',
+          });
+        }
+
         const [application] = await tx
           .update(loanApplications)
           .set({
-            repaymentMethodId: body.repaymentMethodId,
-            paymentGuaranteeTypeId: body.paymentGuaranteeTypeId,
+            repaymentMethodId: finalBody.repaymentMethodId,
+            paymentGuaranteeTypeId: finalBody.paymentGuaranteeTypeId,
             approvedAmount: toDecimalString(approvedAmount),
-            actNumber: body.actNumber,
+            actNumber: finalBody.actNumber,
             status: 'APPROVED',
             statusDate,
             statusChangedByUserId: userId,
             rejectionReasonId: null,
             statusNote: null,
+            assignedApprovalUserId: null,
+            assignedApprovalUserName: null,
+            currentApprovalLevelId: null,
+            targetApprovalLevelId: null,
           })
           .where(eq(loanApplications.id, id))
           .returning();
@@ -1625,12 +2047,12 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             createdByUserName: userName || userId,
             recordDate: statusDate,
             loanApplicationId: existing.id,
-            agreementId: body.agreementId ?? null,
+            agreementId: finalBody.agreementId ?? null,
             bankId: existing.bankId,
             bankAccountType: existing.bankAccountType,
             bankAccountNumber: existing.bankAccountNumber,
             thirdPartyId: existing.thirdPartyId,
-            payeeThirdPartyId: body.payeeThirdPartyId,
+            payeeThirdPartyId: finalBody.payeeThirdPartyId,
             installments: approvedInstallments,
             creditStartDate: statusDate,
             maturityDate: lastInstallment.dueDate,
@@ -1641,8 +2063,8 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             insuranceValue: toDecimalString(schedule.summary.totalInsurance),
             discountStudyCredit: toNumber(existing.creditStudyFee) > 0,
             costCenterId: affiliationOffice.costCenterId ?? null,
-            repaymentMethodId: body.repaymentMethodId,
-            paymentGuaranteeTypeId: body.paymentGuaranteeTypeId,
+            repaymentMethodId: finalBody.repaymentMethodId,
+            paymentGuaranteeTypeId: finalBody.paymentGuaranteeTypeId,
             guaranteeDocument: existing.creditNumber,
             status: 'GENERATED',
             statusDate,
@@ -1655,17 +2077,17 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           })
           .returning();
 
-        if (body.agreementId) {
+        if (finalBody.agreementId) {
           await tx.insert(loanAgreementHistory).values({
             loanId: loan.id,
-            agreementId: body.agreementId,
+            agreementId: finalBody.agreementId,
             effectiveDate: statusDate,
             changedByUserId: userId,
             changedByUserName: userName || userId,
             note: 'Convenio asignado al aprobar solicitud',
             metadata: {
               sourceLoanApplicationId: id,
-              actNumber: body.actNumber,
+              actNumber: finalBody.actNumber,
             },
           });
         }
@@ -1679,7 +2101,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           note: 'Credito generado desde aprobacion de solicitud',
           metadata: {
             sourceLoanApplicationId: id,
-            actNumber: body.actNumber,
+            actNumber: finalBody.actNumber,
             approvedInstallments,
           },
         });
@@ -1711,15 +2133,31 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           toStatus: 'APPROVED',
           changedByUserId: userId,
           changedByUserName: userName || userId,
-          note: `Solicitud aprobada. Acta ${body.actNumber}`.slice(0, 255),
+          note: `Solicitud aprobada. Acta ${finalBody.actNumber}`.slice(0, 255),
           metadata: {
             loanId: loan.id,
             approvedAmount: toDecimalString(approvedAmount),
-            actNumber: body.actNumber,
-            agreementId: body.agreementId ?? null,
-            payeeThirdPartyId: body.payeeThirdPartyId,
+            actNumber: finalBody.actNumber,
+            agreementId: finalBody.agreementId ?? null,
+            payeeThirdPartyId: finalBody.payeeThirdPartyId,
             approvedInstallments,
             firstCollectionDate,
+          },
+        });
+
+        await recordFinalApproval(tx, {
+          loanApplicationId: id,
+          levelId: pendingApplication.currentApprovalLevelId,
+          actor: {
+            userId,
+            userName: userName || userId,
+          },
+          note: `Aprobacion final. Acta ${finalBody.actNumber}`,
+          metadata: {
+            loanId: loan.id,
+            approvedAmount: toDecimalString(approvedAmount),
+            approvedInstallments,
+            actNumber: finalBody.actNumber,
           },
         });
 
@@ -1737,7 +2175,8 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         beforeValue: existing,
         afterValue: updated,
         metadata: {
-          body,
+          mode: finalBody.mode,
+          body: finalBody,
         },
         ipAddress,
         userAgent,
@@ -1753,6 +2192,295 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         actionKey: appRoute.metadata.permissionKey.actionKey,
         action: 'update',
         functionName: 'approve',
+        resourceId: id.toString(),
+        status: 'failure',
+        errorMessage: error?.body.message,
+        metadata: {
+          body,
+        },
+        ipAddress,
+        userAgent,
+      });
+      return error;
+    }
+  },
+
+  reassign: async ({ body }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      if (body.strategy === 'TO_USER' && !body.toAssignedUserId) {
+        throwHttpError({
+          status: 400,
+          message: 'Debe seleccionar usuario destino',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      if (body.strategy === 'TO_USER' && body.toAssignedUserId === body.fromAssignedUserId) {
+        throwHttpError({
+          status: 400,
+          message: 'El usuario destino debe ser diferente al usuario origen',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const { userId, userName } = getRequiredUserContext(session);
+      const note = body.note?.trim();
+
+      const [result] = await db.transaction(async (tx) => {
+        const assignedApplications = await tx.query.loanApplications.findMany({
+          where: and(
+            eq(loanApplications.status, 'PENDING'),
+            eq(loanApplications.assignedApprovalUserId, body.fromAssignedUserId)
+          ),
+          columns: {
+            id: true,
+            status: true,
+            requestedAmount: true,
+            currentApprovalLevelId: true,
+            targetApprovalLevelId: true,
+            assignedApprovalUserId: true,
+            assignedApprovalUserName: true,
+          },
+          orderBy: [asc(loanApplications.createdAt), asc(loanApplications.id)],
+        });
+
+        let reassignedCount = 0;
+        for (const application of assignedApplications) {
+          const ensured = await ensurePendingAssignment(tx, application, {
+            userId,
+            userName: userName || userId,
+          });
+
+          if (ensured.assignedApprovalUserId !== body.fromAssignedUserId) {
+            continue;
+          }
+
+          if (!ensured.currentApprovalLevelId) {
+            throwHttpError({
+              status: 409,
+              message: `La solicitud ${ensured.id} no tiene nivel actual para reasignar`,
+              code: 'CONFLICT',
+            });
+          }
+
+          await reassignApplicationApproval(tx, {
+            loanApplicationId: ensured.id,
+            currentLevelId: ensured.currentApprovalLevelId,
+            fromAssignedUserId: body.fromAssignedUserId,
+            actor: {
+              userId,
+              userName: userName || userId,
+            },
+            strategy: body.strategy,
+            toAssignedUserId: body.toAssignedUserId,
+            note:
+              note ||
+              (body.strategy === 'ROUND_ROBIN'
+                ? 'Reasignacion masiva por round robin'
+                : 'Reasignacion masiva a usuario'),
+          });
+          reassignedCount += 1;
+        }
+
+        return [
+          {
+            totalMatched: assignedApplications.length,
+            reassignedCount,
+          },
+        ];
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'reassign',
+        status: 'success',
+        metadata: {
+          body,
+          result,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return { status: 200 as const, body: result };
+    } catch (e) {
+      const error = genericTsRestErrorResponse(e, {
+        genericMsg: 'Error al reasignar solicitudes',
+      });
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'reassign',
+        status: 'failure',
+        errorMessage: error?.body.message,
+        metadata: {
+          body,
+        },
+        ipAddress,
+        userAgent,
+      });
+      return error;
+    }
+  },
+
+  reassignOne: async ({ params: { id }, body }, { request, appRoute, nextRequest }) => {
+    let session: UnifiedAuthContext | undefined;
+    const ipAddress = getClientIp(nextRequest);
+    const userAgent = nextRequest.headers.get('user-agent');
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      if (body.strategy === 'TO_USER' && !body.toAssignedUserId) {
+        throwHttpError({
+          status: 400,
+          message: 'Debe seleccionar usuario destino',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const existing = await db.query.loanApplications.findFirst({
+        where: eq(loanApplications.id, id),
+      });
+
+      if (!existing) {
+        throwHttpError({
+          status: 404,
+          message: `Solicitud de credito con ID ${id} no encontrada`,
+          code: 'NOT_FOUND',
+        });
+      }
+
+      if (existing.status !== 'PENDING') {
+        throwHttpError({
+          status: 400,
+          message: 'Solo se pueden reasignar solicitudes en estado pendiente',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const { userId, userName } = getRequiredUserContext(session);
+      const note = body.note?.trim();
+
+      const [updated] = await db.transaction(async (tx) => {
+        const pendingApplication = await ensurePendingAssignment(
+          tx,
+          {
+            id: existing.id,
+            status: existing.status,
+            requestedAmount: existing.requestedAmount,
+            currentApprovalLevelId: existing.currentApprovalLevelId,
+            targetApprovalLevelId: existing.targetApprovalLevelId,
+            assignedApprovalUserId: existing.assignedApprovalUserId,
+            assignedApprovalUserName: existing.assignedApprovalUserName,
+          },
+          {
+            userId,
+            userName: userName || userId,
+          }
+        );
+
+        if (!pendingApplication.currentApprovalLevelId || !pendingApplication.assignedApprovalUserId) {
+          throwHttpError({
+            status: 409,
+            message: 'La solicitud no tiene asignacion vigente para reasignar',
+            code: 'CONFLICT',
+          });
+        }
+
+        if (
+          body.strategy === 'TO_USER' &&
+          body.toAssignedUserId === pendingApplication.assignedApprovalUserId
+        ) {
+          throwHttpError({
+            status: 400,
+            message: 'El usuario destino debe ser diferente al asignado actual',
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        await reassignApplicationApproval(tx, {
+          loanApplicationId: id,
+          currentLevelId: pendingApplication.currentApprovalLevelId,
+          fromAssignedUserId: pendingApplication.assignedApprovalUserId,
+          actor: {
+            userId,
+            userName: userName || userId,
+          },
+          strategy: body.strategy,
+          toAssignedUserId: body.toAssignedUserId,
+          note:
+            note ||
+            (body.strategy === 'ROUND_ROBIN'
+              ? 'Reasignacion individual por round robin'
+              : 'Reasignacion individual a usuario'),
+        });
+
+        const refreshed = await tx.query.loanApplications.findFirst({
+          where: eq(loanApplications.id, id),
+        });
+
+        if (!refreshed) {
+          throwHttpError({
+            status: 500,
+            message: 'No fue posible obtener solicitud reasignada',
+            code: 'INTERNAL_SERVER_ERROR',
+          });
+        }
+
+        return [refreshed];
+      });
+
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'reassignOne',
+        resourceId: id.toString(),
+        resourceLabel: existing.creditNumber,
+        status: 'success',
+        beforeValue: existing,
+        afterValue: updated,
+        metadata: {
+          body,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return { status: 200 as const, body: updated };
+    } catch (e) {
+      const error = genericTsRestErrorResponse(e, {
+        genericMsg: `Error al reasignar solicitud de credito ${id}`,
+      });
+      await logAudit(session, {
+        resourceKey: appRoute.metadata.permissionKey.resourceKey,
+        actionKey: appRoute.metadata.permissionKey.actionKey,
+        action: 'update',
+        functionName: 'reassignOne',
         resourceId: id.toString(),
         status: 'failure',
         errorMessage: error?.body.message,

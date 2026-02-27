@@ -64,6 +64,9 @@ import {
   billingCycleProfileCycles,
   agreementBillingEmailDispatches,
   loanApplicationRiskAssessments,
+  loanApprovalLevels,
+  loanApprovalLevelUsers,
+  loanApplicationApprovalHistory,
   channels,
   loanApplicationStatusHistory,
   loanApplicationEvents,
@@ -549,11 +552,22 @@ export const loanApplicationsRelations = relations(loanApplications, ({ one, man
     fields: [loanApplications.paymentGuaranteeTypeId],
     references: [paymentGuaranteeTypes.id],
   }),
+  currentApprovalLevel: one(loanApprovalLevels, {
+    fields: [loanApplications.currentApprovalLevelId],
+    references: [loanApprovalLevels.id],
+    relationName: 'loanApplicationCurrentApprovalLevel',
+  }),
+  targetApprovalLevel: one(loanApprovalLevels, {
+    fields: [loanApplications.targetApprovalLevelId],
+    references: [loanApprovalLevels.id],
+    relationName: 'loanApplicationTargetApprovalLevel',
+  }),
 
   loans: many(loans),
   loanApplicationCoDebtors: many(loanApplicationCoDebtors),
   loanApplicationDocuments: many(loanApplicationDocuments),
   loanApplicationPledges: many(loanApplicationPledges),
+  loanApplicationApprovalHistory: many(loanApplicationApprovalHistory),
   loanApplicationStatusHistory: many(loanApplicationStatusHistory),
   loanApplicationEvents: many(loanApplicationEvents),
   loanApplicationRiskAssessments: many(loanApplicationRiskAssessments),
@@ -1087,6 +1101,30 @@ export const loanApplicationRiskAssessmentsRelations = relations(
 );
 
 // ---------------------------------------------------------------------
+// Niveles globales de aprobacion de solicitudes
+// ---------------------------------------------------------------------
+export const loanApprovalLevelsRelations = relations(loanApprovalLevels, ({ many }) => ({
+  users: many(loanApprovalLevelUsers),
+  loanApplicationsAsCurrentLevel: many(loanApplications, {
+    relationName: 'loanApplicationCurrentApprovalLevel',
+  }),
+  loanApplicationsAsTargetLevel: many(loanApplications, {
+    relationName: 'loanApplicationTargetApprovalLevel',
+  }),
+  loanApplicationApprovalHistory: many(loanApplicationApprovalHistory),
+}));
+
+// ---------------------------------------------------------------------
+// Usuarios por nivel de aprobacion
+// ---------------------------------------------------------------------
+export const loanApprovalLevelUsersRelations = relations(loanApprovalLevelUsers, ({ one }) => ({
+  level: one(loanApprovalLevels, {
+    fields: [loanApprovalLevelUsers.loanApprovalLevelId],
+    references: [loanApprovalLevels.id],
+  }),
+}));
+
+// ---------------------------------------------------------------------
 // Canales de creación de créditos
 // ---------------------------------------------------------------------
 export const channelsRelations = relations(channels, ({ many }) => ({
@@ -1103,6 +1141,23 @@ export const loanApplicationStatusHistoryRelations = relations(
     loanApplication: one(loanApplications, {
       fields: [loanApplicationStatusHistory.loanApplicationId],
       references: [loanApplications.id],
+    }),
+  })
+);
+
+// ---------------------------------------------------------------------
+// Historial del flujo de aprobacion por niveles
+// ---------------------------------------------------------------------
+export const loanApplicationApprovalHistoryRelations = relations(
+  loanApplicationApprovalHistory,
+  ({ one }) => ({
+    loanApplication: one(loanApplications, {
+      fields: [loanApplicationApprovalHistory.loanApplicationId],
+      references: [loanApplications.id],
+    }),
+    level: one(loanApprovalLevels, {
+      fields: [loanApplicationApprovalHistory.levelId],
+      references: [loanApprovalLevels.id],
     }),
   })
 );

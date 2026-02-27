@@ -1,5 +1,6 @@
 import { api } from '@/clients/api';
 import {
+  ListLoanApplicationInboxQuerySchema,
   ListLoanApplicationActNumbersQuerySchema,
   type ListLoanApplicationsQuery,
 } from '@/schemas/loan-application';
@@ -9,6 +10,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 type ListLoanApplicationActNumbersQuery = z.infer<typeof ListLoanApplicationActNumbersQuerySchema>;
+type ListLoanApplicationInboxQuery = z.infer<typeof ListLoanApplicationInboxQuerySchema>;
 
 export const loanApplicationsKeys = {
   all: ['loan-applications'] as const,
@@ -19,6 +21,10 @@ export const loanApplicationsKeys = {
 
   details: () => [...loanApplicationsKeys.all, 'detail'] as const,
   detail: (id: number) => [...loanApplicationsKeys.details(), id] as const,
+
+  inbox: () => [...loanApplicationsKeys.all, 'inbox'] as const,
+  inboxList: (filters: Partial<ListLoanApplicationInboxQuery> = {}) =>
+    [...loanApplicationsKeys.inbox(), filters] as const,
 
   actNumbers: () => [...loanApplicationsKeys.all, 'act-numbers'] as const,
   actNumbersList: (query: ListLoanApplicationActNumbersQuery) =>
@@ -42,6 +48,9 @@ function defaultQuery(filters?: Partial<ListLoanApplicationsQuery>) {
       'loanApplicationCoDebtors',
       'loanApplicationDocuments',
       'loanApplicationPledges',
+      'currentApprovalLevel',
+      'targetApprovalLevel',
+      'loanApplicationApprovalHistory',
       'loanApplicationStatusHistory',
       'loanApplicationRiskAssessments',
     ],
@@ -72,6 +81,15 @@ export function useLoanApplication(
       query: { include: options?.include ?? defaultQuery().include },
     },
     enabled: options?.enabled ?? !!id,
+  });
+}
+
+export function useLoanApplicationInbox(filters: Partial<ListLoanApplicationInboxQuery> = {}) {
+  const query = defaultQuery(filters);
+
+  return api.loanApplication.inbox.useQuery({
+    queryKey: loanApplicationsKeys.inboxList(query),
+    queryData: { query },
   });
 }
 
@@ -153,6 +171,38 @@ export function useApproveLoanApplication() {
   });
 }
 
+export function useReassignLoanApplications() {
+  const queryClient = api.useQueryClient();
+
+  return api.loanApplication.reassign.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: loanApplicationsKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loanApplicationsKeys.inbox() });
+      toast.success('Solicitudes reasignadas correctamente');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
+export function useReassignLoanApplication() {
+  const queryClient = api.useQueryClient();
+
+  return api.loanApplication.reassignOne.useMutation({
+    onSuccess: (_, variables) => {
+      const id = variables.params.id as number;
+      queryClient.invalidateQueries({ queryKey: loanApplicationsKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loanApplicationsKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: loanApplicationsKeys.inbox() });
+      toast.success('Solicitud reasignada correctamente');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
 export function usePresignLoanApplicationDocumentUpload() {
   return api.loanApplication.presignDocumentUpload.useMutation({
     onError: (error) => {
@@ -186,5 +236,17 @@ export async function prefetchLoanApplications(
   await queryClient.prefetchQuery({
     queryKey: loanApplicationsKeys.list(query),
     queryFn: () => api.loanApplication.list.query({ query }),
+  });
+}
+
+export async function prefetchLoanApplicationInbox(
+  queryClient: ReturnType<typeof useQueryClient>,
+  filters: Partial<ListLoanApplicationInboxQuery> = {}
+) {
+  const query = defaultQuery(filters);
+
+  await queryClient.prefetchQuery({
+    queryKey: loanApplicationsKeys.inboxList(query),
+    queryFn: () => api.loanApplication.inbox.query({ query }),
   });
 }

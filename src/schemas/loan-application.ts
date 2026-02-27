@@ -49,6 +49,7 @@ const LoanApplicationWhereFieldsSchema = z
     creditProductId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     installments: z.union([z.number(), NumberOperatorsSchema]).optional(),
     requestedAmount: z.union([z.string(), StringOperatorsSchema]).optional(),
+    assignedApprovalUserId: z.union([z.string(), StringOperatorsSchema]).optional(),
     status: z.union([z.enum(LOAN_APPLICATION_STATUS_OPTIONS), StringOperatorsSchema]).optional(),
     pledgesSubsidy: z.union([z.boolean(), BooleanOperatorsSchema]).optional(),
     isInsuranceApproved: z.union([z.boolean(), BooleanOperatorsSchema]).optional(),
@@ -65,6 +66,7 @@ const LOAN_APPLICATION_SORT_FIELDS = [
   'thirdPartyId',
   'creditProductId',
   'requestedAmount',
+  'assignedApprovalUserId',
   'createdAt',
   'updatedAt',
 ] as const;
@@ -85,6 +87,9 @@ const LOAN_APPLICATION_INCLUDE_OPTIONS = [
   'loanApplicationCoDebtors',
   'loanApplicationDocuments',
   'loanApplicationPledges',
+  'currentApprovalLevel',
+  'targetApprovalLevel',
+  'loanApplicationApprovalHistory',
   'loanApplicationStatusHistory',
   'loanApplicationRiskAssessments',
 ] as const;
@@ -102,6 +107,8 @@ export type ListLoanApplicationsQuery = z.infer<typeof ListLoanApplicationsQuery
 export const GetLoanApplicationQuerySchema = z.object({
   include: LoanApplicationIncludeSchema,
 });
+
+export const ListLoanApplicationInboxQuerySchema = ListLoanApplicationsQuerySchema;
 
 export const ListLoanApplicationActNumbersQuerySchema = z.object({
   affiliationOfficeId: z.number().int().positive(),
@@ -276,7 +283,8 @@ export const RejectLoanApplicationBodySchema = z.object({
   rejectionReasonId: z.number().int().positive(),
 });
 
-export const ApproveLoanApplicationBodySchema = z.object({
+export const FinalApproveLoanApplicationBodySchema = z.object({
+  mode: z.literal('FINAL'),
   repaymentMethodId: z.number().int().positive(),
   paymentGuaranteeTypeId: z.number().int().positive(),
   agreementId: z.number().int().positive().nullable().optional(),
@@ -289,6 +297,49 @@ export const ApproveLoanApplicationBodySchema = z.object({
   payeeThirdPartyId: z.number().int().positive(),
   firstCollectionDate: z.coerce.date(),
 });
+
+export const StepApproveLoanApplicationBodySchema = z.object({
+  mode: z.literal('STEP'),
+  approvalNote: z.string().min(1).max(1000),
+});
+
+export const ApproveLoanApplicationBodySchema = z.union([
+  FinalApproveLoanApplicationBodySchema,
+  StepApproveLoanApplicationBodySchema,
+]);
+
+export const ReassignLoanApplicationsBodySchema = z
+  .object({
+    fromAssignedUserId: z.uuid(),
+    strategy: z.enum(['TO_USER', 'ROUND_ROBIN']),
+    toAssignedUserId: z.uuid().optional(),
+    note: z.string().min(1).max(1000).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.strategy === 'TO_USER' && !value.toAssignedUserId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Debe seleccionar usuario destino cuando la estrategia es a usuario',
+        path: ['toAssignedUserId'],
+      });
+    }
+  });
+
+export const ReassignLoanApplicationBodySchema = z
+  .object({
+    strategy: z.enum(['TO_USER', 'ROUND_ROBIN']),
+    toAssignedUserId: z.uuid().optional(),
+    note: z.string().min(1).max(1000).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.strategy === 'TO_USER' && !value.toAssignedUserId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Debe seleccionar usuario destino cuando la estrategia es a usuario',
+        path: ['toAssignedUserId'],
+      });
+    }
+  });
 
 export const PresignLoanApplicationDocumentBodySchema = z.object({
   fileName: z.string().min(1).max(255),

@@ -12,7 +12,7 @@ import {
 } from '@/components/data-table/data-table-faceted-filter';
 import { Input } from '@/components/ui/input';
 import { useHasPermission } from '@/stores/auth-store-provider';
-import { Plus, RefreshCw, X } from 'lucide-react';
+import { Repeat, Plus, RefreshCw, X } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import * as React from 'react';
 
@@ -21,11 +21,15 @@ interface ToolbarProps {
   onSearchChange: (value: string) => void;
   statusFilter?: LoanApplicationStatus;
   onStatusFilterChange: (value: LoanApplicationStatus | undefined) => void;
+  assignedUserFilter?: string;
+  assignedUserOptions: Array<{ label: string; value: string }>;
+  onAssignedUserFilterChange: (value: string | undefined) => void;
   rangeDateFilter?: DateRange;
   onRangeDateFilterChange: (value: DateRange | undefined) => void;
   onReset: () => void;
   onRefresh?: () => void;
   onCreate?: () => void;
+  onReassign?: () => void;
   exportActions?: React.ReactNode;
   isRefreshing?: boolean;
 }
@@ -35,17 +39,25 @@ export function LoanApplicationsToolbar({
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
+  assignedUserFilter,
+  assignedUserOptions,
+  onAssignedUserFilterChange,
   rangeDateFilter,
   onRangeDateFilterChange,
   onReset,
   onRefresh,
   onCreate,
+  onReassign,
   exportActions,
   isRefreshing = false,
 }: ToolbarProps) {
   const canCreate = useHasPermission('loan-applications:create');
+  const canApprove = useHasPermission('loan-applications:approve');
   const hasActiveFilters =
-    Boolean(searchValue) || Boolean(statusFilter) || Boolean(rangeDateFilter?.from);
+    Boolean(searchValue) ||
+    Boolean(statusFilter) ||
+    Boolean(assignedUserFilter) ||
+    Boolean(rangeDateFilter?.from);
 
   const statusOptions = LOAN_APPLICATION_STATUS_OPTIONS.map((status) => ({
     label: loanApplicationStatusLabels[status],
@@ -68,6 +80,12 @@ export function LoanApplicationsToolbar({
           value={statusFilter}
           onValueChange={(value) => onStatusFilterChange(value as LoanApplicationStatus | undefined)}
         />
+        <SimpleSelectFilter
+          title="Asignado"
+          options={assignedUserOptions}
+          value={assignedUserFilter}
+          onValueChange={(value) => onAssignedUserFilterChange(value as string | undefined)}
+        />
         {hasActiveFilters && (
           <Button variant="ghost" onClick={onReset} className="h-9 px-2 lg:px-3">
             Limpiar
@@ -89,6 +107,13 @@ export function LoanApplicationsToolbar({
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+        )}
+
+        {onReassign && canApprove && (
+          <Button type="button" variant="outline" size="sm" onClick={onReassign} className="h-9">
+            <Repeat className="mr-2 h-4 w-4" />
+            Reasignar
           </Button>
         )}
 

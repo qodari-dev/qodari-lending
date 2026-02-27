@@ -142,6 +142,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Convenios', url: `/agreements` },
                   { title: 'Plantillas de correo', url: `/billing-email-templates` },
                   { title: 'Perfiles de facturacion', url: `/billing-cycle-profiles` },
+                  { title: 'Niveles de aprobacion', url: `/loan-approval-levels` },
                 ],
               },
               {
@@ -174,6 +175,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 icon: FileText,
                 items: [
                   { title: 'Colocacion de crédito', url: `/loan-applications` },
+                  { title: 'Aprobacion solicitudes', url: `/loan-application-approvals` },
                   { title: 'Creditos', url: `/loans` },
                   { title: 'Refinanciacion', url: `/loan-refinancing` },
                 ],

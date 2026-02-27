@@ -34,10 +34,13 @@ import type {
   creditProductCategories,
   creditProductDocuments,
   creditProductAccounts,
+  loanApprovalLevels,
+  loanApprovalLevelUsers,
   loanApplications,
   loanApplicationPledges,
   loanApplicationCoDebtors,
   loanApplicationDocuments,
+  loanApplicationApprovalHistory,
   loans,
   loanAgreementHistory,
   loanStatusHistory,
@@ -392,6 +395,25 @@ export type CreditProductAccounts = typeof creditProductAccounts.$inferSelect & 
 export type NewCreditProductAccounts = typeof creditProductAccounts.$inferInsert;
 
 // ---------------------------------------------------------------------
+// Niveles globales de aprobacion de solicitudes
+// ---------------------------------------------------------------------
+export type LoanApprovalLevels = typeof loanApprovalLevels.$inferSelect & {
+  users?: LoanApprovalLevelUsers[];
+  loanApplicationsAsCurrentLevel?: LoanApplications[];
+  loanApplicationsAsTargetLevel?: LoanApplications[];
+  loanApplicationApprovalHistory?: LoanApplicationApprovalHistory[];
+};
+export type NewLoanApprovalLevels = typeof loanApprovalLevels.$inferInsert;
+
+// ---------------------------------------------------------------------
+// Usuarios por nivel de aprobacion de solicitudes
+// ---------------------------------------------------------------------
+export type LoanApprovalLevelUsers = typeof loanApprovalLevelUsers.$inferSelect & {
+  level?: LoanApprovalLevels;
+};
+export type NewLoanApprovalLevelUsers = typeof loanApprovalLevelUsers.$inferInsert;
+
+// ---------------------------------------------------------------------
 // Concr39 - Solicitudes de créditos
 // ---------------------------------------------------------------------
 export type LoanApplications = typeof loanApplications.$inferSelect & {
@@ -407,11 +429,14 @@ export type LoanApplications = typeof loanApplications.$inferSelect & {
   investmentType?: InvestmentTypes | null;
   channel?: Channels | null;
   paymentGuaranteeType?: PaymentGuaranteeTypes;
+  currentApprovalLevel?: LoanApprovalLevels | null;
+  targetApprovalLevel?: LoanApprovalLevels | null;
 
   loans?: Loans[];
   loanApplicationCoDebtors?: LoanApplicationCoDebtors[];
   loanApplicationDocuments?: LoanApplicationDocuments[];
   loanApplicationPledges?: LoanApplicationPledges[];
+  loanApplicationApprovalHistory?: LoanApplicationApprovalHistory[];
   loanApplicationStatusHistory?: LoanApplicationStatusHistory[];
   loanApplicationEvents?: LoanApplicationEvents[];
   loanApplicationRiskAssessments?: LoanApplicationRiskAssessments[];
@@ -443,6 +468,15 @@ export type LoanApplicationDocuments = typeof loanApplicationDocuments.$inferSel
   documentType?: DocumentTypes;
 };
 export type NewLoanApplicationDocuments = typeof loanApplicationDocuments.$inferInsert;
+
+// ---------------------------------------------------------------------
+// Historial del flujo de aprobacion por niveles
+// ---------------------------------------------------------------------
+export type LoanApplicationApprovalHistory = typeof loanApplicationApprovalHistory.$inferSelect & {
+  loanApplication?: LoanApplications;
+  level?: LoanApprovalLevels | null;
+};
+export type NewLoanApplicationApprovalHistory = typeof loanApplicationApprovalHistory.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Concr08 - Créditos aprobados / liquidados

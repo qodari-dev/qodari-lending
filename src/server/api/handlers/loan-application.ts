@@ -15,7 +15,6 @@ import {
   loanApplicationPledges,
   loanApplicationApprovalHistory,
   loanApplicationRiskAssessments,
-  loanApprovalLevels,
   loanApprovalLevelUsers,
   loanApplications,
   loanAgreementHistory,
@@ -1169,12 +1168,15 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             assignedApprovalUserName: updatedApplication.assignedApprovalUserName,
           },
           {
-          userId,
-          userName: userName || userId,
+            userId,
+            userName: userName || userId,
           }
         );
 
-        const { targetLevelId } = await resolveTargetApprovalLevel(tx, approvalState.requestedAmount);
+        const { targetLevelId } = await resolveTargetApprovalLevel(
+          tx,
+          approvalState.requestedAmount
+        );
 
         if (approvalState.targetApprovalLevelId !== targetLevelId) {
           await tx
@@ -1594,7 +1596,10 @@ export const loanApplication = tsr.router(contract.loanApplication, {
 
           assertAssignedApprover(pendingApplication, userId);
 
-          if (!pendingApplication.currentApprovalLevelId || !pendingApplication.targetApprovalLevelId) {
+          if (
+            !pendingApplication.currentApprovalLevelId ||
+            !pendingApplication.targetApprovalLevelId
+          ) {
             throwHttpError({
               status: 409,
               message: 'No fue posible determinar el nivel de aprobacion de la solicitud',
@@ -1602,7 +1607,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             });
           }
 
-          if (pendingApplication.currentApprovalLevelId === pendingApplication.targetApprovalLevelId) {
+          if (
+            pendingApplication.currentApprovalLevelId === pendingApplication.targetApprovalLevelId
+          ) {
             throwHttpError({
               status: 400,
               message: 'Esta solicitud requiere aprobacion final con los datos de desembolso',
@@ -2002,7 +2009,10 @@ export const loanApplication = tsr.router(contract.loanApplication, {
 
         assertAssignedApprover(pendingApplication, userId);
 
-        if (!pendingApplication.currentApprovalLevelId || !pendingApplication.targetApprovalLevelId) {
+        if (
+          !pendingApplication.currentApprovalLevelId ||
+          !pendingApplication.targetApprovalLevelId
+        ) {
           throwHttpError({
             status: 409,
             message: 'No fue posible determinar el nivel de aprobacion de la solicitud',
@@ -2010,7 +2020,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           });
         }
 
-        if (pendingApplication.currentApprovalLevelId !== pendingApplication.targetApprovalLevelId) {
+        if (
+          pendingApplication.currentApprovalLevelId !== pendingApplication.targetApprovalLevelId
+        ) {
           throwHttpError({
             status: 400,
             message: 'La solicitud aun no esta en el nivel final de aprobacion',
@@ -2403,7 +2415,10 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           }
         );
 
-        if (!pendingApplication.currentApprovalLevelId || !pendingApplication.assignedApprovalUserId) {
+        if (
+          !pendingApplication.currentApprovalLevelId ||
+          !pendingApplication.assignedApprovalUserId
+        ) {
           throwHttpError({
             status: 409,
             message: 'La solicitud no tiene asignacion vigente para reasignar',

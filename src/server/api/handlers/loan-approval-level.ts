@@ -1,9 +1,4 @@
-import {
-  db,
-  loanApprovalLevels,
-  loanApprovalLevelUsers,
-  loanApplications,
-} from '@/server/db';
+import { db, loanApprovalLevels, loanApprovalLevelUsers, loanApplications } from '@/server/db';
 import { UnifiedAuthContext } from '@/server/utils/auth-context';
 import { logAudit } from '@/server/utils/audit-logger';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
@@ -18,7 +13,7 @@ import {
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { toDecimalString, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, asc, eq, or, sql } from 'drizzle-orm';
+import { asc, eq, or, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 type LoanApprovalLevelColumn = keyof typeof loanApprovalLevels.$inferSelect;
@@ -119,7 +114,9 @@ async function ensureNoAmountOrderConflict(
     });
   }
 
-  const active = merged.filter((level) => level.isActive).sort((a, b) => a.levelOrder - b.levelOrder);
+  const active = merged
+    .filter((level) => level.isActive)
+    .sort((a, b) => a.levelOrder - b.levelOrder);
 
   let previousAmount = -1;
   for (let index = 0; index < active.length; index += 1) {
@@ -404,11 +401,16 @@ export const loanApprovalLevel = tsr.router(contract.loanApprovalLevel, {
         if (payload.isActive !== undefined) updatePayload.isActive = payload.isActive;
 
         if (Object.keys(updatePayload).length) {
-          await tx.update(loanApprovalLevels).set(updatePayload).where(eq(loanApprovalLevels.id, id));
+          await tx
+            .update(loanApprovalLevels)
+            .set(updatePayload)
+            .where(eq(loanApprovalLevels.id, id));
         }
 
         if (payload.users !== undefined) {
-          await tx.delete(loanApprovalLevelUsers).where(eq(loanApprovalLevelUsers.loanApprovalLevelId, id));
+          await tx
+            .delete(loanApprovalLevelUsers)
+            .where(eq(loanApprovalLevelUsers.loanApprovalLevelId, id));
           if (payload.users.length) {
             await tx.insert(loanApprovalLevelUsers).values(
               payload.users.map((user) => ({

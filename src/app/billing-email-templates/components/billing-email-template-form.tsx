@@ -23,7 +23,7 @@ import { BillingEmailTemplate, CreateBillingEmailTemplateBodySchema } from '@/sc
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useId, useMemo } from 'react';
-import { Controller, FormProvider, type Resolver, useForm } from 'react-hook-form';
+import { Controller, FormProvider, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { BillingHtmlEditor } from './billing-html-editor';
 
@@ -85,7 +85,7 @@ export function BillingEmailTemplateForm({
   const { mutateAsync: update, isPending: isUpdating } = useUpdateBillingEmailTemplate();
 
   const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
-  const htmlPreview = form.watch('htmlContent');
+  const htmlPreview = useWatch({ control: form.control, name: 'htmlContent' });
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

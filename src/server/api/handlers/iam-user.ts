@@ -11,6 +11,7 @@ const toIamUser = (user: {
   lastName: string;
   status: 'active' | 'suspended';
   isAdmin: boolean;
+  isEmployee?: boolean;
 }) => ({
   id: user.id,
   email: user.email,
@@ -19,6 +20,7 @@ const toIamUser = (user: {
   displayName: `${user.firstName} ${user.lastName}`.trim() || user.email,
   status: user.status,
   isAdmin: user.isAdmin,
+  isEmployee: user.isEmployee,
 });
 
 export const iamUser = tsr.router(contract.iamUser, {
@@ -30,6 +32,7 @@ export const iamUser = tsr.router(contract.iamUser, {
         page: query.page,
         limit: query.limit,
         search: query.search,
+        isEmployee: query.isEmployee,
       });
 
       return {

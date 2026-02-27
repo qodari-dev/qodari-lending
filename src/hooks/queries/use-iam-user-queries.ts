@@ -16,6 +16,7 @@ function defaultQuery(filters?: Partial<ListIamUsersQuery>) {
     page: filters?.page ?? 1,
     limit: filters?.limit ?? 200,
     search: filters?.search,
+    isEmployee: filters?.isEmployee,
   } as ListIamUsersQuery;
 }
 

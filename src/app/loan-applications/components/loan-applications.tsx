@@ -96,7 +96,7 @@ export function LoanApplications() {
   const { mutateAsync: reassignLoanApplication, isPending: isSingleReassigning } =
     useReassignLoanApplication();
 
-  const { data: iamUsersData } = useIamUsers({ limit: 200 });
+  const { data: iamUsersData } = useIamUsers({ limit: 200, isEmployee: true });
   const iamUsers = React.useMemo(() => iamUsersData?.body?.data ?? [], [iamUsersData]);
 
   const rangeDateFilter = React.useMemo(() => {

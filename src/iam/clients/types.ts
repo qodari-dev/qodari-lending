@@ -100,6 +100,7 @@ export const SafeUserSchema = z.object({
   email: z.email(),
   firstName: z.string(),
   lastName: z.string(),
+  isEmployee: z.boolean().optional(),
   phone: z.string().nullable().optional(),
   status: UserStatusSchema,
   isAdmin: z.boolean(),
@@ -136,6 +137,7 @@ export type ListUsersParams = {
   page?: number;
   limit?: number;
   search?: string;
+  isEmployee?: boolean;
   include?: ('roles' | 'sessions' | 'auditLogs')[];
 };
 

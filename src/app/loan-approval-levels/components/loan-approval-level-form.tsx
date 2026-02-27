@@ -125,7 +125,7 @@ export function LoanApprovalLevelForm({
     });
   }, [form, loanApprovalLevel, opened]);
 
-  const { data: iamUsersData } = useIamUsers({ limit: 200 });
+  const { data: iamUsersData } = useIamUsers({ limit: 200, isEmployee: true });
   const iamUsers = useMemo(() => iamUsersData?.body?.data ?? [], [iamUsersData]);
   const findIamUser = useCallback(
     (id: string | undefined) => iamUsers.find((user) => user.id === id) ?? null,

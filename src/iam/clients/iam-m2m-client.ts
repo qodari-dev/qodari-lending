@@ -176,6 +176,7 @@ class IamM2MClient {
         page: params?.page,
         limit: params?.limit,
         search: params?.search,
+        isEmployee: params?.isEmployee,
         include: params?.include,
       },
     });

@@ -6,6 +6,7 @@ export const ListIamUsersQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(200).optional().default(50),
   search: z.string().optional(),
+  isEmployee: z.coerce.boolean().optional(),
 });
 
 export type ListIamUsersQuery = z.infer<typeof ListIamUsersQuerySchema>;
@@ -22,6 +23,7 @@ export const IamUserSchema = z.object({
   displayName: z.string(),
   status: z.enum(['active', 'suspended']),
   isAdmin: z.boolean(),
+  isEmployee: z.boolean().optional(),
 });
 
 export const IamUsersMetaSchema = z.object({

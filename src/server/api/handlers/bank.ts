@@ -132,19 +132,8 @@ export const bank = tsr.router(contract.bank, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newBank = await db.transaction(async (tx) => {
-        const [newBank] = await tx.insert(banks).values(body).returning();
-
-        return newBank;
-      });
+      const [newBank] = await db.insert(banks).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -192,13 +181,6 @@ export const bank = tsr.router(contract.bank, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.banks.findFirst({
         where: eq(banks.id, id),
@@ -212,15 +194,7 @@ export const bank = tsr.router(contract.bank, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(banks)
-          .set(body)
-          .where(eq(banks.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(banks).set(body).where(eq(banks.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -272,13 +246,6 @@ export const bank = tsr.router(contract.bank, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.banks.findFirst({
         where: eq(banks.id, id),

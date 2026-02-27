@@ -29,7 +29,9 @@ const IDENTIFICATION_TYPE_FIELDS: FieldMap = {
   isActive: identificationTypes.isActive,
   createdAt: identificationTypes.createdAt,
   updatedAt: identificationTypes.updatedAt,
-} satisfies Partial<Record<IdentificationTypeColumn, (typeof identificationTypes)[IdentificationTypeColumn]>>;
+} satisfies Partial<
+  Record<IdentificationTypeColumn, (typeof identificationTypes)[IdentificationTypeColumn]>
+>;
 
 const IDENTIFICATION_TYPE_QUERY_CONFIG: QueryConfig = {
   fields: IDENTIFICATION_TYPE_FIELDS,
@@ -136,19 +138,8 @@ export const identificationType = tsr.router(contract.identificationType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newIdentificationType = await db.transaction(async (tx) => {
-        const [newIdentificationType] = await tx.insert(identificationTypes).values(body).returning();
-
-        return newIdentificationType;
-      });
+      const [newIdentificationType] = await db.insert(identificationTypes).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -196,13 +187,6 @@ export const identificationType = tsr.router(contract.identificationType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.identificationTypes.findFirst({
         where: eq(identificationTypes.id, id),
@@ -216,15 +200,11 @@ export const identificationType = tsr.router(contract.identificationType, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(identificationTypes)
-          .set(body)
-          .where(eq(identificationTypes.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db
+        .update(identificationTypes)
+        .set(body)
+        .where(eq(identificationTypes.id, id))
+        .returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -276,13 +256,6 @@ export const identificationType = tsr.router(contract.identificationType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.identificationTypes.findFirst({
         where: eq(identificationTypes.id, id),

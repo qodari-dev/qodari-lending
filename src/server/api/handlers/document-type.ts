@@ -143,19 +143,8 @@ export const documentType = tsr.router(contract.documentType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newDocumentType = await db.transaction(async (tx) => {
-        const [newDocumentType] = await tx.insert(documentTypes).values(body).returning();
-
-        return newDocumentType;
-      });
+      const [newDocumentType] = await db.insert(documentTypes).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -203,13 +192,6 @@ export const documentType = tsr.router(contract.documentType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.documentTypes.findFirst({
         where: eq(documentTypes.id, id),
@@ -223,15 +205,7 @@ export const documentType = tsr.router(contract.documentType, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(documentTypes)
-          .set(body)
-          .where(eq(documentTypes.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(documentTypes).set(body).where(eq(documentTypes.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -283,13 +257,6 @@ export const documentType = tsr.router(contract.documentType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.documentTypes.findFirst({
         where: eq(documentTypes.id, id),

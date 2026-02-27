@@ -131,19 +131,8 @@ export const investmentType = tsr.router(contract.investmentType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newInvestmentType = await db.transaction(async (tx) => {
-        const [newInvestmentType] = await tx.insert(investmentTypes).values(body).returning();
-
-        return newInvestmentType;
-      });
+      const [newInvestmentType] = await db.insert(investmentTypes).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -191,13 +180,6 @@ export const investmentType = tsr.router(contract.investmentType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.investmentTypes.findFirst({
         where: eq(investmentTypes.id, id),
@@ -211,15 +193,7 @@ export const investmentType = tsr.router(contract.investmentType, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(investmentTypes)
-          .set(body)
-          .where(eq(investmentTypes.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(investmentTypes).set(body).where(eq(investmentTypes.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -271,13 +245,6 @@ export const investmentType = tsr.router(contract.investmentType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.investmentTypes.findFirst({
         where: eq(investmentTypes.id, id),

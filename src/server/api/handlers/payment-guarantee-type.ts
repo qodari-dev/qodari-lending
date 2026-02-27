@@ -133,22 +133,8 @@ export const paymentGuaranteeType = tsr.router(contract.paymentGuaranteeType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newPaymentGuaranteeType = await db.transaction(async (tx) => {
-        const [newPaymentGuaranteeType] = await tx
-          .insert(paymentGuaranteeTypes)
-          .values(body)
-          .returning();
-
-        return newPaymentGuaranteeType;
-      });
+      const [newPaymentGuaranteeType] = await db.insert(paymentGuaranteeTypes).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -196,13 +182,6 @@ export const paymentGuaranteeType = tsr.router(contract.paymentGuaranteeType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentGuaranteeTypes.findFirst({
         where: eq(paymentGuaranteeTypes.id, id),
@@ -216,15 +195,7 @@ export const paymentGuaranteeType = tsr.router(contract.paymentGuaranteeType, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(paymentGuaranteeTypes)
-          .set(body)
-          .where(eq(paymentGuaranteeTypes.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(paymentGuaranteeTypes).set(body).where(eq(paymentGuaranteeTypes.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -276,13 +247,6 @@ export const paymentGuaranteeType = tsr.router(contract.paymentGuaranteeType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentGuaranteeTypes.findFirst({
         where: eq(paymentGuaranteeTypes.id, id),

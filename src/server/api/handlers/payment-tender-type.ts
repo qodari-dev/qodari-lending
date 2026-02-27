@@ -134,19 +134,8 @@ export const paymentTenderType = tsr.router(contract.paymentTenderType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newPaymentTenderType = await db.transaction(async (tx) => {
-        const [newPaymentTenderType] = await tx.insert(paymentTenderTypes).values(body).returning();
-
-        return newPaymentTenderType;
-      });
+      const [newPaymentTenderType] = await db.insert(paymentTenderTypes).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -194,13 +183,6 @@ export const paymentTenderType = tsr.router(contract.paymentTenderType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentTenderTypes.findFirst({
         where: eq(paymentTenderTypes.id, id),
@@ -214,15 +196,7 @@ export const paymentTenderType = tsr.router(contract.paymentTenderType, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(paymentTenderTypes)
-          .set(body)
-          .where(eq(paymentTenderTypes.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(paymentTenderTypes).set(body).where(eq(paymentTenderTypes.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -274,13 +248,6 @@ export const paymentTenderType = tsr.router(contract.paymentTenderType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentTenderTypes.findFirst({
         where: eq(paymentTenderTypes.id, id),

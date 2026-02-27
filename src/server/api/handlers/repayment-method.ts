@@ -135,19 +135,8 @@ export const repaymentMethod = tsr.router(contract.repaymentMethod, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newRepaymentMethod = await db.transaction(async (tx) => {
-        const [newRepaymentMethod] = await tx.insert(repaymentMethods).values(body).returning();
-
-        return newRepaymentMethod;
-      });
+      const [newRepaymentMethod] = await db.insert(repaymentMethods).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -195,13 +184,6 @@ export const repaymentMethod = tsr.router(contract.repaymentMethod, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.repaymentMethods.findFirst({
         where: eq(repaymentMethods.id, id),
@@ -215,15 +197,7 @@ export const repaymentMethod = tsr.router(contract.repaymentMethod, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(repaymentMethods)
-          .set(body)
-          .where(eq(repaymentMethods.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(repaymentMethods).set(body).where(eq(repaymentMethods.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -275,13 +249,6 @@ export const repaymentMethod = tsr.router(contract.repaymentMethod, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.repaymentMethods.findFirst({
         where: eq(repaymentMethods.id, id),

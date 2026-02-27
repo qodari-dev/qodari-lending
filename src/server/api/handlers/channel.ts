@@ -137,19 +137,8 @@ export const channel = tsr.router(contract.channel, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newChannel = await db.transaction(async (tx) => {
-        const [newChannel] = await tx.insert(channels).values(body).returning();
-
-        return newChannel;
-      });
+      const [newChannel] = await db.insert(channels).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -197,13 +186,6 @@ export const channel = tsr.router(contract.channel, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.channels.findFirst({
         where: eq(channels.id, id),
@@ -217,15 +199,7 @@ export const channel = tsr.router(contract.channel, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(channels)
-          .set(body)
-          .where(eq(channels.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(channels).set(body).where(eq(channels.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -277,13 +251,6 @@ export const channel = tsr.router(contract.channel, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.channels.findFirst({
         where: eq(channels.id, id),

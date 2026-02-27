@@ -69,9 +69,6 @@ export const city = tsr.router(contract.city, {
         offset,
       } = buildQuery({ page, limit, search, where, sort }, CITY_QUERY_CONFIG);
 
-      console.log('==============================');
-      console.log(whereClause);
-
       const [data, countResult] = await Promise.all([
         db.query.cities.findMany({
           where: whereClause,
@@ -139,19 +136,8 @@ export const city = tsr.router(contract.city, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newCity = await db.transaction(async (tx) => {
-        const [newCity] = await tx.insert(cities).values(body).returning();
-
-        return newCity;
-      });
+      const [newCity] = await db.insert(cities).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -199,13 +185,6 @@ export const city = tsr.router(contract.city, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.cities.findFirst({
         where: eq(cities.id, id),
@@ -219,11 +198,7 @@ export const city = tsr.router(contract.city, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx.update(cities).set(body).where(eq(cities.id, id)).returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(cities).set(body).where(eq(cities.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -275,13 +250,6 @@ export const city = tsr.router(contract.city, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.cities.findFirst({
         where: eq(cities.id, id),

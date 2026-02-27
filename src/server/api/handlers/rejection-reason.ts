@@ -131,19 +131,8 @@ export const rejectionReason = tsr.router(contract.rejectionReason, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newRejectionReason = await db.transaction(async (tx) => {
-        const [newRejectionReason] = await tx.insert(rejectionReasons).values(body).returning();
-
-        return newRejectionReason;
-      });
+      const [newRejectionReason] = await db.insert(rejectionReasons).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -191,13 +180,6 @@ export const rejectionReason = tsr.router(contract.rejectionReason, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.rejectionReasons.findFirst({
         where: eq(rejectionReasons.id, id),
@@ -211,15 +193,7 @@ export const rejectionReason = tsr.router(contract.rejectionReason, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(rejectionReasons)
-          .set(body)
-          .where(eq(rejectionReasons.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(rejectionReasons).set(body).where(eq(rejectionReasons.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -271,13 +245,6 @@ export const rejectionReason = tsr.router(contract.rejectionReason, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.rejectionReasons.findFirst({
         where: eq(rejectionReasons.id, id),

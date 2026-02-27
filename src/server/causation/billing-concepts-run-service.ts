@@ -1,5 +1,5 @@
 import { accountingPeriods, creditProducts, db, loans, processRuns } from '@/server/db';
-import { enqueueBillingConceptsJob } from '@/server/queues/billing-concepts-queue';
+import { enqueueBillingConceptsJob } from '@/server/queues/billing-concepts';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { formatDateOnly } from '@/server/utils/value-utils';
 import { and, eq } from 'drizzle-orm';

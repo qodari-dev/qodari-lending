@@ -18,14 +18,4 @@ function buildConnectionOptions(): ConnectionOptions {
   };
 }
 
-declare global {
-  var __bullmqRedisConnection: ConnectionOptions | undefined;
-}
-
-export function getBullMqRedisConnection() {
-  if (!globalThis.__bullmqRedisConnection) {
-    globalThis.__bullmqRedisConnection = buildConnectionOptions();
-  }
-
-  return globalThis.__bullmqRedisConnection;
-}
+export const redisConnection = buildConnectionOptions();

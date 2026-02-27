@@ -1,6 +1,6 @@
 import { processRuns, db, accountingPeriods, creditProducts, loans } from '@/server/db';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
-import { enqueueCurrentInterestJob } from '@/server/queues/current-interest-queue';
+import { enqueueCurrentInterestJob } from '@/server/queues/current-interest';
 import { formatDateOnly } from '@/server/utils/value-utils';
 import { and, eq } from 'drizzle-orm';
 import type { CausationScopeType, CurrentInterestRunSummary } from './types';

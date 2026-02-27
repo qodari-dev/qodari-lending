@@ -1,29 +1,33 @@
-import { db, processRuns } from '@/server/db';
 import { executeCurrentInterestProcessRun } from '@/server/causation/current-interest-run';
-import { CURRENT_INTEREST_QUEUE_NAME } from '@/server/queues/current-interest-queue';
-import { getBullMqRedisConnection } from '@/server/queues/redis';
 import type { CurrentInterestJobData } from '@/server/causation/types';
-import { Worker } from 'bullmq';
+import { redisConnection } from '@/server/clients/redis';
+import { db, processRuns } from '@/server/db';
+import { Queue, Worker } from 'bullmq';
 import { eq } from 'drizzle-orm';
 
-declare global {
-  var __currentInterestWorker: Worker<CurrentInterestJobData> | undefined;
+const QUEUE_NAME = 'causation-current-interest';
+const JOB_NAME = 'process-current-interest-run';
+
+export const currentInterestQueue = new Queue<CurrentInterestJobData>(QUEUE_NAME, {
+  connection: redisConnection,
+});
+
+export async function enqueueCurrentInterestJob(data: CurrentInterestJobData) {
+  await currentInterestQueue.add(JOB_NAME, data, {
+    jobId: `current-interest-run-${data.processRunId}`,
+    attempts: 1,
+    removeOnComplete: 500,
+    removeOnFail: 500,
+  });
 }
 
-export function startCurrentInterestWorker() {
-  if (globalThis.__currentInterestWorker) {
-    return globalThis.__currentInterestWorker;
-  }
-
+export function createCurrentInterestWorker() {
   const worker = new Worker<CurrentInterestJobData>(
-    CURRENT_INTEREST_QUEUE_NAME,
+    QUEUE_NAME,
     async (job) => {
       await executeCurrentInterestProcessRun(job.data.processRunId);
     },
-    {
-      connection: getBullMqRedisConnection(),
-      concurrency: 1,
-    }
+    { connection: redisConnection, concurrency: 1 }
   );
 
   worker.on('failed', async (job, error) => {
@@ -40,6 +44,5 @@ export function startCurrentInterestWorker() {
       .where(eq(processRuns.id, processRunId));
   });
 
-  globalThis.__currentInterestWorker = worker;
   return worker;
 }

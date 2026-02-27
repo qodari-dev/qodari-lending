@@ -1,29 +1,33 @@
 import { executeBillingConceptsProcessRun } from '@/server/causation/billing-concepts-run';
 import type { BillingConceptsJobData } from '@/server/causation/types';
+import { redisConnection } from '@/server/clients/redis';
 import { db, processRuns } from '@/server/db';
-import { BILLING_CONCEPTS_QUEUE_NAME } from '@/server/queues/billing-concepts-queue';
-import { getBullMqRedisConnection } from '@/server/queues/redis';
-import { Worker } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import { eq } from 'drizzle-orm';
 
-declare global {
-  var __billingConceptsWorker: Worker<BillingConceptsJobData> | undefined;
+const QUEUE_NAME = 'causation-billing-concepts';
+const JOB_NAME = 'process-billing-concepts-run';
+
+export const billingConceptsQueue = new Queue<BillingConceptsJobData>(QUEUE_NAME, {
+  connection: redisConnection,
+});
+
+export async function enqueueBillingConceptsJob(data: BillingConceptsJobData) {
+  await billingConceptsQueue.add(JOB_NAME, data, {
+    jobId: `billing-concepts-run-${data.processRunId}`,
+    attempts: 1,
+    removeOnComplete: 500,
+    removeOnFail: 500,
+  });
 }
 
-export function startBillingConceptsWorker() {
-  if (globalThis.__billingConceptsWorker) {
-    return globalThis.__billingConceptsWorker;
-  }
-
+export function createBillingConceptsWorker() {
   const worker = new Worker<BillingConceptsJobData>(
-    BILLING_CONCEPTS_QUEUE_NAME,
+    QUEUE_NAME,
     async (job) => {
       await executeBillingConceptsProcessRun(job.data.processRunId);
     },
-    {
-      connection: getBullMqRedisConnection(),
-      concurrency: 1,
-    }
+    { connection: redisConnection, concurrency: 1 }
   );
 
   worker.on('failed', async (job, error) => {
@@ -40,6 +44,5 @@ export function startBillingConceptsWorker() {
       .where(eq(processRuns.id, processRunId));
   });
 
-  globalThis.__billingConceptsWorker = worker;
   return worker;
 }

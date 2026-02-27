@@ -1,29 +1,33 @@
 import { executeLateInterestProcessRun } from '@/server/causation/late-interest-run';
 import type { LateInterestJobData } from '@/server/causation/types';
+import { redisConnection } from '@/server/clients/redis';
 import { db, processRuns } from '@/server/db';
-import { LATE_INTEREST_QUEUE_NAME } from '@/server/queues/late-interest-queue';
-import { getBullMqRedisConnection } from '@/server/queues/redis';
-import { Worker } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import { eq } from 'drizzle-orm';
 
-declare global {
-  var __lateInterestWorker: Worker<LateInterestJobData> | undefined;
+const QUEUE_NAME = 'causation-late-interest';
+const JOB_NAME = 'process-late-interest-run';
+
+export const lateInterestQueue = new Queue<LateInterestJobData>(QUEUE_NAME, {
+  connection: redisConnection,
+});
+
+export async function enqueueLateInterestJob(data: LateInterestJobData) {
+  await lateInterestQueue.add(JOB_NAME, data, {
+    jobId: `late-interest-run-${data.processRunId}`,
+    attempts: 1,
+    removeOnComplete: 500,
+    removeOnFail: 500,
+  });
 }
 
-export function startLateInterestWorker() {
-  if (globalThis.__lateInterestWorker) {
-    return globalThis.__lateInterestWorker;
-  }
-
+export function createLateInterestWorker() {
   const worker = new Worker<LateInterestJobData>(
-    LATE_INTEREST_QUEUE_NAME,
+    QUEUE_NAME,
     async (job) => {
       await executeLateInterestProcessRun(job.data.processRunId);
     },
-    {
-      connection: getBullMqRedisConnection(),
-      concurrency: 1,
-    }
+    { connection: redisConnection, concurrency: 1 }
   );
 
   worker.on('failed', async (job, error) => {
@@ -40,6 +44,5 @@ export function startLateInterestWorker() {
       .where(eq(processRuns.id, processRunId));
   });
 
-  globalThis.__lateInterestWorker = worker;
   return worker;
 }

@@ -50,7 +50,7 @@ app.use('*', async (c, next) => {
 });
 
 const queueBoardApp = getQueueBoardApp();
-app.route('/api/queue', queueBoardApp);
+app.route('/api/queues', queueBoardApp);
 app.route('/', queueBoardApp);
 
 const handler = handle(app);

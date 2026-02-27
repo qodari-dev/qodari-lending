@@ -1,29 +1,33 @@
 import { executeCurrentInsuranceProcessRun } from '@/server/causation/current-insurance-run';
 import type { CurrentInsuranceJobData } from '@/server/causation/types';
+import { redisConnection } from '@/server/clients/redis';
 import { db, processRuns } from '@/server/db';
-import { CURRENT_INSURANCE_QUEUE_NAME } from '@/server/queues/current-insurance-queue';
-import { getBullMqRedisConnection } from '@/server/queues/redis';
-import { Worker } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import { eq } from 'drizzle-orm';
 
-declare global {
-  var __currentInsuranceWorker: Worker<CurrentInsuranceJobData> | undefined;
+const QUEUE_NAME = 'causation-current-insurance';
+const JOB_NAME = 'process-current-insurance-run';
+
+export const currentInsuranceQueue = new Queue<CurrentInsuranceJobData>(QUEUE_NAME, {
+  connection: redisConnection,
+});
+
+export async function enqueueCurrentInsuranceJob(data: CurrentInsuranceJobData) {
+  await currentInsuranceQueue.add(JOB_NAME, data, {
+    jobId: `current-insurance-run-${data.processRunId}`,
+    attempts: 1,
+    removeOnComplete: 500,
+    removeOnFail: 500,
+  });
 }
 
-export function startCurrentInsuranceWorker() {
-  if (globalThis.__currentInsuranceWorker) {
-    return globalThis.__currentInsuranceWorker;
-  }
-
+export function createCurrentInsuranceWorker() {
   const worker = new Worker<CurrentInsuranceJobData>(
-    CURRENT_INSURANCE_QUEUE_NAME,
+    QUEUE_NAME,
     async (job) => {
       await executeCurrentInsuranceProcessRun(job.data.processRunId);
     },
-    {
-      connection: getBullMqRedisConnection(),
-      concurrency: 1,
-    }
+    { connection: redisConnection, concurrency: 1 }
   );
 
   worker.on('failed', async (job, error) => {
@@ -40,6 +44,5 @@ export function startCurrentInsuranceWorker() {
       .where(eq(processRuns.id, processRunId));
   });
 
-  globalThis.__currentInsuranceWorker = worker;
   return worker;
 }

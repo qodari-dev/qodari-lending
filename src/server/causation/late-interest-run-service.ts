@@ -1,5 +1,5 @@
 import { accountingPeriods, creditProducts, db, loans, processRuns } from '@/server/db';
-import { enqueueLateInterestJob } from '@/server/queues/late-interest-queue';
+import { enqueueLateInterestJob } from '@/server/queues/late-interest';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { formatDateOnly } from '@/server/utils/value-utils';
 import { and, eq } from 'drizzle-orm';

@@ -1,5 +1,5 @@
 import { accountingPeriods, creditProducts, db, loans, processRuns } from '@/server/db';
-import { enqueueCurrentInsuranceJob } from '@/server/queues/current-insurance-queue';
+import { enqueueCurrentInsuranceJob } from '@/server/queues/current-insurance';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { formatDateOnly } from '@/server/utils/value-utils';
 import { and, eq } from 'drizzle-orm';

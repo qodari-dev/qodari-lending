@@ -7,7 +7,7 @@ import {
   loanInstallments,
   loans,
 } from '@/server/db';
-import { enqueueAgreementBillingEmailJob } from '@/server/queues/agreement-billing-email-queue';
+import { enqueueAgreementBillingEmailJob } from '@/server/queues/agreement-billing-email';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';

@@ -3,13 +3,13 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { HonoAdapter } from '@bull-board/hono';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
-import { getAgreementBillingEmailQueueInstance } from './agreement-billing-email-queue';
-import { getBillingConceptsQueueInstance } from './billing-concepts-queue';
-import { getCurrentInsuranceQueueInstance } from './current-insurance-queue';
-import { getCurrentInterestQueueInstance } from './current-interest-queue';
-import { getLateInterestQueueInstance } from './late-interest-queue';
+import { agreementBillingEmailQueue } from './agreement-billing-email';
+import { billingConceptsQueue } from './billing-concepts';
+import { currentInsuranceQueue } from './current-insurance';
+import { currentInterestQueue } from './current-interest';
+import { lateInterestQueue } from './late-interest';
 
-const QUEUE_BOARD_BASE_PATH = '/api/queue';
+const QUEUE_BOARD_BASE_PATH = '/api/queues';
 
 declare global {
   var __queueBoardApp: Hono | undefined;
@@ -21,11 +21,11 @@ function buildQueueBoardApp() {
 
   createBullBoard({
     queues: [
-      new BullMQAdapter(getAgreementBillingEmailQueueInstance()),
-      new BullMQAdapter(getBillingConceptsQueueInstance()),
-      new BullMQAdapter(getCurrentInterestQueueInstance()),
-      new BullMQAdapter(getCurrentInsuranceQueueInstance()),
-      new BullMQAdapter(getLateInterestQueueInstance()),
+      new BullMQAdapter(agreementBillingEmailQueue),
+      new BullMQAdapter(billingConceptsQueue),
+      new BullMQAdapter(currentInterestQueue),
+      new BullMQAdapter(currentInsuranceQueue),
+      new BullMQAdapter(lateInterestQueue),
     ],
     serverAdapter,
     options: {

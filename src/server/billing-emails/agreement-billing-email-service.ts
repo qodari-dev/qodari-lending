@@ -1,4 +1,4 @@
-import { sendResendEmail } from '@/server/billing-emails/resend-client';
+import { sendResendEmail } from '@/server/clients/resend';
 import {
   agreementBillingEmailDispatches,
   billingCycleProfileCycles,

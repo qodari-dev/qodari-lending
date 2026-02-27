@@ -20,25 +20,9 @@ type SendResendEmailResult = {
   id: string;
 };
 
-declare global {
-  var __resendSdkClient: Resend | undefined;
-}
-
-function getResendClient() {
-  const apiKey = env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error('RESEND_API_KEY no configurado');
-  }
-
-  if (!globalThis.__resendSdkClient) {
-    globalThis.__resendSdkClient = new Resend(apiKey);
-  }
-
-  return globalThis.__resendSdkClient;
-}
+const resend = new Resend(env.RESEND_API_KEY);
 
 export async function sendResendEmail(input: SendResendEmailInput): Promise<SendResendEmailResult> {
-  const resend = getResendClient();
   const response = await resend.emails.send({
     from: input.from,
     to: input.to,

@@ -2,6 +2,8 @@ import { env } from '@/env';
 import { UnifiedAuthContext } from './auth-context';
 import { iamClient } from '@/iam/clients/iam-m2m-client';
 import { CreateAuditLogBody } from '@/iam/clients/types';
+import { creditsSettings, db } from '@/server/db';
+import { eq } from 'drizzle-orm';
 
 export type AuditLogParams = {
   accountId?: string;
@@ -41,6 +43,51 @@ export type AuditLogParams = {
   metadata?: Record<string, unknown>;
 };
 
+const AUDIT_ENABLED_CACHE_TTL_MS = 30_000;
+let auditEnabledCache:
+  | {
+      value: boolean;
+      expiresAt: number;
+    }
+  | null = null;
+let auditEnabledPromise: Promise<boolean> | null = null;
+
+async function isAuditTransactionsEnabled(): Promise<boolean> {
+  const now = Date.now();
+  if (auditEnabledCache && now < auditEnabledCache.expiresAt) {
+    return auditEnabledCache.value;
+  }
+
+  if (auditEnabledPromise) {
+    return auditEnabledPromise;
+  }
+
+  auditEnabledPromise = (async () => {
+    try {
+      const settings = await db.query.creditsSettings.findFirst({
+        where: eq(creditsSettings.appSlug, env.IAM_APP_SLUG),
+        columns: {
+          auditTransactionsEnabled: true,
+        },
+      });
+
+      const enabled = settings?.auditTransactionsEnabled ?? false;
+      auditEnabledCache = {
+        value: enabled,
+        expiresAt: Date.now() + AUDIT_ENABLED_CACHE_TTL_MS,
+      };
+      return enabled;
+    } catch {
+      // Si no podemos leer configuración, no bloqueamos auditoría.
+      return true;
+    } finally {
+      auditEnabledPromise = null;
+    }
+  })();
+
+  return auditEnabledPromise;
+}
+
 /**
  * Log audit event to IAM service (non-blocking)
  * This function will not throw errors - audit failures should not break main operations
@@ -50,6 +97,8 @@ export async function logAudit(
   params: AuditLogParams
 ): Promise<void> {
   if (!session) return;
+  const auditEnabled = await isAuditTransactionsEnabled();
+  if (!auditEnabled) return;
 
   // Build the payload for IAM audit endpoint
   const auditData: CreateAuditLogBody = {

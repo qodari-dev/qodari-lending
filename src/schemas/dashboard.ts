@@ -90,6 +90,18 @@ export const DashboardLoanTrendPointSchema = z.object({
   totalAmount: z.number().nonnegative(),
 });
 
+export const DashboardApproverSummarySchema = z.object({
+  userId: z.string().uuid(),
+  userName: z.string().min(1),
+  assignedCount: z.number().int().nonnegative(),
+  workedCount: z.number().int().nonnegative(),
+  approvedFinalCount: z.number().int().nonnegative(),
+  forwardedCount: z.number().int().nonnegative(),
+  rejectedCount: z.number().int().nonnegative(),
+  canceledCount: z.number().int().nonnegative(),
+  pendingCount: z.number().int().nonnegative(),
+});
+
 export const DashboardSummaryResponseSchema = z.object({
   period: DashboardPeriodSchema,
   applications: z.object({
@@ -124,6 +136,13 @@ export const DashboardSummaryResponseSchema = z.object({
     approvedAmountTotal: z.number().nonnegative(),
     byCategory: z.array(DashboardLoanCategorySummarySchema),
     trendLast12Months: z.array(DashboardLoanTrendPointSchema),
+  }),
+  approvals: z.object({
+    totalAssignedCount: z.number().int().nonnegative(),
+    totalWorkedCount: z.number().int().nonnegative(),
+    totalApprovedFinalCount: z.number().int().nonnegative(),
+    totalPendingCount: z.number().int().nonnegative(),
+    byUser: z.array(DashboardApproverSummarySchema),
   }),
 });
 

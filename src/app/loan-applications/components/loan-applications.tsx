@@ -37,6 +37,7 @@ import {
 } from '@/schemas/loan-application';
 import { RowData, TableMeta } from '@tanstack/react-table';
 import React from 'react';
+import { LoanApplicationApprovalLoadSheet } from './loan-application-approval-load-sheet';
 import { loanApplicationColumns } from './loan-application-columns';
 import { LoanApplicationForm } from './loan-application-form';
 import { loanApplicationExportConfig } from './loan-application-export-config';
@@ -163,6 +164,7 @@ export function LoanApplications() {
   >('TO_USER');
   const [singleToAssignedUserId, setSingleToAssignedUserId] = React.useState<string>('');
   const [singleReassignNote, setSingleReassignNote] = React.useState('');
+  const [openedLoadSheet, setOpenedLoadSheet] = React.useState(false);
 
   const handleCreate = React.useCallback(() => {
     setLoanApplication(undefined);
@@ -309,6 +311,7 @@ export function LoanApplications() {
               onReset={resetFilters}
               onCreate={handleCreate}
               onReassign={handleOpenReassign}
+              onApprovalLoad={() => setOpenedLoadSheet(true)}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
               exportActions={
@@ -330,6 +333,10 @@ export function LoanApplications() {
         loanApplication={loanApplication}
         opened={openedFormSheet}
         onOpened={handleFormSheetChange}
+      />
+      <LoanApplicationApprovalLoadSheet
+        opened={openedLoadSheet}
+        onOpened={setOpenedLoadSheet}
       />
 
       <Dialog

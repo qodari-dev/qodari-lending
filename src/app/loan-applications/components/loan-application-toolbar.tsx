@@ -12,7 +12,7 @@ import {
 } from '@/components/data-table/data-table-faceted-filter';
 import { Input } from '@/components/ui/input';
 import { useHasPermission } from '@/stores/auth-store-provider';
-import { Repeat, Plus, RefreshCw, X } from 'lucide-react';
+import { Repeat, Plus, RefreshCw, Users, X } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import * as React from 'react';
 
@@ -30,6 +30,7 @@ interface ToolbarProps {
   onRefresh?: () => void;
   onCreate?: () => void;
   onReassign?: () => void;
+  onApprovalLoad?: () => void;
   exportActions?: React.ReactNode;
   isRefreshing?: boolean;
 }
@@ -48,6 +49,7 @@ export function LoanApplicationsToolbar({
   onRefresh,
   onCreate,
   onReassign,
+  onApprovalLoad,
   exportActions,
   isRefreshing = false,
 }: ToolbarProps) {
@@ -114,6 +116,19 @@ export function LoanApplicationsToolbar({
           <Button type="button" variant="outline" size="sm" onClick={onReassign} className="h-9">
             <Repeat className="mr-2 h-4 w-4" />
             Reasignar
+          </Button>
+        )}
+
+        {onApprovalLoad && canApprove && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onApprovalLoad}
+            className="h-9"
+          >
+            <Users className="mr-2 h-4 w-4" />
+            Carga
           </Button>
         )}
 

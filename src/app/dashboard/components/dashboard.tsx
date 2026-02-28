@@ -104,6 +104,25 @@ const trendChartConfig = {
   },
 } satisfies ChartConfig;
 
+const approvalsChartConfig = {
+  approvedFinalCount: {
+    label: 'Aprobacion final',
+    color: 'var(--chart-1)',
+  },
+  forwardedCount: {
+    label: 'Escaladas',
+    color: 'var(--chart-2)',
+  },
+  rejectedCount: {
+    label: 'Rechazadas',
+    color: 'var(--chart-3)',
+  },
+  canceledCount: {
+    label: 'Canceladas',
+    color: 'var(--chart-5)',
+  },
+} satisfies ChartConfig;
+
 function formatPeriodLabel(year: number, month: number): string {
   return `${MONTH_LABELS[month]} ${year}`;
 }
@@ -114,6 +133,12 @@ function formatMoney(value: number, decimals = 0): string {
     locale: 'es-CO',
     decimals,
   });
+}
+
+function formatApproverLabel(value: string): string {
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 2) return value;
+  return words.slice(0, 2).join(' ');
 }
 
 export function Dashboard() {
@@ -202,6 +227,18 @@ export function Dashboard() {
       label: item.label,
       amount: item.totalAmount,
       count: item.totalCount,
+    }));
+  }, [summary]);
+
+  const approvalsChartData = React.useMemo(() => {
+    if (!summary) return [];
+
+    return summary.approvals.byUser.slice(0, 8).map((item) => ({
+      userLabel: formatApproverLabel(item.userName),
+      approvedFinalCount: item.approvedFinalCount,
+      forwardedCount: item.forwardedCount,
+      rejectedCount: item.rejectedCount,
+      canceledCount: item.canceledCount,
     }));
   }, [summary]);
 
@@ -364,6 +401,163 @@ export function Dashboard() {
                 </CardHeader>
                 <CardContent className="text-muted-foreground text-xs">
                   Cambios de estado en el periodo
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Asignaciones a aprobadores</CardDescription>
+                  <CardTitle>{formatNumber(summary.approvals.totalAssignedCount, 0)}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-xs">
+                  Eventos de asignacion y reasignacion del periodo
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Solicitudes trabajadas</CardDescription>
+                  <CardTitle>{formatNumber(summary.approvals.totalWorkedCount, 0)}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-xs">
+                  Decisiones tomadas por aprobadores en el periodo
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Aprobaciones finales</CardDescription>
+                  <CardTitle>{formatNumber(summary.approvals.totalApprovedFinalCount, 0)}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-xs">
+                  Solicitudes cerradas como aprobadas
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Pendientes asignadas</CardDescription>
+                  <CardTitle>{formatNumber(summary.approvals.totalPendingCount, 0)}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-xs">
+                  Cola actual de solicitudes creadas en el periodo
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Desempeno de aprobadores</CardTitle>
+                  <CardDescription>
+                    Resultados por usuario segun acciones registradas en el periodo
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {approvalsChartData.length ? (
+                    <ChartContainer config={approvalsChartConfig} className="h-[320px] w-full">
+                      <BarChart data={approvalsChartData} layout="vertical" margin={{ left: 12 }}>
+                        <CartesianGrid horizontal={false} />
+                        <XAxis type="number" allowDecimals={false} />
+                        <YAxis
+                          type="category"
+                          dataKey="userLabel"
+                          tickLine={false}
+                          axisLine={false}
+                          width={120}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar
+                          dataKey="approvedFinalCount"
+                          stackId="work"
+                          fill="var(--color-approvedFinalCount)"
+                        />
+                        <Bar
+                          dataKey="forwardedCount"
+                          stackId="work"
+                          fill="var(--color-forwardedCount)"
+                        />
+                        <Bar
+                          dataKey="rejectedCount"
+                          stackId="work"
+                          fill="var(--color-rejectedCount)"
+                        />
+                        <Bar
+                          dataKey="canceledCount"
+                          stackId="work"
+                          fill="var(--color-canceledCount)"
+                          radius={[0, 4, 4, 0]}
+                        />
+                      </BarChart>
+                    </ChartContainer>
+                  ) : (
+                    <div className="text-muted-foreground flex h-[320px] items-center justify-center text-sm">
+                      No hay actividad de aprobadores en el periodo
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Detalle por aprobador</CardTitle>
+                  <CardDescription>
+                    Asignadas y trabajadas se cuentan por eventos del periodo
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Usuario</TableHead>
+                        <TableHead className="text-right">Asignadas</TableHead>
+                        <TableHead className="text-right">Trabajadas</TableHead>
+                        <TableHead className="text-right">Aprobo final</TableHead>
+                        <TableHead className="text-right">Escalo</TableHead>
+                        <TableHead className="text-right">Rechazo</TableHead>
+                        <TableHead className="text-right">Cancelo</TableHead>
+                        <TableHead className="text-right">Pendientes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {summary.approvals.byUser.length ? (
+                        summary.approvals.byUser.map((item) => (
+                          <TableRow key={item.userId}>
+                            <TableCell>{item.userName}</TableCell>
+                            <TableCell className="text-right">
+                              {formatNumber(item.assignedCount, 0)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatNumber(item.workedCount, 0)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumber(item.approvedFinalCount, 0)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumber(item.forwardedCount, 0)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumber(item.rejectedCount, 0)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumber(item.canceledCount, 0)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumber(item.pendingCount, 0)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-muted-foreground text-center">
+                            No hay actividad de aprobadores en el periodo
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </div>

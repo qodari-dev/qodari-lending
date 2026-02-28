@@ -22,6 +22,9 @@ export const loanApplicationsKeys = {
   details: () => [...loanApplicationsKeys.all, 'detail'] as const,
   detail: (id: number) => [...loanApplicationsKeys.details(), id] as const,
 
+  approvalLoad: () => [...loanApplicationsKeys.all, 'approval-load'] as const,
+  approvalLoadDetail: (levelId: number) => [...loanApplicationsKeys.approvalLoad(), levelId] as const,
+
   inbox: () => [...loanApplicationsKeys.all, 'inbox'] as const,
   inboxList: (filters: Partial<ListLoanApplicationInboxQuery> = {}) =>
     [...loanApplicationsKeys.inbox(), filters] as const,
@@ -81,6 +84,16 @@ export function useLoanApplication(
       query: { include: options?.include ?? defaultQuery().include },
     },
     enabled: options?.enabled ?? !!id,
+  });
+}
+
+export function useLoanApplicationApprovalLoad(levelId?: number, options?: { enabled?: boolean }) {
+  return api.loanApplication.approvalLoad.useQuery({
+    queryKey: loanApplicationsKeys.approvalLoadDetail(levelId ?? 0),
+    queryData: {
+      query: { levelId: levelId ?? 0 },
+    },
+    enabled: (options?.enabled ?? true) && typeof levelId === 'number' && levelId > 0,
   });
 }
 

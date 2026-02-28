@@ -115,6 +115,36 @@ export const ListLoanApplicationActNumbersQuerySchema = z.object({
   limit: z.number().int().positive().max(100).optional(),
 });
 
+export const GetLoanApplicationApprovalLoadQuerySchema = z.object({
+  levelId: z.number().int().positive(),
+});
+
+export const LoanApplicationApprovalLoadItemSchema = z.object({
+  loanApplicationId: z.number().int().positive(),
+  creditNumber: z.string().min(1),
+  requestedAmount: z.number().nonnegative(),
+  applicationDate: z.string().min(1),
+  assignedAt: z.string().min(1).nullable(),
+  pendingDays: z.number().int().nonnegative(),
+});
+
+export const LoanApplicationApprovalLoadUserSchema = z.object({
+  userId: z.string().uuid(),
+  userName: z.string().min(1),
+  pendingCount: z.number().int().nonnegative(),
+  oldestAssignedAt: z.string().min(1).nullable(),
+  oldestPendingDays: z.number().int().nonnegative(),
+  applications: z.array(LoanApplicationApprovalLoadItemSchema),
+});
+
+export const LoanApplicationApprovalLoadResponseSchema = z.object({
+  levelId: z.number().int().positive(),
+  levelName: z.string().min(1),
+  levelOrder: z.number().int().positive(),
+  totalPendingCount: z.number().int().nonnegative(),
+  users: z.array(LoanApplicationApprovalLoadUserSchema),
+});
+
 function isValidDecimal(value: string | null | undefined): boolean {
   if (value === null || value === undefined) return false;
   if (value.trim() === '') return false;
@@ -372,5 +402,9 @@ export type LoanApplicationSortField = (typeof LOAN_APPLICATION_SORT_FIELDS)[num
 export type LoanApplicationInclude = (typeof LOAN_APPLICATION_INCLUDE_OPTIONS)[number];
 export type LoanApplicationActNumbersList = ClientInferResponseBody<
   Contract['loanApplication']['listActNumbers'],
+  200
+>;
+export type LoanApplicationApprovalLoad = ClientInferResponseBody<
+  Contract['loanApplication']['approvalLoad'],
   200
 >;

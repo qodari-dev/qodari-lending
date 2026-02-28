@@ -7,6 +7,7 @@ import {
   creditFunds,
   db,
   investmentTypes,
+  loanApplicationApprovalHistory,
   loanApplicationStatusHistory,
   loanApplications,
   loanPaymentMethodAllocations,
@@ -152,6 +153,9 @@ async function calculateDashboardSummary(accountingPeriodId: number): Promise<Da
     applicationsByChannelRows,
     applicationsByInvestmentTypeRows,
     topRejectionReasonResult,
+    approvalAssignmentsResult,
+    approvalActionsResult,
+    pendingApprovalsResult,
     collectionTotalsRows,
     collectionByMethodRows,
     fundRows,
@@ -267,6 +271,65 @@ async function calculateDashboardSummary(accountingPeriodId: number): Promise<Da
       GROUP BY rr.id, rr.name
       ORDER BY COUNT(*) DESC, rr.name ASC
       LIMIT 5
+    `),
+
+    db.execute(sql<{
+      userId: string | null;
+      userName: string | null;
+      assignedCount: number;
+    }>`
+      SELECT
+        laah.assigned_to_user_id AS "userId",
+        COALESCE(NULLIF(TRIM(laah.assigned_to_user_name), ''), laah.assigned_to_user_id::text, 'Sin usuario') AS "userName",
+        COUNT(*)::int AS "assignedCount"
+      FROM ${loanApplicationApprovalHistory} laah
+      WHERE laah.action IN ('ASSIGNED', 'REASSIGNED')
+        AND laah.assigned_to_user_id IS NOT NULL
+        AND laah.occurred_at >= ${periodStartAt}
+        AND laah.occurred_at < ${periodNextStartAt}
+      GROUP BY laah.assigned_to_user_id, laah.assigned_to_user_name
+    `),
+
+    db.execute(sql<{
+      userId: string | null;
+      userName: string | null;
+      workedCount: number;
+      approvedFinalCount: number;
+      forwardedCount: number;
+      rejectedCount: number;
+      canceledCount: number;
+    }>`
+      SELECT
+        laah.actor_user_id AS "userId",
+        COALESCE(NULLIF(TRIM(laah.actor_user_name), ''), laah.actor_user_id::text, 'Sin usuario') AS "userName",
+        COUNT(*)::int AS "workedCount",
+        COUNT(*) FILTER (WHERE laah.action = 'APPROVED_FINAL')::int AS "approvedFinalCount",
+        COUNT(*) FILTER (WHERE laah.action = 'APPROVED_FORWARD')::int AS "forwardedCount",
+        COUNT(*) FILTER (WHERE laah.action = 'REJECTED')::int AS "rejectedCount",
+        COUNT(*) FILTER (WHERE laah.action = 'CANCELED')::int AS "canceledCount"
+      FROM ${loanApplicationApprovalHistory} laah
+      WHERE laah.action IN ('APPROVED_FORWARD', 'APPROVED_FINAL', 'REJECTED', 'CANCELED')
+        AND laah.actor_user_id IS NOT NULL
+        AND laah.occurred_at >= ${periodStartAt}
+        AND laah.occurred_at < ${periodNextStartAt}
+      GROUP BY laah.actor_user_id, laah.actor_user_name
+    `),
+
+    db.execute(sql<{
+      userId: string | null;
+      userName: string | null;
+      pendingCount: number;
+    }>`
+      SELECT
+        la.assigned_approval_user_id AS "userId",
+        COALESCE(NULLIF(TRIM(la.assigned_approval_user_name), ''), la.assigned_approval_user_id::text, 'Sin usuario') AS "userName",
+        COUNT(*)::int AS "pendingCount"
+      FROM ${loanApplications} la
+      WHERE la.status = 'PENDING'
+        AND la.assigned_approval_user_id IS NOT NULL
+        AND la.application_date >= ${periodStart}
+        AND la.application_date < ${periodNextStart}
+      GROUP BY la.assigned_approval_user_id, la.assigned_approval_user_name
     `),
 
     db
@@ -402,6 +465,90 @@ async function calculateDashboardSummary(accountingPeriodId: number): Promise<Da
       total: toInteger(row.total),
     })
   );
+
+  const approvalsByUserMap = new Map<
+    string,
+    {
+      userId: string;
+      userName: string;
+      assignedCount: number;
+      workedCount: number;
+      approvedFinalCount: number;
+      forwardedCount: number;
+      rejectedCount: number;
+      canceledCount: number;
+      pendingCount: number;
+    }
+  >();
+
+  function ensureApproverSummary(userId: string, userName: string) {
+    const existing = approvalsByUserMap.get(userId);
+
+    if (existing) {
+      if (!existing.userName || existing.userName === existing.userId) {
+        existing.userName = userName;
+      }
+      return existing;
+    }
+
+    const created = {
+      userId,
+      userName,
+      assignedCount: 0,
+      workedCount: 0,
+      approvedFinalCount: 0,
+      forwardedCount: 0,
+      rejectedCount: 0,
+      canceledCount: 0,
+      pendingCount: 0,
+    };
+
+    approvalsByUserMap.set(userId, created);
+    return created;
+  }
+
+  for (const row of approvalAssignmentsResult.rows as Array<Record<string, unknown>>) {
+    const userId = toSafeString(row.userId);
+    if (!userId) continue;
+
+    const entry = ensureApproverSummary(userId, toSafeString(row.userName, userId));
+    entry.assignedCount = toInteger(row.assignedCount);
+  }
+
+  for (const row of approvalActionsResult.rows as Array<Record<string, unknown>>) {
+    const userId = toSafeString(row.userId);
+    if (!userId) continue;
+
+    const entry = ensureApproverSummary(userId, toSafeString(row.userName, userId));
+    entry.workedCount = toInteger(row.workedCount);
+    entry.approvedFinalCount = toInteger(row.approvedFinalCount);
+    entry.forwardedCount = toInteger(row.forwardedCount);
+    entry.rejectedCount = toInteger(row.rejectedCount);
+    entry.canceledCount = toInteger(row.canceledCount);
+  }
+
+  for (const row of pendingApprovalsResult.rows as Array<Record<string, unknown>>) {
+    const userId = toSafeString(row.userId);
+    if (!userId) continue;
+
+    const entry = ensureApproverSummary(userId, toSafeString(row.userName, userId));
+    entry.pendingCount = toInteger(row.pendingCount);
+  }
+
+  const approvalsByUser = Array.from(approvalsByUserMap.values()).sort((a, b) => {
+    if (b.workedCount !== a.workedCount) return b.workedCount - a.workedCount;
+    if (b.assignedCount !== a.assignedCount) return b.assignedCount - a.assignedCount;
+    if (b.pendingCount !== a.pendingCount) return b.pendingCount - a.pendingCount;
+    return a.userName.localeCompare(b.userName, 'es');
+  });
+
+  const totalAssignedCount = approvalsByUser.reduce((acc, row) => acc + row.assignedCount, 0);
+  const totalWorkedCount = approvalsByUser.reduce((acc, row) => acc + row.workedCount, 0);
+  const totalApprovedFinalCount = approvalsByUser.reduce(
+    (acc, row) => acc + row.approvedFinalCount,
+    0
+  );
+  const totalPendingCount = approvalsByUser.reduce((acc, row) => acc + row.pendingCount, 0);
 
   const applicationsByChannel = applicationsByChannelRows.map((row) => ({
     channelId: toNullableInteger(row.channelId),
@@ -554,6 +701,13 @@ async function calculateDashboardSummary(accountingPeriodId: number): Promise<Da
       approvedAmountTotal: approvedLoansAmountTotal,
       byCategory: loansByCategory,
       trendLast12Months,
+    },
+    approvals: {
+      totalAssignedCount,
+      totalWorkedCount,
+      totalApprovedFinalCount,
+      totalPendingCount,
+      byUser: approvalsByUser,
     },
   };
 }

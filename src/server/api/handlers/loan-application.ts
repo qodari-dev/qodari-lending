@@ -15,6 +15,7 @@ import {
   loanApplicationPledges,
   loanApplicationApprovalHistory,
   loanApplicationRiskAssessments,
+  loanApprovalLevels,
   loanApprovalLevelUsers,
   loanApplications,
   loanAgreementHistory,
@@ -487,6 +488,16 @@ async function ensureUniqueCreditNumber(prefix: string) {
   });
 }
 
+function toIsoDateTimeString(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toISOString();
+  }
+  return null;
+}
+
 export const loanApplication = tsr.router(contract.loanApplication, {
   list: async ({ query }, { request, appRoute }) => {
     try {
@@ -695,6 +706,242 @@ export const loanApplication = tsr.router(contract.loanApplication, {
     } catch (e) {
       return genericTsRestErrorResponse(e, {
         genericMsg: `Error al obtener solicitud de credito ${id}`,
+      });
+    }
+  },
+
+  approvalLoad: async ({ query }, { request, appRoute }) => {
+    let session: UnifiedAuthContext | undefined;
+
+    try {
+      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({
+          status: 401,
+          message: 'Not authenticated',
+          code: 'UNAUTHENTICATED',
+        });
+      }
+
+      const { userId, userName } = getRequiredUserContext(session);
+
+      await db.transaction(async (tx) => {
+        const unassignedPending = await tx.query.loanApplications.findMany({
+          where: and(
+            eq(loanApplications.status, 'PENDING'),
+            or(
+              isNull(loanApplications.currentApprovalLevelId),
+              isNull(loanApplications.targetApprovalLevelId),
+              isNull(loanApplications.assignedApprovalUserId)
+            )
+          ),
+          columns: {
+            id: true,
+            status: true,
+            requestedAmount: true,
+            currentApprovalLevelId: true,
+            targetApprovalLevelId: true,
+            assignedApprovalUserId: true,
+            assignedApprovalUserName: true,
+          },
+          orderBy: [asc(loanApplications.createdAt), asc(loanApplications.id)],
+          limit: 250,
+        });
+
+        for (const application of unassignedPending) {
+          await ensurePendingAssignment(
+            tx,
+            application,
+            {
+              userId,
+              userName: userName || userId,
+            }
+          );
+        }
+      });
+
+      const level = await db.query.loanApprovalLevels.findFirst({
+        where: eq(loanApprovalLevels.id, query.levelId),
+        columns: {
+          id: true,
+          name: true,
+          levelOrder: true,
+          isActive: true,
+        },
+      });
+
+      if (!level) {
+        throwHttpError({
+          status: 404,
+          message: 'Nivel de aprobacion no encontrado',
+          code: 'NOT_FOUND',
+        });
+      }
+
+      const [levelUsers, pendingApplicationsResult] = await Promise.all([
+        db.query.loanApprovalLevelUsers.findMany({
+          where: and(
+            eq(loanApprovalLevelUsers.loanApprovalLevelId, level.id),
+            eq(loanApprovalLevelUsers.isActive, true)
+          ),
+          columns: {
+            userId: true,
+            userName: true,
+            sortOrder: true,
+          },
+          orderBy: [asc(loanApprovalLevelUsers.sortOrder), asc(loanApprovalLevelUsers.id)],
+        }),
+        db.execute(sql<{
+          loanApplicationId: number;
+          creditNumber: string;
+          requestedAmount: string;
+          applicationDate: string | Date;
+          assignedAt: string | Date | null;
+          pendingDays: number;
+          userId: string | null;
+          userName: string | null;
+        }>`
+          WITH last_assignment AS (
+            SELECT DISTINCT ON (laah.loan_application_id)
+              laah.loan_application_id AS "loanApplicationId",
+              laah.occurred_at AS "assignedAt"
+            FROM ${loanApplicationApprovalHistory} laah
+            WHERE laah.action IN ('ASSIGNED', 'REASSIGNED')
+            ORDER BY laah.loan_application_id, laah.occurred_at DESC, laah.id DESC
+          )
+          SELECT
+            la.id AS "loanApplicationId",
+            la.credit_number AS "creditNumber",
+            la.requested_amount::text AS "requestedAmount",
+            la.application_date AS "applicationDate",
+            COALESCE(last_assignment."assignedAt", la.updated_at, la.created_at) AS "assignedAt",
+            GREATEST(
+              0,
+              CURRENT_DATE - COALESCE(last_assignment."assignedAt"::date, la.updated_at::date, la.created_at::date)
+            )::int AS "pendingDays",
+            la.assigned_approval_user_id AS "userId",
+            COALESCE(
+              NULLIF(TRIM(la.assigned_approval_user_name), ''),
+              la.assigned_approval_user_id::text,
+              'Sin usuario'
+            ) AS "userName"
+          FROM ${loanApplications} la
+          LEFT JOIN last_assignment
+            ON last_assignment."loanApplicationId" = la.id
+          WHERE la.status = 'PENDING'
+            AND la.current_approval_level_id = ${level.id}
+            AND la.assigned_approval_user_id IS NOT NULL
+          ORDER BY
+            COALESCE(NULLIF(TRIM(la.assigned_approval_user_name), ''), la.assigned_approval_user_id::text),
+            COALESCE(last_assignment."assignedAt", la.updated_at, la.created_at) ASC,
+            la.application_date ASC,
+            la.id ASC
+        `),
+      ]);
+
+      const usersMap = new Map<
+        string,
+        {
+          userId: string;
+          userName: string;
+          pendingCount: number;
+          oldestAssignedAt: string | null;
+          oldestPendingDays: number;
+          applications: Array<{
+            loanApplicationId: number;
+            creditNumber: string;
+            requestedAmount: number;
+            applicationDate: string;
+            assignedAt: string | null;
+            pendingDays: number;
+          }>;
+        }
+      >();
+
+      for (const levelUser of levelUsers) {
+        usersMap.set(levelUser.userId, {
+          userId: levelUser.userId,
+          userName: levelUser.userName,
+          pendingCount: 0,
+          oldestAssignedAt: null,
+          oldestPendingDays: 0,
+          applications: [],
+        });
+      }
+
+      for (const row of pendingApplicationsResult.rows as Array<Record<string, unknown>>) {
+        const assignedUserId = typeof row.userId === 'string' ? row.userId : null;
+        if (!assignedUserId) continue;
+
+        const entry =
+          usersMap.get(assignedUserId) ??
+          {
+            userId: assignedUserId,
+            userName:
+              typeof row.userName === 'string' && row.userName.trim()
+                ? row.userName
+                : assignedUserId,
+            pendingCount: 0,
+            oldestAssignedAt: null,
+            oldestPendingDays: 0,
+            applications: [],
+          };
+
+        const assignedAt = toIsoDateTimeString(row.assignedAt);
+        const pendingDays = typeof row.pendingDays === 'number' ? row.pendingDays : 0;
+
+        entry.applications.push({
+          loanApplicationId: Number(row.loanApplicationId),
+          creditNumber: String(row.creditNumber),
+          requestedAmount:
+            typeof row.requestedAmount === 'number' || typeof row.requestedAmount === 'string'
+              ? toNumber(row.requestedAmount)
+              : 0,
+          applicationDate:
+            typeof row.applicationDate === 'string'
+              ? row.applicationDate
+              : formatDateOnly(row.applicationDate as Date),
+          assignedAt,
+          pendingDays,
+        });
+
+        usersMap.set(assignedUserId, entry);
+      }
+
+      const users = Array.from(usersMap.values())
+        .map((user) => {
+          const oldestItem = user.applications[0] ?? null;
+
+          return {
+            ...user,
+            pendingCount: user.applications.length,
+            oldestAssignedAt: oldestItem?.assignedAt ?? null,
+            oldestPendingDays: oldestItem?.pendingDays ?? 0,
+          };
+        })
+        .sort((a, b) => {
+          if (b.pendingCount !== a.pendingCount) return b.pendingCount - a.pendingCount;
+          if (b.oldestPendingDays !== a.oldestPendingDays) {
+            return b.oldestPendingDays - a.oldestPendingDays;
+          }
+          return a.userName.localeCompare(b.userName, 'es');
+        });
+
+      const totalPendingCount = users.reduce((acc, user) => acc + user.pendingCount, 0);
+
+      return {
+        status: 200 as const,
+        body: {
+          levelId: level.id,
+          levelName: level.name,
+          levelOrder: level.levelOrder,
+          totalPendingCount,
+          users,
+        },
+      };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: `Error al consultar carga del nivel de aprobacion ${query.levelId}`,
       });
     }
   },

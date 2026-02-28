@@ -130,19 +130,8 @@ export const thirdPartyType = tsr.router(contract.thirdPartyType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newThirdPartyType = await db.transaction(async (tx) => {
-        const [newThirdPartyType] = await tx.insert(thirdPartyTypes).values(body).returning();
-
-        return newThirdPartyType;
-      });
+      const [newThirdPartyType] = await db.insert(thirdPartyTypes).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -190,13 +179,6 @@ export const thirdPartyType = tsr.router(contract.thirdPartyType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.thirdPartyTypes.findFirst({
         where: eq(thirdPartyTypes.id, id),
@@ -210,15 +192,11 @@ export const thirdPartyType = tsr.router(contract.thirdPartyType, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(thirdPartyTypes)
-          .set(body)
-          .where(eq(thirdPartyTypes.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db
+        .update(thirdPartyTypes)
+        .set(body)
+        .where(eq(thirdPartyTypes.id, id))
+        .returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -270,13 +248,6 @@ export const thirdPartyType = tsr.router(contract.thirdPartyType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.thirdPartyTypes.findFirst({
         where: eq(thirdPartyTypes.id, id),

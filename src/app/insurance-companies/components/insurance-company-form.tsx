@@ -157,7 +157,7 @@ export function InsuranceCompanyForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateInsuranceCompany();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateInsuranceCompany();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

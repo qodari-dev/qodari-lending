@@ -250,24 +250,13 @@ export const thirdParty = tsr.router(contract.thirdParty, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const payload = resolveThirdPartyContactPayload(body);
 
-      const newThirdParty = await db.transaction(async (tx) => {
-        const [newThirdParty] = await tx
-          .insert(thirdParties)
-          .values(payload as typeof thirdParties.$inferInsert)
-          .returning();
-
-        return newThirdParty;
-      });
+      const [newThirdParty] = await db
+        .insert(thirdParties)
+        .values(payload as typeof thirdParties.$inferInsert)
+        .returning();
 
       const label = newThirdParty.personType === 'NATURAL'
         ? `${newThirdParty.firstName} ${newThirdParty.firstLastName}`
@@ -319,13 +308,6 @@ export const thirdParty = tsr.router(contract.thirdParty, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.thirdParties.findFirst({
         where: eq(thirdParties.id, id),
@@ -341,15 +323,11 @@ export const thirdParty = tsr.router(contract.thirdParty, {
 
       const payload = resolveThirdPartyContactPayload(body, existing);
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(thirdParties)
-          .set(payload)
-          .where(eq(thirdParties.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db
+        .update(thirdParties)
+        .set(payload)
+        .where(eq(thirdParties.id, id))
+        .returning();
 
       const label = existing.personType === 'NATURAL'
         ? `${existing.firstName} ${existing.firstLastName}`
@@ -405,13 +383,6 @@ export const thirdParty = tsr.router(contract.thirdParty, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.thirdParties.findFirst({
         where: eq(thirdParties.id, id),

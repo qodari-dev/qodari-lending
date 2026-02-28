@@ -145,13 +145,6 @@ export const insuranceCompany = tsr.router(contract.insuranceCompany, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const { insuranceRateRanges: rateRangesData, ...companyData } = body;
 
@@ -217,13 +210,6 @@ export const insuranceCompany = tsr.router(contract.insuranceCompany, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.insuranceCompanies.findFirst({
         where: eq(insuranceCompanies.id, id),
@@ -322,13 +308,6 @@ export const insuranceCompany = tsr.router(contract.insuranceCompany, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.insuranceCompanies.findFirst({
         where: eq(insuranceCompanies.id, id),

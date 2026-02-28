@@ -38,7 +38,7 @@ import {
 import { rangesOverlap } from '@/utils/range-overlap';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useFieldArray, useForm, useFormContext, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -86,7 +86,7 @@ export function InsuranceCompanyRateRangesForm() {
     dialogForm.setValue('rateValue', null);
   }, [selectedRateType, dialogForm]);
 
-  const hasRanges = useMemo(() => fields.length > 0, [fields.length]);
+  const hasRanges = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);

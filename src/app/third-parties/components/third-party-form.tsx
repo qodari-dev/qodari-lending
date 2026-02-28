@@ -178,7 +178,7 @@ export function ThirdPartyForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateThirdParty();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateThirdParty();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

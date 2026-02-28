@@ -132,19 +132,8 @@ export const costCenter = tsr.router(contract.costCenter, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newCostCenter = await db.transaction(async (tx) => {
-        const [newCostCenter] = await tx.insert(costCenters).values(body).returning();
-
-        return newCostCenter;
-      });
+      const [newCostCenter] = await db.insert(costCenters).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -192,13 +181,6 @@ export const costCenter = tsr.router(contract.costCenter, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.costCenters.findFirst({
         where: eq(costCenters.id, id),
@@ -212,15 +194,11 @@ export const costCenter = tsr.router(contract.costCenter, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(costCenters)
-          .set(body)
-          .where(eq(costCenters.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db
+        .update(costCenters)
+        .set(body)
+        .where(eq(costCenters.id, id))
+        .returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -272,13 +250,6 @@ export const costCenter = tsr.router(contract.costCenter, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.costCenters.findFirst({
         where: eq(costCenters.id, id),

@@ -33,7 +33,7 @@ import {
 } from '@/schemas/gl-account';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -80,7 +80,7 @@ export function GlAccountForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateGlAccount();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateGlAccount();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

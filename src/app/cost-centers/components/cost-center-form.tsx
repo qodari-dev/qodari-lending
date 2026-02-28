@@ -19,7 +19,7 @@ import {
 import { CreateCostCenterBodySchema, CostCenter } from '@/schemas/cost-center';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -58,7 +58,7 @@ export function CostCenterForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateCostCenter();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateCostCenter();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

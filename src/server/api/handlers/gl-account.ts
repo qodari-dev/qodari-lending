@@ -144,19 +144,8 @@ export const glAccount = tsr.router(contract.glAccount, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newGlAccount = await db.transaction(async (tx) => {
-        const [newGlAccount] = await tx.insert(glAccounts).values(body).returning();
-
-        return newGlAccount;
-      });
+      const [newGlAccount] = await db.insert(glAccounts).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -204,13 +193,6 @@ export const glAccount = tsr.router(contract.glAccount, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.glAccounts.findFirst({
         where: eq(glAccounts.id, id),
@@ -224,15 +206,7 @@ export const glAccount = tsr.router(contract.glAccount, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(glAccounts)
-          .set(body)
-          .where(eq(glAccounts.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(glAccounts).set(body).where(eq(glAccounts.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -284,13 +258,6 @@ export const glAccount = tsr.router(contract.glAccount, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.glAccounts.findFirst({
         where: eq(glAccounts.id, id),

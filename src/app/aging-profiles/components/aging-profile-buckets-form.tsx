@@ -30,7 +30,7 @@ import {
 } from '@/schemas/aging-profile';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Controller, useFieldArray, useForm, useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -62,7 +62,7 @@ export function AgingProfileBucketsForm() {
     },
   });
 
-  const hasBuckets = useMemo(() => fields.length > 0, [fields.length]);
+  const hasBuckets = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);
@@ -231,12 +231,17 @@ export function AgingProfileBucketsForm() {
                 control={dialogForm.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="provisionRate">Provision</FieldLabel>
+                    <FieldLabel htmlFor="provisionRate">Provision (%)</FieldLabel>
                     <Input
                       id="provisionRate"
-                      {...field}
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.000001"
                       value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value || null)}
+                      onChange={(e) =>
+                        field.onChange(e.target.value ? Number(e.target.value) : null)
+                      }
                       aria-invalid={fieldState.invalid}
                     />
                     {fieldState.error && <FieldError errors={[fieldState.error]} />}

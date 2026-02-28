@@ -63,7 +63,7 @@ export const AgingBucketInputSchema = z.object({
   name: z.string().min(1).max(60),
   daysFrom: z.number().int().min(0),
   daysTo: z.number().int().min(0).nullable().optional(),
-  provisionRate: z.string().nullable().optional(),
+  provisionRate: z.coerce.number().min(0).max(100).nullable().optional(),
   isActive: z.boolean(),
 });
 

@@ -156,13 +156,6 @@ export const agingProfile = tsr.router(contract.agingProfile, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const { agingBuckets: bucketsData, ...profileData } = body;
 
@@ -241,13 +234,6 @@ export const agingProfile = tsr.router(contract.agingProfile, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.agingProfiles.findFirst({
         where: eq(agingProfiles.id, id),
@@ -364,13 +350,6 @@ export const agingProfile = tsr.router(contract.agingProfile, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.agingProfiles.findFirst({
         where: eq(agingProfiles.id, id),
@@ -437,13 +416,6 @@ export const agingProfile = tsr.router(contract.agingProfile, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.agingProfiles.findFirst({
         where: eq(agingProfiles.id, id),

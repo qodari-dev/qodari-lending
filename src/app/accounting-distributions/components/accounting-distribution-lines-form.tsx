@@ -74,7 +74,7 @@ export function AccountingDistributionLinesForm() {
     resolver: zodResolver(AccountingDistributionLineInputSchema),
     defaultValues: {
       glAccountId: undefined,
-      percentage: '',
+      percentage: 0,
       nature: 'DEBIT',
     },
   });
@@ -100,7 +100,7 @@ export function AccountingDistributionLinesForm() {
     return map;
   }, [glAccounts]);
 
-  const hasLines = useMemo(() => fields.length > 0, [fields.length]);
+  const hasLines = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);
@@ -113,7 +113,7 @@ export function AccountingDistributionLinesForm() {
   const handleAddClick = () => {
     dialogForm.reset({
       glAccountId: undefined,
-      percentage: '',
+      percentage: 0,
       nature: 'DEBIT',
     });
     setEditingIndex(null);
@@ -124,7 +124,7 @@ export function AccountingDistributionLinesForm() {
     const current = fields[index];
     dialogForm.reset({
       glAccountId: current?.glAccountId ?? undefined,
-      percentage: current?.percentage ?? '',
+      percentage: current?.percentage ?? 0,
       nature: current?.nature ?? 'DEBIT',
     });
     setEditingIndex(index);
@@ -233,10 +233,12 @@ export function AccountingDistributionLinesForm() {
                     <Input
                       id="percentage"
                       type="number"
+                      min={0}
+                      max={100}
                       step="0.01"
                       inputMode="decimal"
                       {...field}
-                      onChange={(e) => field.onChange(e.target.value)}
+                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 0)}
                       aria-invalid={fieldState.invalid}
                     />
                     {fieldState.error && <FieldError errors={[fieldState.error]} />}

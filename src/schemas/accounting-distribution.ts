@@ -82,7 +82,7 @@ export const GetAccountingDistributionQuerySchema = z.object({
 
 export const AccountingDistributionLineInputSchema = z.object({
   glAccountId: z.number().int().positive(),
-  percentage: z.string().min(1, 'Porcentaje es requerido'),
+  percentage: z.coerce.number().min(0).max(100),
   nature: z.enum(ENTRY_NATURE_OPTIONS),
 });
 
@@ -98,7 +98,7 @@ const addLineTotalsValidation = <T extends z.ZodTypeAny>(schema: T) =>
   schema.superRefine((value, ctx) => {
     const data = value as {
       accountingDistributionLines?: {
-        percentage: string;
+        percentage: number;
         nature: 'DEBIT' | 'CREDIT';
       }[];
     };
@@ -107,9 +107,8 @@ const addLineTotalsValidation = <T extends z.ZodTypeAny>(schema: T) =>
 
     const totals = lines.reduce(
       (acc, line) => {
-        const amount = Number(line.percentage) || 0;
-        if (line.nature === 'DEBIT') acc.debit += amount;
-        if (line.nature === 'CREDIT') acc.credit += amount;
+        if (line.nature === 'DEBIT') acc.debit += line.percentage;
+        if (line.nature === 'CREDIT') acc.credit += line.percentage;
         return acc;
       },
       { debit: 0, credit: 0 }

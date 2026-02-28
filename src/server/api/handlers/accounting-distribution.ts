@@ -144,13 +144,6 @@ export const accountingDistribution = tsr.router(contract.accountingDistribution
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const { accountingDistributionLines: linesData, ...distributionData } = body;
 
@@ -219,13 +212,6 @@ export const accountingDistribution = tsr.router(contract.accountingDistribution
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.accountingDistributions.findFirst({
         where: eq(accountingDistributions.id, id),
@@ -322,13 +308,6 @@ export const accountingDistribution = tsr.router(contract.accountingDistribution
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.accountingDistributions.findFirst({
         where: eq(accountingDistributions.id, id),

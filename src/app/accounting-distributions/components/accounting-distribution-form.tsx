@@ -25,9 +25,8 @@ import {
 } from '@/schemas/accounting-distribution';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
-import { toast } from 'sonner';
 import { z } from 'zod';
 import { AccountingDistributionLinesForm } from './accounting-distribution-lines-form';
 
@@ -71,32 +70,10 @@ export function AccountingDistributionForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateAccountingDistribution();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateAccountingDistribution();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {
-      const lines = values.accountingDistributionLines ?? [];
-      if (lines.length > 0) {
-        const totals = lines.reduce(
-          (acc, line) => {
-            const value = Number(line.percentage) || 0;
-            if (line.nature === 'DEBIT') acc.debit += value;
-            if (line.nature === 'CREDIT') acc.credit += value;
-            return acc;
-          },
-          { debit: 0, credit: 0 }
-        );
-
-        const epsilon = 0.01;
-        const debitOk = Math.abs(totals.debit - 100) <= epsilon;
-        const creditOk = Math.abs(totals.credit - 100) <= epsilon;
-
-        if (!debitOk || !creditOk) {
-          toast.error('El total de debito y credito debe ser 100');
-          return;
-        }
-      }
-
       if (accountingDistribution) {
         await update({ params: { id: accountingDistribution.id }, body: values });
       } else {

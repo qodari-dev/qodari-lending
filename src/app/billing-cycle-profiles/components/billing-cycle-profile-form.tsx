@@ -121,7 +121,7 @@ export function BillingCycleProfileForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateBillingCycleProfile();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateBillingCycleProfile();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

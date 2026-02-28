@@ -160,13 +160,6 @@ export const billingCycleProfile = tsr.router(contract.billingCycleProfile, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const { billingCycleProfileCycles: cyclesData, ...profileData } = body;
       const profilePayload = {
@@ -245,13 +238,6 @@ export const billingCycleProfile = tsr.router(contract.billingCycleProfile, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.billingCycleProfiles.findFirst({
         where: eq(billingCycleProfiles.id, id),
@@ -365,13 +351,6 @@ export const billingCycleProfile = tsr.router(contract.billingCycleProfile, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.billingCycleProfiles.findFirst({
         where: eq(billingCycleProfiles.id, id),

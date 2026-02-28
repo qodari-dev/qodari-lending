@@ -29,7 +29,7 @@ import {
 } from '@/schemas/billing-cycle-profile';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Controller, useFieldArray, useForm, useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -59,7 +59,7 @@ export function BillingCycleProfileCyclesForm() {
   });
 
   const cyclesPerMonth = form.watch('cyclesPerMonth') ?? 0;
-  const hasCycles = useMemo(() => fields.length > 0, [fields.length]);
+  const hasCycles = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);

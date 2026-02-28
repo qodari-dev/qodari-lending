@@ -1,4 +1,4 @@
-import { sendResendEmail } from '@/server/clients/resend';
+import { sendResendGenericEmail } from '@/server/clients/resend';
 import {
   agreementBillingEmailDispatches,
   billingCycleProfileCycles,
@@ -11,6 +11,7 @@ import { enqueueAgreementBillingEmailJob } from '@/server/queues/agreement-billi
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
+import { replaceVariablesInTemplate } from '@/utils/replace-vaiables-in-template';
 import { addDays, getDaysInMonth, isSaturday, isSunday, startOfDay, subDays } from 'date-fns';
 import { and, asc, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
 import { Workbook } from 'exceljs';
@@ -34,10 +35,7 @@ function buildPeriod(date: Date) {
   return `${year}-${month}`;
 }
 
-function buildAgreementLabel(agreement: {
-  agreementCode: string;
-  businessName: string;
-}) {
+function buildAgreementLabel(agreement: { agreementCode: string; businessName: string }) {
   return `${agreement.agreementCode} - ${agreement.businessName}`;
 }
 
@@ -65,16 +63,6 @@ function resolveCycleRunDateInMonth(params: {
     return moveToBusinessDay(baseDate, 'PREVIOUS');
   }
   return moveToBusinessDay(baseDate, 'NEXT');
-}
-
-function renderTemplate(template: string, variables: Record<string, string>) {
-  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, variableKey: string) => {
-    return variables[variableKey] ?? '';
-  });
-}
-
-function stripHtmlToText(value: string) {
-  return value.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function getThirdPartyLabel(input: {
@@ -145,10 +133,7 @@ async function getInstallmentValue(loanId: number, runDate: string) {
 
 async function buildLoansAttachment(agreementId: number, runDate: string) {
   const agreementLoans = await db.query.loans.findMany({
-    where: and(
-      eq(loans.agreementId, agreementId),
-      inArray(loans.status, ['ACTIVE', 'ACCOUNTED'])
-    ),
+    where: and(eq(loans.agreementId, agreementId), inArray(loans.status, ['ACTIVE', 'ACCOUNTED'])),
     columns: {
       id: true,
       creditNumber: true,
@@ -331,11 +316,7 @@ export async function enqueueAgreementBillingEmails(input: EnqueueAgreementBilli
     });
 
     const selectedCycles =
-      input.triggerSource === 'CRON'
-        ? dueCycles
-        : dueCycles.length
-          ? [dueCycles[0]]
-          : [cycles[0]];
+      input.triggerSource === 'CRON' ? dueCycles : dueCycles.length ? [dueCycles[0]] : [cycles[0]];
 
     if (!selectedCycles.length) {
       skippedCount += 1;
@@ -389,7 +370,10 @@ export async function listAgreementBillingEmailDispatches(agreementId: number, l
       lastError: true,
       createdAt: true,
     },
-    orderBy: [desc(agreementBillingEmailDispatches.createdAt), desc(agreementBillingEmailDispatches.id)],
+    orderBy: [
+      desc(agreementBillingEmailDispatches.createdAt),
+      desc(agreementBillingEmailDispatches.id),
+    ],
     limit,
   });
 }
@@ -505,18 +489,35 @@ export async function processAgreementBillingEmailDispatch(dispatchId: number) {
       fecha_envio: formatDateOnly(new Date()),
     };
 
-    const subject = renderTemplate(template.subject, variables);
-    const html = renderTemplate(template.htmlContent, variables);
-    const text = renderTemplate(stripHtmlToText(template.htmlContent), variables);
+    const subject = replaceVariablesInTemplate(template.subject, variables);
+    const html = replaceVariablesInTemplate(template.htmlContent, variables);
+    // const text = renderTemplate(stripHtmlToText(template.htmlContent), variables);
 
     const attachment = await buildLoansAttachment(agreement.id, dispatch.scheduledDate);
-    const resendResponse = await sendResendEmail({
+    // const resendResponse = await sendResendEmail({
+    //   from: template.fromEmail,
+    //   to: [agreement.billingEmailTo],
+    //   cc: agreement.billingEmailCc ? [agreement.billingEmailCc] : undefined,
+    //   subject,
+    //   html,
+    //   text,
+    //   attachments: [
+    //     {
+    //       filename: `cartera-${agreement.agreementCode.toLowerCase()}-${dispatch.period}.xlsx`,
+    //       content: attachment.contentBase64,
+    //     },
+    //   ],
+    // });
+
+    const resendResponse = await sendResendGenericEmail({
       from: template.fromEmail,
       to: [agreement.billingEmailTo],
       cc: agreement.billingEmailCc ? [agreement.billingEmailCc] : undefined,
-      subject,
-      html,
-      text,
+      variables: {
+        PREVIEW_TEXT: subject,
+        SUBJECT: subject,
+        HTML_CONTENT: html,
+      },
       attachments: [
         {
           filename: `cartera-${agreement.agreementCode.toLowerCase()}-${dispatch.period}.xlsx`,

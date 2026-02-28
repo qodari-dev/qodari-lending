@@ -177,18 +177,11 @@ export const billingConcept = tsr.router(contract.billingConcept, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const { billingConceptRules: rulesData, ...conceptData } = body;
-      const normalizedRules = rulesData?.map((rule) =>
-        normalizeRuleByCalcMethod(rule, conceptData.calcMethod)
-      );
+      const normalizedRules = conceptData.isSystem
+        ? []
+        : rulesData?.map((rule) => normalizeRuleByCalcMethod(rule, conceptData.calcMethod));
 
       const [created] = await db.transaction(async (tx) => {
         const [concept] = await tx.insert(billingConcepts).values(conceptData).returning();
@@ -249,13 +242,6 @@ export const billingConcept = tsr.router(contract.billingConcept, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.billingConcepts.findFirst({
         where: eq(billingConcepts.id, id),
@@ -275,9 +261,10 @@ export const billingConcept = tsr.router(contract.billingConcept, {
 
       const { billingConceptRules: rulesData, ...conceptData } = body;
       const effectiveCalcMethod = conceptData.calcMethod ?? existing.calcMethod;
-      const normalizedRules = rulesData?.map((rule) =>
-        normalizeRuleByCalcMethod(rule, effectiveCalcMethod)
-      );
+      const effectiveIsSystem = conceptData.isSystem ?? existing.isSystem;
+      const normalizedRules = effectiveIsSystem
+        ? []
+        : rulesData?.map((rule) => normalizeRuleByCalcMethod(rule, effectiveCalcMethod));
 
       const [updated] = await db.transaction(async (tx) => {
         const [conceptUpdated] = await tx
@@ -351,13 +338,6 @@ export const billingConcept = tsr.router(contract.billingConcept, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.billingConcepts.findFirst({
         where: eq(billingConcepts.id, id),

@@ -21,7 +21,8 @@ import {
   Undo2,
   Redo2,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { HTML_PREVIEW_CLASSES } from './html-preview-styles';
 
 type BillingHtmlEditorProps = {
   value: string;
@@ -45,7 +46,7 @@ function variableToken(variable: string) {
 export function BillingHtmlEditor({ value, onChange, variables, invalid }: BillingHtmlEditorProps) {
   const [mode, setMode] = useState<EditorMode>('VISUAL');
   const htmlTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const normalizedValue = useMemo(() => normalizeHtml(value), [value]);
+  const normalizedValue = normalizeHtml(value);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -58,8 +59,7 @@ export function BillingHtmlEditor({ value, onChange, variables, invalid }: Billi
     content: normalizedValue,
     editorProps: {
       attributes: {
-        class:
-          'min-h-[300px] rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none [&_h1]:my-3 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:my-3 [&_h2]:text-2xl [&_h2]:font-semibold [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1',
+        class: `min-h-[300px] rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none ${HTML_PREVIEW_CLASSES}`,
       },
     },
     onUpdate: ({ editor: instance }) => {

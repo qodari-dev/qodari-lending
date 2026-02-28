@@ -107,7 +107,7 @@ export function PaymentAllocationPolicyRulesForm() {
     return map;
   }, [billingConcepts]);
 
-  const hasRules = useMemo(() => fields.length > 0, [fields.length]);
+  const hasRules = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);

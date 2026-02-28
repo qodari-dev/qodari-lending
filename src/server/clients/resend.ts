@@ -39,3 +39,34 @@ export async function sendResendEmail(input: SendResendEmailInput): Promise<Send
 
   return { id: response.data.id };
 }
+
+type GenericEmailInput = {
+  from: string;
+  to: string[];
+  cc?: string[];
+  attachments?: ResendAttachment[];
+  variables: {
+    PREVIEW_TEXT: string;
+    SUBJECT: string;
+    HTML_CONTENT: string;
+  };
+};
+
+export async function sendResendGenericEmail(input: GenericEmailInput) {
+  const response = await resend.emails.send({
+    from: input.from,
+    to: input.to,
+    cc: input.cc,
+    attachments: input.attachments,
+    subject: input.variables.SUBJECT,
+    template: {
+      id: 'general-template',
+      variables: input.variables,
+    },
+  });
+  if (response.error || !response.data?.id) {
+    throw new Error(response.error?.message || 'No fue posible enviar correo en Resend');
+  }
+
+  return { id: response.data.id };
+}

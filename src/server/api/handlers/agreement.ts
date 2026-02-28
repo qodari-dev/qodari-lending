@@ -206,29 +206,13 @@ export const agreement = tsr.router(contract.agreement, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const payload = {
         ...normalizePayload(body),
-        agreementCode: body.agreementCode.trim().toUpperCase(),
-        documentNumber: body.documentNumber.trim(),
-        businessName: body.businessName.trim(),
-        cityId: body.cityId,
-        startDate: formatDateOnly(body.startDate),
-        isActive: body.isActive,
         statusDate: formatDateOnly(new Date()),
       };
 
-      const newItem = await db.transaction(async (tx) => {
-        const [created] = await tx.insert(agreements).values(payload).returning();
-        return created;
-      });
+      const [newItem] = await db.insert(agreements).values(payload).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -277,13 +261,6 @@ export const agreement = tsr.router(contract.agreement, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.agreements.findFirst({
         where: eq(agreements.id, id),
@@ -305,15 +282,11 @@ export const agreement = tsr.router(contract.agreement, {
         ...(isStatusChanging ? { statusDate: formatDateOnly(new Date()) } : {}),
       };
 
-      const updated = await db.transaction(async (tx) => {
-        const [item] = await tx
-          .update(agreements)
-          .set(payloadToUpdate)
-          .where(eq(agreements.id, id))
-          .returning();
-
-        return item;
-      });
+      const [updated] = await db
+        .update(agreements)
+        .set(payloadToUpdate)
+        .where(eq(agreements.id, id))
+        .returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -366,13 +339,6 @@ export const agreement = tsr.router(contract.agreement, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.agreements.findFirst({
         where: eq(agreements.id, id),

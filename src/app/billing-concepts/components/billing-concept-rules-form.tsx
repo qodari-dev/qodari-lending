@@ -34,7 +34,7 @@ import { formatDateOnly } from '@/utils/formatters';
 import { datesOverlap, rangesOverlap, toFiniteNumber } from '@/utils/range-overlap';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   Controller,
   type Resolver,
@@ -99,7 +99,7 @@ export function BillingConceptRulesForm() {
     },
   });
 
-  const hasRules = useMemo(() => fields.length > 0, [fields.length]);
+  const hasRules = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);

@@ -15,7 +15,6 @@ import {
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { formatDate, formatDateTime } from '@/utils/formatters';
 import { RotateCcw } from 'lucide-react';
-import { useMemo } from 'react';
 
 export function AgreementInfo({
   agreement,
@@ -40,7 +39,7 @@ export function AgreementInfo({
   const { mutateAsync: retryDispatch, isPending: isRetryingDispatch } =
     useRetryAgreementBillingEmailDispatch();
   const agreementDetail = agreementResponse?.body ?? agreement;
-  const dispatches = useMemo(() => dispatchesResponse?.body?.data ?? [], [dispatchesResponse]);
+  const dispatches = dispatchesResponse?.body?.data ?? [];
 
   if (!agreement || !agreementDetail) return null;
 

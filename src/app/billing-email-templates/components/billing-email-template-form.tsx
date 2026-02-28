@@ -22,10 +22,11 @@ import { cn } from '@/lib/utils';
 import { BillingEmailTemplate, CreateBillingEmailTemplateBodySchema } from '@/schemas/billing-email-template';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { Controller, FormProvider, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { BillingHtmlEditor } from './billing-html-editor';
+import { HTML_PREVIEW_CLASSES } from './html-preview-styles';
 
 type FormValues = z.infer<typeof CreateBillingEmailTemplateBodySchema>;
 
@@ -84,7 +85,7 @@ export function BillingEmailTemplateForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateBillingEmailTemplate();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateBillingEmailTemplate();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
   const htmlPreview = useWatch({ control: form.control, name: 'htmlContent' });
 
   const onSubmit = useCallback(
@@ -217,7 +218,8 @@ export function BillingEmailTemplateForm({
                 <p className="text-muted-foreground text-sm font-medium">Vista previa HTML</p>
                 <div
                   className={cn(
-                    'rounded-md border p-4 text-sm [&_h1]:my-3 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:my-3 [&_h2]:text-2xl [&_h2]:font-semibold [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1',
+                    'rounded-md border p-4 text-sm',
+                    HTML_PREVIEW_CLASSES,
                     !htmlPreview?.trim() && 'text-muted-foreground'
                   )}
                   dangerouslySetInnerHTML={{

@@ -34,7 +34,7 @@ import {
 } from '@/schemas/payment-allocation-policy';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { Controller, FormProvider, type Resolver, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { PaymentAllocationPolicyRulesForm } from './payment-allocation-policy-rules-form';
@@ -84,7 +84,7 @@ export function PaymentAllocationPolicyForm({
   const { mutateAsync: create, isPending: isCreating } = useCreatePaymentAllocationPolicy();
   const { mutateAsync: update, isPending: isUpdating } = useUpdatePaymentAllocationPolicy();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

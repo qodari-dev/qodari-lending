@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { BillingEmailTemplate } from '@/schemas/billing-email-template';
 import { formatDate } from '@/utils/formatters';
+import { HTML_PREVIEW_CLASSES } from './html-preview-styles';
 
 export function BillingEmailTemplateInfo({
   billingEmailTemplate,
@@ -54,7 +55,7 @@ export function BillingEmailTemplateInfo({
           <div className="space-y-2">
             <p className="text-muted-foreground text-sm font-medium">Vista previa HTML</p>
             <div
-              className="rounded-md border p-4 text-sm [&_h1]:my-3 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:my-3 [&_h2]:text-2xl [&_h2]:font-semibold [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1"
+              className={`rounded-md border p-4 text-sm ${HTML_PREVIEW_CLASSES}`}
               dangerouslySetInnerHTML={{ __html: billingEmailTemplate.htmlContent }}
             />
           </div>

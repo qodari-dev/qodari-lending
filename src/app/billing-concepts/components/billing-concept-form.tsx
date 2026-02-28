@@ -102,6 +102,7 @@ export function BillingConceptForm({
     },
   });
   const calcMethod = useWatch({ control: form.control, name: 'calcMethod' });
+  const isSystem = useWatch({ control: form.control, name: 'isSystem' });
   const isTieredMethod = calcMethod === 'TIERED_FIXED_AMOUNT' || calcMethod === 'TIERED_PERCENTAGE';
   const requiresBaseAmount = calcMethod === 'PERCENTAGE' || calcMethod === 'TIERED_PERCENTAGE';
 
@@ -152,7 +153,7 @@ export function BillingConceptForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateBillingConcept();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateBillingConcept();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {
@@ -190,7 +191,7 @@ export function BillingConceptForm({
             <Tabs defaultValue="concept" className="w-full">
               <TabsList className="mb-4 w-full">
                 <TabsTrigger value="concept">Concepto</TabsTrigger>
-                <TabsTrigger value="rules">Reglas</TabsTrigger>
+                <TabsTrigger value="rules" disabled={isSystem}>Reglas</TabsTrigger>
               </TabsList>
 
               <TabsContent value="concept" className="space-y-4 pt-2">
@@ -547,7 +548,12 @@ export function BillingConceptForm({
                           <div>
                             <Switch
                               checked={field.value}
-                              onCheckedChange={field.onChange}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                if (checked) {
+                                  form.setValue('billingConceptRules', []);
+                                }
+                              }}
                               aria-invalid={fieldState.invalid}
                             />
                           </div>

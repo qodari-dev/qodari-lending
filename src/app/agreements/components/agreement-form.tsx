@@ -130,7 +130,7 @@ export function AgreementForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateAgreement();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateAgreement();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

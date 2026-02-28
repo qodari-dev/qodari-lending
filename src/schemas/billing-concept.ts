@@ -256,6 +256,7 @@ function isTieredCalcMethod(method: BillingConceptCalcMethod | undefined): boole
 const addBillingConceptValidation = <T extends z.ZodTypeAny>(schema: T) =>
   schema.superRefine((value, ctx) => {
     const data = value as {
+      isSystem?: boolean;
       calcMethod?: BillingConceptCalcMethod;
       baseAmount?: BillingConceptBaseAmount | null;
       rangeMetric?: BillingConceptRangeMetric | null;
@@ -274,6 +275,15 @@ const addBillingConceptValidation = <T extends z.ZodTypeAny>(schema: T) =>
 
     const rules = data.billingConceptRules ?? [];
     const activeRules = rules.filter((rule) => rule.isActive !== false);
+
+    if (data.isSystem && rules.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Conceptos del sistema no deben tener reglas',
+        path: ['billingConceptRules'],
+      });
+      return;
+    }
 
     if (data.minAmount && data.maxAmount && Number(data.minAmount) > Number(data.maxAmount)) {
       ctx.addIssue({

@@ -31,7 +31,11 @@ const BILLING_EMAIL_TEMPLATE_FIELDS: FieldMap = {
 
 const BILLING_EMAIL_TEMPLATE_QUERY_CONFIG: QueryConfig = {
   fields: BILLING_EMAIL_TEMPLATE_FIELDS,
-  searchFields: [billingEmailTemplates.name, billingEmailTemplates.subject, billingEmailTemplates.fromEmail],
+  searchFields: [
+    billingEmailTemplates.name,
+    billingEmailTemplates.subject,
+    billingEmailTemplates.fromEmail,
+  ],
   defaultSort: { column: billingEmailTemplates.createdAt, order: 'desc' },
 };
 
@@ -53,10 +57,10 @@ function normalizePayload(
 ) {
   return {
     ...payload,
-    name: payload.name?.trim(),
-    fromEmail: payload.fromEmail?.trim().toLowerCase(),
-    subject: payload.subject?.trim(),
-    htmlContent: payload.htmlContent?.trim(),
+    name: payload.name?.trim() ?? '',
+    fromEmail: payload.fromEmail?.trim().toLowerCase() ?? '',
+    subject: payload.subject?.trim() ?? '',
+    htmlContent: payload.htmlContent?.trim() ?? '',
   };
 }
 
@@ -149,21 +153,8 @@ export const billingEmailTemplate = tsr.router(contract.billingEmailTemplate, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const payload = {
-        name: body.name.trim(),
-        fromEmail: body.fromEmail.trim().toLowerCase(),
-        subject: body.subject.trim(),
-        htmlContent: body.htmlContent.trim(),
-        isActive: body.isActive,
-      };
+      const payload = normalizePayload(body);
       const [created] = await db.insert(billingEmailTemplates).values(payload).returning();
 
       await logAudit(session, {
@@ -208,13 +199,6 @@ export const billingEmailTemplate = tsr.router(contract.billingEmailTemplate, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.billingEmailTemplates.findFirst({
         where: eq(billingEmailTemplates.id, id),
@@ -283,13 +267,6 @@ export const billingEmailTemplate = tsr.router(contract.billingEmailTemplate, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.billingEmailTemplates.findFirst({
         where: eq(billingEmailTemplates.id, id),

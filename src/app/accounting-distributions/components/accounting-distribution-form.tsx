@@ -26,7 +26,7 @@ import {
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useId } from 'react';
-import { Controller, FormProvider, useForm } from 'react-hook-form';
+import { Controller, FormProvider, Resolver, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { AccountingDistributionLinesForm } from './accounting-distribution-lines-form';
 
@@ -44,7 +44,7 @@ export function AccountingDistributionForm({
   const formId = useId();
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(CreateAccountingDistributionBodySchema),
+    resolver: zodResolver(CreateAccountingDistributionBodySchema) as Resolver<FormValues>,
     defaultValues: {
       name: '',
       isActive: true,
@@ -60,7 +60,7 @@ export function AccountingDistributionForm({
         accountingDistributionLines:
           accountingDistribution?.accountingDistributionLines?.map((line) => ({
             glAccountId: line.glAccountId,
-            percentage: line.percentage,
+            percentage: Number(line.percentage),
             nature: line.nature,
           })) ?? [],
       });
@@ -93,9 +93,7 @@ export function AccountingDistributionForm({
               ? 'Editar Distribucion Contable'
               : 'Nueva Distribucion Contable'}
           </SheetTitle>
-          <SheetDescription>
-            Define como se reparte un valor entre auxiliares.
-          </SheetDescription>
+          <SheetDescription>Define como se reparte un valor entre auxiliares.</SheetDescription>
         </SheetHeader>
         <FormProvider {...form}>
           <form id={formId} onSubmit={form.handleSubmit(onSubmit, onSubmitError)} className="px-4">

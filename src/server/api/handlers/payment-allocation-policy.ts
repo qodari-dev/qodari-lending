@@ -54,17 +54,14 @@ const PAYMENT_ALLOCATION_POLICY_INCLUDES =
     },
   });
 
-function normalizePolicyPayload(
-  payload: Partial<{
-    name: string;
-    note: string | null;
-  }>
-) {
+function normalizePolicyPayload<T extends Partial<{ name: string; note: string | null }>>(
+  payload: T
+): T {
   return {
     ...payload,
     ...(payload.name !== undefined ? { name: payload.name.trim() } : {}),
     ...(payload.note !== undefined ? { note: payload.note?.trim() || null } : {}),
-  };
+  } as T;
 }
 
 export const paymentAllocationPolicy = tsr.router(contract.paymentAllocationPolicy, {
@@ -144,20 +141,9 @@ export const paymentAllocationPolicy = tsr.router(contract.paymentAllocationPoli
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const { paymentAllocationPolicyRules: rulesData, ...policyData } = body;
-      const payload = {
-        ...policyData,
-        name: policyData.name.trim(),
-        note: policyData.note?.trim() || null,
-      };
+      const payload = normalizePolicyPayload(policyData);
 
       const [created] = await db.transaction(async (tx) => {
         const [policy] = await tx.insert(paymentAllocationPolicies).values(payload).returning();
@@ -219,13 +205,6 @@ export const paymentAllocationPolicy = tsr.router(contract.paymentAllocationPoli
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentAllocationPolicies.findFirst({
         where: eq(paymentAllocationPolicies.id, id),
@@ -322,13 +301,6 @@ export const paymentAllocationPolicy = tsr.router(contract.paymentAllocationPoli
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentAllocationPolicies.findFirst({
         where: eq(paymentAllocationPolicies.id, id),

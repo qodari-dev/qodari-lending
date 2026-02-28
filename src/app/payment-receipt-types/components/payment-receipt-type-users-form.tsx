@@ -44,6 +44,7 @@ import { ChevronDownIcon, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm, useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
+import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
 
 type FormValues = z.infer<typeof CreatePaymentReceiptTypeBodySchema>;
@@ -52,7 +53,7 @@ export function PaymentReceiptTypeUsersForm() {
   const form = useFormContext<FormValues>();
   const dialogContentRef = useRef<HTMLDivElement | null>(null);
 
-  const { fields, append, update, remove, replace } = useFieldArray({
+  const { fields, append, update, remove } = useFieldArray({
     control: form.control,
     name: 'userPaymentReceiptTypes',
   });
@@ -69,25 +70,32 @@ export function PaymentReceiptTypeUsersForm() {
     },
   });
 
-  const { data: iamUsersData } = useIamUsers({ limit: 200, isEmployee: true });
-  const iamUsers = useMemo(() => iamUsersData?.body?.data ?? [], [iamUsersData]);
+  // Server-side search for users
+  const [userSearch, setUserSearch] = useState('');
+  const [debouncedUserSearch] = useDebounce(userSearch.trim(), 350);
+
+  const { data: iamUsersData } = useIamUsers({
+    limit: 20,
+    isEmployee: true,
+    search: debouncedUserSearch || undefined,
+  });
+  const searchResults = useMemo(() => iamUsersData?.body?.data ?? [], [iamUsersData]);
+
+  // Merge search results with already-assigned users (so they always appear in combobox)
+  const comboboxItems = useMemo(() => {
+    const searchIds = new Set(searchResults.map((u) => u.id));
+    const missingAssigned = fields
+      .filter((f) => !searchIds.has(f.userId))
+      .map((f) => ({ id: f.userId, displayName: f.userName }) as IamUser);
+    return [...searchResults, ...missingAssigned];
+  }, [searchResults, fields]);
+
   const findIamUser = useCallback(
-    (id: string | undefined) => iamUsers.find((user) => user.id === id) ?? null,
-    [iamUsers]
+    (id: string | undefined) => comboboxItems.find((user) => user.id === id) ?? null,
+    [comboboxItems]
   );
 
-  const userLabelMap = useMemo(() => {
-    const map = new Map<string, string>();
-    iamUsers.forEach((user) => {
-      map.set(user.id, user.displayName);
-    });
-    fields.forEach((user) => {
-      map.set(user.userId, user.userName);
-    });
-    return map;
-  }, [iamUsers, fields]);
-
-  const hasUsers = useMemo(() => fields.length > 0, [fields.length]);
+  const hasUsers = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);
@@ -133,18 +141,6 @@ export function PaymentReceiptTypeUsersForm() {
       return;
     }
 
-    if (values.isDefault) {
-      if (editingIndex !== null) {
-        const next = fields.map((f, idx) => (idx === editingIndex ? values : { ...f, isDefault: false }));
-        replace(next);
-      } else {
-        const next = fields.map((f) => ({ ...f, isDefault: false }));
-        replace([...next, values]);
-      }
-      setIsDialogOpen(false);
-      return;
-    }
-
     if (editingIndex !== null) {
       update(editingIndex, values);
     } else {
@@ -155,7 +151,8 @@ export function PaymentReceiptTypeUsersForm() {
   };
 
   const getUserLabelForTable = (id: string) => {
-    return userLabelMap.get(id) ?? id;
+    const found = comboboxItems.find((u) => u.id === id);
+    return found?.displayName ?? id;
   };
 
   return (
@@ -186,8 +183,20 @@ export function PaymentReceiptTypeUsersForm() {
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="userId">Usuario</FieldLabel>
                     <Combobox
-                      items={iamUsers}
+                      items={comboboxItems}
                       value={findIamUser(field.value)}
+                      filter={null}
+                      onOpenChange={(isOpen) => {
+                        if (!isOpen) setUserSearch('');
+                      }}
+                      onInputValueChange={(value, details) => {
+                        if (
+                          details.reason === 'input-change' ||
+                          details.reason === 'input-clear'
+                        ) {
+                          setUserSearch(value);
+                        }
+                      }}
                       onValueChange={(value: IamUser | null) => {
                         field.onChange(value?.id ?? undefined);
                         dialogForm.setValue('userName', value?.displayName ?? '');

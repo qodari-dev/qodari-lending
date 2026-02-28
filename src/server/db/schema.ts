@@ -1971,10 +1971,7 @@ export const processRunScopeTypeEnum = pgEnum('process_run_scope_type', [
   'LOAN',
 ]);
 
-export const processRunTriggerSourceEnum = pgEnum('process_run_trigger_source', [
-  'MANUAL',
-  'CRON',
-]);
+export const processRunTriggerSourceEnum = pgEnum('process_run_trigger_source', ['MANUAL', 'CRON']);
 
 // ---------------------------------------------------------------------
 // Concr33-Concr42 Process Runs
@@ -2864,11 +2861,10 @@ export const billingEmailDispatchStatusEnum = pgEnum('billing_email_dispatch_sta
   'FAILED',
 ]);
 
-export const billingEmailDispatchTriggerSourceEnum = pgEnum('billing_email_dispatch_trigger_source', [
-  'CRON',
-  'MANUAL',
-  'RETRY',
-]);
+export const billingEmailDispatchTriggerSourceEnum = pgEnum(
+  'billing_email_dispatch_trigger_source',
+  ['CRON', 'MANUAL', 'RETRY']
+);
 
 export const agreementBillingEmailDispatches = pgTable(
   'agreement_billing_email_dispatches',
@@ -2911,7 +2907,10 @@ export const agreementBillingEmailDispatches = pgTable(
       t.billingCycleProfileId,
       t.billingCycleProfileCycleId
     ),
-    check('chk_agreement_billing_email_dispatch_period_format', sql`${t.period} ~ '^[0-9]{4}-[0-9]{2}$'`),
+    check(
+      'chk_agreement_billing_email_dispatch_period_format',
+      sql`${t.period} ~ '^[0-9]{4}-[0-9]{2}$'`
+    ),
     check('chk_agreement_billing_email_dispatch_attempts_min', sql`${t.attempts} >= 0`),
   ]
 );

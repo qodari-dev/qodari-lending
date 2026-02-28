@@ -19,7 +19,7 @@ import { useCreateCreditFund, useUpdateCreditFund } from '@/hooks/queries/use-cr
 import { CreditFund, CreateCreditFundBodySchema } from '@/schemas/credit-fund';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { CreditFundBudgetsForm } from './credit-fund-budgets-form';
@@ -57,8 +57,6 @@ export function CreditFundForm({
           creditFund?.creditFundBudgets?.map((budget) => ({
             accountingPeriodId: budget.accountingPeriodId,
             fundAmount: budget.fundAmount,
-            reinvestmentAmount: budget.reinvestmentAmount,
-            expenseAmount: budget.expenseAmount,
           })) ?? [],
       });
     }
@@ -67,7 +65,7 @@ export function CreditFundForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateCreditFund();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateCreditFund();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

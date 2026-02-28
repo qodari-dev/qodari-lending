@@ -132,13 +132,6 @@ export const creditFund = tsr.router(contract.creditFund, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const { creditFundBudgets: budgetsData, ...fundData } = body;
 
@@ -149,6 +142,8 @@ export const creditFund = tsr.router(contract.creditFund, {
           await tx.insert(creditFundBudgets).values(
             budgetsData.map((budget) => ({
               ...budget,
+              reinvestmentAmount: '0',
+              expenseAmount: '0',
               creditFundId: fund.id,
             }))
           );
@@ -204,13 +199,6 @@ export const creditFund = tsr.router(contract.creditFund, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.creditFunds.findFirst({
         where: eq(creditFunds.id, id),
@@ -230,6 +218,15 @@ export const creditFund = tsr.router(contract.creditFund, {
 
       const { creditFundBudgets: budgetsData, ...fundData } = body;
 
+      // Map existing amounts by period so we preserve reinvestmentAmount/expenseAmount
+      // (updated by automated processes, not editable from the form)
+      const existingAmountsByPeriod = new Map(
+        existingBudgets.map((b) => [
+          b.accountingPeriodId,
+          { reinvestmentAmount: b.reinvestmentAmount, expenseAmount: b.expenseAmount },
+        ])
+      );
+
       const [updated] = await db.transaction(async (tx) => {
         const [fundUpdated] = await tx
           .update(creditFunds)
@@ -242,10 +239,15 @@ export const creditFund = tsr.router(contract.creditFund, {
 
           if (budgetsData.length) {
             await tx.insert(creditFundBudgets).values(
-              budgetsData.map((budget) => ({
-                ...budget,
-                creditFundId: id,
-              }))
+              budgetsData.map((budget) => {
+                const existing = existingAmountsByPeriod.get(budget.accountingPeriodId);
+                return {
+                  ...budget,
+                  reinvestmentAmount: existing?.reinvestmentAmount ?? '0',
+                  expenseAmount: existing?.expenseAmount ?? '0',
+                  creditFundId: id,
+                };
+              })
             );
           }
         }
@@ -305,13 +307,6 @@ export const creditFund = tsr.router(contract.creditFund, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.creditFunds.findFirst({
         where: eq(creditFunds.id, id),

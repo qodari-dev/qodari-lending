@@ -118,18 +118,8 @@ export const accountingPeriod = tsr.router(contract.accountingPeriod, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newPeriod = await db.transaction(async (tx) => {
-        const [created] = await tx.insert(accountingPeriods).values(body).returning();
-        return created;
-      });
+      const [newPeriod] = await db.insert(accountingPeriods).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -177,13 +167,6 @@ export const accountingPeriod = tsr.router(contract.accountingPeriod, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.accountingPeriods.findFirst({
         where: eq(accountingPeriods.id, id),
@@ -206,15 +189,11 @@ export const accountingPeriod = tsr.router(contract.accountingPeriod, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [result] = await tx
-          .update(accountingPeriods)
-          .set(body)
-          .where(eq(accountingPeriods.id, id))
-          .returning();
-
-        return result;
-      });
+      const [updated] = await db
+        .update(accountingPeriods)
+        .set(body)
+        .where(eq(accountingPeriods.id, id))
+        .returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -266,13 +245,6 @@ export const accountingPeriod = tsr.router(contract.accountingPeriod, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.accountingPeriods.findFirst({
         where: eq(accountingPeriods.id, id),

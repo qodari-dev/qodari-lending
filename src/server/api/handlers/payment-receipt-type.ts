@@ -2,7 +2,7 @@ import { db, paymentReceiptTypes, userPaymentReceiptTypes } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { tsr } from '@ts-rest/serverless/next';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 import { logAudit } from '@/server/utils/audit-logger';
@@ -140,13 +140,6 @@ export const paymentReceiptType = tsr.router(contract.paymentReceiptType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const { userPaymentReceiptTypes: usersData, ...receiptTypeData } = body;
 
@@ -156,13 +149,29 @@ export const paymentReceiptType = tsr.router(contract.paymentReceiptType, {
           .values(receiptTypeData)
           .returning();
 
-        if (usersData?.length) {
+        if (usersData) {
           await tx.insert(userPaymentReceiptTypes).values(
             usersData.map((user) => ({
               ...user,
               paymentReceiptTypeId: receiptType.id,
             }))
           );
+
+          // Ensure isDefault is unique per user across all receipt types
+          const defaultUserIds = usersData.filter((u) => u.isDefault).map((u) => u.userId);
+
+          if (defaultUserIds.length) {
+            await tx
+              .update(userPaymentReceiptTypes)
+              .set({ isDefault: false })
+              .where(
+                and(
+                  inArray(userPaymentReceiptTypes.userId, defaultUserIds),
+                  ne(userPaymentReceiptTypes.paymentReceiptTypeId, receiptType.id),
+                  eq(userPaymentReceiptTypes.isDefault, true)
+                )
+              );
+          }
         }
 
         return [receiptType];
@@ -215,13 +224,6 @@ export const paymentReceiptType = tsr.router(contract.paymentReceiptType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentReceiptTypes.findFirst({
         where: eq(paymentReceiptTypes.id, id),
@@ -248,7 +250,7 @@ export const paymentReceiptType = tsr.router(contract.paymentReceiptType, {
           .where(eq(paymentReceiptTypes.id, id))
           .returning();
 
-        if (usersData?.length) {
+        if (usersData) {
           await tx
             .delete(userPaymentReceiptTypes)
             .where(eq(userPaymentReceiptTypes.paymentReceiptTypeId, id));
@@ -260,6 +262,22 @@ export const paymentReceiptType = tsr.router(contract.paymentReceiptType, {
                 paymentReceiptTypeId: id,
               }))
             );
+
+            // Ensure isDefault is unique per user across all receipt types
+            const defaultUserIds = usersData.filter((u) => u.isDefault).map((u) => u.userId);
+
+            if (defaultUserIds.length) {
+              await tx
+                .update(userPaymentReceiptTypes)
+                .set({ isDefault: false })
+                .where(
+                  and(
+                    inArray(userPaymentReceiptTypes.userId, defaultUserIds),
+                    ne(userPaymentReceiptTypes.paymentReceiptTypeId, id),
+                    eq(userPaymentReceiptTypes.isDefault, true)
+                  )
+                );
+            }
           }
         }
 
@@ -318,13 +336,6 @@ export const paymentReceiptType = tsr.router(contract.paymentReceiptType, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentReceiptTypes.findFirst({
         where: eq(paymentReceiptTypes.id, id),

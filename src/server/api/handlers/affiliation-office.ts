@@ -2,7 +2,7 @@ import { db, affiliationOffices, userAffiliationOffices } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { tsr } from '@ts-rest/serverless/next';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 import { logAudit } from '@/server/utils/audit-logger';
@@ -59,28 +59,6 @@ const AFFILIATION_OFFICE_INCLUDES = createIncludeMap<typeof db.query.affiliation
     config: true,
   },
 });
-
-type AffiliationOfficeUserInput = {
-  userId: string;
-  userName: string;
-  isPrimary: boolean;
-};
-
-function normalizePrimaryUsers(users?: AffiliationOfficeUserInput[]) {
-  if (!users) return undefined;
-
-  let primaryAssigned = false;
-  return users.map((user) => {
-    if (!user.isPrimary) return user;
-
-    if (primaryAssigned) {
-      return { ...user, isPrimary: false };
-    }
-
-    primaryAssigned = true;
-    return user;
-  });
-}
 
 // ============================================
 // HANDLER
@@ -170,27 +148,37 @@ export const affiliationOffice = tsr.router(contract.affiliationOffice, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const { userAffiliationOffices: usersData, ...officeData } = body;
-      const normalizedUsers = normalizePrimaryUsers(usersData);
 
       const [created] = await db.transaction(async (tx) => {
         const [office] = await tx.insert(affiliationOffices).values(officeData).returning();
 
-        if (normalizedUsers?.length) {
+        if (usersData?.length) {
           await tx.insert(userAffiliationOffices).values(
-            normalizedUsers.map((user) => ({
+            usersData.map((user) => ({
               ...user,
               affiliationOfficeId: office.id,
             }))
           );
+
+          // Ensure isPrimary is unique per user across all offices
+          const primaryUserIds = usersData
+            .filter((u) => u.isPrimary)
+            .map((u) => u.userId);
+
+          if (primaryUserIds.length) {
+            await tx
+              .update(userAffiliationOffices)
+              .set({ isPrimary: false })
+              .where(
+                and(
+                  inArray(userAffiliationOffices.userId, primaryUserIds),
+                  ne(userAffiliationOffices.affiliationOfficeId, office.id),
+                  eq(userAffiliationOffices.isPrimary, true)
+                )
+              );
+          }
         }
 
         return [office];
@@ -206,7 +194,7 @@ export const affiliationOffice = tsr.router(contract.affiliationOffice, {
         status: 'success',
         afterValue: {
           ...created,
-          _userAffiliationOffices: normalizedUsers ?? [],
+          _userAffiliationOffices: usersData ?? [],
         },
         ipAddress,
         userAgent,
@@ -244,13 +232,6 @@ export const affiliationOffice = tsr.router(contract.affiliationOffice, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.affiliationOffices.findFirst({
         where: eq(affiliationOffices.id, id),
@@ -269,7 +250,6 @@ export const affiliationOffice = tsr.router(contract.affiliationOffice, {
       });
 
       const { userAffiliationOffices: usersData, ...officeData } = body;
-      const normalizedUsers = normalizePrimaryUsers(usersData);
 
       const [updated] = await db.transaction(async (tx) => {
         const [officeUpdated] = await tx
@@ -283,13 +263,31 @@ export const affiliationOffice = tsr.router(contract.affiliationOffice, {
             .delete(userAffiliationOffices)
             .where(eq(userAffiliationOffices.affiliationOfficeId, id));
 
-          if (normalizedUsers?.length) {
+          if (usersData.length) {
             await tx.insert(userAffiliationOffices).values(
-              normalizedUsers.map((user) => ({
+              usersData.map((user) => ({
                 ...user,
                 affiliationOfficeId: id,
               }))
             );
+
+            // Ensure isPrimary is unique per user across all offices
+            const primaryUserIds = usersData
+              .filter((u) => u.isPrimary)
+              .map((u) => u.userId);
+
+            if (primaryUserIds.length) {
+              await tx
+                .update(userAffiliationOffices)
+                .set({ isPrimary: false })
+                .where(
+                  and(
+                    inArray(userAffiliationOffices.userId, primaryUserIds),
+                    ne(userAffiliationOffices.affiliationOfficeId, id),
+                    eq(userAffiliationOffices.isPrimary, true)
+                  )
+                );
+            }
           }
         }
 
@@ -310,7 +308,7 @@ export const affiliationOffice = tsr.router(contract.affiliationOffice, {
         },
         afterValue: {
           ...updated,
-          _userAffiliationOffices: normalizedUsers ?? existingUsers,
+          _userAffiliationOffices: usersData ?? existingUsers,
         },
         ipAddress,
         userAgent,
@@ -349,13 +347,6 @@ export const affiliationOffice = tsr.router(contract.affiliationOffice, {
 
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.affiliationOffices.findFirst({
         where: eq(affiliationOffices.id, id),

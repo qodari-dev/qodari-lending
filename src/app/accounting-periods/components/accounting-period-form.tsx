@@ -31,7 +31,7 @@ import {
 } from '@/schemas/accounting-period';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -68,7 +68,7 @@ export function AccountingPeriodForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateAccountingPeriod();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateAccountingPeriod();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

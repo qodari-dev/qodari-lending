@@ -67,8 +67,6 @@ export function CreditFundBudgetsForm() {
     defaultValues: {
       accountingPeriodId: undefined,
       fundAmount: '0',
-      reinvestmentAmount: '0',
-      expenseAmount: '0',
     },
   });
 
@@ -93,7 +91,7 @@ export function CreditFundBudgetsForm() {
     [findPeriod]
   );
 
-  const hasBudgets = useMemo(() => fields.length > 0, [fields.length]);
+  const hasBudgets = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);
@@ -107,8 +105,6 @@ export function CreditFundBudgetsForm() {
     dialogForm.reset({
       accountingPeriodId: undefined,
       fundAmount: '0',
-      reinvestmentAmount: '0',
-      expenseAmount: '0',
     });
     setEditingIndex(null);
     setIsDialogOpen(true);
@@ -119,8 +115,6 @@ export function CreditFundBudgetsForm() {
     dialogForm.reset({
       accountingPeriodId: current?.accountingPeriodId ?? undefined,
       fundAmount: current?.fundAmount ?? '0',
-      reinvestmentAmount: current?.reinvestmentAmount ?? '0',
-      expenseAmount: current?.expenseAmount ?? '0',
     });
     setEditingIndex(index);
     setIsDialogOpen(true);
@@ -233,40 +227,6 @@ export function CreditFundBudgetsForm() {
                   </Field>
                 )}
               />
-              <Controller
-                name="reinvestmentAmount"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="reinvestmentAmount">Monto reinversion</FieldLabel>
-                    <Input
-                      id="reinvestmentAmount"
-                      {...field}
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="expenseAmount"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="expenseAmount">Monto gastos</FieldLabel>
-                    <Input
-                      id="expenseAmount"
-                      {...field}
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
             </div>
             <DialogFooter>
               <DialogClose asChild>
@@ -288,8 +248,6 @@ export function CreditFundBudgetsForm() {
             <TableRow>
               <TableHead>Periodo</TableHead>
               <TableHead>Fondo</TableHead>
-              <TableHead>Reinversion</TableHead>
-              <TableHead>Gastos</TableHead>
               <TableHead className="w-30 text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -299,12 +257,6 @@ export function CreditFundBudgetsForm() {
                 <TableCell>{getPeriodLabel(field.accountingPeriodId)}</TableCell>
                 <TableCell className="text-muted-foreground font-mono text-xs">
                   {formatCurrency(field.fundAmount)}
-                </TableCell>
-                <TableCell className="text-muted-foreground font-mono text-xs">
-                  {formatCurrency(field.reinvestmentAmount)}
-                </TableCell>
-                <TableCell className="text-muted-foreground font-mono text-xs">
-                  {formatCurrency(field.expenseAmount)}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-2">

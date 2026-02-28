@@ -69,8 +69,6 @@ export const GetCreditFundQuerySchema = z.object({
 export const CreditFundBudgetInputSchema = z.object({
   accountingPeriodId: z.number().int().positive(),
   fundAmount: z.string().min(1, 'Monto es requerido'),
-  reinvestmentAmount: z.string().min(1, 'Monto es requerido'),
-  expenseAmount: z.string().min(1, 'Monto es requerido'),
 });
 
 export type CreditFundBudgetInput = z.infer<typeof CreditFundBudgetInputSchema>;

@@ -120,7 +120,7 @@ export function AffiliationOfficeForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateAffiliationOffice();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateAffiliationOffice();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

@@ -139,15 +139,6 @@ const addUsersValidation = <T extends z.ZodTypeAny>(schema: T) =>
       }
       seen.add(user.userId);
     }
-
-    const primaryCount = users.filter((user) => user.isPrimary).length;
-    if (primaryCount > 1) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Solo puede haber un usuario principal',
-        path: ['userAffiliationOffices'],
-      });
-    }
   });
 
 export const CreateAffiliationOfficeBodySchema = addUsersValidation(AffiliationOfficeBaseSchema);

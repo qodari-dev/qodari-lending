@@ -106,7 +106,7 @@ export function PaymentReceiptTypeForm({
   const { mutateAsync: create, isPending: isCreating } = useCreatePaymentReceiptType();
   const { mutateAsync: update, isPending: isUpdating } = useUpdatePaymentReceiptType();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

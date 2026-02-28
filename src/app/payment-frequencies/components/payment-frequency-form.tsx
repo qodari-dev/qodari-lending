@@ -31,7 +31,7 @@ import {
 } from '@/schemas/payment-frequency';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { Controller, FormProvider, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -98,7 +98,7 @@ export function PaymentFrequencyForm({
   const { mutateAsync: create, isPending: isCreating } = useCreatePaymentFrequency();
   const { mutateAsync: update, isPending: isUpdating } = useUpdatePaymentFrequency();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

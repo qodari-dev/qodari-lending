@@ -143,22 +143,8 @@ export const paymentFrequency = tsr.router(contract.paymentFrequency, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
-      const newPaymentFrequency = await db.transaction(async (tx) => {
-        const [newPaymentFrequency] = await tx
-          .insert(paymentFrequencies)
-          .values(body)
-          .returning();
-
-        return newPaymentFrequency;
-      });
+      const [newPaymentFrequency] = await db.insert(paymentFrequencies).values(body).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -206,13 +192,6 @@ export const paymentFrequency = tsr.router(contract.paymentFrequency, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentFrequencies.findFirst({
         where: eq(paymentFrequencies.id, id),
@@ -226,15 +205,7 @@ export const paymentFrequency = tsr.router(contract.paymentFrequency, {
         });
       }
 
-      const updated = await db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(paymentFrequencies)
-          .set(body)
-          .where(eq(paymentFrequencies.id, id))
-          .returning();
-
-        return updated;
-      });
+      const [updated] = await db.update(paymentFrequencies).set(body).where(eq(paymentFrequencies.id, id)).returning();
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
@@ -286,13 +257,6 @@ export const paymentFrequency = tsr.router(contract.paymentFrequency, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.paymentFrequencies.findFirst({
         where: eq(paymentFrequencies.id, id),

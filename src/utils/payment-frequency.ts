@@ -44,7 +44,7 @@ function getCalendarDay(args: {
 }): number {
   const lastDay = new Date(args.year, args.month + 1, 0).getDate();
   if (args.day <= lastDay) return args.day;
-  return args.useEndOfMonthFallback ? lastDay : lastDay;
+  return args.useEndOfMonthFallback ? lastDay : args.day;
 }
 
 function buildCalendarDate(args: {

@@ -46,7 +46,8 @@ import {
 import { formatPaymentFrequencyRule } from '@/utils/payment-frequency';
 import { formatCurrency, formatNumber, formatPercent } from '@/utils/formatters';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertTriangle, ChevronDownIcon, Info } from 'lucide-react';
+import { triggerDownload } from '@/components/data-table/export/download';
+import { AlertTriangle, ChevronDownIcon, FileDown, Info } from 'lucide-react';
 import React from 'react';
 import { Controller, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -161,6 +162,41 @@ export function CreditSimulation() {
       form.setValue('insuranceCompanyId', null);
     }
   }, [form, selectedCreditProductId, selectedProduct?.paysInsurance]);
+
+  const [isDownloadingPdf, setIsDownloadingPdf] = React.useState(false);
+
+  const handleDownloadPdf = React.useCallback(async () => {
+    if (!result) return;
+
+    try {
+      setIsDownloadingPdf(true);
+      const response = await fetch('/api/v1/credit-simulation/pdf', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result),
+      });
+
+      if (!response.ok) {
+        let message = 'No fue posible generar el PDF';
+        try {
+          const body = (await response.json()) as { body?: { message?: string } };
+          if (body?.body?.message) message = body.body.message;
+        } catch {
+          // keep fallback
+        }
+        toast.error(message);
+        return;
+      }
+
+      const blob = await response.blob();
+      triggerDownload(blob, 'simulacion-de-credito.pdf');
+    } catch {
+      toast.error('No fue posible descargar el PDF');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  }, [result]);
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -508,8 +544,25 @@ export function CreditSimulation() {
           <div className="space-y-6 lg:col-span-3">
             <Card>
               <CardHeader>
-                <CardTitle>Resumen</CardTitle>
-                <CardDescription>Resultado de la simulacion y capacidad de pago.</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Resumen</CardTitle>
+                    <CardDescription>
+                      Resultado de la simulacion y capacidad de pago.
+                    </CardDescription>
+                  </div>
+                  {result && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadPdf}
+                      disabled={isDownloadingPdf}
+                    >
+                      {isDownloadingPdf ? <Spinner /> : <FileDown className="h-4 w-4" />}
+                      Descargar PDF
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {result ? (

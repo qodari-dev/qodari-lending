@@ -17,6 +17,7 @@ import {
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { formatCurrency } from '@/utils/formatters';
 import { calculatePaymentCapacity } from '@/utils/payment-capacity';
 import { resolvePaymentFrequencyIntervalDays } from '@/utils/payment-frequency';
 import { getThirdPartyLabel } from '@/utils/third-party';
@@ -194,7 +195,7 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
 
       const warningMessage = isWithinCapacity
         ? null
-        : `La cuota maxima (${maxInstallmentPayment.toFixed(2)}) supera la capacidad de pago (${paymentCapacity.toFixed(2)}).`;
+        : `La cuota maxima (${formatCurrency(maxInstallmentPayment)}) supera la capacidad de pago (${formatCurrency(paymentCapacity)}).`;
 
       return {
         status: 200 as const,

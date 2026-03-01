@@ -16,15 +16,7 @@ import type { InsuranceRateType } from '@/schemas/insurance-company';
 import type { PaymentScheduleMode } from '@/schemas/payment-frequency';
 import { buildCalendarDate } from './date-utils';
 import { roundMoney, toSafeNumber } from './number-utils';
-
-export type {
-  DayCountConvention,
-  FinancingType,
-  InsuranceAccrualMethod,
-  InsuranceRangeMetric,
-  InsuranceRateType,
-  InterestRateType,
-};
+import { resolveNextSemiMonthlyDate } from './payment-frequency';
 
 export type InsuranceRateRangeRule = {
   rangeMetric: InsuranceRangeMetric;
@@ -96,32 +88,7 @@ export type ResolvedInsuranceFactor = {
   insuranceMinimumAmount: number;
 };
 
-function nextSemiMonthlyDate(args: {
-  previous: Date;
-  day1: number;
-  day2: number;
-  useEndOfMonthFallback: boolean;
-}): Date {
-  const previous = startOfDay(args.previous);
-  const year = previous.getFullYear();
-  const month = previous.getMonth();
-
-  const firstCandidate = buildCalendarDate(year, month, args.day1, args.useEndOfMonthFallback);
-  const secondCandidate = buildCalendarDate(year, month, args.day2, args.useEndOfMonthFallback);
-
-  if (previous < firstCandidate) return firstCandidate;
-  if (previous < secondCandidate) return secondCandidate;
-
-  const nextMonth = addMonths(previous, 1);
-  return buildCalendarDate(
-    nextMonth.getFullYear(),
-    nextMonth.getMonth(),
-    args.day1,
-    args.useEndOfMonthFallback
-  );
-}
-
-function buildDueDates(input: CreditSimulationInput): Date[] {
+export function buildDueDates(input: CreditSimulationInput): Date[] {
   const firstDate = startOfDay(input.firstPaymentDate);
   const dueDates: Date[] = [firstDate];
   const useEndOfMonthFallback = input.useEndOfMonthFallback ?? true;
@@ -150,8 +117,8 @@ function buildDueDates(input: CreditSimulationInput): Date[] {
     const day2 = Math.max(input.semiMonthDay1 ?? 15, input.semiMonthDay2 ?? 30);
     let previous = firstDate;
     for (let index = 2; index <= input.installments; index++) {
-      previous = nextSemiMonthlyDate({
-        previous,
+      previous = resolveNextSemiMonthlyDate({
+        fromDate: addDays(previous, 1),
         day1,
         day2,
         useEndOfMonthFallback,
@@ -167,7 +134,13 @@ function buildDueDates(input: CreditSimulationInput): Date[] {
   return dueDates;
 }
 
-function getYearBaseDays(convention: DayCountConvention): number {
+export const SIMULATION_DEFAULTS = {
+  interestRateType: 'EFFECTIVE_ANNUAL' as InterestRateType,
+  dayCountConvention: 'ACTUAL_360' as DayCountConvention,
+  insuranceAccrualMethod: 'PER_INSTALLMENT' as InsuranceAccrualMethod,
+} as const;
+
+export function getYearBaseDays(convention: DayCountConvention): number {
   switch (convention) {
     case 'ACTUAL_365':
       return 365;
@@ -180,7 +153,7 @@ function getYearBaseDays(convention: DayCountConvention): number {
   }
 }
 
-function calculatePeriodRate(args: {
+export function calculatePeriodRate(args: {
   ratePercent: number;
   daysInterval: number;
   interestRateType: InterestRateType;
@@ -206,7 +179,7 @@ function calculatePeriodRate(args: {
   }
 }
 
-function calculateInsuranceCharge(args: {
+export function calculateInsuranceCharge(args: {
   installmentNumber: number;
   openingBalance: number;
   principal: number;
@@ -234,7 +207,7 @@ function calculateInsuranceCharge(args: {
   return roundMoney(insurance);
 }
 
-function calculateInstallmentInterest(args: {
+export function calculateInstallmentInterest(args: {
   financingType: FinancingType;
   principal: number;
   openingBalance: number;
@@ -311,7 +284,7 @@ function findFixedPaymentAmount(args: {
     high = roundMoney(high * 1.5);
   }
 
-  for (let i = 0; i < 80; i += 1) {
+  while (high - low > 0.005) {
     const mid = (low + high) / 2;
     const remaining = simulateRemainingWithFixedPayment({
       paymentAmount: mid,
@@ -383,9 +356,9 @@ export function resolveInsuranceFactorFromRange(args: {
 }
 
 export function calculateCreditSimulation(input: CreditSimulationInput): CreditSimulationResult {
-  const interestRateType = input.interestRateType ?? 'EFFECTIVE_ANNUAL';
-  const interestDayCountConvention = input.interestDayCountConvention ?? 'ACTUAL_360';
-  const insuranceAccrualMethod = input.insuranceAccrualMethod ?? 'PER_INSTALLMENT';
+  const interestRateType = input.interestRateType ?? SIMULATION_DEFAULTS.interestRateType;
+  const interestDayCountConvention = input.interestDayCountConvention ?? SIMULATION_DEFAULTS.dayCountConvention;
+  const insuranceAccrualMethod = input.insuranceAccrualMethod ?? SIMULATION_DEFAULTS.insuranceAccrualMethod;
   const insuranceRatePercent = input.insuranceRatePercent ?? 0;
   const insuranceFixedAmount = input.insuranceFixedAmount ?? 0;
   const insuranceMinimumAmount = input.insuranceMinimumAmount ?? 0;
@@ -446,11 +419,9 @@ export function calculateCreditSimulation(input: CreditSimulationInput): CreditS
     });
 
     let principalPayment =
-      input.installments === 1
+      index === input.installments
         ? roundMoney(openingBalance)
-        : index === input.installments
-          ? roundMoney(openingBalance)
-          : roundMoney(fixedPaymentAmount - interest - insurance);
+        : roundMoney(fixedPaymentAmount - interest - insurance);
 
     if (principalPayment < 0) {
       principalPayment = 0;
@@ -459,10 +430,7 @@ export function calculateCreditSimulation(input: CreditSimulationInput): CreditS
       principalPayment = roundMoney(openingBalance);
     }
 
-    const payment =
-      index === input.installments
-        ? roundMoney(principalPayment + interest + insurance)
-        : roundMoney(principalPayment + interest + insurance);
+    const payment = roundMoney(principalPayment + interest + insurance);
     const closingBalance = roundMoney(openingBalance - principalPayment);
 
     installments.push({

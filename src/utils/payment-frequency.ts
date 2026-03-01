@@ -63,7 +63,7 @@ function resolveNextMonthlyDate(args: {
   );
 }
 
-function resolveNextSemiMonthlyDate(args: {
+export function resolveNextSemiMonthlyDate(args: {
   fromDate: Date;
   day1: number;
   day2: number;

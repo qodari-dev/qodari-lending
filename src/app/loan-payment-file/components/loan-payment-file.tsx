@@ -26,6 +26,7 @@ import { useProcessLoanPaymentFile } from '@/hooks/queries/use-loan-payment-file
 import { useAvailableLoanPaymentReceiptTypes } from '@/hooks/queries/use-loan-payment-queries';
 import { usePaymentTenderTypes } from '@/hooks/queries/use-payment-tender-type-queries';
 import { ProcessLoanPaymentFileResult } from '@/schemas/loan-payment-file';
+import { detectDelimiter, parsePaymentAmount, parsePaymentDate, splitLine } from '@/utils/file-parsing';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import React from 'react';
 import { toast } from 'sonner';
@@ -39,20 +40,6 @@ type ParsedRow = {
   isValid: boolean;
   errorMessage: string | null;
 };
-
-function detectDelimiter(firstLine: string): ';' | ',' | '\t' | ' - ' {
-  if (firstLine.includes(';')) return ';';
-  if (firstLine.includes('\t')) return '\t';
-  if (firstLine.includes(',')) return ',';
-  return ' - ';
-}
-
-function splitLine(line: string, delimiter: ';' | ',' | '\t' | ' - ') {
-  if (delimiter === ' - ') {
-    return line.split(/\s+-\s+/g);
-  }
-  return line.split(delimiter);
-}
 
 function isHeaderLine(parts: string[]) {
   if (parts.length < 4) return false;
@@ -69,62 +56,6 @@ function isHeaderLine(parts: string[]) {
     col3.includes('fecha') &&
     col4.includes('valor')
   );
-}
-
-function parsePaymentDate(input: string): string | null {
-  const value = input.trim();
-  let yyyy = '';
-  let mm = '';
-  let dd = '';
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    [yyyy, mm, dd] = value.split('-');
-  } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-    [dd, mm, yyyy] = value.split('/');
-  } else if (/^\d{2}-\d{2}-\d{4}$/.test(value)) {
-    [dd, mm, yyyy] = value.split('-');
-  } else {
-    return null;
-  }
-
-  const asNumberYear = Number(yyyy);
-  const asNumberMonth = Number(mm);
-  const asNumberDay = Number(dd);
-  const date = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
-
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.getFullYear() !== asNumberYear ||
-    date.getMonth() + 1 !== asNumberMonth ||
-    date.getDate() !== asNumberDay
-  ) {
-    return null;
-  }
-
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function parsePaymentAmount(input: string): number | null {
-  const raw = input.trim().replace(/[^\d,.-]/g, '');
-  if (!raw) return null;
-
-  let normalized = raw;
-  const lastComma = normalized.lastIndexOf(',');
-  const lastDot = normalized.lastIndexOf('.');
-
-  if (lastComma !== -1 && lastDot !== -1) {
-    if (lastComma > lastDot) {
-      normalized = normalized.replace(/\./g, '').replace(',', '.');
-    } else {
-      normalized = normalized.replace(/,/g, '');
-    }
-  } else if (lastComma !== -1) {
-    normalized = normalized.replace(',', '.');
-  }
-
-  const value = Number(normalized);
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return value;
 }
 
 function parseFileContent(fileContent: string): ParsedRow[] {

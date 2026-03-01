@@ -18,6 +18,7 @@ import {
   GenerateRiskCenterDatacreditoResult,
   RiskCenterReportType,
 } from '@/schemas/risk-center-report';
+import { getMonthStart } from '@/utils/date-utils';
 import { formatDate } from '@/utils/formatters';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FileDown } from 'lucide-react';
@@ -34,10 +35,6 @@ type Props = {
 
 type FormValues = z.infer<typeof GenerateRiskCenterCifinBodySchema>;
 type ReportResult = GenerateRiskCenterCifinResult | GenerateRiskCenterDatacreditoResult;
-
-function getMonthStart(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
 
 export function RiskCenterReportForm({ reportType, title, description }: Props) {
   const [result, setResult] = React.useState<ReportResult | null>(null);

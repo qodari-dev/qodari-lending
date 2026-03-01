@@ -11,6 +11,7 @@ import { enqueueAgreementBillingEmailJob } from '@/server/queues/agreement-billi
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import { replaceVariablesInTemplate } from '@/utils/replace-vaiables-in-template';
 import { addDays, getDaysInMonth, isSaturday, isSunday, startOfDay, subDays } from 'date-fns';
 import { and, asc, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
@@ -63,27 +64,6 @@ function resolveCycleRunDateInMonth(params: {
     return moveToBusinessDay(baseDate, 'PREVIOUS');
   }
   return moveToBusinessDay(baseDate, 'NEXT');
-}
-
-function getThirdPartyLabel(input: {
-  personType?: 'NATURAL' | 'LEGAL' | null;
-  businessName?: string | null;
-  firstName?: string | null;
-  secondName?: string | null;
-  firstLastName?: string | null;
-  secondLastName?: string | null;
-  documentNumber?: string | null;
-}) {
-  if (input.personType === 'LEGAL') {
-    return input.businessName ?? input.documentNumber ?? '-';
-  }
-
-  const fullName = [input.firstName, input.secondName, input.firstLastName, input.secondLastName]
-    .filter((value): value is string => Boolean(value?.trim()))
-    .join(' ')
-    .trim();
-
-  return fullName || input.documentNumber || '-';
 }
 
 async function getInstallmentValue(loanId: number, runDate: string) {

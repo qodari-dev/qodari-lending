@@ -31,7 +31,9 @@ import { usePaymentTenderTypes } from '@/hooks/queries/use-payment-tender-type-q
 import { Loan, LoanBalanceSummaryResponse } from '@/schemas/loan';
 import { ProcessLoanPaymentPayrollResult } from '@/schemas/loan-payment-payroll';
 import { getTsRestErrorMessage } from '@/utils/get-ts-rest-error-message';
+import { detectDelimiter, parsePaymentAmount, splitLine } from '@/utils/file-parsing';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { roundMoney } from '@/utils/number-utils';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { zodResolver } from '@hookform/resolvers/zod';
 import React from 'react';
@@ -82,47 +84,6 @@ const FormSchema = z.object({
 
 type FormValues = z.infer<typeof FormSchema>;
 
-function round2(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function detectDelimiter(firstLine: string): ';' | ',' | '\t' | ' - ' {
-  if (firstLine.includes(';')) return ';';
-  if (firstLine.includes('\t')) return '\t';
-  if (firstLine.includes(',')) return ',';
-  return ' - ';
-}
-
-function splitLine(line: string, delimiter: ';' | ',' | '\t' | ' - ') {
-  if (delimiter === ' - ') {
-    return line.split(/\s+-\s+/g);
-  }
-  return line.split(delimiter);
-}
-
-function parseAmount(input: string): number | null {
-  const raw = input.trim().replace(/[^\d,.-]/g, '');
-  if (!raw) return null;
-
-  let normalized = raw;
-  const lastComma = normalized.lastIndexOf(',');
-  const lastDot = normalized.lastIndexOf('.');
-
-  if (lastComma !== -1 && lastDot !== -1) {
-    if (lastComma > lastDot) {
-      normalized = normalized.replace(/\./g, '').replace(',', '.');
-    } else {
-      normalized = normalized.replace(/,/g, '');
-    }
-  } else if (lastComma !== -1) {
-    normalized = normalized.replace(',', '.');
-  }
-
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return round2(parsed);
-}
-
 function parseBasicFile(content: string) {
   const lines = content
     .split(/\r?\n/g)
@@ -145,11 +106,12 @@ function parseBasicFile(content: string) {
     }
 
     const creditNumber = (raw[0] ?? '').trim().toUpperCase();
-    const amount = parseAmount(raw[1] ?? '');
-    if (!creditNumber || amount === null) return;
+    const rawAmount = parsePaymentAmount(raw[1] ?? '');
+    if (!creditNumber || rawAmount === null) return;
+    const amount = roundMoney(rawAmount);
 
     const current = result.get(creditNumber) ?? 0;
-    result.set(creditNumber, round2(current + amount));
+    result.set(creditNumber, roundMoney(current + amount));
   });
 
   return result;
@@ -159,12 +121,12 @@ function distributeByBalance(totalAmount: number, balance: number) {
   const amount = Math.max(0, totalAmount);
   if (amount > balance) {
     return {
-      paymentAmount: round2(balance),
-      overpaidAmount: round2(amount - balance),
+      paymentAmount: roundMoney(balance),
+      overpaidAmount: roundMoney(amount - balance),
     };
   }
   return {
-    paymentAmount: round2(amount),
+    paymentAmount: roundMoney(amount),
     overpaidAmount: 0,
   };
 }
@@ -272,12 +234,12 @@ export function LoanPaymentPayroll() {
   const totals = React.useMemo(() => {
     const totalPaymentAmount = rowsToProcess.reduce((acc, row) => acc + row.paymentAmount, 0);
     const totalOverpaidAmount = rowsToProcess.reduce((acc, row) => acc + row.overpaidAmount, 0);
-    const totalAssigned = round2(totalPaymentAmount + totalOverpaidAmount);
-    const difference = round2((collectionAmount ?? 0) - totalAssigned);
+    const totalAssigned = roundMoney(totalPaymentAmount + totalOverpaidAmount);
+    const difference = roundMoney((collectionAmount ?? 0) - totalAssigned);
 
     return {
-      totalPaymentAmount: round2(totalPaymentAmount),
-      totalOverpaidAmount: round2(totalOverpaidAmount),
+      totalPaymentAmount: roundMoney(totalPaymentAmount),
+      totalOverpaidAmount: roundMoney(totalOverpaidAmount),
       totalAssigned,
       difference,
       creditCount: rowsToProcess.length,
@@ -368,7 +330,7 @@ export function LoanPaymentPayroll() {
     setRows((currentRows) =>
       currentRows.map((row) => {
         if (row.loanId !== loanId) return row;
-        const normalized = Number.isFinite(value) && value >= 0 ? round2(value) : 0;
+        const normalized = Number.isFinite(value) && value >= 0 ? roundMoney(value) : 0;
         if (normalized > row.balance) {
           const distribution = distributeByBalance(normalized, row.balance);
           return {
@@ -390,7 +352,7 @@ export function LoanPaymentPayroll() {
     setRows((currentRows) =>
       currentRows.map((row) =>
         row.loanId === loanId
-          ? { ...row, overpaidAmount: Number.isFinite(value) && value >= 0 ? round2(value) : 0 }
+          ? { ...row, overpaidAmount: Number.isFinite(value) && value >= 0 ? roundMoney(value) : 0 }
           : row
       )
     );

@@ -3,23 +3,13 @@
 import { DataTableColumnHeader } from '@/components/data-table';
 import { LoanApplication } from '@/schemas/loan-application';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import type { ColumnDef } from '@tanstack/react-table';
 import { LoanApplicationApprovalRowActions } from './loan-application-approval-row-actions';
 
 function getApplicantLabel(application: LoanApplication): string {
-  const person = application.thirdParty;
-  if (!person) return String(application.thirdPartyId);
-
-  if (person.personType === 'LEGAL') {
-    return person.businessName ?? person.documentNumber;
-  }
-
-  const fullName = [person.firstName, person.secondName, person.firstLastName, person.secondLastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-
-  return fullName || person.documentNumber;
+  if (!application.thirdParty) return String(application.thirdPartyId);
+  return getThirdPartyLabel(application.thirdParty);
 }
 
 export const LoanApplicationApprovalColumns: ColumnDef<LoanApplication>[] = [

@@ -1,5 +1,6 @@
 import { addDays, addMonths, startOfDay } from 'date-fns';
 import type { PaymentScheduleMode } from '@/schemas/payment-frequency';
+import { buildCalendarDate } from './date-utils';
 
 export type PaymentFrequencyScheduleConfig = {
   scheduleMode: PaymentScheduleMode;
@@ -36,61 +37,30 @@ export function formatPaymentFrequencyRule(config: PaymentFrequencyScheduleConfi
   }
 }
 
-function getCalendarDay(args: {
-  year: number;
-  month: number;
-  day: number;
-  useEndOfMonthFallback: boolean;
-}): number {
-  const lastDay = new Date(args.year, args.month + 1, 0).getDate();
-  if (args.day <= lastDay) return args.day;
-  return args.useEndOfMonthFallback ? lastDay : args.day;
-}
-
-function buildCalendarDate(args: {
-  year: number;
-  month: number;
-  day: number;
-  useEndOfMonthFallback: boolean;
-}): Date {
-  return startOfDay(
-    new Date(
-      args.year,
-      args.month,
-      getCalendarDay({
-        year: args.year,
-        month: args.month,
-        day: args.day,
-        useEndOfMonthFallback: args.useEndOfMonthFallback,
-      })
-    )
-  );
-}
-
 function resolveNextMonthlyDate(args: {
   fromDate: Date;
   dayOfMonth: number;
   useEndOfMonthFallback: boolean;
 }): Date {
   const fromDate = startOfDay(args.fromDate);
-  const sameMonthCandidate = buildCalendarDate({
-    year: fromDate.getFullYear(),
-    month: fromDate.getMonth(),
-    day: args.dayOfMonth,
-    useEndOfMonthFallback: args.useEndOfMonthFallback,
-  });
+  const sameMonthCandidate = buildCalendarDate(
+    fromDate.getFullYear(),
+    fromDate.getMonth(),
+    args.dayOfMonth,
+    args.useEndOfMonthFallback
+  );
 
   if (sameMonthCandidate >= fromDate) {
     return sameMonthCandidate;
   }
 
   const nextMonth = addMonths(fromDate, 1);
-  return buildCalendarDate({
-    year: nextMonth.getFullYear(),
-    month: nextMonth.getMonth(),
-    day: args.dayOfMonth,
-    useEndOfMonthFallback: args.useEndOfMonthFallback,
-  });
+  return buildCalendarDate(
+    nextMonth.getFullYear(),
+    nextMonth.getMonth(),
+    args.dayOfMonth,
+    args.useEndOfMonthFallback
+  );
 }
 
 function resolveNextSemiMonthlyDate(args: {
@@ -103,35 +73,35 @@ function resolveNextSemiMonthlyDate(args: {
   const day1 = Math.min(args.day1, args.day2);
   const day2 = Math.max(args.day1, args.day2);
 
-  const firstCandidate = buildCalendarDate({
-    year: fromDate.getFullYear(),
-    month: fromDate.getMonth(),
-    day: day1,
-    useEndOfMonthFallback: args.useEndOfMonthFallback,
-  });
+  const firstCandidate = buildCalendarDate(
+    fromDate.getFullYear(),
+    fromDate.getMonth(),
+    day1,
+    args.useEndOfMonthFallback
+  );
 
   if (firstCandidate >= fromDate) {
     return firstCandidate;
   }
 
-  const secondCandidate = buildCalendarDate({
-    year: fromDate.getFullYear(),
-    month: fromDate.getMonth(),
-    day: day2,
-    useEndOfMonthFallback: args.useEndOfMonthFallback,
-  });
+  const secondCandidate = buildCalendarDate(
+    fromDate.getFullYear(),
+    fromDate.getMonth(),
+    day2,
+    args.useEndOfMonthFallback
+  );
 
   if (secondCandidate >= fromDate) {
     return secondCandidate;
   }
 
   const nextMonth = addMonths(fromDate, 1);
-  return buildCalendarDate({
-    year: nextMonth.getFullYear(),
-    month: nextMonth.getMonth(),
-    day: day1,
-    useEndOfMonthFallback: args.useEndOfMonthFallback,
-  });
+  return buildCalendarDate(
+    nextMonth.getFullYear(),
+    nextMonth.getMonth(),
+    day1,
+    args.useEndOfMonthFallback
+  );
 }
 
 export function resolveSuggestedFirstCollectionDate(args: {

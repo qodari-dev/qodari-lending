@@ -5,7 +5,8 @@ import {
 } from '@/schemas/subsidy';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { formatDateOnly } from '@/server/utils/value-utils';
+import { normalizeUpperCase } from '@/server/utils/string-utils';
+import { formatDateOnly, stringToSeed } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { z } from 'zod';
 import { contract } from '../contracts';
@@ -24,14 +25,6 @@ type HandlerContext = {
   appRoute: { metadata: PermissionMetadata };
 };
 
-function normalizePeriod(period: string) {
-  return period.trim().toUpperCase();
-}
-
-function periodSeed(period: string) {
-  return period.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-}
-
 async function generatePledgePaymentVoucher(
   body: GeneratePledgePaymentVoucherBody,
   context: HandlerContext
@@ -41,8 +34,8 @@ async function generatePledgePaymentVoucher(
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-    const period = normalizePeriod(body.period);
-    const seed = periodSeed(period);
+    const period = normalizeUpperCase(body.period);
+    const seed = stringToSeed(period);
     const processedCredits = 35 + (seed % 14);
     const processedPayments = processedCredits + (seed % 9) + 4;
     const totalDiscountedAmount = processedPayments * 138_000;
@@ -81,8 +74,8 @@ async function generatePerformedPledgesReport(
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-    const period = normalizePeriod(body.period);
-    const seed = periodSeed(period);
+    const period = normalizeUpperCase(body.period);
+    const seed = stringToSeed(period);
     const reviewedCredits = 70 + (seed % 20);
     const reportedCredits = Math.max(10, Math.floor(reviewedCredits * 0.78));
     const rows = Array.from({ length: reportedCredits }).map((_, index) => {
@@ -126,8 +119,8 @@ async function generateNotPerformedPledgesReport(
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-    const period = normalizePeriod(body.period);
-    const seed = periodSeed(period);
+    const period = normalizeUpperCase(body.period);
+    const seed = stringToSeed(period);
     const reviewedCredits = 70 + (seed % 20);
     const reportedCredits = Math.max(4, Math.floor(reviewedCredits * 0.22));
     const rows = Array.from({ length: reportedCredits }).map((_, index) => {

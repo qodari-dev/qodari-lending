@@ -8,23 +8,14 @@ import {
   LoanApplicationStatus,
 } from '@/schemas/loan-application';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { LoanApplicationRowActions } from './loan-application-row-actions';
 
 function getApplicantLabel(application: LoanApplication): string {
-  const person = application.thirdParty;
-  if (!person) return String(application.thirdPartyId);
-
-  if (person.personType === 'LEGAL') {
-    return person.businessName ?? person.documentNumber;
-  }
-
-  const fullName = [person.firstName, person.secondName, person.firstLastName, person.secondLastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fullName || person.documentNumber;
+  if (!application.thirdParty) return String(application.thirdPartyId);
+  return getThirdPartyLabel(application.thirdParty);
 }
 
 function StatusBadge({ status }: { status: LoanApplicationStatus }) {

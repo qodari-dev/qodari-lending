@@ -18,8 +18,16 @@ import {
   thirdParties,
 } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
+import {
+  getNextMonth,
+  pad2,
+  shiftMonth,
+  toMonthStart,
+  toUtcDateEndInclusive,
+  toUtcDateStart,
+} from '@/server/utils/date-utils';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { toNumber } from '@/server/utils/value-utils';
+import { toInteger, toNullableInteger, toNumber, toSafeString } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
@@ -64,63 +72,6 @@ type DashboardCacheEntry = {
 
 const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
 const dashboardSummaryCache = new Map<number, DashboardCacheEntry>();
-
-function pad2(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-function toMonthStart(year: number, month: number): string {
-  return `${year}-${pad2(month)}-01`;
-}
-
-function getNextMonth(year: number, month: number): { year: number; month: number } {
-  if (month === 12) {
-    return { year: year + 1, month: 1 };
-  }
-  return { year, month: month + 1 };
-}
-
-function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
-  const shifted = new Date(Date.UTC(year, month - 1 + delta, 1));
-  return {
-    year: shifted.getUTCFullYear(),
-    month: shifted.getUTCMonth() + 1,
-  };
-}
-
-function toUtcDateStart(value: string): Date {
-  return new Date(`${value}T00:00:00.000Z`);
-}
-
-function toUtcDateEndInclusive(year: number, month: number): string {
-  const date = new Date(Date.UTC(year, month, 0));
-  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
-}
-
-function toInteger(value: unknown): number {
-  if (typeof value === 'number') return Number.isFinite(value) ? Math.trunc(value) : 0;
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
-  }
-  return 0;
-}
-
-function toNullableInteger(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? Math.trunc(value) : null;
-  }
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
-  }
-  return null;
-}
-
-function toSafeString(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback;
-}
 
 async function calculateDashboardSummary(accountingPeriodId: number): Promise<DashboardSummary> {
   const period = await db.query.accountingPeriods.findFirst({

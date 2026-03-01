@@ -25,7 +25,9 @@ import {
   QueryConfig,
 } from '@/server/utils/query/query-builder';
 import { getRequiredUserContext } from '@/server/utils/required-user-context';
+import { extractUnknownErrorMessage } from '@/server/utils/error-utils';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { normalizeDocumentNumber } from '@/server/utils/string-utils';
 import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
@@ -82,27 +84,8 @@ const LOAN_PAYMENT_INCLUDES = createIncludeMap<typeof db.query.loanPayments>()({
   },
 });
 
-function normalizeDocumentNumber(value: string): string {
-  return value.trim().replace(/[^\dA-Za-z]/g, '').toUpperCase();
-}
-
 function normalizeCreditNumber(value: string): string {
   return value.trim().toUpperCase();
-}
-
-function extractUnknownErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message.trim();
-  }
-
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === 'string' && message.trim()) {
-      return message.trim();
-    }
-  }
-
-  return fallback;
 }
 
 export const loanPayment = tsr.router(contract.loanPayment, {

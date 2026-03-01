@@ -11,6 +11,7 @@ import {
   ProcessAccountingInterfaceCurrentInterestBodySchema,
   ProcessAccountingInterfaceCurrentInterestResult,
 } from '@/schemas/accounting-interface';
+import { getMonthStart } from '@/utils/date-utils';
 import { formatDate } from '@/utils/formatters';
 import { zodResolver } from '@hookform/resolvers/zod';
 import React from 'react';
@@ -20,10 +21,6 @@ import { z } from 'zod';
 
 const FormSchema = ProcessAccountingInterfaceCurrentInterestBodySchema;
 type FormValues = z.infer<typeof FormSchema>;
-
-function getMonthStart(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
 
 export function InterfaceAccountingCurrentInterest() {
   const [result, setResult] = React.useState<ProcessAccountingInterfaceCurrentInterestResult | null>(null);

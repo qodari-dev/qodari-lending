@@ -8,28 +8,13 @@ import {
   paymentReceiptMovementTypeLabels,
 } from '@/schemas/loan-payment';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import type { ColumnDef } from '@tanstack/react-table';
 import { LoanPaymentRowActions } from './loan-payment-row-actions';
 
 function getBorrowerLabel(loanPayment: LoanPayment): string {
-  const borrower = loanPayment.loan?.borrower;
-  if (!borrower) return loanPayment.loan?.creditNumber ?? String(loanPayment.loanId);
-
-  if (borrower.personType === 'LEGAL') {
-    return borrower.businessName ?? borrower.documentNumber;
-  }
-
-  const fullName = [
-    borrower.firstName,
-    borrower.secondName,
-    borrower.firstLastName,
-    borrower.secondLastName,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-
-  return fullName || borrower.documentNumber;
+  if (!loanPayment.loan?.borrower) return loanPayment.loan?.creditNumber ?? String(loanPayment.loanId);
+  return getThirdPartyLabel(loanPayment.loan.borrower);
 }
 
 export const loanPaymentColumns: ColumnDef<LoanPayment>[] = [

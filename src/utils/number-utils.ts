@@ -10,7 +10,7 @@ export function toSafeNumber(value: NumericInput): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function normalizeDecimalInput(value: string): string | null {
+export function normalizeDecimalInput(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
 

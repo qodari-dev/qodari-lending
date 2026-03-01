@@ -40,6 +40,7 @@ import {
 import { BankAccountType, bankAccountTypeLabels } from '@/schemas/loan-application';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatDate, formatDateTime, formatPercent } from '@/utils/formatters';
+import { getThirdPartyLabel } from '@/utils/third-party';
 
 const LOAN_DOCUMENT_TYPES = [
   'plan-de-pagos',
@@ -62,33 +63,6 @@ const loanDocumentLabels: Record<LoanDocumentType, string> = {
   aceptacion: 'Aceptación del crédito',
   libranza: 'Libranza',
 };
-
-function getPartyLabel(
-  party:
-    | {
-        personType: 'NATURAL' | 'LEGAL';
-        businessName?: string | null;
-        firstName?: string | null;
-        secondName?: string | null;
-        firstLastName?: string | null;
-        secondLastName?: string | null;
-        documentNumber: string;
-      }
-    | null
-    | undefined
-): string {
-  if (!party) return '-';
-
-  if (party.personType === 'LEGAL') {
-    return party.businessName ?? party.documentNumber;
-  }
-
-  const fullName = [party.firstName, party.secondName, party.firstLastName, party.secondLastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fullName || party.documentNumber;
-}
 
 function StatusBadge({ status }: { status: LoanStatus }) {
   return (
@@ -292,8 +266,8 @@ export function LoanInfo({
           title: 'Partes y recaudo',
           columns: 3,
           items: [
-            { label: 'Titular', value: getPartyLabel(detail.borrower) },
-            { label: 'Desembolso a', value: getPartyLabel(detail.disbursementParty) },
+            { label: 'Titular', value: getThirdPartyLabel(detail.borrower) },
+            { label: 'Desembolso a', value: getThirdPartyLabel(detail.disbursementParty) },
             {
               label: 'Convenio',
               value: detail.agreement
@@ -972,7 +946,7 @@ export function LoanInfo({
                           <TableCell>
                             {item.thirdParty?.documentNumber ?? item.thirdPartyId ?? '-'}
                           </TableCell>
-                          <TableCell>{getPartyLabel(item.thirdParty)}</TableCell>
+                          <TableCell>{getThirdPartyLabel(item.thirdParty)}</TableCell>
                           <TableCell>{item.thirdParty?.homeCity?.name ?? '-'}</TableCell>
                           <TableCell>{item.thirdParty?.workCity?.name ?? '-'}</TableCell>
                         </TableRow>

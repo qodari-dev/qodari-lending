@@ -21,6 +21,7 @@ import {
   GenerateInsuranceReportResult,
   InsuranceReportRow,
 } from '@/schemas/insurance-report';
+import { getMonthStart } from '@/utils/date-utils';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FileDown } from 'lucide-react';
@@ -31,10 +32,6 @@ import { z } from 'zod';
 
 const FormSchema = GenerateInsuranceReportBodySchema;
 type FormValues = z.infer<typeof FormSchema>;
-
-function getMonthStart(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
 
 export function InsuranceReport() {
   const [result, setResult] = React.useState<GenerateInsuranceReportResult | null>(null);

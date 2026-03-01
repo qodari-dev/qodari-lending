@@ -37,6 +37,7 @@ import { PaymentTenderType } from '@/schemas/payment-tender-type';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { parseDecimalString, roundMoney } from '@/utils/number-utils';
 import { onSubmitError } from '@/utils/on-submit-error';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -50,24 +51,8 @@ type FormValues = z.infer<typeof CreateLoanPaymentBodySchema>;
 type GlAccountOption = { id: number; code: string; name: string };
 
 function getBorrowerLabel(loan: Loan): string {
-  const borrower = loan.borrower;
-  if (!borrower) return loan.creditNumber;
-
-  if (borrower.personType === 'LEGAL') {
-    return borrower.businessName ?? borrower.documentNumber;
-  }
-
-  const fullName = [
-    borrower.firstName,
-    borrower.secondName,
-    borrower.firstLastName,
-    borrower.secondLastName,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-
-  return fullName || borrower.documentNumber;
+  if (!loan.borrower) return loan.creditNumber;
+  return getThirdPartyLabel(loan.borrower);
 }
 
 export function LoanPaymentForm({

@@ -1,49 +1,6 @@
-function normalizeDecimalInput(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
+import { normalizeDecimalInput, roundMoney } from '@/utils/number-utils';
 
-  const sign = trimmed.startsWith('-') ? '-' : trimmed.startsWith('+') ? '+' : '';
-  const unsigned = trimmed.slice(sign.length).replace(/\s+/g, '');
-  if (!unsigned || !/^\d[\d.,]*$/.test(unsigned)) return null;
-
-  const lastDot = unsigned.lastIndexOf('.');
-  const lastComma = unsigned.lastIndexOf(',');
-
-  if (lastDot === -1 && lastComma === -1) {
-    return `${sign}${unsigned}`;
-  }
-
-  if (lastDot !== -1 && lastComma !== -1) {
-    const decimalIndex = Math.max(lastDot, lastComma);
-    const integerPart = unsigned.slice(0, decimalIndex).replace(/[.,]/g, '');
-    const decimalPart = unsigned.slice(decimalIndex + 1).replace(/[.,]/g, '');
-    if (!integerPart || !decimalPart) return null;
-    return `${sign}${integerPart}.${decimalPart}`;
-  }
-
-  const separator = lastComma !== -1 ? ',' : '.';
-  const parts = unsigned.split(separator);
-  if (parts.some((part) => part.length === 0)) return null;
-
-  if (parts.length === 2) {
-    const [left, right] = parts;
-    if (right.length === 3 && left.length <= 3) {
-      return `${sign}${left}${right}`;
-    }
-    return `${sign}${left}.${right}`;
-  }
-
-  const allThousands = parts.slice(1).every((part) => part.length === 3);
-  if (allThousands) {
-    return `${sign}${parts.join('')}`;
-  }
-
-  const integerPart = parts.slice(0, -1).join('');
-  const decimalPart = parts.at(-1);
-  if (!integerPart || !decimalPart) return null;
-
-  return `${sign}${integerPart}.${decimalPart}`;
-}
+export { roundMoney };
 
 export function toNumber(value: string | number | null | undefined): number {
   if (value === null || value === undefined) return 0;
@@ -74,6 +31,49 @@ export function toDbDate(value: Date | null | undefined): string | null | undefi
   return formatDateOnly(value);
 }
 
-export function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
+// ============================================
+// ISO / Date coercion
+// ============================================
+
+export function toIsoString(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  return value.toISOString();
+}
+
+// ============================================
+// Type coercion (unknown → primitive)
+// ============================================
+
+export function toInteger(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.trunc(value) : 0;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
+  }
+  return 0;
+}
+
+export function toNullableInteger(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Math.trunc(value) : null;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
+  }
+  return null;
+}
+
+export function toSafeString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+// ============================================
+// Deterministic seed from string
+// ============================================
+
+export function stringToSeed(value: string): number {
+  return value.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 }

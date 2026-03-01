@@ -11,6 +11,7 @@ import {
   ProcessAccountingInterfaceCreditsBodySchema,
   ProcessAccountingInterfaceCreditsResult,
 } from '@/schemas/accounting-interface';
+import { getMonthStart } from '@/utils/date-utils';
 import { formatDate } from '@/utils/formatters';
 import { zodResolver } from '@hookform/resolvers/zod';
 import React from 'react';
@@ -20,10 +21,6 @@ import { z } from 'zod';
 
 const FormSchema = ProcessAccountingInterfaceCreditsBodySchema;
 type FormValues = z.infer<typeof FormSchema>;
-
-function getMonthStart(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
 
 export function InterfaceAccountingCredits() {
   const [result, setResult] = React.useState<ProcessAccountingInterfaceCreditsResult | null>(null);

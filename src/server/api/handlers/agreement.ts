@@ -20,7 +20,7 @@ import {
   QueryConfig,
 } from '@/server/utils/query/query-builder';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { formatDateOnly, toDbDate } from '@/server/utils/value-utils';
+import { formatDateOnly, toDbDate, toIsoString } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { eq, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
@@ -120,12 +120,6 @@ function normalizePayload<
     startDate: payload.startDate ? formatDateOnly(payload.startDate) : undefined,
     endDate: toDbDate(payload.endDate),
   };
-}
-
-function toIsoString(value: Date | string | null | undefined) {
-  if (!value) return null;
-  if (typeof value === 'string') return value;
-  return value.toISOString();
 }
 
 export const agreement = tsr.router(contract.agreement, {

@@ -4,23 +4,14 @@ import { DataTableColumnHeader } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Loan, loanStatusLabels, LoanStatus } from '@/schemas/loan';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { LoanRowActions } from './loan-row-actions';
 
 function getBorrowerLabel(loan: Loan): string {
-  const person = loan.borrower;
-  if (!person) return String(loan.thirdPartyId);
-
-  if (person.personType === 'LEGAL') {
-    return person.businessName ?? person.documentNumber;
-  }
-
-  const fullName = [person.firstName, person.secondName, person.firstLastName, person.secondLastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return fullName || person.documentNumber;
+  if (!loan.borrower) return String(loan.thirdPartyId);
+  return getThirdPartyLabel(loan.borrower);
 }
 
 function StatusBadge({ status }: { status: LoanStatus }) {

@@ -1,15 +1,6 @@
 import { LoanStatement, LoanStatementEntry } from '@/schemas/loan';
 import { CreditExtractClientMovement, CreditExtractClientStatement } from '@/schemas/credit-report';
-
-function toNumber(value: string | number | null | undefined): number {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function roundMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
+import { roundMoney, toSafeNumber } from '@/utils/number-utils';
 
 function toDecimalString(value: number): string {
   return roundMoney(value).toFixed(2);
@@ -107,7 +98,7 @@ export function buildCreditExtractClientStatement(
   const movementGroups = new Map<string, MovementGroup>();
 
   for (const entry of statement.entries) {
-    const delta = roundMoney(toNumber(entry.receivableDelta));
+    const delta = roundMoney(toSafeNumber(entry.receivableDelta));
     if (Math.abs(delta) < 0.005) continue;
 
     const key = buildGroupKey(entry);
@@ -135,7 +126,7 @@ export function buildCreditExtractClientStatement(
   }
 
   const groups = Array.from(movementGroups.values());
-  let runningBalance = roundMoney(toNumber(statement.openingBalance));
+  let runningBalance = roundMoney(toSafeNumber(statement.openingBalance));
   let totalCharges = 0;
   let totalPayments = 0;
 

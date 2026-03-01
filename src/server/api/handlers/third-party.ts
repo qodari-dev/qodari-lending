@@ -1,6 +1,7 @@
 import { db, thirdParties } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { toNullableString } from '@/server/utils/string-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { eq, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
@@ -122,12 +123,6 @@ function resolveThirdPartyContactPayload(
   input: ThirdPartyContactInput,
   existing?: typeof thirdParties.$inferSelect
 ) {
-  const toNullableString = (value: string | null | undefined) => {
-    if (value === null || value === undefined) return null;
-    const trimmed = value.trim();
-    return trimmed.length ? trimmed : null;
-  };
-
   const homeAddress = toNullableString(input.homeAddress) ?? toNullableString(existing?.homeAddress);
   const workAddress = toNullableString(input.workAddress) ?? toNullableString(existing?.workAddress);
   const homeCityId = input.homeCityId ?? existing?.homeCityId ?? null;

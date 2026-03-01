@@ -14,6 +14,7 @@ import type {
 } from '@/schemas/credit-product';
 import type { InsuranceRateType } from '@/schemas/insurance-company';
 import type { PaymentScheduleMode } from '@/schemas/payment-frequency';
+import { buildCalendarDate } from './date-utils';
 import { roundMoney, toSafeNumber } from './number-utils';
 
 export type {
@@ -95,28 +96,6 @@ export type ResolvedInsuranceFactor = {
   insuranceMinimumAmount: number;
 };
 
-function getValidCalendarDay(
-  year: number,
-  month: number,
-  day: number,
-  useEndOfMonthFallback: boolean
-): number {
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  if (day <= lastDay) return day;
-  return useEndOfMonthFallback ? lastDay : lastDay;
-}
-
-function createCalendarDate(
-  year: number,
-  month: number,
-  day: number,
-  useEndOfMonthFallback: boolean
-): Date {
-  return startOfDay(
-    new Date(year, month, getValidCalendarDay(year, month, day, useEndOfMonthFallback))
-  );
-}
-
 function nextSemiMonthlyDate(args: {
   previous: Date;
   day1: number;
@@ -127,14 +106,14 @@ function nextSemiMonthlyDate(args: {
   const year = previous.getFullYear();
   const month = previous.getMonth();
 
-  const firstCandidate = createCalendarDate(year, month, args.day1, args.useEndOfMonthFallback);
-  const secondCandidate = createCalendarDate(year, month, args.day2, args.useEndOfMonthFallback);
+  const firstCandidate = buildCalendarDate(year, month, args.day1, args.useEndOfMonthFallback);
+  const secondCandidate = buildCalendarDate(year, month, args.day2, args.useEndOfMonthFallback);
 
   if (previous < firstCandidate) return firstCandidate;
   if (previous < secondCandidate) return secondCandidate;
 
   const nextMonth = addMonths(previous, 1);
-  return createCalendarDate(
+  return buildCalendarDate(
     nextMonth.getFullYear(),
     nextMonth.getMonth(),
     args.day1,
@@ -155,7 +134,7 @@ function buildDueDates(input: CreditSimulationInput): Date[] {
     for (let index = 2; index <= input.installments; index++) {
       const monthRef = addMonths(firstDate, index - 1);
       dueDates.push(
-        createCalendarDate(
+        buildCalendarDate(
           monthRef.getFullYear(),
           monthRef.getMonth(),
           anchorDay,

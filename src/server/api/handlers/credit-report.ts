@@ -23,7 +23,7 @@ import { db, loans } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary, getLoanStatement } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { buildCreditExtractClientStatement } from '@/utils/credit-extract-client';
+import { buildCreditExtractClientStatement } from '@/server/utils/credit-extract-client';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { formatDateOnly, roundMoney } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';

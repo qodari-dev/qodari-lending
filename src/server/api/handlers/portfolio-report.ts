@@ -11,7 +11,7 @@ import {
 } from '@/schemas/portfolio-report';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { formatDateOnly, roundMoney } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney, stringToSeed } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { z } from 'zod';
 import { contract } from '../contracts';
@@ -62,16 +62,12 @@ type PortfolioReportRow = {
   note: string | null;
 };
 
-function reportTypeSeed(reportType: PortfolioReportType) {
-  return reportType.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-}
-
 function buildMockRows(
   reportType: PortfolioReportType,
   cutoffDate: string,
   reportedCredits: number
 ): PortfolioReportRow[] {
-  const seed = reportTypeSeed(reportType);
+  const seed = stringToSeed(reportType);
   const cutoffCompact = cutoffDate.replace(/-/g, '').slice(2);
 
   return Array.from({ length: reportedCredits }).map((_, index) => {
@@ -105,7 +101,7 @@ function buildMockReport<TReportType extends PortfolioReportType>(
   message: string;
 } {
   const cutoffDate = formatDateOnly(cutoffDateValue);
-  const seed = reportTypeSeed(reportType);
+  const seed = stringToSeed(reportType);
   const reviewedCredits = 70 + (seed % 30);
   const reportedCredits = Math.max(10, Math.floor(reviewedCredits * (0.62 + (seed % 4) * 0.07)));
   const rows = buildMockRows(reportType, cutoffDate, reportedCredits);
@@ -218,7 +214,7 @@ async function generatePortfolioByCreditType(
 }
 
 function buildPortfolioIndicatorsRows(cutoffDate: string): PortfolioIndicatorsReportRow[] {
-  const seed = cutoffDate.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const seed = stringToSeed(cutoffDate);
   const grossPortfolio = roundMoney(65_000_000 + (seed % 20) * 1_200_000);
   const overduePortfolio = roundMoney(grossPortfolio * (0.11 + (seed % 6) * 0.008));
   const delinquencyRate = Number(((overduePortfolio / grossPortfolio) * 100).toFixed(2));

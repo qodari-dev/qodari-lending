@@ -6,7 +6,7 @@ import {
 } from '@/schemas/loan-write-off';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { formatDateOnly, roundMoney } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney, stringToSeed } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { z } from 'zod';
 import { contract } from '../contracts';
@@ -23,16 +23,12 @@ type HandlerContext = {
   appRoute: { metadata: PermissionMetadata };
 };
 
-function proposalSeed(proposalId: string) {
-  return proposalId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-}
-
 function buildProposalId(cutoffDate: Date) {
   return `WO-${formatDateOnly(cutoffDate).replace(/-/g, '')}`;
 }
 
 function buildMockRows(proposalId: string): LoanWriteOffProposalRow[] {
-  const seed = proposalSeed(proposalId);
+  const seed = stringToSeed(proposalId);
   const totalRows = 8 + (seed % 5);
 
   return Array.from({ length: totalRows }).map((_, index) => {

@@ -52,7 +52,7 @@ import { GlAccount } from '@/schemas/gl-account';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Controller, useFieldArray, useForm, useFormContext } from 'react-hook-form';
+import { Controller, type Resolver, useFieldArray, useForm, useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -71,7 +71,7 @@ export function AccountingDistributionLinesForm() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const dialogForm = useForm<AccountingDistributionLineInput>({
-    resolver: zodResolver(AccountingDistributionLineInputSchema),
+    resolver: zodResolver(AccountingDistributionLineInputSchema) as Resolver<AccountingDistributionLineInput>,
     defaultValues: {
       glAccountId: undefined,
       percentage: 0,

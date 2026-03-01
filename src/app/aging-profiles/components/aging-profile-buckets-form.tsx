@@ -31,7 +31,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Controller, useFieldArray, useForm, useFormContext } from 'react-hook-form';
+import { Controller, type Resolver, useFieldArray, useForm, useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -51,7 +51,7 @@ export function AgingProfileBucketsForm() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const dialogForm = useForm<AgingBucketInput>({
-    resolver: zodResolver(AgingBucketInputSchema),
+    resolver: zodResolver(AgingBucketInputSchema) as Resolver<AgingBucketInput>,
     defaultValues: {
       sortOrder: 0,
       name: '',

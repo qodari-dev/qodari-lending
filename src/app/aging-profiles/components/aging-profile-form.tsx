@@ -23,7 +23,7 @@ import { AgingProfile, CreateAgingProfileBodySchema } from '@/schemas/aging-prof
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useId } from 'react';
-import { Controller, FormProvider, useForm } from 'react-hook-form';
+import { Controller, FormProvider, type Resolver, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { AgingProfileBucketsForm } from './aging-profile-buckets-form';
 
@@ -41,7 +41,7 @@ export function AgingProfileForm({
   const formId = useId();
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(CreateAgingProfileBodySchema),
+    resolver: zodResolver(CreateAgingProfileBodySchema) as Resolver<FormValues>,
     defaultValues: {
       name: '',
       note: null,
@@ -62,7 +62,7 @@ export function AgingProfileForm({
             name: bucket.name,
             daysFrom: bucket.daysFrom,
             daysTo: bucket.daysTo ?? null,
-            provisionRate: bucket.provisionRate ?? null,
+            provisionRate: bucket.provisionRate != null ? Number(bucket.provisionRate) : null,
             isActive: bucket.isActive,
           })) ?? [],
       });

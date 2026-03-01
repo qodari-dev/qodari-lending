@@ -299,7 +299,7 @@ export function CreditProductForm({
   const { mutateAsync: create, isPending: isCreating } = useCreateCreditProduct();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateCreditProduct();
 
-  const isLoading = useMemo(() => isCreating || isUpdating, [isCreating, isUpdating]);
+  const isLoading = isCreating || isUpdating;
 
   const onSubmit = useCallback(
     async (values: FormValues) => {

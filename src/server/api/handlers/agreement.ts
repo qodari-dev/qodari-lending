@@ -77,8 +77,8 @@ const AGREEMENT_INCLUDES = createIncludeMap<typeof db.query.agreements>()({
   },
 });
 
-function normalizePayload(
-  payload: Partial<{
+function normalizePayload<
+  T extends Partial<{
     agreementCode: string;
     documentNumber: string;
     businessName: string;
@@ -93,8 +93,8 @@ function normalizePayload(
     endDate: Date | null;
     note: string | null;
     isActive: boolean;
-  }>
-) {
+  }>,
+>(payload: T) {
   return {
     ...payload,
     agreementCode: payload.agreementCode?.trim().toUpperCase(),

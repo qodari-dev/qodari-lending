@@ -179,6 +179,7 @@ export const agingProfile = tsr.router(contract.agingProfile, {
           await tx.insert(agingBuckets).values(
             bucketsData.map((bucket) => ({
               ...bucket,
+              provisionRate: bucket.provisionRate != null ? String(bucket.provisionRate) : null,
               agingProfileId: profile.id,
             }))
           );
@@ -289,6 +290,7 @@ export const agingProfile = tsr.router(contract.agingProfile, {
             await tx.insert(agingBuckets).values(
               bucketsData.map((bucket) => ({
                 ...bucket,
+                provisionRate: bucket.provisionRate != null ? String(bucket.provisionRate) : null,
                 agingProfileId: id,
               }))
             );

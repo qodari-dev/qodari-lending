@@ -205,13 +205,6 @@ export const creditProduct = tsr.router(contract.creditProduct, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const {
         creditProductRefinancePolicy: refinancePolicyData,
@@ -342,13 +335,6 @@ export const creditProduct = tsr.router(contract.creditProduct, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.creditProducts.findFirst({
         where: eq(creditProducts.id, id),
@@ -617,13 +603,6 @@ export const creditProduct = tsr.router(contract.creditProduct, {
     const userAgent = nextRequest.headers.get('user-agent');
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
 
       const existing = await db.query.creditProducts.findFirst({
         where: eq(creditProducts.id, id),

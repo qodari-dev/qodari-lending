@@ -36,7 +36,7 @@ import {
 } from '@/schemas/credit-product';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Controller, useFieldArray, useForm, useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -64,7 +64,7 @@ export function CreditProductCategoriesForm() {
     },
   });
 
-  const hasItems = useMemo(() => fields.length > 0, [fields.length]);
+  const hasItems = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);

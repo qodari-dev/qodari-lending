@@ -157,6 +157,7 @@ export const accountingDistribution = tsr.router(contract.accountingDistribution
           await tx.insert(accountingDistributionLines).values(
             linesData.map((line) => ({
               ...line,
+              percentage: String(line.percentage),
               accountingDistributionId: distribution.id,
             }))
           );
@@ -247,6 +248,7 @@ export const accountingDistribution = tsr.router(contract.accountingDistribution
             await tx.insert(accountingDistributionLines).values(
               linesData.map((line) => ({
                 ...line,
+                percentage: String(line.percentage),
                 accountingDistributionId: id,
               }))
             );

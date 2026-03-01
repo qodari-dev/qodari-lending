@@ -88,7 +88,7 @@ export function CreditProductRequiredDocumentsForm() {
     return map;
   }, [documentTypes]);
 
-  const hasItems = useMemo(() => fields.length > 0, [fields.length]);
+  const hasItems = fields.length > 0;
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);

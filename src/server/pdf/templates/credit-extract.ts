@@ -2,7 +2,7 @@ import React from 'react';
 import { CreditExtractReportResponse } from '@/schemas/credit-report';
 import { PdfTemplateBuilder } from '../types';
 import { createBaseStyles } from '../theme';
-import { formatCurrency, formatDate } from '../format';
+import { formatCurrency, formatDate } from '@/utils/formatters';
 import { PageShell, MetaLines, SummaryGrid, PdfTable, TableColumn } from '../components';
 
 const h = React.createElement;
@@ -58,6 +58,7 @@ export const creditExtractTemplate: PdfTemplateBuilder<CreditExtractReportRespon
   const styles = createBaseStyles(rpdf);
 
   return PageShell(rpdf, {
+    styles,
     children: [
       h(Text, { style: styles.title, key: 'title' }, 'Extracto de credito'),
       ...MetaLines(rpdf, styles, [

@@ -1,7 +1,7 @@
 import React from 'react';
 import { PdfTemplateBuilder } from '../types';
 import { createBaseStyles } from '../theme';
-import { formatCurrency, formatDate } from '../format';
+import { formatCurrency, formatDate } from '@/utils/formatters';
 import { PageShell, MetaLines, PdfTable, TableColumn, SignatureBlock } from '../components';
 import { LoanDocumentData } from './loan-document-types';
 import {
@@ -76,26 +76,8 @@ export const planDePagosTemplate: PdfTemplateBuilder<LoanDocumentData> = (data, 
   const totalInsurance = installments.reduce((s, i) => s + Number(i.insuranceAmount), 0);
   const totalCuota = totalCapital + totalInterest + totalInsurance;
 
-  const totalsRow: InstallmentRow = {
-    installmentNumber: 0,
-    dueDate: '',
-    principalAmount: String(totalCapital),
-    interestAmount: String(totalInterest),
-    insuranceAmount: String(totalInsurance),
-    remainingPrincipal: '0',
-  };
-
-  const totalColumns: TableColumn<InstallmentRow>[] = [
-    { header: '', width: '7%', getValue: () => '' },
-    { header: '', width: '14%', getValue: () => 'Total:' },
-    { header: '', width: '16%', textAlign: 'right', getValue: (r) => formatCurrency(r.principalAmount) },
-    { header: '', width: '16%', textAlign: 'right', getValue: (r) => formatCurrency(r.interestAmount) },
-    { header: '', width: '16%', textAlign: 'right', getValue: (r) => formatCurrency(r.insuranceAmount) },
-    { header: '', width: '16%', textAlign: 'right', getValue: () => formatCurrency(totalCuota) },
-    { header: '', width: '15%', textAlign: 'right', getValue: (r) => formatCurrency(r.remainingPrincipal) },
-  ];
-
   return PageShell(rpdf, {
+    styles,
     children: [
       h(Text, { style: styles.title, key: 'title' }, 'REPORTE DE PLAN DE PAGOS'),
       h(Text, { style: { ...styles.sectionTitle, marginTop: 4 }, key: 'credit' }, `CREDITO: ${loan.creditNumber}`),
@@ -125,31 +107,20 @@ export const planDePagosTemplate: PdfTemplateBuilder<LoanDocumentData> = (data, 
         emptyMessage: 'Sin cuotas registradas.',
         keyExtractor: (r) => `inst-${r.installmentNumber}`,
         tableKey: 'installments',
+        footerValues: [
+          '',
+          'Total:',
+          formatCurrency(totalCapital),
+          formatCurrency(totalInterest),
+          formatCurrency(totalInsurance),
+          formatCurrency(totalCuota),
+          formatCurrency(0),
+        ],
       }),
 
-      // Totals row
-      h(
-        View,
-        { style: { ...styles.row, borderTopWidth: 1, borderTopColor: '#111827' }, key: 'totals' },
-        ...totalColumns.map((col, i) =>
-          h(
-            Text,
-            {
-              style: {
-                width: col.width,
-                ...(col.textAlign ? { textAlign: col.textAlign } : {}),
-                fontWeight: 'bold' as const,
-              },
-              key: `total-${i}`,
-            },
-            col.getValue(totalsRow),
-          ),
-        ),
-      ),
-
       h(View, { style: { marginTop: 40 }, key: 'signatures' },
-        SignatureBlock(rpdf, { name: '', title: 'REVISADO POR' }),
-        SignatureBlock(rpdf, { name: '', title: 'ELABORADO POR' }),
+        SignatureBlock(rpdf, styles, { name: '', title: 'REVISADO POR' }),
+        SignatureBlock(rpdf, styles, { name: '', title: 'ELABORADO POR' }),
       ),
 
       h(Text, { style: { ...styles.small, marginTop: 20 }, key: 'print-date' }, `Fecha de Impresion: ${formatDate(printDate)}`),

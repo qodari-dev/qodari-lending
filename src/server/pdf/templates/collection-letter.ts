@@ -2,7 +2,7 @@ import React from 'react';
 import { PdfTemplateBuilder } from '../types';
 import { createBaseStyles } from '../theme';
 import { LetterBody, PageShell, SignatureBlock } from '../components';
-import { formatDate } from '../format';
+import { formatDate } from '@/utils/formatters';
 
 const h = React.createElement;
 
@@ -23,8 +23,9 @@ export const collectionLetterTemplate: PdfTemplateBuilder<CollectionLetterData> 
   const styles = createBaseStyles(rpdf);
 
   return PageShell(rpdf, {
+    styles,
     children: [
-      ...LetterBody(rpdf, {
+      ...LetterBody(rpdf, styles, {
         title: data.title,
         city: data.city,
         date: formatDate(data.generatedAt),
@@ -38,7 +39,7 @@ export const collectionLetterTemplate: PdfTemplateBuilder<CollectionLetterData> 
       h(Text, { style: { ...styles.small, marginTop: 10 }, key: 'disclaimer' },
         'Documento de demostracion. Contenido sujeto a validacion del area juridica y de cartera.'
       ),
-      SignatureBlock(rpdf, {
+      SignatureBlock(rpdf, styles, {
         name: data.senderName,
         title: data.senderRole,
       }),

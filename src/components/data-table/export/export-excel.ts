@@ -16,7 +16,7 @@ export async function exportToExcel<TData>(
 
   // Set column widths
   config.columns.forEach((col, idx) => {
-    worksheet.getColumn(idx + 1).width = col.width ?? 20;
+    worksheet.getColumn(idx + 1).width = col.excelWidth ?? col.width ?? 20;
   });
 
   // Row 1: Title (merged across all columns)

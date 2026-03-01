@@ -23,3 +23,15 @@ export async function renderTemplate<TData>(
     },
   });
 }
+
+/** Renders a template and returns the result as a base64-encoded string. */
+export async function renderTemplateToBase64<TData>(
+  data: TData,
+  template: PdfTemplateBuilder<TData>,
+): Promise<string> {
+  const rpdf = await loadReactPdf();
+  const document = template(data, rpdf);
+  const blob = await rpdf.pdf(document).toBlob();
+  const buffer = Buffer.from(await blob.arrayBuffer());
+  return buffer.toString('base64');
+}

@@ -27,7 +27,7 @@ export async function exportToPdf<TData>(
       filename: config.filename,
       columns: config.columns.map((c) => ({
         header: c.header,
-        width: c.width,
+        width: c.pdfWidth ?? c.width,
         textAlign: c.textAlign,
       })),
       rows,

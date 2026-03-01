@@ -26,6 +26,8 @@ import { getAuthContextAndValidatePermission } from '@/server/utils/require-perm
 import { buildCreditExtractClientStatement } from '@/server/utils/credit-extract-client';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { formatDateOnly, roundMoney } from '@/server/utils/value-utils';
+import { renderTemplateToBase64 } from '@/server/pdf/render';
+import { demoDocumentTemplate } from '@/server/pdf/templates/demo-document';
 import { tsr } from '@ts-rest/serverless/next';
 import { differenceInCalendarDays } from 'date-fns';
 import { eq } from 'drizzle-orm';
@@ -63,42 +65,8 @@ function buildRangeMeta(startDate: Date, endDate: Date, base: number) {
   return { reviewedCredits, reportedCredits };
 }
 
-function pdfEscape(value: string) {
-  return value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
-
-function buildDemoPdfBase64(title: string, lines: string[]) {
-  const allLines = [title, ...lines];
-  const textOps = allLines
-    .map((line, index) => `BT /F1 12 Tf 72 ${760 - index * 18} Td (${pdfEscape(line)}) Tj ET`)
-    .join('\n');
-  const streamContent = `${textOps}\n`;
-
-  const obj1 = '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n';
-  const obj2 = '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n';
-  const obj3 =
-    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n';
-  const obj4 = '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n';
-  const obj5 = `5 0 obj\n<< /Length ${Buffer.byteLength(streamContent, 'utf8')} >>\nstream\n${streamContent}endstream\nendobj\n`;
-
-  const objects = [obj1, obj2, obj3, obj4, obj5];
-
-  let pdf = '%PDF-1.4\n';
-  const offsets: number[] = [];
-  for (const obj of objects) {
-    offsets.push(Buffer.byteLength(pdf, 'utf8'));
-    pdf += obj;
-  }
-
-  const xrefOffset = Buffer.byteLength(pdf, 'utf8');
-  pdf += `xref\n0 ${objects.length + 1}\n`;
-  pdf += '0000000000 65535 f \n';
-  for (const offset of offsets) {
-    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
-  }
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-
-  return Buffer.from(pdf, 'utf8').toString('base64');
+async function buildDemoPdfBase64(title: string, lines: string[]): Promise<string> {
+  return renderTemplateToBase64({ title, lines }, demoDocumentTemplate);
 }
 
 export async function getCreditExtractReportData(
@@ -549,13 +517,14 @@ async function generateMinutesPdf(body: GenerateMinutesPdfBody, context: Handler
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
     // TODO(credit-report-minutes-pdf): generar PDF oficial del acta desde datos reales y plantilla institucional.
+    const pdfBase64 = await buildDemoPdfBase64('ACTA', [`Numero: ${body.minutesNumber.trim()}`]);
     return {
       status: 200 as const,
       body: {
         reportType: 'MINUTES_PDF' as const,
         minutesNumber: body.minutesNumber.trim(),
         fileName: `acta-${body.minutesNumber.trim().toLowerCase().replace(/\s+/g, '-')}.pdf`,
-        pdfBase64: buildDemoPdfBase64('ACTA', [`Numero: ${body.minutesNumber.trim()}`]),
+        pdfBase64,
         message: 'PDF de acta generado (demo).',
       },
     };
@@ -573,15 +542,16 @@ async function generateCreditClearancePdf(
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
     // TODO(credit-report-credit-clearance-pdf): generar PDF oficial de paz y salvo de credito.
+    const pdfBase64 = await buildDemoPdfBase64('PAZ Y SALVO CREDITO', [
+      `Credito: ${body.creditNumber.trim()}`,
+    ]);
     return {
       status: 200 as const,
       body: {
         reportType: 'CREDIT_CLEARANCE_PDF' as const,
         creditNumber: body.creditNumber.trim(),
         fileName: `paz-y-salvo-credito-${body.creditNumber.trim().toLowerCase().replace(/\s+/g, '-')}.pdf`,
-        pdfBase64: buildDemoPdfBase64('PAZ Y SALVO CREDITO', [
-          `Credito: ${body.creditNumber.trim()}`,
-        ]),
+        pdfBase64,
         message: 'PDF de paz y salvo de credito generado (demo).',
       },
     };
@@ -599,15 +569,16 @@ async function generateThirdPartyClearancePdf(
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
     // TODO(credit-report-third-party-clearance-pdf): generar PDF oficial de paz y salvo por tercero.
+    const pdfBase64 = await buildDemoPdfBase64('PAZ Y SALVO TERCERO', [
+      `Documento: ${body.thirdPartyDocumentNumber.trim()}`,
+    ]);
     return {
       status: 200 as const,
       body: {
         reportType: 'THIRD_PARTY_CLEARANCE_PDF' as const,
         thirdPartyDocumentNumber: body.thirdPartyDocumentNumber.trim(),
         fileName: `paz-y-salvo-tercero-${body.thirdPartyDocumentNumber.trim().toLowerCase().replace(/\s+/g, '-')}.pdf`,
-        pdfBase64: buildDemoPdfBase64('PAZ Y SALVO TERCERO', [
-          `Documento: ${body.thirdPartyDocumentNumber.trim()}`,
-        ]),
+        pdfBase64,
         message: 'PDF de paz y salvo de tercero generado (demo).',
       },
     };

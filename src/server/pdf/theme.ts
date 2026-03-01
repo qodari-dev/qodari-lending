@@ -14,6 +14,9 @@ export const pdfFontSizes = {
   body: 10,
   value: 11,
   small: 9,
+  legal: 9,
+  label: 10,
+  formLabel: 9,
 } as const;
 
 export const pdfSpacing = {
@@ -57,6 +60,12 @@ export function createBaseStyles(rpdf: ReactPdfModule) {
       paddingVertical: pdfSpacing.headRowPaddingV,
       backgroundColor: pdfColors.bgLight,
     },
+    footerRow: {
+      flexDirection: 'row',
+      borderTopWidth: 1,
+      borderTopColor: pdfColors.text,
+      paddingVertical: pdfSpacing.rowPaddingV,
+    },
     summaryGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -81,6 +90,57 @@ export function createBaseStyles(rpdf: ReactPdfModule) {
     small: {
       fontSize: pdfFontSizes.small,
       color: pdfColors.muted,
+    },
+    // -- Loan document styles (legal text, forms, labels) --
+    legalText: {
+      marginBottom: 6,
+      lineHeight: 1.5,
+      fontSize: pdfFontSizes.legal,
+      textAlign: 'justify',
+    },
+    labelText: {
+      marginBottom: 2,
+      fontSize: pdfFontSizes.label,
+    },
+    sectionHeader: {
+      fontSize: pdfFontSizes.label,
+      fontWeight: 'bold',
+      marginTop: 10,
+      marginBottom: 4,
+      textAlign: 'center',
+    },
+    formLabel: {
+      fontWeight: 'bold',
+      fontSize: pdfFontSizes.formLabel,
+    },
+    formCell: {
+      borderBottomWidth: 1,
+      borderBottomColor: pdfColors.border,
+      paddingVertical: 4,
+      paddingHorizontal: 4,
+    },
+    hr: {
+      borderBottomWidth: 1,
+      borderBottomColor: pdfColors.text,
+      marginVertical: 8,
+    },
+    signatureLine: {
+      borderBottomWidth: 1,
+      borderBottomColor: pdfColors.text,
+      width: 200,
+      marginBottom: 4,
+    },
+    twoColumnRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    signatureRow: {
+      flexDirection: 'row',
+      marginTop: 20,
+      gap: 40,
+    },
+    signatureColumn: {
+      width: '45%',
     },
   });
 }

@@ -25,10 +25,12 @@ export function PdfTable<T>(
     emptyMessage?: string;
     keyExtractor: (row: T) => string;
     tableKey?: string;
-  },
+    /** Optional footer values aligned to columns (e.g. totals row). Empty string = skip cell. */
+    footerValues?: string[];
+  }
 ): React.ReactElement {
   const { View, Text } = rpdf;
-  const { columns, rows, emptyMessage, keyExtractor, tableKey = 'table' } = options;
+  const { columns, rows, emptyMessage, keyExtractor, tableKey = 'table', footerValues } = options;
 
   const colStyle = (col: TableColumn<T>) => ({
     width: col.width,
@@ -39,7 +41,9 @@ export function PdfTable<T>(
   const headRow = h(
     View,
     { style: styles.headRow, key: `${tableKey}-head`, fixed: true },
-    ...columns.map((col, i) => h(Text, { style: colStyle(col), key: `${tableKey}-th-${i}` }, col.header)),
+    ...columns.map((col, i) =>
+      h(Text, { style: colStyle(col), key: `${tableKey}-th-${i}` }, col.header)
+    )
   );
 
   if (rows.length === 0) {
@@ -47,7 +51,7 @@ export function PdfTable<T>(
       View,
       { key: `${tableKey}-wrapper` },
       headRow,
-      h(Text, { style: styles.small, key: `${tableKey}-empty` }, emptyMessage ?? 'Sin datos.'),
+      h(Text, { style: styles.small, key: `${tableKey}-empty` }, emptyMessage ?? 'Sin datos.')
     );
   }
 
@@ -56,17 +60,33 @@ export function PdfTable<T>(
       View,
       { style: styles.row, key: keyExtractor(row), wrap: false },
       ...columns.map((col, i) =>
-        h(Text, { style: colStyle(col), key: `${keyExtractor(row)}-${i}` }, col.getValue(row)),
-      ),
-    ),
+        h(Text, { style: colStyle(col), key: `${keyExtractor(row)}-${i}` }, col.getValue(row))
+      )
+    )
   );
 
-  return h(
-    View,
-    { key: `${tableKey}-wrapper` },
-    headRow,
-    ...dataRows,
-  );
+  const children: React.ReactNode[] = [headRow, ...dataRows];
+
+  if (footerValues) {
+    children.push(
+      h(
+        View,
+        { style: styles.footerRow, key: `${tableKey}-footer`, wrap: false },
+        ...columns.map((col, i) =>
+          h(
+            Text,
+            {
+              style: { ...colStyle(col), fontWeight: 'bold' as const },
+              key: `${tableKey}-ft-${i}`,
+            },
+            footerValues[i] ?? ''
+          )
+        )
+      )
+    );
+  }
+
+  return h(View, { key: `${tableKey}-wrapper` }, ...children);
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +98,7 @@ export type SummaryItem = { label: string; value: string };
 export function SummaryGrid(
   rpdf: ReactPdfModule,
   styles: BaseStyles,
-  items: SummaryItem[],
+  items: SummaryItem[]
 ): React.ReactElement {
   const { View, Text } = rpdf;
 
@@ -90,9 +110,9 @@ export function SummaryGrid(
         View,
         { style: styles.summaryCard, key: `summary-${i}` },
         h(Text, { style: styles.summaryLabel }, item.label),
-        h(Text, { style: styles.summaryValue }, item.value),
-      ),
-    ),
+        h(Text, { style: styles.summaryValue }, item.value)
+      )
+    )
   );
 }
 
@@ -103,12 +123,12 @@ export function SummaryGrid(
 export function MetaLines(
   rpdf: ReactPdfModule,
   styles: BaseStyles,
-  lines: Array<{ label: string; value: string }>,
+  lines: Array<{ label: string; value: string }>
 ): React.ReactElement[] {
   const { Text } = rpdf;
 
   return lines.map((line, i) =>
-    h(Text, { style: styles.metaLine, key: `meta-${i}` }, `${line.label}: ${line.value}`),
+    h(Text, { style: styles.metaLine, key: `meta-${i}` }, `${line.label}: ${line.value}`)
   );
 }
 
@@ -119,17 +139,18 @@ export function MetaLines(
 export function PageShell(
   rpdf: ReactPdfModule,
   options: {
+    styles?: BaseStyles;
     children: React.ReactNode[];
     pageSize?: string;
-  },
+  }
 ): React.ReactElement {
   const { Document, Page } = rpdf;
-  const styles = createBaseStyles(rpdf);
+  const styles = options.styles ?? createBaseStyles(rpdf);
 
   return h(
     Document,
     null,
-    h(Page, { size: options.pageSize ?? 'A4', style: styles.page }, ...options.children),
+    h(Page, { size: options.pageSize ?? 'A4', style: styles.page }, ...options.children)
   );
 }
 
@@ -139,60 +160,124 @@ export function PageShell(
 
 export function LetterBody(
   rpdf: ReactPdfModule,
+  styles: BaseStyles,
   options: {
     title: string;
     paragraphs: string[];
     date: string;
     city?: string;
-  },
+  }
 ): React.ReactElement[] {
   const { Text } = rpdf;
-  const styles = createBaseStyles(rpdf);
 
   const elements: React.ReactElement[] = [];
 
   if (options.city) {
     elements.push(
-      h(Text, { style: styles.metaLine, key: 'letter-city' }, `${options.city}, ${options.date}`),
+      h(Text, { style: styles.metaLine, key: 'letter-city' }, `${options.city}, ${options.date}`)
     );
   } else {
     elements.push(h(Text, { style: styles.metaLine, key: 'letter-date' }, options.date));
   }
 
-  elements.push(h(Text, { style: { ...styles.title, marginTop: 16 }, key: 'letter-title' }, options.title));
+  elements.push(
+    h(Text, { style: { ...styles.title, marginTop: 16 }, key: 'letter-title' }, options.title)
+  );
 
   options.paragraphs.forEach((p, i) => {
-    elements.push(
-      h(
-        Text,
-        { style: { marginBottom: 8, lineHeight: 1.5 }, key: `letter-p-${i}` },
-        p,
-      ),
-    );
+    elements.push(h(Text, { style: styles.legalText, key: `letter-p-${i}` }, p));
   });
 
   return elements;
 }
 
 // ---------------------------------------------------------------------------
-// SignatureBlock
+// SignatureBlock (simple: name + title)
 // ---------------------------------------------------------------------------
 
 export function SignatureBlock(
   rpdf: ReactPdfModule,
+  styles: BaseStyles,
   options: {
     name: string;
     title: string;
-  },
+  }
 ): React.ReactElement {
   const { View, Text } = rpdf;
-  const styles = createBaseStyles(rpdf);
 
   return h(
     View,
     { style: { marginTop: 48 } },
-    h(View, { style: { borderTopWidth: 1, borderTopColor: '#111827', width: 200, marginBottom: 4 } }),
+    h(View, { style: styles.signatureLine }),
     h(Text, { style: { fontSize: 10 } }, options.name),
-    h(Text, { style: styles.small }, options.title),
+    h(Text, { style: styles.small }, options.title)
   );
+}
+
+// ---------------------------------------------------------------------------
+// SignatureField (multi-field: label + fields like name, doc, address)
+// ---------------------------------------------------------------------------
+
+export type SignatureFieldItem = { label: string; value?: string };
+
+export function SignatureField(
+  rpdf: ReactPdfModule,
+  styles: BaseStyles,
+  options: {
+    title: string;
+    fields: SignatureFieldItem[];
+    showSignatureLine?: boolean;
+    showFingerprint?: boolean;
+  }
+): React.ReactElement {
+  const { View, Text } = rpdf;
+  const { title, fields, showSignatureLine = true, showFingerprint = false } = options;
+
+  const children: React.ReactNode[] = [
+    h(Text, { style: { fontWeight: 'bold' as const, fontSize: 10, marginBottom: 4 } }, title),
+  ];
+
+  for (const field of fields) {
+    children.push(h(Text, { style: { fontSize: 9 } }, `${field.label}: ${field.value ?? ''}`));
+  }
+
+  if (showSignatureLine) {
+    children.push(
+      h(Text, { style: { fontSize: 9, marginTop: 8 } }, 'Firma: _______________________________')
+    );
+  }
+
+  if (showFingerprint) {
+    children.push(
+      h(
+        Text,
+        { style: { fontSize: 8, marginTop: 16, textAlign: 'center' as const } },
+        'Huella Dactilar'
+      )
+    );
+  }
+
+  return h(View, null, ...children);
+}
+
+// ---------------------------------------------------------------------------
+// SignatureRow (wraps multiple SignatureFields side by side)
+// ---------------------------------------------------------------------------
+
+export function SignatureRow(
+  rpdf: ReactPdfModule,
+  styles: BaseStyles,
+  columns: React.ReactElement[]
+): React.ReactElement {
+  const { View } = rpdf;
+  return h(View, { style: styles.signatureRow }, ...columns);
+}
+
+// ---------------------------------------------------------------------------
+// HorizontalRule
+// ---------------------------------------------------------------------------
+
+export function HorizontalRule(rpdf: ReactPdfModule, styles: BaseStyles): React.ReactElement {
+  const { View } = rpdf;
+  return h(View, { style: styles.hr });
 }

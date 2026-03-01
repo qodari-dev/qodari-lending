@@ -56,6 +56,7 @@ export const tableReportTemplate: PdfTemplateBuilder<TableReportData> = (data, r
   });
 
   return PageShell(rpdf, {
+    styles,
     children: [
       h(Text, { style: styles.title, key: 'title' }, data.title),
       ...MetaLines(rpdf, styles, [

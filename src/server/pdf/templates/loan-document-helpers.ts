@@ -1,14 +1,8 @@
 import { Loans } from '@/server/db/types';
+import { getThirdPartyLabel } from '@/utils/third-party';
 
 export function getBorrowerFullName(loan: Loans): string {
-  const b = loan.borrower;
-  if (!b) return '-';
-  if (b.personType === 'LEGAL') return b.businessName ?? b.documentNumber;
-  const name = [b.firstName, b.secondName, b.firstLastName, b.secondLastName]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return name || b.documentNumber;
+  return getThirdPartyLabel(loan.borrower);
 }
 
 export function getBorrowerDocument(loan: Loans): string {

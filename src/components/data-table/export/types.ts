@@ -13,8 +13,12 @@ export interface ExportColumn<TData> {
   accessorKey?: keyof TData & string;
   /** Custom value extractor – returns a plain string for the cell */
   getValue?: (row: TData) => string;
-  /** Column width: percentage for PDF, character width for Excel */
+  /** Generic width (used as fallback for both PDF and Excel). Prefer pdfWidth / excelWidth. */
   width?: number;
+  /** Column width as percentage of page for PDF export (e.g. 15 → 15%). Takes precedence over `width`. */
+  pdfWidth?: number;
+  /** Column width in characters for Excel export (default: 20). Takes precedence over `width`. */
+  excelWidth?: number;
   /** Text alignment within the column */
   textAlign?: 'left' | 'center' | 'right';
 }

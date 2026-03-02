@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { useAuthUser, useHasPermission } from '@/stores/auth-store-provider';
-import companyLogo from '../../../public/company-logo.png';
+import appLogo from '../../../public/app-logo.png';
 
 // Helper to check if any subitem matches the current pathname
 function isMenuActive(items: { url: string }[] | undefined, pathname: string): boolean {
@@ -56,7 +56,7 @@ function withAutoActive<T extends { items?: { url: string }[]; icon?: LucideIcon
 function AppLogo({ className }: { className?: string }) {
   return (
     <Image
-      src={companyLogo}
+      src={appLogo}
       alt="Qodari IAM logo"
       className={cn('object-contain', className)}
       sizes="80px"

@@ -1,6 +1,6 @@
 'use client';
 
-import { exportToPdf } from '@/components/data-table/export/export-pdf';
+import { triggerDownload } from '@/components/data-table/export/download';
 import { PageContent, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,12 +39,6 @@ import React from 'react';
 import { Controller, type Resolver, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-
-type WorkerStudyExportRow = {
-  section: string;
-  detail: string;
-  value: string;
-};
 
 const paymentBehaviorLabels: Record<WorkerStudyResult['credits'][number]['paymentBehavior'], string> = {
   PAID: 'Pagado',
@@ -107,71 +101,31 @@ export function WorkerStudy() {
       return;
     }
 
-    const exportRows: WorkerStudyExportRow[] = [
-      {
-        section: 'Trabajador',
-        detail: 'Nombre',
-        value: result.worker.fullName,
-      },
-      {
-        section: 'Trabajador',
-        detail: 'Documento',
-        value: `${result.worker.identificationTypeCode} ${result.worker.documentNumber}`,
-      },
-      {
-        section: 'Salario',
-        detail: 'Actual',
-        value: formatCurrency(result.salary.currentSalary),
-      },
-      {
-        section: 'Salario',
-        detail: 'Promedio ultimos 6 meses',
-        value: formatCurrency(result.salary.averageSalaryLastSixMonths),
-      },
-      {
-        section: 'Trayectoria',
-        detail: 'Meses de aportes',
-        value: formatNumber(result.trajectory.totalContributionMonths),
-      },
-      ...result.contributions.map((item) => ({
-        section: 'Aportes',
-        detail: `${item.period} - ${item.companyName}`,
-        value: `${formatCurrency(item.contributionBaseSalary)} / ${formatCurrency(item.contributionValue)}`,
-      })),
-      ...result.companyHistory.map((item) => ({
-        section: 'Empresas',
-        detail: item.companyName,
-        value: `${formatDate(item.fromDate)} a ${item.toDate ? formatDate(item.toDate) : 'Actual'}`,
-      })),
-      ...result.loanApplications.map((item) => ({
-        section: 'Solicitudes',
-        detail: `${item.creditNumber} (${getLoanApplicationStatusLabel(item.status)})`,
-        value: `${formatDate(item.applicationDate)} / ${formatCurrency(item.requestedAmount)} / ${item.approvedAmount !== null ? formatCurrency(item.approvedAmount) : '-'}`,
-      })),
-      ...result.credits.map((item) => ({
-        section: 'Creditos',
-        detail: `${item.creditNumber} (${getLoanStatusLabel(item.status)})`,
-        value: `${formatCurrency(item.principalAmount)} / Saldo ${formatCurrency(item.currentBalance)} / Mora ${formatCurrency(item.overdueBalance)} / ${paymentBehaviorLabels[item.paymentBehavior]}`,
-      })),
-    ];
-
     try {
       setIsExportingPdf(true);
-      await exportToPdf(
-        {
-          title: 'Estudio de trabajador',
-          filename: `estudio-trabajador-${result.worker.documentNumber}`,
-          columns: [
-            { header: 'Seccion', accessorKey: 'section', width: 20 },
-            { header: 'Detalle', accessorKey: 'detail', width: 45 },
-            { header: 'Valor', accessorKey: 'value', width: 35 },
-          ],
-        },
-        exportRows
-      );
-      toast.success('PDF generado correctamente');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No fue posible generar el PDF');
+      const response = await fetch('/api/v1/worker-study/pdf', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result),
+      });
+
+      if (!response.ok) {
+        let message = 'No fue posible generar el PDF';
+        try {
+          const body = (await response.json()) as { body?: { message?: string } };
+          if (body?.body?.message) message = body.body.message;
+        } catch {
+          // keep fallback
+        }
+        toast.error(message);
+        return;
+      }
+
+      const blob = await response.blob();
+      triggerDownload(blob, `estudio-trabajador-${result.worker.documentNumber}.pdf`);
+    } catch {
+      toast.error('No fue posible descargar el PDF');
     } finally {
       setIsExportingPdf(false);
     }

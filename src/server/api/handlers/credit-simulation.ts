@@ -26,6 +26,112 @@ import { tsr } from '@ts-rest/serverless/next';
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
+// ---------------------------------------------------------------------------
+// Worker Study – query row types
+// ---------------------------------------------------------------------------
+
+type WorkerStudyLoanApplicationRow = {
+  id: number;
+  creditNumber: string;
+  applicationDate: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
+  requestedAmount: string;
+  approvedAmount: string | null;
+  creditProduct: { name: string } | null;
+};
+
+type WorkerStudyCreditRow = {
+  id: number;
+  creditNumber: string;
+  loanApplicationId: number;
+  recordDate: string;
+  creditStartDate: string;
+  status:
+    | 'ACTIVE'
+    | 'GENERATED'
+    | 'INACTIVE'
+    | 'ACCOUNTED'
+    | 'VOID'
+    | 'RELIQUIDATED'
+    | 'FINISHED'
+    | 'PAID';
+  disbursementStatus: 'LIQUIDATED' | 'SENT_TO_ACCOUNTING' | 'SENT_TO_BANK' | 'DISBURSED';
+  principalAmount: string;
+  loanApplication: {
+    creditProduct: { name: string } | null;
+  } | null;
+};
+
+// ---------------------------------------------------------------------------
+// Worker Study – mock data builder
+// TODO(worker-study): Replace with real subsidy module integration:
+//   - contribution history from affiliates
+//   - company contribution history
+//   - employment trajectory
+//   - current and historical salary
+// ---------------------------------------------------------------------------
+
+const MOCK_SALARY_BASE = 1_800_000;
+const MOCK_SALARY_INCREMENT_PER_DIGIT = 15_000;
+const MOCK_SALARY_AVERAGE_FACTOR = 0.96;
+const MOCK_SALARY_HIGHEST_FACTOR = 1.08;
+const MOCK_CONTRIBUTION_RATE = 0.04;
+const MOCK_CONTRIBUTION_PERIODS = [
+  '2025-09',
+  '2025-10',
+  '2025-11',
+  '2025-12',
+  '2026-01',
+  '2026-02',
+] as const;
+
+function buildMockWorkerData(args: {
+  documentNumber: string;
+  employerBusinessName: string | null;
+}) {
+  const documentTail = Number(args.documentNumber.replace(/\D/g, '').slice(-2) || '0');
+  const salaryBase = MOCK_SALARY_BASE + documentTail * MOCK_SALARY_INCREMENT_PER_DIGIT;
+  const currentSalary = roundMoney(salaryBase);
+  const companyName = args.employerBusinessName ?? 'Servicios Integrales SAS';
+
+  return {
+    salary: {
+      currentSalary,
+      averageSalaryLastSixMonths: roundMoney(salaryBase * MOCK_SALARY_AVERAGE_FACTOR),
+      highestSalaryLastSixMonths: roundMoney(salaryBase * MOCK_SALARY_HIGHEST_FACTOR),
+    },
+    trajectory: {
+      totalContributionMonths: 92,
+      currentCompanyName: companyName,
+      previousCompanyName: args.employerBusinessName ? null : 'Comercial Andina LTDA',
+    },
+    contributions: MOCK_CONTRIBUTION_PERIODS.map((period) => ({
+      period,
+      companyName,
+      contributionBaseSalary: currentSalary,
+      contributionValue: roundMoney(currentSalary * MOCK_CONTRIBUTION_RATE),
+    })),
+    companyHistory: [
+      {
+        companyName,
+        fromDate: '2022-03-01',
+        toDate: null,
+        contributionMonths: 47,
+      },
+      ...(args.employerBusinessName
+        ? []
+        : [
+            {
+              companyName: 'Comercial Andina LTDA',
+              fromDate: '2018-01-01',
+              toDate: '2022-02-28',
+              contributionMonths: 50,
+            },
+          ]),
+    ],
+  };
+}
+
 export const creditSimulation = tsr.router(contract.creditSimulation, {
   calculate: async ({ body }, { request, appRoute }) => {
     try {
@@ -259,36 +365,8 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         });
       }
 
-      let loanApplicationRows: Array<{
-        id: number;
-        creditNumber: string;
-        applicationDate: string;
-        status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
-        requestedAmount: string;
-        approvedAmount: string | null;
-        creditProduct: { name: string } | null;
-      }> = [];
-      let creditRows: Array<{
-        id: number;
-        creditNumber: string;
-        loanApplicationId: number;
-        recordDate: string;
-        creditStartDate: string;
-        status:
-          | 'ACTIVE'
-          | 'GENERATED'
-          | 'INACTIVE'
-          | 'ACCOUNTED'
-          | 'VOID'
-          | 'RELIQUIDATED'
-          | 'FINISHED'
-          | 'PAID';
-        disbursementStatus: 'LIQUIDATED' | 'SENT_TO_ACCOUNTING' | 'SENT_TO_BANK' | 'DISBURSED';
-        principalAmount: string;
-        loanApplication: {
-          creditProduct: { name: string } | null;
-        } | null;
-      }> = [];
+      let loanApplicationRows: WorkerStudyLoanApplicationRow[] = [];
+      let creditRows: WorkerStudyCreditRow[] = [];
 
       if (workerThirdParty) {
         [loanApplicationRows, creditRows] = await Promise.all([
@@ -387,17 +465,10 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
       const thirdPartyLabel = getThirdPartyLabel(workerThirdParty);
       const workerFullName = thirdPartyLabel === '-' ? 'Afiliado demo' : thirdPartyLabel;
 
-      // TODO(worker-study): conectar con el modulo de subsidio para consultar data real:
-      // - historial de aportes del afiliado
-      // - historial de empresas aportantes
-      // - trayectoria laboral
-      // - salario historico y salario actual
-      // Esta respuesta mock existe solo para soportar la captura de presentacion.
-      const documentTail = Number(body.documentNumber.replace(/\D/g, '').slice(-2) || '0');
-      const salaryBase = 1800000 + documentTail * 15000;
-      const currentSalary = roundMoney(salaryBase);
-      const averageSalaryLastSixMonths = roundMoney(salaryBase * 0.96);
-      const highestSalaryLastSixMonths = roundMoney(salaryBase * 1.08);
+      const mockData = buildMockWorkerData({
+        documentNumber: body.documentNumber,
+        employerBusinessName: workerThirdParty?.employerBusinessName ?? null,
+      });
 
       return {
         status: 200 as const,
@@ -409,70 +480,10 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
             identificationTypeName: identificationType.name,
             documentNumber: workerThirdParty?.documentNumber ?? documentNumber,
           },
-          salary: {
-            currentSalary,
-            averageSalaryLastSixMonths,
-            highestSalaryLastSixMonths,
-          },
-          trajectory: {
-            totalContributionMonths: 92,
-            currentCompanyName: workerThirdParty?.employerBusinessName ?? 'Servicios Integrales SAS',
-            previousCompanyName: workerThirdParty?.employerBusinessName
-              ? null
-              : 'Comercial Andina LTDA',
-          },
-          contributions: [
-            {
-              period: '2025-09',
-              companyName: 'Servicios Integrales SAS',
-              contributionBaseSalary: currentSalary,
-              contributionValue: roundMoney(currentSalary * 0.04),
-            },
-            {
-              period: '2025-10',
-              companyName: 'Servicios Integrales SAS',
-              contributionBaseSalary: currentSalary,
-              contributionValue: roundMoney(currentSalary * 0.04),
-            },
-            {
-              period: '2025-11',
-              companyName: 'Servicios Integrales SAS',
-              contributionBaseSalary: currentSalary,
-              contributionValue: roundMoney(currentSalary * 0.04),
-            },
-            {
-              period: '2025-12',
-              companyName: 'Servicios Integrales SAS',
-              contributionBaseSalary: currentSalary,
-              contributionValue: roundMoney(currentSalary * 0.04),
-            },
-            {
-              period: '2026-01',
-              companyName: 'Servicios Integrales SAS',
-              contributionBaseSalary: currentSalary,
-              contributionValue: roundMoney(currentSalary * 0.04),
-            },
-            {
-              period: '2026-02',
-              companyName: 'Servicios Integrales SAS',
-              contributionBaseSalary: currentSalary,
-              contributionValue: roundMoney(currentSalary * 0.04),
-            },
-          ],
-          companyHistory: [
-            {
-              companyName: 'Servicios Integrales SAS',
-              fromDate: '2022-03-01',
-              toDate: null,
-              contributionMonths: 47,
-            },
-            {
-              companyName: 'Comercial Andina LTDA',
-              fromDate: '2018-01-01',
-              toDate: '2022-02-28',
-              contributionMonths: 50,
-            },
-          ],
+          salary: mockData.salary,
+          trajectory: mockData.trajectory,
+          contributions: mockData.contributions,
+          companyHistory: mockData.companyHistory,
           loanApplications: studiedLoanApplications,
           credits: studiedCredits,
           notes: workerThirdParty

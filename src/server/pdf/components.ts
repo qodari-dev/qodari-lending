@@ -1,8 +1,11 @@
+import path from 'path';
 import React from 'react';
 import { ReactPdfModule } from './types';
 import { createBaseStyles, BaseStyles } from './theme';
 
 const h = React.createElement;
+
+const COMPANY_LOGO_PATH = path.join(process.cwd(), 'public', 'company-logo.png');
 
 // ---------------------------------------------------------------------------
 // Table
@@ -142,15 +145,30 @@ export function PageShell(
     styles?: BaseStyles;
     children: React.ReactNode[];
     pageSize?: string;
+    /** Show the company logo at the top of the first page. Defaults to true. */
+    showLogo?: boolean;
   }
 ): React.ReactElement {
-  const { Document, Page } = rpdf;
+  const { Document, Page, View, Image } = rpdf;
   const styles = options.styles ?? createBaseStyles(rpdf);
+  const showLogo = options.showLogo ?? true;
+
+  const pageChildren: React.ReactNode[] = [];
+
+  if (showLogo) {
+    pageChildren.push(
+      h(View, { style: styles.logoHeader, key: '__logo-header', fixed: true },
+        h(Image, { src: COMPANY_LOGO_PATH, style: styles.logoImage }),
+      ),
+    );
+  }
+
+  pageChildren.push(...options.children);
 
   return h(
     Document,
     null,
-    h(Page, { size: options.pageSize ?? 'A4', style: styles.page }, ...options.children)
+    h(Page, { size: options.pageSize ?? 'A4', style: styles.page }, ...pageChildren)
   );
 }
 

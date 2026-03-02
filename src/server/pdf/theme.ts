@@ -142,6 +142,19 @@ export function createBaseStyles(rpdf: ReactPdfModule) {
     signatureColumn: {
       width: '45%',
     },
+    // -- Logo header --
+    logoHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+      paddingBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: pdfColors.border,
+    },
+    logoImage: {
+      width: 56,
+      height: 56,
+    },
   });
 }
 

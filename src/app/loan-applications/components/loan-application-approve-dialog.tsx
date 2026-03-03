@@ -3,6 +3,17 @@
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+  ComboboxValue,
+} from '@/components/ui/combobox';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -35,14 +46,16 @@ import {
   FinalApproveLoanApplicationBodySchema,
   LoanApplication,
 } from '@/schemas/loan-application';
+import { ThirdParty } from '@/schemas/third-party';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { formatDate } from '@/utils/formatters';
 import { resolveSuggestedFirstCollectionDate } from '@/utils/payment-frequency';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, ChevronDownIcon } from 'lucide-react';
 import React from 'react';
 import { Controller, type Resolver, useForm } from 'react-hook-form';
+import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
 
 type ApproveFormValues = z.infer<typeof FinalApproveLoanApplicationBodySchema>;
@@ -59,6 +72,11 @@ export function LoanApplicationApproveDialog({
   onApproved?(): void;
 }) {
   const canReadCreditsSettings = useHasPermission('credits-settings:read');
+  const dialogContentRef = React.useRef<HTMLDivElement | null>(null);
+  const [thirdPartySearch, setThirdPartySearch] = React.useState('');
+  const [debouncedThirdPartySearch] = useDebounce(thirdPartySearch.trim(), 350);
+  const [pinnedThirdParty, setPinnedThirdParty] = React.useState<ThirdParty | null>(null);
+
   const form = useForm<ApproveFormValues>({
     resolver: zodResolver(FinalApproveLoanApplicationBodySchema) as Resolver<ApproveFormValues>,
     mode: 'onChange',
@@ -109,10 +127,16 @@ export function LoanApplicationApproveDialog({
   const agreements = React.useMemo(() => agreementsData?.body?.data ?? [], [agreementsData]);
 
   const { data: thirdPartiesData } = useThirdParties({
-    limit: 1000,
+    limit: 20,
     sort: [{ field: 'createdAt', order: 'desc' }],
+    search: debouncedThirdPartySearch || undefined,
   });
-  const thirdParties = React.useMemo(() => thirdPartiesData?.body?.data ?? [], [thirdPartiesData]);
+  const thirdParties = React.useMemo(() => {
+    const base = thirdPartiesData?.body?.data ?? [];
+    if (!pinnedThirdParty) return base;
+    if (base.some((item) => item.id === pinnedThirdParty.id)) return base;
+    return [pinnedThirdParty, ...base];
+  }, [thirdPartiesData, pinnedThirdParty]);
 
   const { data: actNumbersData, isLoading: isLoadingActNumbers } = useLoanApplicationActNumbers({
     affiliationOfficeId: loanApplication?.affiliationOfficeId ?? 0,
@@ -147,6 +171,11 @@ export function LoanApplicationApproveDialog({
 
   React.useEffect(() => {
     if (!opened || !loanApplication) return;
+
+    // Pin the loan application's third party so it always shows in combobox
+    if (loanApplication.thirdParty) {
+      setPinnedThirdParty(loanApplication.thirdParty as ThirdParty);
+    }
 
     form.reset({
       mode: 'FINAL',
@@ -200,7 +229,7 @@ export function LoanApplicationApproveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpened}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent ref={dialogContentRef} className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Aprobar solicitud</DialogTitle>
           <DialogDescription>
@@ -242,7 +271,7 @@ export function LoanApplicationApproveDialog({
               name="paymentGuaranteeTypeId"
               control={form.control}
               render={({ field, fieldState }) => (
-                <div className="col-span-2 space-y-2">
+                <div className="space-y-2">
                   <Label htmlFor="approvePaymentGuaranteeTypeId">Garantia de pago</Label>
                   <Select
                     value={field.value ? String(field.value) : ''}
@@ -376,22 +405,61 @@ export function LoanApplicationApproveDialog({
               control={form.control}
               render={({ field, fieldState }) => (
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="approvePayeeThirdPartyId">Tercero desembolso</Label>
-                  <Select
-                    value={field.value ? String(field.value) : ''}
-                    onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                  <Label>Tercero desembolso</Label>
+                  <Combobox
+                    items={thirdParties}
+                    value={thirdParties.find((item) => item.id === field.value) ?? null}
+                    filter={null}
+                    onOpenChange={(isOpen) => {
+                      if (!isOpen) setThirdPartySearch('');
+                    }}
+                    onInputValueChange={(value, details) => {
+                      if (
+                        details.reason === 'input-change' ||
+                        details.reason === 'input-clear'
+                      ) {
+                        setThirdPartySearch(value);
+                      }
+                    }}
+                    onValueChange={(value: ThirdParty | null) => {
+                      field.onChange(value?.id ?? undefined);
+                      if (value) setPinnedThirdParty(value);
+                    }}
+                    itemToStringValue={(item: ThirdParty) => String(item.id)}
+                    itemToStringLabel={(item: ThirdParty) =>
+                      `${getThirdPartyLabel(item)} (${item.documentNumber})`
+                    }
                   >
-                    <SelectTrigger id="approvePayeeThirdPartyId">
-                      <SelectValue placeholder="Seleccione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {thirdParties.map((item) => (
-                        <SelectItem key={item.id} value={String(item.id)}>
-                          {getThirdPartyLabel(item)} ({item.documentNumber})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <ComboboxTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-between font-normal"
+                        >
+                          <ComboboxValue placeholder="Seleccione..." />
+                          <ChevronDownIcon className="text-muted-foreground size-4" />
+                        </Button>
+                      }
+                    />
+                    <ComboboxContent portalContainer={dialogContentRef}>
+                      <ComboboxInput
+                        placeholder="Buscar tercero..."
+                        showClear
+                        showTrigger={false}
+                      />
+                      <ComboboxList>
+                        <ComboboxEmpty>No se encontraron terceros</ComboboxEmpty>
+                        <ComboboxCollection>
+                          {(item: ThirdParty) => (
+                            <ComboboxItem key={item.id} value={item}>
+                              {getThirdPartyLabel(item)} ({item.documentNumber})
+                            </ComboboxItem>
+                          )}
+                        </ComboboxCollection>
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
                   {fieldState.error ? (
                     <p className="text-destructive text-xs">{fieldState.error.message}</p>
                   ) : null}

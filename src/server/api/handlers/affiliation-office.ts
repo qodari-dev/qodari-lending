@@ -1,6 +1,7 @@
 import { db, affiliationOffices, userAffiliationOffices } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { getRequiredUserContext } from '@/server/utils/required-user-context';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
@@ -65,6 +66,36 @@ const AFFILIATION_OFFICE_INCLUDES = createIncludeMap<typeof db.query.affiliation
 // ============================================
 
 export const affiliationOffice = tsr.router(contract.affiliationOffice, {
+  // ==========================================
+  // MY OFFICES - GET /affiliation-offices/my-offices
+  // ==========================================
+  myOffices: async (_, { request, appRoute }) => {
+    try {
+      const session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+      if (!session) {
+        throwHttpError({ status: 401, message: 'Not authenticated', code: 'UNAUTHENTICATED' });
+      }
+
+      const { userId } = getRequiredUserContext(session);
+
+      const rows = await db.query.userAffiliationOffices.findMany({
+        where: eq(userAffiliationOffices.userId, userId),
+        with: { affiliationOffice: { with: { city: true, costCenter: true } } },
+        orderBy: (t, { desc }) => [desc(t.isPrimary), desc(t.createdAt)],
+      });
+
+      const offices = rows
+        .map((row) => row.affiliationOffice)
+        .filter((office): office is NonNullable<typeof office> => !!office && office.isActive);
+
+      return { status: 200 as const, body: offices };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: 'Error al obtener oficinas del usuario',
+      });
+    }
+  },
+
   // ==========================================
   // LIST - GET /affiliation-offices
   // ==========================================

@@ -25,6 +25,7 @@ import { assessPaymentCapacity } from '@/utils/payment-capacity';
 import {
   formatPaymentFrequencyRule,
   resolvePaymentFrequencyIntervalDays,
+  resolveSuggestedFirstCollectionDate,
 } from '@/utils/payment-frequency';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { Eye } from 'lucide-react';
@@ -78,17 +79,31 @@ export function LoanApplicationDetails({
     );
     const annualRatePercent = Number(loanApplication.financingFactor ?? 0);
     const insuranceRatePercent = Number(loanApplication.insuranceFactor ?? 0);
-    const firstPaymentDate = loanApplication.applicationDate
+
+    if (!financingType || !daysInterval || !installments) {
+      return null;
+    }
+
+    const baseDate = loanApplication.applicationDate
       ? new Date(`${loanApplication.applicationDate}T00:00:00`)
       : null;
 
-    if (!financingType || !daysInterval || !installments || !firstPaymentDate) {
+    if (!baseDate || Number.isNaN(baseDate.getTime())) {
       return null;
     }
 
-    if (Number.isNaN(firstPaymentDate.getTime())) {
-      return null;
-    }
+    const firstPaymentDate = loanApplication.paymentFrequency
+      ? resolveSuggestedFirstCollectionDate({
+          baseDate,
+          minimumDaysBeforeCollection: 7,
+          scheduleMode: loanApplication.paymentFrequency.scheduleMode,
+          intervalDays: loanApplication.paymentFrequency.intervalDays,
+          dayOfMonth: loanApplication.paymentFrequency.dayOfMonth,
+          semiMonthDay1: loanApplication.paymentFrequency.semiMonthDay1,
+          semiMonthDay2: loanApplication.paymentFrequency.semiMonthDay2,
+          useEndOfMonthFallback: loanApplication.paymentFrequency.useEndOfMonthFallback,
+        })
+      : baseDate;
 
     return calculateCreditSimulation({
       financingType,

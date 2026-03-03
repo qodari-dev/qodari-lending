@@ -37,10 +37,12 @@ export function LoanApplicationThirdPartiesForm({
   thirdParties,
   onCreateThirdParty,
   onEditThirdParty,
+  onThirdPartySearch,
 }: {
   thirdParties: ThirdParty[];
   onCreateThirdParty: () => void;
   onEditThirdParty: (thirdParty: ThirdParty) => void;
+  onThirdPartySearch: (search: string) => void;
 }) {
   const form = useFormContext<FormValues>();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -107,6 +109,18 @@ export function LoanApplicationThirdPartiesForm({
         <Combobox
           items={thirdParties}
           value={selectedThirdParty}
+          filter={null}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) onThirdPartySearch('');
+          }}
+          onInputValueChange={(value, details) => {
+            if (
+              details.reason === 'input-change' ||
+              details.reason === 'input-clear'
+            ) {
+              onThirdPartySearch(value);
+            }
+          }}
           onValueChange={(value) => setSelectedThirdPartyId(value?.id)}
           itemToStringValue={(item) => String(item.id)}
           itemToStringLabel={(item) => `${getThirdPartyLabel(item)} (${item.documentNumber})`}
@@ -124,7 +138,7 @@ export function LoanApplicationThirdPartiesForm({
             <ComboboxList>
               <ComboboxEmpty>No se encontraron terceros</ComboboxEmpty>
               <ComboboxCollection>
-                {(item) => (
+                {(item: ThirdParty) => (
                   <ComboboxItem key={item.id} value={item}>
                     {getThirdPartyLabel(item)} ({item.documentNumber})
                   </ComboboxItem>

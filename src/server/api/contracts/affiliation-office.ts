@@ -15,6 +15,18 @@ const resourceKey = 'affiliation-offices';
 
 export const affiliationOffice = c.router(
   {
+    myOffices: {
+      method: 'GET',
+      path: '/my-offices',
+      metadata: {
+        auth: 'required',
+      } satisfies TsRestMetaData,
+      responses: {
+        200: c.type<AffiliationOffices[]>(),
+        401: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
     list: {
       method: 'GET',
       path: '/',

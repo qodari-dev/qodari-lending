@@ -65,7 +65,7 @@ import {
   resolveSuggestedFirstCollectionDate,
 } from '@/utils/payment-frequency';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 import { env } from '@/env';
 import {
@@ -341,7 +341,7 @@ async function resolveInsuranceFactor(args: {
 
   return {
     product,
-    insuranceFactor: insuranceResolved.insuranceRatePercent,
+    insuranceFactor: insuranceResolved.insuranceFactor,
     insuranceCompanyId: insurer.id,
     insuranceRateType: insuranceResolved.insuranceRateType,
     insuranceRatePercent: insuranceResolved.insuranceRatePercent,
@@ -417,12 +417,12 @@ async function ensureThirdPartiesAreUpToDate(args: { thirdPartyIds: number[] }) 
 
 function generateCreditNumber(prefix: string): string {
   const now = new Date();
-  const yy = String(now.getUTCFullYear()).slice(-2);
-  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(now.getUTCDate()).padStart(2, '0');
-  const hh = String(now.getUTCHours()).padStart(2, '0');
-  const mi = String(now.getUTCMinutes()).padStart(2, '0');
-  const ss = String(now.getUTCSeconds()).padStart(2, '0');
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mi = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
   const rnd = Math.floor(Math.random() * 900 + 100);
   const normalizedPrefix = prefix.trim().toUpperCase().slice(0, 5);
   return `${normalizedPrefix}${yy}${mm}${dd}${hh}${mi}${ss}${rnd}`;
@@ -469,10 +469,12 @@ function pickApplicableBillingRule(args: {
   return applicable[0] ?? null;
 }
 
-async function ensureUniqueCreditNumber(prefix: string) {
+type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function ensureUniqueCreditNumber(prefix: string, dbOrTx: DbOrTx = db) {
   for (let i = 0; i < 5; i += 1) {
     const creditNumber = generateCreditNumber(prefix);
-    const exists = await db.query.loanApplications.findFirst({
+    const exists = await dbOrTx.query.loanApplications.findFirst({
       where: eq(loanApplications.creditNumber, creditNumber),
       columns: { id: true },
     });
@@ -486,16 +488,6 @@ async function ensureUniqueCreditNumber(prefix: string) {
     message: 'No fue posible generar consecutivo para la solicitud',
     code: 'INTERNAL_SERVER_ERROR',
   });
-}
-
-function toIsoDateTimeString(value: unknown): string | null {
-  if (!value) return null;
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string') {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toISOString();
-  }
-  return null;
 }
 
 export const loanApplication = tsr.router(contract.loanApplication, {
@@ -552,38 +544,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      const { userId, userName } = getRequiredUserContext(session);
-
-      await db.transaction(async (tx) => {
-        const unassignedPending = await tx.query.loanApplications.findMany({
-          where: and(
-            eq(loanApplications.status, 'PENDING'),
-            or(
-              isNull(loanApplications.currentApprovalLevelId),
-              isNull(loanApplications.targetApprovalLevelId),
-              isNull(loanApplications.assignedApprovalUserId)
-            )
-          ),
-          columns: {
-            id: true,
-            status: true,
-            requestedAmount: true,
-            currentApprovalLevelId: true,
-            targetApprovalLevelId: true,
-            assignedApprovalUserId: true,
-            assignedApprovalUserName: true,
-          },
-          orderBy: [asc(loanApplications.createdAt), asc(loanApplications.id)],
-          limit: 250,
-        });
-
-        for (const application of unassignedPending) {
-          await ensurePendingAssignment(tx, application, {
-            userId,
-            userName: userName || userId,
-          });
-        }
-      });
+      const { userId } = getRequiredUserContext(session);
 
       const { page, limit, search, where, sort, include } = query;
       const {
@@ -711,54 +672,8 @@ export const loanApplication = tsr.router(contract.loanApplication, {
   },
 
   approvalLoad: async ({ query }, { request, appRoute }) => {
-    let session: UnifiedAuthContext | undefined;
-
     try {
-      session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
-      if (!session) {
-        throwHttpError({
-          status: 401,
-          message: 'Not authenticated',
-          code: 'UNAUTHENTICATED',
-        });
-      }
-
-      const { userId, userName } = getRequiredUserContext(session);
-
-      await db.transaction(async (tx) => {
-        const unassignedPending = await tx.query.loanApplications.findMany({
-          where: and(
-            eq(loanApplications.status, 'PENDING'),
-            or(
-              isNull(loanApplications.currentApprovalLevelId),
-              isNull(loanApplications.targetApprovalLevelId),
-              isNull(loanApplications.assignedApprovalUserId)
-            )
-          ),
-          columns: {
-            id: true,
-            status: true,
-            requestedAmount: true,
-            currentApprovalLevelId: true,
-            targetApprovalLevelId: true,
-            assignedApprovalUserId: true,
-            assignedApprovalUserName: true,
-          },
-          orderBy: [asc(loanApplications.createdAt), asc(loanApplications.id)],
-          limit: 250,
-        });
-
-        for (const application of unassignedPending) {
-          await ensurePendingAssignment(
-            tx,
-            application,
-            {
-              userId,
-              userName: userName || userId,
-            }
-          );
-        }
-      });
+      await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
       const level = await db.query.loanApprovalLevels.findFirst({
         where: eq(loanApprovalLevels.id, query.levelId),
@@ -778,7 +693,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      const [levelUsers, pendingApplicationsResult] = await Promise.all([
+      const [levelUsers, pendingApplications] = await Promise.all([
         db.query.loanApprovalLevelUsers.findMany({
           where: and(
             eq(loanApprovalLevelUsers.loanApprovalLevelId, level.id),
@@ -791,72 +706,45 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           },
           orderBy: [asc(loanApprovalLevelUsers.sortOrder), asc(loanApprovalLevelUsers.id)],
         }),
-        db.execute(sql<{
-          loanApplicationId: number;
-          creditNumber: string;
-          requestedAmount: string;
-          applicationDate: string | Date;
-          assignedAt: string | Date | null;
-          pendingDays: number;
-          userId: string | null;
-          userName: string | null;
-        }>`
-          WITH last_assignment AS (
-            SELECT DISTINCT ON (laah.loan_application_id)
-              laah.loan_application_id AS "loanApplicationId",
-              laah.occurred_at AS "assignedAt"
-            FROM ${loanApplicationApprovalHistory} laah
-            WHERE laah.action IN ('ASSIGNED', 'REASSIGNED')
-            ORDER BY laah.loan_application_id, laah.occurred_at DESC, laah.id DESC
-          )
-          SELECT
-            la.id AS "loanApplicationId",
-            la.credit_number AS "creditNumber",
-            la.requested_amount::text AS "requestedAmount",
-            la.application_date AS "applicationDate",
-            COALESCE(last_assignment."assignedAt", la.updated_at, la.created_at) AS "assignedAt",
-            GREATEST(
-              0,
-              CURRENT_DATE - COALESCE(last_assignment."assignedAt"::date, la.updated_at::date, la.created_at::date)
-            )::int AS "pendingDays",
-            la.assigned_approval_user_id AS "userId",
-            COALESCE(
-              NULLIF(TRIM(la.assigned_approval_user_name), ''),
-              la.assigned_approval_user_id::text,
-              'Sin usuario'
-            ) AS "userName"
-          FROM ${loanApplications} la
-          LEFT JOIN last_assignment
-            ON last_assignment."loanApplicationId" = la.id
-          WHERE la.status = 'PENDING'
-            AND la.current_approval_level_id = ${level.id}
-            AND la.assigned_approval_user_id IS NOT NULL
-          ORDER BY
-            COALESCE(NULLIF(TRIM(la.assigned_approval_user_name), ''), la.assigned_approval_user_id::text),
-            COALESCE(last_assignment."assignedAt", la.updated_at, la.created_at) ASC,
-            la.application_date ASC,
-            la.id ASC
-        `),
+        db.query.loanApplications.findMany({
+          where: and(
+            eq(loanApplications.status, 'PENDING'),
+            eq(loanApplications.currentApprovalLevelId, level.id),
+            isNotNull(loanApplications.assignedApprovalUserId)
+          ),
+          columns: {
+            id: true,
+            creditNumber: true,
+            requestedAmount: true,
+            applicationDate: true,
+            assignedApprovalUserId: true,
+            assignedApprovalUserName: true,
+            updatedAt: true,
+            createdAt: true,
+          },
+          orderBy: [asc(loanApplications.updatedAt), asc(loanApplications.id)],
+        }),
       ]);
 
-      const usersMap = new Map<
-        string,
-        {
-          userId: string;
-          userName: string;
-          pendingCount: number;
-          oldestAssignedAt: string | null;
-          oldestPendingDays: number;
-          applications: Array<{
-            loanApplicationId: number;
-            creditNumber: string;
-            requestedAmount: number;
-            applicationDate: string;
-            assignedAt: string | null;
-            pendingDays: number;
-          }>;
-        }
-      >();
+      type ApprovalLoadUserEntry = {
+        userId: string;
+        userName: string;
+        pendingCount: number;
+        oldestAssignedAt: string | null;
+        oldestPendingDays: number;
+        applications: Array<{
+          loanApplicationId: number;
+          creditNumber: string;
+          requestedAmount: number;
+          applicationDate: string;
+          assignedAt: string | null;
+          pendingDays: number;
+        }>;
+      };
+
+      const todayMs = new Date(formatDateOnly(new Date()) + 'T00:00:00').getTime();
+
+      const usersMap = new Map<string, ApprovalLoadUserEntry>();
 
       for (const levelUser of levelUsers) {
         usersMap.set(levelUser.userId, {
@@ -869,39 +757,32 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      for (const row of pendingApplicationsResult.rows as Array<Record<string, unknown>>) {
-        const assignedUserId = typeof row.userId === 'string' ? row.userId : null;
+      for (const app of pendingApplications) {
+        const assignedUserId = app.assignedApprovalUserId;
         if (!assignedUserId) continue;
 
-        const entry =
-          usersMap.get(assignedUserId) ??
-          {
-            userId: assignedUserId,
-            userName:
-              typeof row.userName === 'string' && row.userName.trim()
-                ? row.userName
-                : assignedUserId,
-            pendingCount: 0,
-            oldestAssignedAt: null,
-            oldestPendingDays: 0,
-            applications: [],
-          };
+        const assignedAt = app.updatedAt ?? app.createdAt;
+        const assignedAtIso = assignedAt instanceof Date ? assignedAt.toISOString() : String(assignedAt);
+        const assignedDateMs = new Date(formatDateOnly(assignedAt) + 'T00:00:00').getTime();
+        const pendingDays = Math.max(0, Math.round((todayMs - assignedDateMs) / 86_400_000));
 
-        const assignedAt = toIsoDateTimeString(row.assignedAt);
-        const pendingDays = typeof row.pendingDays === 'number' ? row.pendingDays : 0;
+        const entry: ApprovalLoadUserEntry = usersMap.get(assignedUserId) ?? {
+          userId: assignedUserId,
+          userName: app.assignedApprovalUserName?.trim() || assignedUserId,
+          pendingCount: 0,
+          oldestAssignedAt: null,
+          oldestPendingDays: 0,
+          applications: [],
+        };
 
         entry.applications.push({
-          loanApplicationId: Number(row.loanApplicationId),
-          creditNumber: String(row.creditNumber),
-          requestedAmount:
-            typeof row.requestedAmount === 'number' || typeof row.requestedAmount === 'string'
-              ? toNumber(row.requestedAmount)
-              : 0,
-          applicationDate:
-            typeof row.applicationDate === 'string'
-              ? row.applicationDate
-              : formatDateOnly(row.applicationDate as Date),
-          assignedAt,
+          loanApplicationId: app.id,
+          creditNumber: app.creditNumber,
+          requestedAmount: toNumber(app.requestedAmount),
+          applicationDate: typeof app.applicationDate === 'string'
+            ? app.applicationDate
+            : formatDateOnly(app.applicationDate),
+          assignedAt: assignedAtIso,
           pendingDays,
         });
 
@@ -911,7 +792,6 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const users = Array.from(usersMap.values())
         .map((user) => {
           const oldestItem = user.applications[0] ?? null;
-
           return {
             ...user,
             pendingCount: user.applications.length,
@@ -1021,10 +901,11 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      const creditNumber = await ensureUniqueCreditNumber(officeCode);
       const statusDate = formatDateOnly(new Date());
 
       const [created] = await db.transaction(async (tx) => {
+        const creditNumber = await ensureUniqueCreditNumber(officeCode, tx);
+
         const [application] = await tx
           .insert(loanApplications)
           .values({

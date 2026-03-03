@@ -35,7 +35,6 @@ function validateConfigurationOrder(
     maxApprovalAmount: string | null;
   }>
 ) {
-  let foundNullMax = false;
   let previousMax = -1;
 
   for (let index = 0; index < levels.length; index += 1) {
@@ -50,7 +49,6 @@ function validateConfigurationOrder(
           code: 'CONFLICT',
         });
       }
-      foundNullMax = true;
       continue;
     }
 
@@ -67,14 +65,6 @@ function validateConfigurationOrder(
       throwHttpError({
         status: 409,
         message: 'Configuracion invalida de niveles: topes no ascendentes',
-        code: 'CONFLICT',
-      });
-    }
-
-    if (foundNullMax) {
-      throwHttpError({
-        status: 409,
-        message: 'Configuracion invalida de niveles: no puede haber niveles despues de tope abierto',
         code: 'CONFLICT',
       });
     }

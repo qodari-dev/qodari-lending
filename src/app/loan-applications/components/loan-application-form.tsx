@@ -44,7 +44,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { useAffiliationOffices } from '@/hooks/queries/use-affiliation-office-queries';
+import { useMyAffiliationOffices } from '@/hooks/queries/use-affiliation-office-queries';
 import { useBanks } from '@/hooks/queries/use-bank-queries';
 import { useChannels } from '@/hooks/queries/use-channel-queries';
 import { useCreditProducts } from '@/hooks/queries/use-credit-product-queries';
@@ -92,6 +92,7 @@ import { ChevronDownIcon, Plus } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Controller, FormProvider, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
+import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
 import { LoanApplicationThirdPartiesForm } from './loan-application-co-debtors-form';
 import {
@@ -120,8 +121,10 @@ export function LoanApplicationForm({
     'applicant'
   );
   const [thirdPartyToEdit, setThirdPartyToEdit] = useState<ThirdParty | undefined>(undefined);
-  const [localThirdParty, setLocalThirdParty] = useState<ThirdParty | null>(null);
+  const [knownThirdParties, setKnownThirdParties] = useState<Map<number, ThirdParty>>(new Map());
   const [showAmortizationPreview, setShowAmortizationPreview] = useState(false);
+  const [thirdPartySearch, setThirdPartySearch] = useState('');
+  const [debouncedThirdPartySearch] = useDebounce(thirdPartySearch.trim(), 350);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(CreateLoanApplicationBodySchema) as Resolver<FormValues>,
@@ -170,24 +173,33 @@ export function LoanApplicationForm({
   });
   const channels = useMemo(() => channelsData?.body?.data ?? [], [channelsData]);
 
-  const { data: officesData } = useAffiliationOffices({
-    limit: 1000,
-    where: { and: [{ isActive: true }] },
-    sort: [{ field: 'name', order: 'asc' }],
-  });
-  const offices = useMemo(() => officesData?.body?.data ?? [], [officesData]);
+  const { data: myOfficesData } = useMyAffiliationOffices();
+  const offices = useMemo(() => myOfficesData?.body ?? [], [myOfficesData]);
 
   const { data: thirdPartiesData } = useThirdParties({
-    limit: 1000,
+    limit: 20,
     include: ['identificationType', 'homeCity', 'workCity'],
     sort: [{ field: 'createdAt', order: 'desc' }],
+    search: debouncedThirdPartySearch || undefined,
   });
+  const addKnownThirdParty = useCallback((tp: ThirdParty) => {
+    setKnownThirdParties((prev) => {
+      if (prev.has(tp.id)) return prev;
+      const next = new Map(prev);
+      next.set(tp.id, tp);
+      return next;
+    });
+  }, []);
+
   const thirdParties = useMemo(() => {
     const base = thirdPartiesData?.body?.data ?? [];
-    if (!localThirdParty) return base;
-    if (base.some((item) => item.id === localThirdParty.id)) return base;
-    return [localThirdParty, ...base];
-  }, [thirdPartiesData, localThirdParty]);
+    const ids = new Set(base.map((item) => item.id));
+    const extras: ThirdParty[] = [];
+    for (const tp of knownThirdParties.values()) {
+      if (!ids.has(tp.id)) extras.push(tp);
+    }
+    return [...extras, ...base];
+  }, [thirdPartiesData, knownThirdParties]);
 
   const { data: creditProductsData } = useCreditProducts({
     limit: 1000,
@@ -499,6 +511,16 @@ export function LoanApplicationForm({
 
   useEffect(() => {
     if (!opened) return;
+
+    // Pin third parties from the loan application so they always show in combobox
+    if (loanApplication?.thirdParty) {
+      addKnownThirdParty(loanApplication.thirdParty as ThirdParty);
+    }
+    for (const coDebtor of loanApplication?.loanApplicationCoDebtors ?? []) {
+      if (coDebtor.thirdParty) {
+        addKnownThirdParty(coDebtor.thirdParty as ThirdParty);
+      }
+    }
 
     form.reset({
       channelId: loanApplication?.channelId ?? undefined,
@@ -889,7 +911,22 @@ export function LoanApplicationForm({
                           <Combobox
                             items={thirdParties}
                             value={thirdParties.find((item) => item.id === field.value) ?? null}
-                            onValueChange={(value) => field.onChange(value?.id ?? undefined)}
+                            filter={null}
+                            onOpenChange={(isOpen) => {
+                              if (!isOpen) setThirdPartySearch('');
+                            }}
+                            onInputValueChange={(value, details) => {
+                              if (
+                                details.reason === 'input-change' ||
+                                details.reason === 'input-clear'
+                              ) {
+                                setThirdPartySearch(value);
+                              }
+                            }}
+                            onValueChange={(value) => {
+                              field.onChange(value?.id ?? undefined);
+                              if (value) addKnownThirdParty(value);
+                            }}
                             itemToStringValue={(item) => String(item.id)}
                             itemToStringLabel={(item) =>
                               `${getThirdPartyLabel(item)} (${item.documentNumber})`
@@ -916,7 +953,7 @@ export function LoanApplicationForm({
                               <ComboboxList>
                                 <ComboboxEmpty>No se encontraron terceros</ComboboxEmpty>
                                 <ComboboxCollection>
-                                  {(item) => (
+                                  {(item: ThirdParty) => (
                                     <ComboboxItem key={item.id} value={item}>
                                       {getThirdPartyLabel(item)} ({item.documentNumber})
                                     </ComboboxItem>
@@ -1443,6 +1480,7 @@ export function LoanApplicationForm({
               <TabsContent value="coDebtors" className="pt-2">
                 <LoanApplicationThirdPartiesForm
                   thirdParties={thirdParties}
+                  onThirdPartySearch={setThirdPartySearch}
                   onCreateThirdParty={() => openThirdPartyCreate('coDebtor')}
                   onEditThirdParty={(thirdParty) => openThirdPartyEdit('coDebtor', thirdParty)}
                 />
@@ -1483,7 +1521,7 @@ export function LoanApplicationForm({
           if (!open) setThirdPartyToEdit(undefined);
         }}
         onSaved={(thirdParty) => {
-          setLocalThirdParty(thirdParty);
+          addKnownThirdParty(thirdParty);
           if (thirdPartyFormMode === 'applicant') {
             form.setValue('thirdPartyId', thirdParty.id, {
               shouldDirty: true,

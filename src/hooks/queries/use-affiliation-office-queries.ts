@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 export const affiliationOfficesKeys = {
   all: ['affiliation-offices'] as const,
 
+  myOffices: () => [...affiliationOfficesKeys.all, 'my-offices'] as const,
+
   lists: () => [...affiliationOfficesKeys.all, 'list'] as const,
   list: (filters: Partial<ListAffiliationOfficesQuery> = {}) =>
     [...affiliationOfficesKeys.lists(), filters] as const,
@@ -26,6 +28,13 @@ function defaultQuery(filters?: Partial<ListAffiliationOfficesQuery>) {
   } as ListAffiliationOfficesQuery;
 
   return query;
+}
+
+export function useMyAffiliationOffices() {
+  return api.affiliationOffice.myOffices.useQuery({
+    queryKey: affiliationOfficesKeys.myOffices(),
+    queryData: {},
+  });
 }
 
 export function useAffiliationOffices(filters: Partial<ListAffiliationOfficesQuery> = {}) {

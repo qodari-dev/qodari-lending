@@ -204,6 +204,13 @@
       "when": 1772217223952,
       "tag": "0028_panoramic_aaron_stack",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1772588810707,
+      "tag": "0029_chief_pandemic",
+      "breakpoints": true
     }
   ]
 }

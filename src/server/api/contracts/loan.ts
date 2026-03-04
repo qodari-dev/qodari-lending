@@ -1,4 +1,5 @@
 import {
+  BatchBalanceSummaryQuerySchema,
   GetLoanQuerySchema,
   GetLoanStatementQuerySchema,
   LiquidateLoanBodySchema,
@@ -206,6 +207,25 @@ export const loan = c.router(
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,
         404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    batchBalanceSummary: {
+      method: 'GET',
+      path: '/batch-balance-summary',
+      query: BatchBalanceSummaryQuerySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'read',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: c.type<Record<string, LoanBalanceSummary>>(),
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
         500: TsRestErrorSchema,
       },
     },

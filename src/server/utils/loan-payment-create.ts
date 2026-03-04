@@ -6,6 +6,7 @@ import {
   loanPayments,
   loanStatusHistory,
   loans,
+  paymentAllocationPolicyRules,
   paymentTenderTypes,
   portfolioEntries,
   userPaymentReceiptTypes,
@@ -228,11 +229,10 @@ export async function createLoanPaymentTx(
   }
 
   const totalOutstanding = roundMoney(openPortfolio.reduce((acc, row) => acc + toNumber(row.balance), 0));
-  const appliedPaymentAmount = roundMoney(Math.min(requestedPaymentAmount, totalOutstanding));
-  const overflowByCap = roundMoney(Math.max(0, requestedPaymentAmount - appliedPaymentAmount));
-  const overpaidAmount = roundMoney(Math.max(0, providedOverpaidAmount) + overflowByCap);
+  const cappedPaymentAmount = roundMoney(Math.min(requestedPaymentAmount, totalOutstanding));
+  const overflowByCap = roundMoney(Math.max(0, requestedPaymentAmount - cappedPaymentAmount));
 
-  if (!Number.isFinite(appliedPaymentAmount) || appliedPaymentAmount <= 0) {
+  if (!Number.isFinite(cappedPaymentAmount) || cappedPaymentAmount <= 0) {
     throwHttpError({
       status: 400,
       message: 'No hay saldo pendiente para aplicar al abono',
@@ -240,6 +240,53 @@ export async function createLoanPaymentTx(
     });
   }
 
+  // ── Query allocation policy chain ──────────────────────────────────
+  const loanWithPolicy = await tx.query.loans.findFirst({
+    where: eq(loans.id, input.loanId),
+    columns: { id: true },
+    with: {
+      loanApplication: {
+        columns: { id: true },
+        with: {
+          creditProduct: {
+            columns: { id: true },
+            with: {
+              paymentAllocationPolicy: {
+                with: {
+                  paymentAllocationPolicyRules: {
+                    orderBy: [asc(paymentAllocationPolicyRules.priority)],
+                    with: {
+                      billingConcept: {
+                        columns: { id: true, conceptType: true },
+                      },
+                    },
+                  },
+                },
+              },
+              creditProductAccounts: true,
+            },
+          },
+        },
+      },
+      loanBillingConcepts: {
+        columns: { billingConceptId: true, glAccountId: true },
+        with: {
+          billingConcept: {
+            columns: { id: true, conceptType: true },
+          },
+        },
+      },
+    },
+  });
+
+  const allocationPolicy =
+    loanWithPolicy?.loanApplication?.creditProduct?.paymentAllocationPolicy ?? null;
+  const policyRules = allocationPolicy?.paymentAllocationPolicyRules ?? [];
+  const cpAccounts =
+    loanWithPolicy?.loanApplication?.creditProduct?.creditProductAccounts?.[0] ?? null;
+  const loanBillingConceptsList = loanWithPolicy?.loanBillingConcepts ?? [];
+
+  // ── Allocation engine ──────────────────────────────────────────────
   const portfolioApplications: Array<{
     glAccountId: number;
     installmentNumber: number;
@@ -247,30 +294,149 @@ export async function createLoanPaymentTx(
     amount: number;
   }> = [];
 
-  let remainingAmount = appliedPaymentAmount;
+  // Track effective balance per portfolio entry (decreases as rules consume it)
+  const effectiveBalances = new Map<number, number>();
   for (const row of openPortfolio) {
-    if (remainingAmount <= 0.01) break;
-    const rowBalance = roundMoney(toNumber(row.balance));
-    if (rowBalance <= 0) continue;
-
-    const appliedAmount = roundMoney(Math.min(remainingAmount, rowBalance));
-    if (appliedAmount <= 0) continue;
-
-    portfolioApplications.push({
-      glAccountId: row.glAccountId,
-      installmentNumber: row.installmentNumber,
-      dueDate: row.dueDate,
-      amount: appliedAmount,
-    });
-    remainingAmount = roundMoney(remainingAmount - appliedAmount);
+    effectiveBalances.set(row.id, roundMoney(toNumber(row.balance)));
   }
 
-  if (remainingAmount > 0.01) {
+  /** Apply payment to a subset of entries; mutates portfolioApplications & effectiveBalances. */
+  const applyToEntries = (entries: typeof openPortfolio, budget: number): number => {
+    let rem = budget;
+    for (const entry of entries) {
+      if (rem <= 0.01) break;
+      const bal = effectiveBalances.get(entry.id) ?? 0;
+      if (bal <= 0) continue;
+
+      const applied = roundMoney(Math.min(rem, bal));
+      if (applied <= 0) continue;
+
+      const existing = portfolioApplications.find(
+        (a) =>
+          a.glAccountId === entry.glAccountId &&
+          a.installmentNumber === entry.installmentNumber &&
+          a.dueDate === entry.dueDate
+      );
+      if (existing) {
+        existing.amount = roundMoney(existing.amount + applied);
+      } else {
+        portfolioApplications.push({
+          glAccountId: entry.glAccountId,
+          installmentNumber: entry.installmentNumber,
+          dueDate: entry.dueDate,
+          amount: applied,
+        });
+      }
+
+      effectiveBalances.set(entry.id, roundMoney(bal - applied));
+      rem = roundMoney(rem - applied);
+    }
+    return rem;
+  };
+
+  let policyRemainder = cappedPaymentAmount;
+
+  if (policyRules.length > 0 && cpAccounts) {
+    // ── Build billingConceptId → Set<glAccountId> map ──
+    const conceptToGlAccounts = new Map<number, Set<number>>();
+    for (const lbc of loanBillingConceptsList) {
+      const conceptType = lbc.billingConcept?.conceptType;
+      let glId: number | null = null;
+
+      switch (conceptType) {
+        case 'PRINCIPAL':
+          glId = cpAccounts.capitalGlAccountId;
+          break;
+        case 'INTEREST':
+          glId = cpAccounts.interestGlAccountId;
+          break;
+        case 'LATE_INTEREST':
+          glId = cpAccounts.lateInterestGlAccountId;
+          break;
+        default:
+          // INSURANCE, FEE, GUARANTEE, OTHER → snapshot GL from loanBillingConcept
+          glId = lbc.glAccountId;
+          break;
+      }
+
+      if (glId) {
+        const set = conceptToGlAccounts.get(lbc.billingConceptId) ?? new Set<number>();
+        set.add(glId);
+        conceptToGlAccounts.set(lbc.billingConceptId, set);
+      }
+    }
+
+    // ── Apply each rule in priority order ──
+    for (const rule of policyRules) {
+      if (policyRemainder <= 0.01) break;
+
+      const ruleGlAccounts = conceptToGlAccounts.get(rule.billingConceptId);
+      if (!ruleGlAccounts || ruleGlAccounts.size === 0) continue;
+
+      let eligible = openPortfolio.filter(
+        (e) => ruleGlAccounts.has(e.glAccountId) && (effectiveBalances.get(e.id) ?? 0) > 0
+      );
+
+      if (rule.scope === 'ONLY_PAST_DUE') {
+        eligible = eligible.filter((e) => e.dueDate < paymentDate);
+      }
+      // PAST_DUE_FIRST: entries already sorted dueDate ASC — past-due naturally first
+
+      policyRemainder = applyToEntries(eligible, policyRemainder);
+    }
+
+    // ── Handle remaining after all rules ──
+    if (policyRemainder > 0.01) {
+      const handling = allocationPolicy?.overpaymentHandling ?? 'EXCESS_BALANCE';
+
+      if (handling === 'APPLY_TO_PRINCIPAL') {
+        const capitalEntries = openPortfolio.filter(
+          (e) =>
+            e.glAccountId === cpAccounts.capitalGlAccountId &&
+            (effectiveBalances.get(e.id) ?? 0) > 0
+        );
+        policyRemainder = applyToEntries(capitalEntries, policyRemainder);
+      } else if (handling === 'APPLY_TO_FUTURE_INSTALLMENTS') {
+        const remainingEntries = openPortfolio.filter(
+          (e) => (effectiveBalances.get(e.id) ?? 0) > 0
+        );
+        policyRemainder = applyToEntries(remainingEntries, policyRemainder);
+      }
+      // EXCESS_BALANCE: policyRemainder stays as-is → becomes overpaid
+    }
+  } else {
+    // Fallback: FIFO (backward compatible when no allocation policy is configured)
+    policyRemainder = applyToEntries(openPortfolio, policyRemainder);
+  }
+
+  // ── Final amounts ──────────────────────────────────────────────────
+  const appliedPaymentAmount = roundMoney(cappedPaymentAmount - Math.max(0, policyRemainder));
+  const overpaidAmount = roundMoney(
+    Math.max(0, providedOverpaidAmount) + overflowByCap + Math.max(0, policyRemainder)
+  );
+
+  if (!Number.isFinite(appliedPaymentAmount) || appliedPaymentAmount <= 0) {
     throwHttpError({
       status: 400,
-      message: 'No fue posible aplicar completamente el valor del abono',
+      message: 'No fue posible aplicar el abono a la cartera',
       code: 'BAD_REQUEST',
     });
+  }
+
+  // ── Excess accounting configuration ────────────────────────────────
+  let excessGlAccountIdForEntry: number | null = null;
+  if (overpaidAmount > 0) {
+    const settings = await tx.query.creditsSettings.findFirst({
+      columns: {
+        minimumMajorPaidAmount: true,
+        excessGlAccountId: true,
+      },
+    });
+    const threshold =
+      settings?.minimumMajorPaidAmount != null ? toNumber(settings.minimumMajorPaidAmount) : null;
+    if (threshold != null && overpaidAmount >= threshold && settings?.excessGlAccountId != null) {
+      excessGlAccountIdForEntry = settings.excessGlAccountId;
+    }
   }
 
   const paymentNumber = await ensureUniquePaymentNumber(tx, {
@@ -290,7 +456,7 @@ export async function createLoanPaymentTx(
       loanId: input.loanId,
       description: input.description,
       amount: toDecimalString(appliedPaymentAmount),
-      overpaidAmount: overpaidAmount > 0 ? Math.round(overpaidAmount) : null,
+      overpaidAmount: overpaidAmount > 0 ? toDecimalString(overpaidAmount) : null,
       status: 'PAID',
       statusDate: nowDate,
       createdByUserId: input.userId,
@@ -333,7 +499,9 @@ export async function createLoanPaymentTx(
       thirdPartyId: existingLoan.thirdPartyId,
       description: `Abono ${paymentNumber} credito ${existingLoan.creditNumber}`.slice(0, 255),
       nature: 'DEBIT',
-      amount: toDecimalString(appliedPaymentAmount),
+      amount: toDecimalString(
+        excessGlAccountIdForEntry ? appliedPaymentAmount + overpaidAmount : appliedPaymentAmount
+      ),
       loanId: existingLoan.id,
       status: 'DRAFT',
       statusDate: nowDate,
@@ -361,6 +529,33 @@ export async function createLoanPaymentTx(
       loanId: existingLoan.id,
       installmentNumber: row.installmentNumber,
       dueDate: row.dueDate,
+      status: 'DRAFT',
+      statusDate: nowDate,
+      sourceType: 'LOAN_PAYMENT',
+      sourceId: String(createdLoanPayment.id),
+    });
+    sequence += 1;
+  }
+
+  // ── Excess accounting entry (conditional) ──────────────────────────
+  if (excessGlAccountIdForEntry && overpaidAmount > 0) {
+    accountingPayload.push({
+      processType,
+      documentCode: accountingDocumentCode,
+      sequence,
+      entryDate: paymentDate,
+      glAccountId: excessGlAccountIdForEntry,
+      costCenterId: null,
+      thirdPartyId: existingLoan.thirdPartyId,
+      description: `Excedente abono ${paymentNumber} credito ${existingLoan.creditNumber}`.slice(
+        0,
+        255
+      ),
+      nature: 'CREDIT',
+      amount: toDecimalString(overpaidAmount),
+      loanId: existingLoan.id,
+      installmentNumber: null,
+      dueDate: null,
       status: 'DRAFT',
       statusDate: nowDate,
       sourceType: 'LOAN_PAYMENT',

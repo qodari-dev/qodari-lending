@@ -123,7 +123,7 @@ export const CreateLoanPaymentBodySchema = z
       }
     ),
     glAccountId: z.number().int().positive().optional(),
-    overpaidAmount: z.number().int().min(0).optional().default(0),
+    overpaidAmount: z.number().min(0).optional().default(0),
     note: z.string().max(1000).nullable().optional(),
     loanPaymentMethodAllocations: LoanPaymentMethodAllocationInputSchema.array().min(1),
   })

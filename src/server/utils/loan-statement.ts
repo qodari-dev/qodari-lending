@@ -61,16 +61,17 @@ export async function ensureLoanExists(loanId: number) {
   return loan;
 }
 
-export async function getLoanBalanceSummary(loanId: number) {
-  const today = formatDateOnly(new Date());
-  const rows = await db.query.portfolioEntries.findMany({
-    where: and(eq(portfolioEntries.loanId, loanId), sql`${portfolioEntries.status} <> 'VOID'`),
-    with: {
-      glAccount: true,
-    },
-    orderBy: [asc(portfolioEntries.dueDate), asc(portfolioEntries.installmentNumber)],
-  });
+type PortfolioRow = {
+  glAccountId: number;
+  installmentNumber: number;
+  dueDate: string;
+  chargeAmount: string;
+  paymentAmount: string;
+  balance: string;
+  glAccount?: { id: number; code: string; name: string } | null;
+};
 
+function computeBalanceSummary(rows: PortfolioRow[], today: string) {
   const byAccountMap = new Map<
     number,
     {
@@ -150,6 +151,47 @@ export async function getLoanBalanceSummary(loanId: number) {
     nextDueDate: nextUpcomingDueDate ?? earliestOverdueDate,
     byAccount,
   };
+}
+
+export async function getLoanBalanceSummary(loanId: number) {
+  const today = formatDateOnly(new Date());
+  const rows = await db.query.portfolioEntries.findMany({
+    where: and(eq(portfolioEntries.loanId, loanId), sql`${portfolioEntries.status} <> 'VOID'`),
+    with: {
+      glAccount: true,
+    },
+    orderBy: [asc(portfolioEntries.dueDate), asc(portfolioEntries.installmentNumber)],
+  });
+
+  return computeBalanceSummary(rows, today);
+}
+
+export async function getLoanBalanceSummaryBatch(loanIds: number[]) {
+  if (!loanIds.length) return new Map<number, ReturnType<typeof computeBalanceSummary>>();
+
+  const today = formatDateOnly(new Date());
+  const rows = await db.query.portfolioEntries.findMany({
+    where: and(inArray(portfolioEntries.loanId, loanIds), sql`${portfolioEntries.status} <> 'VOID'`),
+    with: {
+      glAccount: true,
+    },
+    orderBy: [asc(portfolioEntries.dueDate), asc(portfolioEntries.installmentNumber)],
+  });
+
+  const rowsByLoan = new Map<number, PortfolioRow[]>();
+  for (const row of rows) {
+    const existing = rowsByLoan.get(row.loanId) ?? [];
+    existing.push(row);
+    rowsByLoan.set(row.loanId, existing);
+  }
+
+  const result = new Map<number, ReturnType<typeof computeBalanceSummary>>();
+  for (const loanId of loanIds) {
+    const loanRows = rowsByLoan.get(loanId) ?? [];
+    result.set(loanId, computeBalanceSummary(loanRows, today));
+  }
+
+  return result;
 }
 
 export async function getLoanStatement(loanId: number, query: LoanStatementQuery) {

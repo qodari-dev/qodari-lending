@@ -1,0 +1,1 @@
+ALTER TABLE "loan_payments" ALTER COLUMN "over_paid_amount" SET DATA TYPE numeric(14, 2);

@@ -274,7 +274,7 @@ export function LoanPaymentPayroll() {
           where: {
             and: [
               ...(values.agreementId ? [{ agreementId: { eq: values.agreementId } }] : []),
-              { status: { in: ['ACTIVE', 'ACCOUNTED', 'GENERATED', 'RELIQUIDATED'] } },
+              { status: { in: ['ACTIVE', 'ACCOUNTED'] } },
             ],
           },
         },
@@ -296,16 +296,14 @@ export function LoanPaymentPayroll() {
         return;
       }
 
-      const balanceResponses = await Promise.all(
-        filteredLoanItems.map((loan) =>
-          api.loan.getBalanceSummary.query({
-            params: { id: loan.id },
-          })
-        )
-      );
+      const loanIds = filteredLoanItems.map((loan) => loan.id);
+      const batchResponse = await api.loan.batchBalanceSummary.query({
+        query: { loanIds },
+      });
+      const balanceMap = (batchResponse.body ?? {}) as Record<string, LoanBalanceSummaryResponse>;
 
-      const parsedRows: PayrollLoanRow[] = filteredLoanItems.map((loan, index) => {
-        const summary = balanceResponses[index]?.body as LoanBalanceSummaryResponse | undefined;
+      const parsedRows: PayrollLoanRow[] = filteredLoanItems.map((loan) => {
+        const summary = balanceMap[String(loan.id)];
         return {
           loanId: loan.id,
           creditNumber: loan.creditNumber,

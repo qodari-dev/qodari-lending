@@ -462,9 +462,9 @@ export const loanPayment = tsr.router(contract.loanPayment, {
               0,
               1000
             ),
-            amount: row.paymentAmount,
+            amount: rowTotal,
             glAccountId: body.glAccountId,
-            overpaidAmount: row.overpaidAmount,
+            overpaidAmount: 0,
             note: `Lote libranza referencia ${body.referenceNumber}`.slice(0, 1000),
             payrollReferenceNumber: body.referenceNumber,
             payrollPayerDocumentNumber: body.companyDocumentNumber?.trim() || null,
@@ -944,21 +944,14 @@ export const loanPayment = tsr.router(contract.loanPayment, {
       }
 
       const originalCreditEntries = originalEntries.filter((entry) => entry.nature === 'CREDIT');
-      if (!originalCreditEntries.length) {
+      // Separate portfolio credits (with installmentNumber) from excess credits (without)
+      const portfolioCreditEntries = originalCreditEntries.filter(
+        (entry) => entry.installmentNumber !== null && entry.dueDate !== null
+      );
+      if (!portfolioCreditEntries.length) {
         throwHttpError({
           status: 400,
           message: 'Los movimientos del abono no tienen creditos para reversar cartera',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const invalidCreditEntry = originalCreditEntries.find(
-        (entry) => entry.installmentNumber === null || entry.dueDate === null
-      );
-      if (invalidCreditEntry) {
-        throwHttpError({
-          status: 400,
-          message: 'Los movimientos del abono no tienen detalle de cuota para reversa',
           code: 'BAD_REQUEST',
         });
       }
@@ -997,7 +990,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         }
       );
 
-      const rollbackDeltas = originalCreditEntries.map((entry) => ({
+      const rollbackDeltas = portfolioCreditEntries.map((entry) => ({
         glAccountId: entry.glAccountId,
         thirdPartyId: entry.thirdPartyId ?? existingLoan.thirdPartyId,
         loanId: entry.loanId ?? existingLoan.id,

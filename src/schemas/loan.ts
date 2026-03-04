@@ -207,6 +207,10 @@ export const GetLoanStatementQuerySchema = z.object({
   to: z.coerce.date().optional(),
 });
 
+export const BatchBalanceSummaryQuerySchema = z.object({
+  loanIds: z.array(z.number().int().positive()).min(1).max(500),
+});
+
 export type LoanBalanceByAccount = {
   glAccountId: number;
   glAccountCode: string | null;

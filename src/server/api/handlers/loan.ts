@@ -28,6 +28,7 @@ import {
 import {
   ensureLoanExists,
   getLoanBalanceSummary,
+  getLoanBalanceSummaryBatch,
   getLoanStatement,
 } from '@/server/utils/loan-statement';
 import { applyPortfolioDeltas } from '@/server/utils/portfolio-utils';
@@ -351,6 +352,27 @@ export const loan = tsr.router(contract.loan, {
     } catch (e) {
       return genericTsRestErrorResponse(e, {
         genericMsg: `Error al obtener saldo del credito ${id}`,
+      });
+    }
+  },
+
+  batchBalanceSummary: async ({ query }, { request, appRoute }) => {
+    try {
+      await getAuthContextAndValidatePermission(request, appRoute.metadata);
+
+      const summaryMap = await getLoanBalanceSummaryBatch(query.loanIds);
+      const result: Record<string, Awaited<ReturnType<typeof getLoanBalanceSummary>>> = {};
+      for (const [loanId, summary] of summaryMap) {
+        result[String(loanId)] = summary;
+      }
+
+      return {
+        status: 200 as const,
+        body: result,
+      };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: 'Error al obtener saldos en lote',
       });
     }
   },

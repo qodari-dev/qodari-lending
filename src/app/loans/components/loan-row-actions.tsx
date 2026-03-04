@@ -19,6 +19,8 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
   const canUpdateBankInfo = useHasPermission('loans:update-bank-info');
   const canVoid = useHasPermission('loans:void');
 
+  const isVoidOrPaid = loan.status === 'VOID' || loan.status === 'PAID';
+
   const actions: (RowAction<Loan> | RowActionGroup<Loan>)[] = [
     {
       label: 'Ver detalles',
@@ -35,7 +37,7 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
       label: 'Anular credito',
       icon: Ban,
       onClick: meta?.onRowVoid,
-      hidden: !(canVoid && loan.status !== 'VOID'),
+      hidden: !(canVoid && !isVoidOrPaid && loan.disbursementStatus !== 'DISBURSED'),
     },
     {
       label: 'Proceso juridico',
@@ -53,13 +55,13 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
       label: 'Cambiar convenio',
       icon: Building2,
       onClick: meta?.onRowAgreement,
-      hidden: !canUpdate,
+      hidden: !(canUpdate && !isVoidOrPaid),
     },
     {
       label: 'Datos bancarios',
       icon: Landmark,
       onClick: meta?.onRowBankInfo,
-      hidden: !canUpdateBankInfo,
+      hidden: !(canUpdateBankInfo && !isVoidOrPaid),
     },
   ];
 

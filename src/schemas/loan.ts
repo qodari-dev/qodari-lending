@@ -160,7 +160,9 @@ export const GetLoanQuerySchema = z.object({
   include: LoanIncludeSchema,
 });
 
-export const LiquidateLoanBodySchema = z.object({});
+export const LiquidateLoanBodySchema = z.object({
+  entryDate: z.coerce.date(),
+});
 export const VoidLoanBodySchema = z.object({
   note: z.string().trim().min(5).max(255),
 });

@@ -66,7 +66,7 @@ export function allocateAmountByPercentage(args: {
       ? roundMoney(args.totalAmount - allocated)
       : roundMoney((args.totalAmount * toNumber(line.percentage)) / totalPercentage);
 
-    allocated += amount;
+    allocated = roundMoney(allocated + amount);
     result.set(line.id, amount);
   }
 

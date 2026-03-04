@@ -88,7 +88,8 @@ export async function getLoanBalanceSummary(loanId: number) {
   let totalPaid = 0;
   let currentBalance = 0;
   let overdueBalance = 0;
-  let nextDueDate: string | null = null;
+  let nextUpcomingDueDate: string | null = null;
+  let earliestOverdueDate: string | null = null;
 
   for (const row of rows) {
     const chargeAmount = toNumber(row.chargeAmount);
@@ -103,9 +104,13 @@ export async function getLoanBalanceSummary(loanId: number) {
       openInstallments.add(row.installmentNumber);
       if (row.dueDate < today) {
         overdueBalance = roundMoney(overdueBalance + balance);
-      }
-      if (!nextDueDate || row.dueDate < nextDueDate) {
-        nextDueDate = row.dueDate;
+        if (!earliestOverdueDate || row.dueDate < earliestOverdueDate) {
+          earliestOverdueDate = row.dueDate;
+        }
+      } else {
+        if (!nextUpcomingDueDate || row.dueDate < nextUpcomingDueDate) {
+          nextUpcomingDueDate = row.dueDate;
+        }
       }
     }
 
@@ -142,7 +147,7 @@ export async function getLoanBalanceSummary(loanId: number) {
     overdueBalance: toDecimalString(overdueBalance),
     currentDueBalance: toDecimalString(roundMoney(currentBalance - overdueBalance)),
     openInstallments: openInstallments.size,
-    nextDueDate,
+    nextDueDate: nextUpcomingDueDate ?? earliestOverdueDate,
     byAccount,
   };
 }

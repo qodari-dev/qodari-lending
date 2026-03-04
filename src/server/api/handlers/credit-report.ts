@@ -69,56 +69,53 @@ async function buildDemoPdfBase64(title: string, lines: string[]): Promise<strin
   return renderTemplateToBase64({ title, lines }, demoDocumentTemplate);
 }
 
-export async function getCreditExtractReportData(
-  creditNumberRaw: string
-): Promise<CreditExtractReportResponse> {
-  const creditNumber = creditNumberRaw.trim();
+const EXTRACT_LOAN_COLUMNS = {
+  id: true,
+  creditNumber: true,
+  status: true,
+  recordDate: true,
+  creditStartDate: true,
+  maturityDate: true,
+  firstCollectionDate: true,
+} as const;
 
-  const loan = await db.query.loans.findFirst({
-    where: eq(loans.creditNumber, creditNumber),
+const EXTRACT_LOAN_WITH = {
+  borrower: {
     columns: {
-      id: true,
-      creditNumber: true,
-      status: true,
-      recordDate: true,
-      creditStartDate: true,
-      maturityDate: true,
-      firstCollectionDate: true,
+      personType: true,
+      businessName: true,
+      firstName: true,
+      secondName: true,
+      firstLastName: true,
+      secondLastName: true,
+      documentNumber: true,
     },
-    with: {
-      borrower: {
-        columns: {
-          personType: true,
-          businessName: true,
-          firstName: true,
-          secondName: true,
-          firstLastName: true,
-          secondLastName: true,
-          documentNumber: true,
-        },
-      },
-      affiliationOffice: {
-        columns: {
-          name: true,
-        },
-      },
-      agreement: {
-        columns: {
-          agreementCode: true,
-          businessName: true,
-        },
-      },
+  },
+  affiliationOffice: {
+    columns: {
+      name: true,
     },
-  });
+  },
+  agreement: {
+    columns: {
+      agreementCode: true,
+      businessName: true,
+    },
+  },
+} as const;
 
-  if (!loan) {
-    throwHttpError({
-      status: 404,
-      message: `No se encontro credito con numero ${creditNumber}`,
-      code: 'NOT_FOUND',
-    });
-  }
-
+async function buildExtractResponse(
+  loan: NonNullable<
+    Awaited<
+      ReturnType<
+        typeof db.query.loans.findFirst<{
+          columns: typeof EXTRACT_LOAN_COLUMNS;
+          with: typeof EXTRACT_LOAN_WITH;
+        }>
+      >
+    >
+  >
+): Promise<CreditExtractReportResponse> {
   const [balanceSummary, statement] = await Promise.all([
     getLoanBalanceSummary(loan.id),
     getLoanStatement(loan.id, {}),
@@ -148,42 +145,33 @@ export async function getCreditExtractReportData(
   };
 }
 
+export async function getCreditExtractReportData(
+  creditNumberRaw: string
+): Promise<CreditExtractReportResponse> {
+  const creditNumber = creditNumberRaw.trim();
+
+  const loan = await db.query.loans.findFirst({
+    where: eq(loans.creditNumber, creditNumber),
+    columns: EXTRACT_LOAN_COLUMNS,
+    with: EXTRACT_LOAN_WITH,
+  });
+
+  if (!loan) {
+    throwHttpError({
+      status: 404,
+      message: `No se encontro credito con numero ${creditNumber}`,
+      code: 'NOT_FOUND',
+    });
+  }
+
+  return buildExtractResponse(loan);
+}
+
 async function getCreditExtractReportDataByLoanId(loanId: number): Promise<CreditExtractReportResponse> {
   const loan = await db.query.loans.findFirst({
     where: eq(loans.id, loanId),
-    columns: {
-      id: true,
-      creditNumber: true,
-      status: true,
-      recordDate: true,
-      creditStartDate: true,
-      maturityDate: true,
-      firstCollectionDate: true,
-    },
-    with: {
-      borrower: {
-        columns: {
-          personType: true,
-          businessName: true,
-          firstName: true,
-          secondName: true,
-          firstLastName: true,
-          secondLastName: true,
-          documentNumber: true,
-        },
-      },
-      affiliationOffice: {
-        columns: {
-          name: true,
-        },
-      },
-      agreement: {
-        columns: {
-          agreementCode: true,
-          businessName: true,
-        },
-      },
-    },
+    columns: EXTRACT_LOAN_COLUMNS,
+    with: EXTRACT_LOAN_WITH,
   });
 
   if (!loan) {
@@ -194,33 +182,7 @@ async function getCreditExtractReportDataByLoanId(loanId: number): Promise<Credi
     });
   }
 
-  const [balanceSummary, statement] = await Promise.all([
-    getLoanBalanceSummary(loan.id),
-    getLoanStatement(loan.id, {}),
-  ]);
-  const clientStatement = buildCreditExtractClientStatement(statement);
-
-  return {
-    loan: {
-      id: loan.id,
-      creditNumber: loan.creditNumber,
-      status: loan.status,
-      recordDate: loan.recordDate,
-      creditStartDate: loan.creditStartDate,
-      maturityDate: loan.maturityDate,
-      firstCollectionDate: loan.firstCollectionDate,
-      borrowerDocumentNumber: loan.borrower?.documentNumber ?? null,
-      borrowerName: getThirdPartyLabel(loan.borrower),
-      affiliationOfficeName: loan.affiliationOffice?.name ?? null,
-      agreementLabel: loan.agreement
-        ? `${loan.agreement.agreementCode} - ${loan.agreement.businessName}`
-        : null,
-    },
-    balanceSummary,
-    statement,
-    clientStatement,
-    generatedAt: new Date().toISOString(),
-  };
+  return buildExtractResponse(loan);
 }
 
 function buildPaidInstallmentsRows(count: number): PaidInstallmentsReportRow[] {

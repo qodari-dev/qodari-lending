@@ -212,7 +212,11 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
       with: {
         glAccount: true,
       },
-      orderBy: [desc(accountingEntries.entryDate), desc(accountingEntries.documentCode), desc(accountingEntries.sequence)],
+      orderBy: [
+        desc(accountingEntries.entryDate),
+        desc(accountingEntries.documentCode),
+        desc(accountingEntries.sequence),
+      ],
     },
   },
   loanAgreementHistory: {
@@ -412,6 +416,14 @@ export const loan = tsr.router(contract.loan, {
         });
       }
 
+      if (existingLoan.disbursementStatus === 'DISBURSED') {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede anular un credito ya desembolsado',
+          code: 'BAD_REQUEST',
+        });
+      }
+
       const paidLoanPayment = await db.query.loanPayments.findFirst({
         where: and(eq(loanPayments.loanId, id), eq(loanPayments.status, 'PAID')),
         columns: { id: true },
@@ -425,27 +437,41 @@ export const loan = tsr.router(contract.loan, {
         });
       }
 
-      const liquidationEntry = await db.query.accountingEntries.findFirst({
-        where: and(
-          eq(accountingEntries.loanId, id),
-          eq(accountingEntries.sourceType, 'LOAN_APPROVAL'),
-          inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
-        ),
-        columns: { id: true },
-      });
-
-      if (liquidationEntry) {
-        throwHttpError({
-          status: 400,
-          message: 'No se puede anular un credito con movimientos de liquidacion',
-          code: 'BAD_REQUEST',
-        });
-      }
-
       const statusDate = formatDateOnly(new Date());
       const { userId, userName } = getRequiredUserContext(session);
 
       const [updatedLoan] = await db.transaction(async (tx) => {
+        // Void accounting entries if they exist
+        await tx
+          .update(accountingEntries)
+          .set({ status: 'VOIDED', statusDate })
+          .where(
+            and(
+              eq(accountingEntries.loanId, id),
+              inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
+            )
+          );
+
+        // Reverse portfolio entries if they exist
+        const existingPortfolioEntries = await tx.query.portfolioEntries.findMany({
+          where: eq(portfolioEntries.loanId, id),
+        });
+
+        if (existingPortfolioEntries.length) {
+          await applyPortfolioDeltas(tx, {
+            movementDate: statusDate,
+            deltas: existingPortfolioEntries.map((entry) => ({
+              glAccountId: entry.glAccountId,
+              thirdPartyId: entry.thirdPartyId,
+              loanId: entry.loanId,
+              installmentNumber: entry.installmentNumber,
+              dueDate: entry.dueDate,
+              chargeDelta: -toNumber(entry.chargeAmount),
+              paymentDelta: -toNumber(entry.paymentAmount),
+            })),
+          });
+        }
+
         await tx
           .update(loanInstallments)
           .set({ status: 'VOID' })
@@ -490,6 +516,7 @@ export const loan = tsr.router(contract.loan, {
           note: body.note,
           metadata: {
             operation: 'VOID_LOAN',
+            reversedPortfolioEntries: existingPortfolioEntries.length,
           },
         });
 
@@ -565,6 +592,14 @@ export const loan = tsr.router(contract.loan, {
           status: 404,
           message: `Credito con ID ${id} no encontrado`,
           code: 'NOT_FOUND',
+        });
+      }
+
+      if (existingLoan.status === 'VOID' || existingLoan.status === 'PAID') {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede modificar un credito en estado anulado o pagado',
+          code: 'BAD_REQUEST',
         });
       }
 
@@ -665,6 +700,14 @@ export const loan = tsr.router(contract.loan, {
         });
       }
 
+      if (existingLoan.status === 'VOID' || existingLoan.status === 'PAID') {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede modificar un credito en estado anulado o pagado',
+          code: 'BAD_REQUEST',
+        });
+      }
+
       if (body.hasPaymentAgreement && !body.paymentAgreementDate) {
         throwHttpError({
           status: 400,
@@ -759,6 +802,14 @@ export const loan = tsr.router(contract.loan, {
           status: 404,
           message: `Credito con ID ${id} no encontrado`,
           code: 'NOT_FOUND',
+        });
+      }
+
+      if (existingLoan.status === 'VOID' || existingLoan.status === 'PAID') {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede modificar un credito en estado anulado o pagado',
+          code: 'BAD_REQUEST',
         });
       }
 
@@ -862,6 +913,14 @@ export const loan = tsr.router(contract.loan, {
           status: 404,
           message: `Credito con ID ${id} no encontrado`,
           code: 'NOT_FOUND',
+        });
+      }
+
+      if (existingLoan.status === 'VOID' || existingLoan.status === 'PAID') {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede modificar un credito en estado anulado o pagado',
+          code: 'BAD_REQUEST',
         });
       }
 
@@ -975,7 +1034,7 @@ export const loan = tsr.router(contract.loan, {
     }
   },
 
-  liquidate: async ({ params: { id } }, { request, appRoute, nextRequest }) => {
+  liquidate: async ({ params: { id }, body }, { request, appRoute, nextRequest }) => {
     let session: UnifiedAuthContext | undefined;
     const ipAddress = getClientIp(nextRequest);
     const userAgent = nextRequest.headers.get('user-agent');
@@ -1046,6 +1105,7 @@ export const loan = tsr.router(contract.loan, {
         with: {
           glAccount: true,
         },
+        orderBy: [asc(accountingDistributionLines.id)],
       });
 
       if (!distributionLines.length) {
@@ -1093,25 +1153,6 @@ export const loan = tsr.router(contract.loan, {
         });
       }
 
-      const alreadyLiquidatedEntry = await db.query.accountingEntries.findFirst({
-        where: and(
-          eq(accountingEntries.processType, 'CREDIT'),
-          eq(accountingEntries.loanId, existingLoan.id),
-          inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
-        ),
-        columns: {
-          id: true,
-        },
-      });
-
-      if (alreadyLiquidatedEntry) {
-        throwHttpError({
-          status: 409,
-          message: 'El credito ya tiene movimientos de liquidacion generados',
-          code: 'CONFLICT',
-        });
-      }
-
       const loanConceptSnapshots = await db.query.loanBillingConcepts.findMany({
         where: eq(loanBillingConcepts.loanId, existingLoan.id),
         with: {
@@ -1124,7 +1165,7 @@ export const loan = tsr.router(contract.loan, {
       );
 
       const documentCode = buildLiquidationDocumentCode(existingLoan.id);
-      const entryDate = formatDateOnly(new Date());
+      const entryDate = formatDateOnly(body.entryDate);
       const { userId, userName } = getRequiredUserContext(session);
       const principalAmount = toNumber(existingLoan.principalAmount);
       const firstInstallment = installments[0];
@@ -1378,6 +1419,23 @@ export const loan = tsr.router(contract.loan, {
       }
 
       const [updatedLoan] = await db.transaction(async (tx) => {
+        const alreadyLiquidatedEntry = await tx.query.accountingEntries.findFirst({
+          where: and(
+            eq(accountingEntries.processType, 'CREDIT'),
+            eq(accountingEntries.loanId, existingLoan.id),
+            inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
+          ),
+          columns: { id: true },
+        });
+
+        if (alreadyLiquidatedEntry) {
+          throwHttpError({
+            status: 409,
+            message: 'El credito ya tiene movimientos de liquidacion generados',
+            code: 'CONFLICT',
+          });
+        }
+
         await tx.insert(accountingEntries).values(accountingEntriesPayload);
 
         await applyPortfolioDeltas(tx, {

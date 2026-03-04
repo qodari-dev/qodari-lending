@@ -13,6 +13,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { useLiquidateLoan, useLoans, useVoidLoan } from '@/hooks/queries/use-loan-queries';
@@ -127,11 +129,13 @@ export function Loans() {
   const { mutateAsync: liquidateLoan, isPending: isLiquidating } = useLiquidateLoan();
   const { mutateAsync: voidLoan, isPending: isVoiding } = useVoidLoan();
   const [openedLiquidateDialog, setOpenedLiquidateDialog] = React.useState(false);
+  const [liquidateEntryDate, setLiquidateEntryDate] = React.useState<Date | null>(new Date());
   const [openedVoidDialog, setOpenedVoidDialog] = React.useState(false);
   const [voidNote, setVoidNote] = React.useState('');
 
   const handleRowLiquidate = React.useCallback((row: Loan) => {
     setLoanToLiquidate(row);
+    setLiquidateEntryDate(new Date());
     setOpenedLiquidateDialog(true);
   }, []);
   const handleRowVoid = React.useCallback((row: Loan) => {
@@ -165,16 +169,16 @@ export function Loans() {
   }, []);
 
   const submitLiquidate = React.useCallback(async () => {
-    if (!loanToLiquidate?.id) return;
+    if (!loanToLiquidate?.id || !liquidateEntryDate) return;
 
     await liquidateLoan({
       params: { id: loanToLiquidate.id },
-      body: {},
+      body: { entryDate: liquidateEntryDate },
     });
 
     setOpenedLiquidateDialog(false);
     setLoanToLiquidate(undefined);
-  }, [liquidateLoan, loanToLiquidate]);
+  }, [liquidateLoan, loanToLiquidate, liquidateEntryDate]);
   const submitVoid = React.useCallback(async () => {
     if (!loanToVoid?.id || !voidNote.trim()) return;
 
@@ -335,9 +339,17 @@ export function Loans() {
               <strong>{loanToLiquidate?.creditNumber ?? ''}</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <Field>
+            <FieldLabel>Fecha de movimiento</FieldLabel>
+            <DatePicker
+              value={liquidateEntryDate}
+              onChange={setLiquidateEntryDate}
+              placeholder="Seleccione fecha de movimiento"
+            />
+          </Field>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction disabled={isLiquidating} onClick={submitLiquidate}>
+            <AlertDialogAction disabled={isLiquidating || !liquidateEntryDate} onClick={submitLiquidate}>
               {isLiquidating && <Spinner />}
               Liquidar
             </AlertDialogAction>

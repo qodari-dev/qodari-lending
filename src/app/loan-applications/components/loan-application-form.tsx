@@ -191,15 +191,31 @@ export function LoanApplicationForm({
     });
   }, []);
 
+  const pinnedThirdParties = useMemo(() => {
+    const pinned = new Map<number, ThirdParty>();
+    if (loanApplication?.thirdParty) {
+      const tp = loanApplication.thirdParty as ThirdParty;
+      pinned.set(tp.id, tp);
+    }
+    for (const coDebtor of loanApplication?.loanApplicationCoDebtors ?? []) {
+      if (coDebtor.thirdParty) {
+        const tp = coDebtor.thirdParty as ThirdParty;
+        pinned.set(tp.id, tp);
+      }
+    }
+    return pinned;
+  }, [loanApplication]);
+
   const thirdParties = useMemo(() => {
     const base = thirdPartiesData?.body?.data ?? [];
     const ids = new Set(base.map((item) => item.id));
     const extras: ThirdParty[] = [];
-    for (const tp of knownThirdParties.values()) {
+    const allKnown = new Map([...pinnedThirdParties, ...knownThirdParties]);
+    for (const tp of allKnown.values()) {
       if (!ids.has(tp.id)) extras.push(tp);
     }
     return [...extras, ...base];
-  }, [thirdPartiesData, knownThirdParties]);
+  }, [thirdPartiesData, knownThirdParties, pinnedThirdParties]);
 
   const { data: creditProductsData } = useCreditProducts({
     limit: 1000,
@@ -511,16 +527,6 @@ export function LoanApplicationForm({
 
   useEffect(() => {
     if (!opened) return;
-
-    // Pin third parties from the loan application so they always show in combobox
-    if (loanApplication?.thirdParty) {
-      addKnownThirdParty(loanApplication.thirdParty as ThirdParty);
-    }
-    for (const coDebtor of loanApplication?.loanApplicationCoDebtors ?? []) {
-      if (coDebtor.thirdParty) {
-        addKnownThirdParty(coDebtor.thirdParty as ThirdParty);
-      }
-    }
 
     form.reset({
       channelId: loanApplication?.channelId ?? undefined,
@@ -1050,7 +1056,9 @@ export function LoanApplicationForm({
                             readOnly
                             disabled
                           />
-                          <p className="text-muted-foreground text-xs">Calculado automáticamente.</p>
+                          <p className="text-muted-foreground text-xs">
+                            Calculado automáticamente.
+                          </p>
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}
@@ -1357,7 +1365,10 @@ export function LoanApplicationForm({
                     />
 
                     <div className="col-span-2 space-y-3 rounded-md border p-4">
-                      <Collapsible open={showAmortizationSection} onOpenChange={setShowAmortizationPreview}>
+                      <Collapsible
+                        open={showAmortizationSection}
+                        onOpenChange={setShowAmortizationPreview}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-sm font-medium">Viabilidad de pago</p>
@@ -1424,8 +1435,10 @@ export function LoanApplicationForm({
                               : 'No puede pagar la solicitud con la capacidad actual.'}
                           </p>
                           <p className="text-xs">
-                            Cuota maxima estimada: {formatCurrency(paymentCapacityAssessment.installmentPayment)}.
-                            Capacidad de pago: {formatCurrency(paymentCapacityAssessment.paymentCapacity)}.
+                            Cuota maxima estimada:{' '}
+                            {formatCurrency(paymentCapacityAssessment.installmentPayment)}.
+                            Capacidad de pago:{' '}
+                            {formatCurrency(paymentCapacityAssessment.paymentCapacity)}.
                             {paymentCapacityAssessment.canPay
                               ? ` Margen: ${formatCurrency(paymentCapacityAssessment.margin)}.`
                               : ` Faltante: ${formatCurrency(paymentCapacityAssessment.shortfall)}.`}

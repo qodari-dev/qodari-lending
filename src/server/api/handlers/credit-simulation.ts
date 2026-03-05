@@ -14,6 +14,7 @@ import {
   paymentFrequencies,
   thirdParties,
 } from '@/server/db';
+import { getSubsidyWorkerStudy } from '@/server/services/subsidy/subsidy-service';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
@@ -61,76 +62,6 @@ type WorkerStudyCreditRow = {
     creditProduct: { name: string } | null;
   } | null;
 };
-
-// ---------------------------------------------------------------------------
-// Worker Study – mock data builder
-// TODO(worker-study): Replace with real subsidy module integration:
-//   - contribution history from affiliates
-//   - company contribution history
-//   - employment trajectory
-//   - current and historical salary
-// ---------------------------------------------------------------------------
-
-const MOCK_SALARY_BASE = 1_800_000;
-const MOCK_SALARY_INCREMENT_PER_DIGIT = 15_000;
-const MOCK_SALARY_AVERAGE_FACTOR = 0.96;
-const MOCK_SALARY_HIGHEST_FACTOR = 1.08;
-const MOCK_CONTRIBUTION_RATE = 0.04;
-const MOCK_CONTRIBUTION_PERIODS = [
-  '2025-09',
-  '2025-10',
-  '2025-11',
-  '2025-12',
-  '2026-01',
-  '2026-02',
-] as const;
-
-function buildMockWorkerData(args: {
-  documentNumber: string;
-  employerBusinessName: string | null;
-}) {
-  const documentTail = Number(args.documentNumber.replace(/\D/g, '').slice(-2) || '0');
-  const salaryBase = MOCK_SALARY_BASE + documentTail * MOCK_SALARY_INCREMENT_PER_DIGIT;
-  const currentSalary = roundMoney(salaryBase);
-  const companyName = args.employerBusinessName ?? 'Servicios Integrales SAS';
-
-  return {
-    salary: {
-      currentSalary,
-      averageSalaryLastSixMonths: roundMoney(salaryBase * MOCK_SALARY_AVERAGE_FACTOR),
-      highestSalaryLastSixMonths: roundMoney(salaryBase * MOCK_SALARY_HIGHEST_FACTOR),
-    },
-    trajectory: {
-      totalContributionMonths: 92,
-      currentCompanyName: companyName,
-      previousCompanyName: args.employerBusinessName ? null : 'Comercial Andina LTDA',
-    },
-    contributions: MOCK_CONTRIBUTION_PERIODS.map((period) => ({
-      period,
-      companyName,
-      contributionBaseSalary: currentSalary,
-      contributionValue: roundMoney(currentSalary * MOCK_CONTRIBUTION_RATE),
-    })),
-    companyHistory: [
-      {
-        companyName,
-        fromDate: '2022-03-01',
-        toDate: null,
-        contributionMonths: 47,
-      },
-      ...(args.employerBusinessName
-        ? []
-        : [
-            {
-              companyName: 'Comercial Andina LTDA',
-              fromDate: '2018-01-01',
-              toDate: '2022-02-28',
-              contributionMonths: 50,
-            },
-          ]),
-    ],
-  };
-}
 
 export const creditSimulation = tsr.router(contract.creditSimulation, {
   calculate: async ({ body }, { request, appRoute }) => {
@@ -464,31 +395,39 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
 
       const thirdPartyLabel = getThirdPartyLabel(workerThirdParty);
       const workerFullName = thirdPartyLabel === '-' ? 'Afiliado demo' : thirdPartyLabel;
-
-      const mockData = buildMockWorkerData({
-        documentNumber: body.documentNumber,
-        employerBusinessName: workerThirdParty?.employerBusinessName ?? null,
+      const workerDocumentNumber = workerThirdParty?.documentNumber ?? documentNumber;
+      const subsidyData = await getSubsidyWorkerStudy({
+        identificationTypeCode: identificationType.code,
+        documentNumber: workerDocumentNumber,
+        fallbackWorkerName: workerFullName,
+        fallbackEmployerBusinessName: workerThirdParty?.employerBusinessName ?? null,
       });
+
+      const localLoanNotes = workerThirdParty
+        ? `Solicitudes encontradas: ${studiedLoanApplications.length}. Creditos encontrados: ${studiedCredits.length}.`
+        : 'No se encontro un tercero registrado para este documento.';
+
+      const notes = [localLoanNotes, ...subsidyData.notes].filter(
+        (item): item is string => typeof item === 'string' && item.trim().length > 0
+      );
 
       return {
         status: 200 as const,
         body: {
           worker: {
-            fullName: workerFullName,
+            fullName: subsidyData.workerName || workerFullName,
             identificationTypeId: identificationType.id,
             identificationTypeCode: identificationType.code,
             identificationTypeName: identificationType.name,
-            documentNumber: workerThirdParty?.documentNumber ?? documentNumber,
+            documentNumber: subsidyData.workerDocumentNumber || workerDocumentNumber,
           },
-          salary: mockData.salary,
-          trajectory: mockData.trajectory,
-          contributions: mockData.contributions,
-          companyHistory: mockData.companyHistory,
+          salary: subsidyData.salary,
+          trajectory: subsidyData.trajectory,
+          contributions: subsidyData.contributions,
+          companyHistory: subsidyData.companyHistory,
           loanApplications: studiedLoanApplications,
           credits: studiedCredits,
-          notes: workerThirdParty
-            ? `Solicitudes encontradas: ${studiedLoanApplications.length}. Creditos encontrados: ${studiedCredits.length}.`
-            : 'No se encontro un tercero registrado para este documento. Se muestran datos demo de trayectoria y salario.',
+          notes: notes.length ? notes.join(' ') : null,
           generatedAt: new Date().toISOString(),
         },
       };

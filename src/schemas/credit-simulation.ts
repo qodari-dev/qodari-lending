@@ -144,18 +144,29 @@ export const WorkerStudyResponseSchema = z.object({
     identificationTypeName: z.string(),
     documentNumber: z.string(),
   }),
-  salary: z.object({
-    currentSalary: z.number().nonnegative(),
-    averageSalaryLastSixMonths: z.number().nonnegative(),
-    highestSalaryLastSixMonths: z.number().nonnegative(),
-  }),
-  trajectory: z.object({
-    totalContributionMonths: z.number().int().nonnegative(),
-    currentCompanyName: z.string().nullable(),
-    previousCompanyName: z.string().nullable(),
-  }),
+  subsidySource: z.string().nullable(),
+  salary: z
+    .object({
+      currentSalary: z.number().nonnegative(),
+      averageSalaryLastSixMonths: z.number().nonnegative(),
+      highestSalaryLastSixMonths: z.number().nonnegative(),
+    })
+    .nullable(),
+  trajectory: z
+    .object({
+      totalContributionMonths: z.number().int().nonnegative(),
+      currentCompanyName: z.string().nullable(),
+      previousCompanyName: z.string().nullable(),
+    })
+    .nullable(),
   contributions: z.array(WorkerStudyContributionSchema),
   companyHistory: z.array(WorkerStudyCompanyHistorySchema),
+  spouse: z
+    .object({
+      fullName: z.string(),
+      documentNumber: z.string().nullable(),
+    })
+    .nullable(),
   loanApplications: z.array(WorkerStudyLoanApplicationSchema),
   credits: z.array(WorkerStudyCreditSchema),
   notes: z.string().nullable(),

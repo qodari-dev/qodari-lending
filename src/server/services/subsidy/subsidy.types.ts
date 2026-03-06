@@ -1,4 +1,4 @@
-export type SubsidySource = 'COMFENALCO' | 'SYSEU' | 'MOCK';
+export type SubsidySource = 'COMFENALCO' | 'SYSEU';
 
 export type SubsidyEmploymentRecord = {
   companyName: string;
@@ -31,20 +31,6 @@ export type SubsidyBeneficiary = {
   isDeceased: boolean;
 };
 
-export type SubsidySpouse = {
-  fullName: string;
-  documentNumber: string | null;
-  identificationTypeCode: string | null;
-};
-
-export type SubsidyTransfer = {
-  period: string;
-  companyName: string | null;
-  baseSalary: number;
-  amount: number;
-  status: string | null;
-};
-
 export type SubsidyWorkerStudyData = {
   source: SubsidySource;
   workerName: string;
@@ -71,5 +57,9 @@ export type SubsidyWorkerStudyData = {
     toDate: string | null;
     contributionMonths: number;
   }>;
+  spouse: {
+    fullName: string;
+    documentNumber: string | null;
+  } | null;
   notes: string[];
 };

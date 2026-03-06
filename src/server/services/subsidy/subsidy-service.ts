@@ -1,4 +1,3 @@
-import { extractUnknownErrorMessage } from '@/server/utils/error-utils';
 import { roundMoney } from '@/server/utils/value-utils';
 import { getSubsidyProvider } from './subsidy-provider-factory';
 import type { SubsidyBeneficiary, SubsidyWorker, SubsidyWorkerStudyData } from './subsidy.types';
@@ -6,23 +5,9 @@ import type { SubsidyBeneficiary, SubsidyWorker, SubsidyWorkerStudyData } from '
 type GetSubsidyWorkerStudyInput = {
   identificationTypeCode: string;
   documentNumber: string;
-  fallbackWorkerName: string;
-  fallbackEmployerBusinessName: string | null;
 };
 
-const MOCK_SALARY_BASE = 1_800_000;
-const MOCK_SALARY_INCREMENT_PER_DIGIT = 15_000;
-const MOCK_SALARY_AVERAGE_FACTOR = 0.96;
-const MOCK_SALARY_HIGHEST_FACTOR = 1.08;
-const MOCK_CONTRIBUTION_RATE = 0.04;
-const MOCK_CONTRIBUTION_PERIODS = [
-  '2025-09',
-  '2025-10',
-  '2025-11',
-  '2025-12',
-  '2026-01',
-  '2026-02',
-] as const;
+const CONTRIBUTION_RATE = 0.04;
 
 function toSafeMoney(value: number): number {
   if (!Number.isFinite(value) || value < 0) return 0;
@@ -47,72 +32,23 @@ function monthsDiff(fromDate: string | null, toDate: string | null) {
   return Math.max(0, years * 12 + months + 1);
 }
 
-function buildMockWorkerStudy(
-  input: GetSubsidyWorkerStudyInput,
-  note: string
-): SubsidyWorkerStudyData {
-  const documentTail = Number(input.documentNumber.replace(/\D/g, '').slice(-2) || '0');
-  const salaryBase = MOCK_SALARY_BASE + documentTail * MOCK_SALARY_INCREMENT_PER_DIGIT;
-  const currentSalary = roundMoney(salaryBase);
-  const companyName = input.fallbackEmployerBusinessName ?? 'Servicios Integrales SAS';
-
-  return {
-    source: 'MOCK',
-    workerName: input.fallbackWorkerName,
-    workerDocumentNumber: input.documentNumber,
-    salary: {
-      currentSalary,
-      averageSalaryLastSixMonths: roundMoney(salaryBase * MOCK_SALARY_AVERAGE_FACTOR),
-      highestSalaryLastSixMonths: roundMoney(salaryBase * MOCK_SALARY_HIGHEST_FACTOR),
-    },
-    trajectory: {
-      totalContributionMonths: 92,
-      currentCompanyName: companyName,
-      previousCompanyName: input.fallbackEmployerBusinessName ? null : 'Comercial Andina LTDA',
-    },
-    contributions: MOCK_CONTRIBUTION_PERIODS.map((period) => ({
-      period,
-      companyName,
-      contributionBaseSalary: currentSalary,
-      contributionValue: roundMoney(currentSalary * MOCK_CONTRIBUTION_RATE),
-    })),
-    companyHistory: [
-      {
-        companyName,
-        fromDate: '2022-03-01',
-        toDate: null,
-        contributionMonths: 47,
-      },
-      ...(input.fallbackEmployerBusinessName
-        ? []
-        : [
-            {
-              companyName: 'Comercial Andina LTDA',
-              fromDate: '2018-01-01',
-              toDate: '2022-02-28',
-              contributionMonths: 50,
-            },
-          ]),
-    ],
-    notes: [note],
-  };
+function isSpouseRelationship(value: string | null | undefined) {
+  if (!value) return false;
+  const normalized = value.toUpperCase();
+  return (
+    normalized.includes('CONYUGE') ||
+    normalized.includes('COMPANER') ||
+    normalized.includes('ESPOS') ||
+    normalized.includes('PAREJA')
+  );
 }
 
 function pickSpouse(beneficiaries: SubsidyBeneficiary[]): SubsidyBeneficiary | null {
-  const spouse = beneficiaries.find((item) => {
-    const relationship = (item.relationship ?? '').toUpperCase();
-    return (
-      relationship.includes('CONYUGE') ||
-      relationship.includes('COMPANER') ||
-      relationship.includes('ESPOS') ||
-      relationship.includes('PAREJA')
-    );
-  });
-  return spouse ?? null;
+  return beneficiaries.find((item) => isSpouseRelationship(item.relationship)) ?? null;
 }
 
 function buildStudyFromProvider(params: {
-  source: 'COMFENALCO' | 'SYSEU';
+  source: SubsidyWorkerStudyData['source'];
   worker: SubsidyWorker;
   beneficiaries: SubsidyBeneficiary[];
 }): SubsidyWorkerStudyData {
@@ -150,7 +86,7 @@ function buildStudyFromProvider(params: {
       period: item.joinedSubsidyAt?.slice(0, 7) ?? item.joinedCompanyAt?.slice(0, 7) ?? currentPeriod(),
       companyName: item.companyName || 'Empresa sin nombre',
       contributionBaseSalary: baseSalary,
-      contributionValue: toSafeMoney(baseSalary * MOCK_CONTRIBUTION_RATE),
+      contributionValue: toSafeMoney(baseSalary * CONTRIBUTION_RATE),
     };
   });
 
@@ -160,14 +96,16 @@ function buildStudyFromProvider(params: {
   );
   const spouse = pickSpouse(params.beneficiaries);
 
+  const currentSalary = toSafeMoney(worker.currentSalary);
+
   return {
     source: params.source,
     workerName: worker.fullName,
     workerDocumentNumber: worker.documentNumber,
     salary: {
-      currentSalary: toSafeMoney(worker.currentSalary),
-      averageSalaryLastSixMonths: toSafeMoney(worker.currentSalary * MOCK_SALARY_AVERAGE_FACTOR),
-      highestSalaryLastSixMonths: toSafeMoney(worker.currentSalary * MOCK_SALARY_HIGHEST_FACTOR),
+      currentSalary,
+      averageSalaryLastSixMonths: currentSalary,
+      highestSalaryLastSixMonths: currentSalary,
     },
     trajectory: {
       totalContributionMonths: companyHistory.reduce((sum, item) => sum + item.contributionMonths, 0),
@@ -176,6 +114,9 @@ function buildStudyFromProvider(params: {
     },
     contributions: contributionRows,
     companyHistory,
+    spouse: spouse
+      ? { fullName: spouse.fullName, documentNumber: spouse.documentNumber }
+      : null,
     notes: [
       `Fuente subsidio: ${params.source}.`,
       `Beneficiarios encontrados: ${params.beneficiaries.length}.`,
@@ -186,14 +127,11 @@ function buildStudyFromProvider(params: {
 
 export async function getSubsidyWorkerStudy(
   input: GetSubsidyWorkerStudyInput
-): Promise<SubsidyWorkerStudyData> {
+): Promise<SubsidyWorkerStudyData | null> {
   const provider = getSubsidyProvider();
 
   if (!provider) {
-    return buildMockWorkerStudy(
-      input,
-      'Subsidio en modo MOCK. Configure SUBSIDY_PROVIDER para usar un proveedor real.'
-    );
+    return null;
   }
 
   try {
@@ -208,27 +146,16 @@ export async function getSubsidyWorkerStudy(
     ]);
 
     if (!worker) {
-      return buildMockWorkerStudy(
-        input,
-        `Proveedor ${provider.key} sin datos del trabajador. Se usan datos demo.`
-      );
+      return null;
     }
 
-    const study = buildStudyFromProvider({
+    return buildStudyFromProvider({
       source: provider.key,
       worker,
       beneficiaries,
     });
-
-    return {
-      ...study,
-      source: provider.key,
-    };
   } catch (error) {
     console.error('[subsidy-service] provider error', error);
-    return buildMockWorkerStudy(
-      input,
-      `Fallo consultando proveedor de subsidio: ${extractUnknownErrorMessage(error, 'error desconocido')}.`
-    );
+    return null;
   }
 }

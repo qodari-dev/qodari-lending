@@ -164,24 +164,36 @@ export const workerStudyReportTemplate: PdfTemplateBuilder<WorkerStudyPdfData> =
       ]),
 
       // -- Salary & trajectory --
-      h(Text, { style: styles.sectionTitle, key: 'sec-salary' }, 'Salario y trayectoria'),
-      SummaryGrid(rpdf, styles, [
-        { label: 'Salario actual', value: formatCurrency(data.salary.currentSalary) },
-        {
-          label: 'Promedio 6 meses',
-          value: formatCurrency(data.salary.averageSalaryLastSixMonths),
-        },
-        {
-          label: 'Mas alto 6 meses',
-          value: formatCurrency(data.salary.highestSalaryLastSixMonths),
-        },
-        {
-          label: 'Meses de aportes',
-          value: formatNumber(data.trajectory.totalContributionMonths),
-        },
-        { label: 'Empresa actual', value: data.trajectory.currentCompanyName ?? '-' },
-        { label: 'Empresa anterior', value: data.trajectory.previousCompanyName ?? '-' },
-      ]),
+      ...(data.salary || data.trajectory
+        ? [
+            h(Text, { style: styles.sectionTitle, key: 'sec-salary' }, 'Salario y trayectoria'),
+            SummaryGrid(rpdf, styles, [
+              ...(data.salary
+                ? [
+                    { label: 'Salario actual', value: formatCurrency(data.salary.currentSalary) },
+                    {
+                      label: 'Promedio 6 meses',
+                      value: formatCurrency(data.salary.averageSalaryLastSixMonths),
+                    },
+                    {
+                      label: 'Mas alto 6 meses',
+                      value: formatCurrency(data.salary.highestSalaryLastSixMonths),
+                    },
+                  ]
+                : []),
+              ...(data.trajectory
+                ? [
+                    {
+                      label: 'Meses de aportes',
+                      value: formatNumber(data.trajectory.totalContributionMonths),
+                    },
+                    { label: 'Empresa actual', value: data.trajectory.currentCompanyName ?? '-' },
+                    { label: 'Empresa anterior', value: data.trajectory.previousCompanyName ?? '-' },
+                  ]
+                : []),
+            ]),
+          ]
+        : []),
 
       // -- Contributions --
       h(Text, { style: styles.sectionTitle, key: 'sec-contributions' }, 'Historial de aportes'),

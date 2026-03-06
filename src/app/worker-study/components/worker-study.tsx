@@ -245,43 +245,55 @@ export function WorkerStudy() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Salario y trayectoria</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-3">
-                <div>
-                  <p className="text-muted-foreground text-xs">Salario actual</p>
-                  <p className="font-medium">{formatCurrency(result.salary.currentSalary)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Promedio ultimos 6 meses</p>
-                  <p className="font-medium">
-                    {formatCurrency(result.salary.averageSalaryLastSixMonths)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Salario mas alto (6 meses)</p>
-                  <p className="font-medium">
-                    {formatCurrency(result.salary.highestSalaryLastSixMonths)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Meses de aportes</p>
-                  <p className="font-medium">
-                    {formatNumber(result.trajectory.totalContributionMonths)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Empresa actual</p>
-                  <p className="font-medium">{result.trajectory.currentCompanyName ?? '-'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Empresa anterior</p>
-                  <p className="font-medium">{result.trajectory.previousCompanyName ?? '-'}</p>
-                </div>
-              </CardContent>
-            </Card>
+            {result.salary ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Salario</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Salario actual</p>
+                    <p className="font-medium">{formatCurrency(result.salary.currentSalary)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Promedio ultimos 6 meses</p>
+                    <p className="font-medium">
+                      {formatCurrency(result.salary.averageSalaryLastSixMonths)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Salario mas alto (6 meses)</p>
+                    <p className="font-medium">
+                      {formatCurrency(result.salary.highestSalaryLastSixMonths)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {result.trajectory ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Trayectoria</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Meses de aportes</p>
+                    <p className="font-medium">
+                      {formatNumber(result.trajectory.totalContributionMonths)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Empresa actual</p>
+                    <p className="font-medium">{result.trajectory.currentCompanyName ?? '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Empresa anterior</p>
+                    <p className="font-medium">{result.trajectory.previousCompanyName ?? '-'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card>
               <CardHeader>

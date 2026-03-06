@@ -6,7 +6,7 @@ import type {
 import { comfenalcoClient } from '@/server/clients/comfenalco';
 import { toNumber } from '@/server/utils/value-utils';
 import type { SubsidyProvider, SubsidyLookupInput } from '../subsidy-provider';
-import type { SubsidyBeneficiary, SubsidySpouse, SubsidyTransfer, SubsidyWorker } from '../subsidy.types';
+import type { SubsidyBeneficiary, SubsidyWorker } from '../subsidy.types';
 
 function normalizeDocument(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -87,17 +87,6 @@ function mapBeneficiary(record: ComfenalcoBeneficiaryRecord): SubsidyBeneficiary
   };
 }
 
-function isSpouseRelationship(value: string | null | undefined) {
-  if (!value) return false;
-  const normalized = value.toUpperCase();
-  return (
-    normalized.includes('CONYUGE') ||
-    normalized.includes('COMPANER') ||
-    normalized.includes('ESPOS') ||
-    normalized.includes('PAREJA')
-  );
-}
-
 class ComfenalcoSubsidyProvider implements SubsidyProvider {
   readonly key = 'COMFENALCO' as const;
 
@@ -113,22 +102,6 @@ class ComfenalcoSubsidyProvider implements SubsidyProvider {
 
     const worker = await comfenalcoClient.getWorkerByDocument(input.documentNumber);
     return (worker?.beneficiarios ?? []).map(mapBeneficiary);
-  }
-
-  async getSpouse(input: SubsidyLookupInput): Promise<SubsidySpouse | null> {
-    const beneficiaries = await this.getBeneficiaries(input);
-    const spouse = beneficiaries.find((item) => isSpouseRelationship(item.relationship));
-    if (!spouse) return null;
-
-    return {
-      fullName: spouse.fullName,
-      documentNumber: spouse.documentNumber,
-      identificationTypeCode: spouse.identificationTypeCode,
-    };
-  }
-
-  async getTransfers(_input: SubsidyLookupInput): Promise<SubsidyTransfer[]> {
-    return [];
   }
 }
 

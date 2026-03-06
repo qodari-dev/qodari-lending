@@ -1,5 +1,5 @@
 import type { SubsidyProvider, SubsidyLookupInput } from '../subsidy-provider';
-import type { SubsidyBeneficiary, SubsidySpouse, SubsidyTransfer, SubsidyWorker } from '../subsidy.types';
+import type { SubsidyBeneficiary, SubsidyWorker } from '../subsidy.types';
 
 class SyseuSubsidyProvider implements SubsidyProvider {
   readonly key = 'SYSEU' as const;
@@ -9,14 +9,6 @@ class SyseuSubsidyProvider implements SubsidyProvider {
   }
 
   async getBeneficiaries(_input: SubsidyLookupInput): Promise<SubsidyBeneficiary[]> {
-    return [];
-  }
-
-  async getSpouse(_input: SubsidyLookupInput): Promise<SubsidySpouse | null> {
-    return null;
-  }
-
-  async getTransfers(_input: SubsidyLookupInput): Promise<SubsidyTransfer[]> {
     return [];
   }
 }

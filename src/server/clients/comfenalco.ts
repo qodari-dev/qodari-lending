@@ -1,5 +1,4 @@
 import { env } from '@/env';
-import { extractUnknownErrorMessage } from '@/server/utils/error-utils';
 
 type ComfenalcoTokenResponse = {
   exito: boolean;
@@ -195,7 +194,3 @@ class ComfenalcoClient {
 }
 
 export const comfenalcoClient = new ComfenalcoClient();
-
-export function getComfenalcoErrorMessage(error: unknown, fallback: string) {
-  return extractUnknownErrorMessage(error, fallback);
-}

@@ -21,6 +21,7 @@ import { costCenter } from './cost-center';
 import { creditFund } from './credit-fund';
 import { creditsSettingsContract } from './credits-settings';
 import { documentType } from './document-type';
+import { documentTemplate } from './document-template';
 import { dashboard } from './dashboard';
 import { glAccount } from './gl-account';
 import { identificationType } from './identification-type';
@@ -45,6 +46,7 @@ import { rejectionReason } from './rejection-reason';
 import { riskCenterReport } from './risk-center-report';
 import { repaymentMethod } from './repayment-method';
 import { subsidy } from './subsidy';
+import { signatureWebhook } from './signature-webhook';
 import { thirdParty } from './third-party';
 import { thirdPartyType } from './third-party-type';
 
@@ -75,6 +77,7 @@ export const contract = c.router(
     creditsSettings: creditsSettingsContract,
     dashboard,
     documentType,
+    documentTemplate,
     glAccount,
     identificationType,
     iamUser,
@@ -97,6 +100,7 @@ export const contract = c.router(
     rejectionReason,
     riskCenterReport,
     repaymentMethod,
+    signatureWebhook,
     subsidy,
     thirdParty,
     thirdPartyType,

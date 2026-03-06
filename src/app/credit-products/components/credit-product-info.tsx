@@ -25,6 +25,7 @@ import {
   billingConceptFinancingModeLabels,
   billingConceptFrequencyLabels,
 } from '@/schemas/billing-concept';
+import { documentTemplateStatusLabels } from '@/schemas/document-template';
 import { formatDate } from '@/utils/formatters';
 
 export function CreditProductInfo({
@@ -71,8 +72,24 @@ export function CreditProductInfo({
     overrideGlAccount?: { code: string; name: string };
   };
 
+  type DocumentRuleView = {
+    id: number;
+    documentTemplateId: number;
+    required: boolean;
+    documentOrder: number;
+    documentTemplate?: {
+      code: string;
+      name: string;
+      version: number;
+      status: 'DRAFT' | 'ACTIVE' | 'INACTIVE';
+    };
+  };
+
   const requiredDocuments = ((creditProduct as unknown as { creditProductDocuments?: unknown[] })
     .creditProductDocuments ?? []) as RequiredDocumentView[];
+
+  const documentRules = ((creditProduct as unknown as { creditProductDocumentRules?: unknown[] })
+    .creditProductDocumentRules ?? []) as DocumentRuleView[];
 
   const accounts = ((creditProduct as unknown as { creditProductAccounts?: unknown[] })
     .creditProductAccounts ?? []) as AccountView[];
@@ -255,6 +272,7 @@ export function CreditProductInfo({
               <TabsTrigger value="categories">Categorias</TabsTrigger>
               <TabsTrigger value="lateRules">Reglas mora</TabsTrigger>
               <TabsTrigger value="documents">Documentos</TabsTrigger>
+              <TabsTrigger value="documentRules">Plantillas firma</TabsTrigger>
               <TabsTrigger value="accounts">Cuentas</TabsTrigger>
               <TabsTrigger value="billingConcepts">Conceptos</TabsTrigger>
               <TabsTrigger value="refinance">Refinanciacion</TabsTrigger>
@@ -357,6 +375,50 @@ export function CreditProductInfo({
               ) : (
                 <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
                   No hay documentos configurados.
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="documentRules" className="space-y-2">
+              <h3 className="text-sm font-semibold">Plantillas de firma</h3>
+              {documentRules.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Plantilla</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Orden</TableHead>
+                      <TableHead>Obligatorio</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...documentRules]
+                      .sort((a, b) => a.documentOrder - b.documentOrder)
+                      .map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            {item.documentTemplate
+                              ? `${item.documentTemplate.code} v${item.documentTemplate.version} - ${item.documentTemplate.name}`
+                              : item.documentTemplateId}
+                          </TableCell>
+                          <TableCell>
+                            {item.documentTemplate
+                              ? documentTemplateStatusLabels[item.documentTemplate.status]
+                              : '-'}
+                          </TableCell>
+                          <TableCell>{item.documentOrder}</TableCell>
+                          <TableCell>
+                            <Badge variant={item.required ? 'default' : 'outline'}>
+                              {item.required ? 'Si' : 'No'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                  No hay plantillas configuradas.
                 </div>
               )}
             </TabsContent>

@@ -141,6 +141,8 @@ const LOAN_INCLUDE_OPTIONS = [
   'loanAgreementHistory',
   'loanStatusHistory',
   'loanBillingConcepts',
+  'loanDocumentInstances',
+  'signatureEnvelopes',
   'loanRefinancingLinksRefinanced',
   'loanRefinancingLinksReference',
 ] as const;
@@ -165,6 +167,28 @@ export const LiquidateLoanBodySchema = z.object({
 });
 export const VoidLoanBodySchema = z.object({
   note: z.string().trim().min(5).max(255),
+});
+export const LoanSignatureEnvelopePathParamsSchema = z.object({
+  id: z.coerce.number(),
+  envelopeId: z.coerce.number(),
+});
+export const PresignLoanSignatureFileViewBodySchema = z.object({
+  fileKey: z.string().trim().min(1).max(1024),
+});
+export const PresignLoanSignatureFileViewResponseSchema = z.object({
+  viewUrl: z.url(),
+  method: z.literal('GET'),
+});
+export const RESEND_SIGNATURE_ENVELOPE_ACTION_OPTIONS = ['REMINDER', 'RETRY'] as const;
+export const ResendLoanSignatureEnvelopeBodySchema = z.object({
+  action: z.enum(RESEND_SIGNATURE_ENVELOPE_ACTION_OPTIONS),
+});
+export const ResendLoanSignatureEnvelopeResponseSchema = z.object({
+  envelopeId: z.number().int().positive(),
+  action: z.enum(RESEND_SIGNATURE_ENVELOPE_ACTION_OPTIONS),
+  status: z.string().min(1),
+  eventType: z.string().min(1),
+  sentAt: z.coerce.date(),
 });
 export const UpdateLoanLegalProcessBodySchema = z
   .object({

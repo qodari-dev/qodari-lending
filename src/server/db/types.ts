@@ -80,6 +80,15 @@ import type {
   paymentAllocationPolicyRules,
   identificationTypes,
   cities,
+  documentTemplates,
+  templateSignerRules,
+  creditProductDocumentRules,
+  loanDocumentInstances,
+  signatureEnvelopes,
+  signatureEnvelopeDocuments,
+  signatureSigners,
+  signatureEvents,
+  signatureArtifacts,
 } from './schema';
 
 // ---------------------------------------------------------------------
@@ -359,6 +368,7 @@ export type CreditProducts = typeof creditProducts.$inferSelect & {
   creditProductChargeOffPolicy?: CreditProductChargeOffPolicies | null;
   creditProductCategories?: CreditProductCategories[];
   creditProductDocuments?: CreditProductDocuments[];
+  creditProductDocumentRules?: CreditProductDocumentRules[];
   creditProductAccounts?: CreditProductAccounts[];
   creditProductBillingConcepts?: CreditProductBillingConcepts[];
   paymentAllocationPolicy?: PaymentAllocationPolicies;
@@ -507,6 +517,8 @@ export type Loans = typeof loans.$inferSelect & {
   loanAgreementHistory?: LoanAgreementHistory[];
   loanStatusHistory?: LoanStatusHistory[];
   loanBillingConcepts?: LoanBillingConcepts[];
+  loanDocumentInstances?: LoanDocumentInstances[];
+  signatureEnvelopes?: SignatureEnvelopes[];
 };
 export type NewLoans = typeof loans.$inferInsert;
 
@@ -854,3 +866,64 @@ export type PaymentAllocationPolicyRules = typeof paymentAllocationPolicyRules.$
   billingConcept?: BillingConcepts;
 };
 export type NewPaymentAllocationPolicyRules = typeof paymentAllocationPolicyRules.$inferInsert;
+
+// ---------------------------------------------------------------------
+// Firma digital - Plantillas documentales
+// ---------------------------------------------------------------------
+export type DocumentTemplates = typeof documentTemplates.$inferSelect & {
+  templateSignerRules?: TemplateSignerRules[];
+  creditProductDocumentRules?: CreditProductDocumentRules[];
+  loanDocumentInstances?: LoanDocumentInstances[];
+};
+export type NewDocumentTemplates = typeof documentTemplates.$inferInsert;
+
+export type TemplateSignerRules = typeof templateSignerRules.$inferSelect & {
+  documentTemplate?: DocumentTemplates;
+};
+export type NewTemplateSignerRules = typeof templateSignerRules.$inferInsert;
+
+export type CreditProductDocumentRules = typeof creditProductDocumentRules.$inferSelect & {
+  creditProduct?: CreditProducts;
+  documentTemplate?: DocumentTemplates;
+};
+export type NewCreditProductDocumentRules = typeof creditProductDocumentRules.$inferInsert;
+
+export type LoanDocumentInstances = typeof loanDocumentInstances.$inferSelect & {
+  loan?: Loans;
+  documentTemplate?: DocumentTemplates;
+  signatureEnvelopeDocuments?: SignatureEnvelopeDocuments[];
+  signatureArtifacts?: SignatureArtifacts[];
+};
+export type NewLoanDocumentInstances = typeof loanDocumentInstances.$inferInsert;
+
+export type SignatureEnvelopes = typeof signatureEnvelopes.$inferSelect & {
+  loan?: Loans;
+  signatureEnvelopeDocuments?: SignatureEnvelopeDocuments[];
+  signatureSigners?: SignatureSigners[];
+  signatureEvents?: SignatureEvents[];
+  signatureArtifacts?: SignatureArtifacts[];
+};
+export type NewSignatureEnvelopes = typeof signatureEnvelopes.$inferInsert;
+
+export type SignatureEnvelopeDocuments = typeof signatureEnvelopeDocuments.$inferSelect & {
+  signatureEnvelope?: SignatureEnvelopes;
+  loanDocumentInstance?: LoanDocumentInstances;
+};
+export type NewSignatureEnvelopeDocuments = typeof signatureEnvelopeDocuments.$inferInsert;
+
+export type SignatureSigners = typeof signatureSigners.$inferSelect & {
+  signatureEnvelope?: SignatureEnvelopes;
+  thirdParty?: ThirdParties | null;
+};
+export type NewSignatureSigners = typeof signatureSigners.$inferInsert;
+
+export type SignatureEvents = typeof signatureEvents.$inferSelect & {
+  signatureEnvelope?: SignatureEnvelopes | null;
+};
+export type NewSignatureEvents = typeof signatureEvents.$inferInsert;
+
+export type SignatureArtifacts = typeof signatureArtifacts.$inferSelect & {
+  signatureEnvelope?: SignatureEnvelopes;
+  loanDocumentInstance?: LoanDocumentInstances | null;
+};
+export type NewSignatureArtifacts = typeof signatureArtifacts.$inferInsert;

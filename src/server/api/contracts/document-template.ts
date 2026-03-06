@@ -1,24 +1,24 @@
 import {
-  CreateBillingEmailTemplateBodySchema,
-  GetBillingEmailTemplateQuerySchema,
-  ListBillingEmailTemplatesQuerySchema,
-  UpdateBillingEmailTemplateBodySchema,
-} from '@/schemas/billing-email-template';
+  CreateDocumentTemplateBodySchema,
+  GetDocumentTemplateQuerySchema,
+  ListDocumentTemplatesQuerySchema,
+  UpdateDocumentTemplateBodySchema,
+} from '@/schemas/document-template';
 import { IdParamSchema } from '@/schemas/shared';
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
-import { BillingEmailTemplates } from '@/server/db';
+import { DocumentTemplates } from '@/server/db';
 import { Paginated } from '@/server/utils/query/schemas';
 import { initContract } from '@ts-rest/core';
 
 const c = initContract();
-const resourceKey = 'billing-email-templates';
+const resourceKey = 'document-templates';
 
-export const billingEmailTemplate = c.router(
+export const documentTemplate = c.router(
   {
     list: {
       method: 'GET',
       path: '/',
-      query: ListBillingEmailTemplatesQuerySchema,
+      query: ListDocumentTemplatesQuerySchema,
       metadata: {
         auth: 'required',
         permissionKey: {
@@ -27,7 +27,7 @@ export const billingEmailTemplate = c.router(
         },
       } satisfies TsRestMetaData,
       responses: {
-        200: c.type<Paginated<BillingEmailTemplates>>(),
+        200: c.type<Paginated<DocumentTemplates>>(),
         400: TsRestErrorSchema,
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,
@@ -38,7 +38,7 @@ export const billingEmailTemplate = c.router(
       method: 'GET',
       path: '/:id',
       pathParams: IdParamSchema,
-      query: GetBillingEmailTemplateQuerySchema,
+      query: GetDocumentTemplateQuerySchema,
       metadata: {
         auth: 'required',
         permissionKey: {
@@ -47,7 +47,7 @@ export const billingEmailTemplate = c.router(
         },
       } satisfies TsRestMetaData,
       responses: {
-        200: c.type<BillingEmailTemplates>(),
+        200: c.type<DocumentTemplates>(),
         400: TsRestErrorSchema,
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,
@@ -58,7 +58,7 @@ export const billingEmailTemplate = c.router(
     create: {
       method: 'POST',
       path: '/',
-      body: CreateBillingEmailTemplateBodySchema,
+      body: CreateDocumentTemplateBodySchema,
       metadata: {
         auth: 'required',
         permissionKey: {
@@ -67,7 +67,7 @@ export const billingEmailTemplate = c.router(
         },
       } satisfies TsRestMetaData,
       responses: {
-        201: c.type<BillingEmailTemplates>(),
+        201: c.type<DocumentTemplates>(),
         400: TsRestErrorSchema,
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,
@@ -79,7 +79,7 @@ export const billingEmailTemplate = c.router(
       method: 'PATCH',
       path: '/:id',
       pathParams: IdParamSchema,
-      body: UpdateBillingEmailTemplateBodySchema,
+      body: UpdateDocumentTemplateBodySchema,
       metadata: {
         auth: 'required',
         permissionKey: {
@@ -88,7 +88,7 @@ export const billingEmailTemplate = c.router(
         },
       } satisfies TsRestMetaData,
       responses: {
-        200: c.type<BillingEmailTemplates>(),
+        200: c.type<DocumentTemplates>(),
         400: TsRestErrorSchema,
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,
@@ -110,7 +110,7 @@ export const billingEmailTemplate = c.router(
         },
       } satisfies TsRestMetaData,
       responses: {
-        200: c.type<BillingEmailTemplates>(),
+        200: c.type<DocumentTemplates>(),
         400: TsRestErrorSchema,
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,
@@ -119,5 +119,5 @@ export const billingEmailTemplate = c.router(
       },
     },
   },
-  { pathPrefix: '/billing-email-templates' }
+  { pathPrefix: '/document-templates' }
 );

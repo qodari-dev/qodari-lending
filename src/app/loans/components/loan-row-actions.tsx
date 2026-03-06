@@ -4,7 +4,16 @@ import { DataTableRowActions, type RowAction, type RowActionGroup } from '@/comp
 import { Loan } from '@/schemas/loan';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { Row, Table } from '@tanstack/react-table';
-import { Ban, Building2, CheckCircle2, Eye, Handshake, Landmark, Scale } from 'lucide-react';
+import {
+  Ban,
+  Building2,
+  CheckCircle2,
+  Eye,
+  FileSignature,
+  Handshake,
+  Landmark,
+  Scale,
+} from 'lucide-react';
 
 interface LoanRowActionsProps {
   row: Row<Loan>;
@@ -31,6 +40,12 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
       label: 'Liquidar',
       icon: CheckCircle2,
       onClick: meta?.onRowLiquidate,
+      hidden: !(canLiquidate && loan.status === 'GENERATED'),
+    },
+    {
+      label: 'Enviar a firma digital',
+      icon: FileSignature,
+      onClick: meta?.onRowSendSignature,
       hidden: !(canLiquidate && loan.status === 'GENERATED'),
     },
     {

@@ -30,6 +30,7 @@ function defaultQuery(filters?: Partial<ListCreditProductsQuery>) {
       'creditProductCategories',
       'creditProductLateInterestRules',
       'creditProductRequiredDocuments',
+      'creditProductDocumentRules',
       'creditProductAccounts',
       'creditProductBillingConcepts',
     ],

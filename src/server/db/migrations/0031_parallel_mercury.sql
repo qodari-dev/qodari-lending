@@ -1,0 +1,2 @@
+DROP INDEX "idx_signature_signers_envelope_order";--> statement-breakpoint
+CREATE UNIQUE INDEX "uniq_signature_signers_envelope_order" ON "signature_signers" USING btree ("signature_envelope_id","sign_order");

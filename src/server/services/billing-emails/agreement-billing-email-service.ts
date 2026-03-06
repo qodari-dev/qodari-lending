@@ -11,6 +11,7 @@ import { enqueueAgreementBillingEmailJob } from '@/server/queues/agreement-billi
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
+import type { BillingEmailTemplateVariable } from '@/utils/billing-email-template-variables';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { replaceVariablesInTemplate } from '@/utils/replace-vaiables-in-template';
 import { addDays, getDaysInMonth, isSaturday, isSunday, startOfDay, subDays } from 'date-fns';
@@ -359,26 +360,6 @@ export async function listAgreementBillingEmailDispatches(agreementId: number, l
 }
 
 export async function retryAgreementBillingEmailDispatch(dispatchId: number) {
-  const dispatch = await db.query.agreementBillingEmailDispatches.findFirst({
-    where: eq(agreementBillingEmailDispatches.id, dispatchId),
-  });
-
-  if (!dispatch) {
-    throwHttpError({
-      status: 404,
-      message: `Despacho con ID ${dispatchId} no encontrado`,
-      code: 'NOT_FOUND',
-    });
-  }
-
-  if (dispatch.status === 'QUEUED' || dispatch.status === 'RUNNING') {
-    throwHttpError({
-      status: 409,
-      message: 'El despacho ya se encuentra en cola o en ejecucion',
-      code: 'CONFLICT',
-    });
-  }
-
   const [updated] = await db
     .update(agreementBillingEmailDispatches)
     .set({
@@ -390,8 +371,36 @@ export async function retryAgreementBillingEmailDispatch(dispatchId: number) {
       failedAt: null,
       lastError: null,
     })
-    .where(eq(agreementBillingEmailDispatches.id, dispatchId))
+    .where(
+      and(
+        eq(agreementBillingEmailDispatches.id, dispatchId),
+        eq(agreementBillingEmailDispatches.status, 'FAILED')
+      )
+    )
     .returning();
+
+  if (!updated) {
+    const dispatch = await db.query.agreementBillingEmailDispatches.findFirst({
+      where: eq(agreementBillingEmailDispatches.id, dispatchId),
+      columns: {
+        status: true,
+      },
+    });
+
+    if (!dispatch) {
+      throwHttpError({
+        status: 404,
+        message: `Despacho con ID ${dispatchId} no encontrado`,
+        code: 'NOT_FOUND',
+      });
+    }
+
+    throwHttpError({
+      status: 409,
+      message: `Solo se pueden reintentar despachos en estado FAILED. Estado actual: ${dispatch.status}`,
+      code: 'CONFLICT',
+    });
+  }
 
   await enqueueAgreementBillingEmailJob({ dispatchId: updated.id });
   return updated;
@@ -433,8 +442,17 @@ export async function processAgreementBillingEmailDispatch(dispatchId: number) {
       startedAt: new Date(),
       attempts: dispatch.attempts + 1,
     })
-    .where(eq(agreementBillingEmailDispatches.id, dispatch.id))
+    .where(
+      and(
+        eq(agreementBillingEmailDispatches.id, dispatch.id),
+        eq(agreementBillingEmailDispatches.status, 'QUEUED')
+      )
+    )
     .returning();
+
+  if (!runningDispatch) {
+    return;
+  }
 
   try {
     if (!dispatch.agreement) {
@@ -453,7 +471,7 @@ export async function processAgreementBillingEmailDispatch(dispatchId: number) {
       throw new Error('El convenio no tiene correo principal configurado');
     }
 
-    const variables: Record<string, string> = {
+    const variables: Record<BillingEmailTemplateVariable, string> = {
       nit: agreement.documentNumber,
       razon_social: agreement.businessName,
       direccion: agreement.address ?? '',
@@ -469,8 +487,8 @@ export async function processAgreementBillingEmailDispatch(dispatchId: number) {
       fecha_envio: formatDateOnly(new Date()),
     };
 
-    const subject = replaceVariablesInTemplate(template.subject, variables);
-    const html = replaceVariablesInTemplate(template.htmlContent, variables);
+    const subject = replaceVariablesInTemplate(template.subject, variables, { strict: true });
+    const html = replaceVariablesInTemplate(template.htmlContent, variables, { strict: true });
     // const text = renderTemplate(stripHtmlToText(template.htmlContent), variables);
 
     const attachment = await buildLoansAttachment(agreement.id, dispatch.scheduledDate);

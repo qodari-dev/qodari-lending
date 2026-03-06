@@ -141,6 +141,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Tipos de créditos', url: `/credit-products` },
                   { title: 'Convenios', url: `/agreements` },
                   { title: 'Plantillas de correo', url: `/billing-email-templates` },
+                  { title: 'Plantillas de firma', url: `/document-templates` },
                   { title: 'Perfiles de facturacion', url: `/billing-cycle-profiles` },
                   { title: 'Niveles de aprobacion', url: `/loan-approval-levels` },
                 ],

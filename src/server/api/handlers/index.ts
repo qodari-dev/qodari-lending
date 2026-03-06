@@ -23,6 +23,7 @@ import { creditSimulation } from './credit-simulation';
 import { creditsSettingsHandler } from './credits-settings';
 import { dashboard } from './dashboard';
 import { documentType } from './document-type';
+import { documentTemplate } from './document-template';
 import { glAccount } from './gl-account';
 import { identificationType } from './identification-type';
 import { iamUser } from './iam-user';
@@ -46,6 +47,7 @@ import { rejectionReason } from './rejection-reason';
 import { riskCenterReport } from './risk-center-report';
 import { repaymentMethod } from './repayment-method';
 import { subsidy } from './subsidy';
+import { signatureWebhook } from './signature-webhook';
 import { thirdParty } from './third-party';
 import { thirdPartyType } from './third-party-type';
 
@@ -73,6 +75,7 @@ export const handler = createNextHandler(contract, {
   creditsSettings: creditsSettingsHandler,
   dashboard,
   documentType,
+  documentTemplate,
   glAccount,
   iamUser,
   identificationType,
@@ -95,6 +98,7 @@ export const handler = createNextHandler(contract, {
   rejectionReason,
   riskCenterReport,
   repaymentMethod,
+  signatureWebhook,
   subsidy,
   thirdParty,
   thirdPartyType,

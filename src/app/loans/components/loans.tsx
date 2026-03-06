@@ -17,7 +17,12 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
-import { useLiquidateLoan, useLoans, useVoidLoan } from '@/hooks/queries/use-loan-queries';
+import {
+  useLiquidateLoan,
+  useLoans,
+  useSendLoanToSignature,
+  useVoidLoan,
+} from '@/hooks/queries/use-loan-queries';
 import { Loan, LoanInclude, LOAN_STATUS_OPTIONS, LoanSortField, LoanStatus } from '@/schemas/loan';
 import { RowData, TableMeta } from '@tanstack/react-table';
 import React from 'react';
@@ -34,6 +39,7 @@ declare module '@tanstack/table-core' {
   interface TableMeta<TData extends RowData> {
     onRowView?: (row: TData) => void;
     onRowLiquidate?: (row: TData) => void;
+    onRowSendSignature?: (row: TData) => void;
     onRowVoid?: (row: TData) => void;
     onRowLegalProcess?: (row: TData) => void;
     onRowPaymentAgreement?: (row: TData) => void;
@@ -45,6 +51,7 @@ declare module '@tanstack/table-core' {
 export function Loans() {
   const [loan, setLoan] = React.useState<Loan>();
   const [loanToLiquidate, setLoanToLiquidate] = React.useState<Loan>();
+  const [loanToSendSignature, setLoanToSendSignature] = React.useState<Loan>();
   const [loanToVoid, setLoanToVoid] = React.useState<Loan>();
   const [loanToUpdateLegalProcess, setLoanToUpdateLegalProcess] = React.useState<Loan>();
   const [loanToUpdatePaymentAgreement, setLoanToUpdatePaymentAgreement] = React.useState<Loan>();
@@ -127,8 +134,10 @@ export function Loans() {
   }, []);
 
   const { mutateAsync: liquidateLoan, isPending: isLiquidating } = useLiquidateLoan();
+  const { mutateAsync: sendToSignature, isPending: isSendingToSignature } = useSendLoanToSignature();
   const { mutateAsync: voidLoan, isPending: isVoiding } = useVoidLoan();
   const [openedLiquidateDialog, setOpenedLiquidateDialog] = React.useState(false);
+  const [openedSendSignatureDialog, setOpenedSendSignatureDialog] = React.useState(false);
   const [liquidateEntryDate, setLiquidateEntryDate] = React.useState<Date | null>(new Date());
   const [openedVoidDialog, setOpenedVoidDialog] = React.useState(false);
   const [voidNote, setVoidNote] = React.useState('');
@@ -137,6 +146,10 @@ export function Loans() {
     setLoanToLiquidate(row);
     setLiquidateEntryDate(new Date());
     setOpenedLiquidateDialog(true);
+  }, []);
+  const handleRowSendSignature = React.useCallback((row: Loan) => {
+    setLoanToSendSignature(row);
+    setOpenedSendSignatureDialog(true);
   }, []);
   const handleRowVoid = React.useCallback((row: Loan) => {
     setLoanToVoid(row);
@@ -179,6 +192,16 @@ export function Loans() {
     setOpenedLiquidateDialog(false);
     setLoanToLiquidate(undefined);
   }, [liquidateLoan, loanToLiquidate, liquidateEntryDate]);
+  const submitSendToSignature = React.useCallback(async () => {
+    if (!loanToSendSignature?.id) return;
+
+    await sendToSignature({
+      params: { id: loanToSendSignature.id },
+    });
+
+    setOpenedSendSignatureDialog(false);
+    setLoanToSendSignature(undefined);
+  }, [loanToSendSignature, sendToSignature]);
   const submitVoid = React.useCallback(async () => {
     if (!loanToVoid?.id || !voidNote.trim()) return;
 
@@ -204,6 +227,7 @@ export function Loans() {
     () => ({
       onRowView: handleRowOpen,
       onRowLiquidate: handleRowLiquidate,
+      onRowSendSignature: handleRowSendSignature,
       onRowVoid: handleRowVoid,
       onRowLegalProcess: handleRowLegalProcess,
       onRowPaymentAgreement: handleRowPaymentAgreement,
@@ -213,6 +237,7 @@ export function Loans() {
     [
       handleRowOpen,
       handleRowLiquidate,
+      handleRowSendSignature,
       handleRowVoid,
       handleRowLegalProcess,
       handleRowPaymentAgreement,
@@ -352,6 +377,34 @@ export function Loans() {
             <AlertDialogAction disabled={isLiquidating || !liquidateEntryDate} onClick={submitLiquidate}>
               {isLiquidating && <Spinner />}
               Liquidar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={openedSendSignatureDialog}
+        onOpenChange={(open) => {
+          setOpenedSendSignatureDialog(open);
+          if (!open) {
+            setLoanToSendSignature(undefined);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enviar documentos a firma digital</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se generaran los documentos de firma del credito{' '}
+              <strong>{loanToSendSignature?.creditNumber ?? ''}</strong> y se creara el sobre de
+              firma digital.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={isSendingToSignature} onClick={submitSendToSignature}>
+              {isSendingToSignature && <Spinner />}
+              Enviar a firma
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

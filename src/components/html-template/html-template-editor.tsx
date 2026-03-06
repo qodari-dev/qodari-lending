@@ -18,16 +18,16 @@ import {
   Italic,
   List,
   ListOrdered,
-  Undo2,
   Redo2,
+  Undo2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HTML_PREVIEW_CLASSES } from './html-preview-styles';
 
-type BillingHtmlEditorProps = {
+type HtmlTemplateEditorProps = {
   value: string;
   onChange(value: string): void;
-  variables: readonly string[];
+  variables?: readonly string[];
   invalid?: boolean;
 };
 
@@ -43,7 +43,12 @@ function variableToken(variable: string) {
   return `{{${variable}}}`;
 }
 
-export function BillingHtmlEditor({ value, onChange, variables, invalid }: BillingHtmlEditorProps) {
+export function HtmlTemplateEditor({
+  value,
+  onChange,
+  variables = [],
+  invalid,
+}: HtmlTemplateEditorProps) {
   const [mode, setMode] = useState<EditorMode>('VISUAL');
   const htmlTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const normalizedValue = normalizeHtml(value);
@@ -152,10 +157,7 @@ export function BillingHtmlEditor({ value, onChange, variables, invalid }: Billi
           type="button"
           size="icon"
           variant="outline"
-          className={cn(
-            'h-8 w-8',
-            editor?.isActive('heading', { level: 1 }) && 'bg-accent'
-          )}
+          className={cn('h-8 w-8', editor?.isActive('heading', { level: 1 }) && 'bg-accent')}
           onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
           disabled={toolbarDisabled}
         >
@@ -165,10 +167,7 @@ export function BillingHtmlEditor({ value, onChange, variables, invalid }: Billi
           type="button"
           size="icon"
           variant="outline"
-          className={cn(
-            'h-8 w-8',
-            editor?.isActive('heading', { level: 2 }) && 'bg-accent'
-          )}
+          className={cn('h-8 w-8', editor?.isActive('heading', { level: 2 }) && 'bg-accent')}
           onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
           disabled={toolbarDisabled}
         >
@@ -246,20 +245,22 @@ export function BillingHtmlEditor({ value, onChange, variables, invalid }: Billi
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-1">
-        {variables.map((variable) => (
-          <Button
-            key={`editor-variable-${variable}`}
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 font-mono text-xs"
-            onClick={() => insertToken(variableToken(variable))}
-          >
-            {variableToken(variable)}
-          </Button>
-        ))}
-      </div>
+      {variables.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {variables.map((variable) => (
+            <Button
+              key={`editor-variable-${variable}`}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 font-mono text-xs"
+              onClick={() => insertToken(variableToken(variable))}
+            >
+              {variableToken(variable)}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       {mode === 'VISUAL' ? (
         <div

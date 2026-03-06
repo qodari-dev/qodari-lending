@@ -83,6 +83,47 @@ export function useLiquidateLoan() {
   });
 }
 
+export function useSendLoanToSignature() {
+  const queryClient = api.useQueryClient();
+
+  return api.loan.sendToSignature.useMutation({
+    onSuccess: (_, variables) => {
+      const id = variables.params.id as number;
+      queryClient.invalidateQueries({ queryKey: loansKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loansKeys.detail(id) });
+      toast.success('Documentos enviados a firma digital');
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
+export function usePresignLoanSignatureFileView() {
+  return api.loan.presignSignatureFileView.useMutation({
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
+export function useResendLoanSignatureEnvelope() {
+  const queryClient = api.useQueryClient();
+
+  return api.loan.resendSignatureEnvelope.useMutation({
+    onSuccess: (_, variables) => {
+      const id = variables.params.id as number;
+      queryClient.invalidateQueries({ queryKey: loansKeys.detail(id) });
+      toast.success(
+        variables.body.action === 'RETRY' ? 'Reintento de envio solicitado' : 'Recordatorio enviado'
+      );
+    },
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
 export function useVoidLoan() {
   const queryClient = api.useQueryClient();
 

@@ -394,20 +394,23 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
       });
 
       const thirdPartyLabel = getThirdPartyLabel(workerThirdParty);
-      const workerFullName = thirdPartyLabel === '-' ? 'Afiliado demo' : thirdPartyLabel;
+      const workerFullName = thirdPartyLabel === '-' ? documentNumber : thirdPartyLabel;
       const workerDocumentNumber = workerThirdParty?.documentNumber ?? documentNumber;
       const subsidyData = await getSubsidyWorkerStudy({
         identificationTypeCode: identificationType.code,
         documentNumber: workerDocumentNumber,
-        fallbackWorkerName: workerFullName,
-        fallbackEmployerBusinessName: workerThirdParty?.employerBusinessName ?? null,
       });
 
       const localLoanNotes = workerThirdParty
         ? `Solicitudes encontradas: ${studiedLoanApplications.length}. Creditos encontrados: ${studiedCredits.length}.`
         : 'No se encontro un tercero registrado para este documento.';
 
-      const notes = [localLoanNotes, ...subsidyData.notes].filter(
+      const subsidyNotes = subsidyData?.notes ?? [];
+      if (!subsidyData) {
+        subsidyNotes.push('No se encontro informacion de subsidio para este documento.');
+      }
+
+      const notes = [localLoanNotes, ...subsidyNotes].filter(
         (item): item is string => typeof item === 'string' && item.trim().length > 0
       );
 
@@ -415,16 +418,18 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         status: 200 as const,
         body: {
           worker: {
-            fullName: subsidyData.workerName || workerFullName,
+            fullName: subsidyData?.workerName || workerFullName,
             identificationTypeId: identificationType.id,
             identificationTypeCode: identificationType.code,
             identificationTypeName: identificationType.name,
-            documentNumber: subsidyData.workerDocumentNumber || workerDocumentNumber,
+            documentNumber: subsidyData?.workerDocumentNumber || workerDocumentNumber,
           },
-          salary: subsidyData.salary,
-          trajectory: subsidyData.trajectory,
-          contributions: subsidyData.contributions,
-          companyHistory: subsidyData.companyHistory,
+          subsidySource: subsidyData?.source ?? null,
+          salary: subsidyData?.salary ?? null,
+          trajectory: subsidyData?.trajectory ?? null,
+          contributions: subsidyData?.contributions ?? [],
+          companyHistory: subsidyData?.companyHistory ?? [],
+          spouse: subsidyData?.spouse ?? null,
           loanApplications: studiedLoanApplications,
           credits: studiedCredits,
           notes: notes.length ? notes.join(' ') : null,

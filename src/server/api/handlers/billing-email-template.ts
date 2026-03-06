@@ -11,6 +11,7 @@ import {
   QueryConfig,
 } from '@/server/utils/query/query-builder';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { findUnknownTemplateVariables } from '@/utils/billing-email-template-variables';
 import { tsr } from '@ts-rest/serverless/next';
 import { eq, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
@@ -46,22 +47,71 @@ const BILLING_EMAIL_TEMPLATE_INCLUDES = createIncludeMap<typeof db.query.billing
   },
 });
 
-function normalizePayload(
-  payload: Partial<{
-    name: string;
-    fromEmail: string;
-    subject: string;
-    htmlContent: string;
-    isActive: boolean;
-  }>
-) {
+type CreateTemplatePayload = {
+  name: string;
+  fromEmail: string;
+  subject: string;
+  htmlContent: string;
+  isActive: boolean;
+};
+
+type UpdateTemplatePayload = Partial<CreateTemplatePayload>;
+
+function normalizeCreatePayload(payload: CreateTemplatePayload): CreateTemplatePayload {
   return {
     ...payload,
-    name: payload.name?.trim() ?? '',
-    fromEmail: payload.fromEmail?.trim().toLowerCase() ?? '',
-    subject: payload.subject?.trim() ?? '',
-    htmlContent: payload.htmlContent?.trim() ?? '',
+    name: payload.name.trim(),
+    fromEmail: payload.fromEmail.trim().toLowerCase(),
+    subject: payload.subject.trim(),
+    htmlContent: payload.htmlContent.trim(),
   };
+}
+
+function normalizeUpdatePayload(payload: UpdateTemplatePayload): UpdateTemplatePayload {
+  return {
+    ...payload,
+    name: payload.name === undefined ? undefined : payload.name.trim(),
+    fromEmail:
+      payload.fromEmail === undefined ? undefined : payload.fromEmail.trim().toLowerCase(),
+    subject: payload.subject === undefined ? undefined : payload.subject.trim(),
+    htmlContent: payload.htmlContent === undefined ? undefined : payload.htmlContent.trim(),
+  };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '23505'
+  );
+}
+
+function ensureTemplateVariablesValid(params: {
+  subject?: string;
+  htmlContent?: string;
+}) {
+  const unknown = new Set<string>();
+
+  if (params.subject !== undefined) {
+    for (const value of findUnknownTemplateVariables(params.subject)) {
+      unknown.add(value);
+    }
+  }
+
+  if (params.htmlContent !== undefined) {
+    for (const value of findUnknownTemplateVariables(params.htmlContent)) {
+      unknown.add(value);
+    }
+  }
+
+  if (!unknown.size) return;
+
+  throwHttpError({
+    status: 400,
+    message: `Variables de plantilla no soportadas: ${[...unknown].join(', ')}`,
+    code: 'BAD_REQUEST',
+  });
 }
 
 async function ensureTemplateNotLinked(templateId: number) {
@@ -154,7 +204,11 @@ export const billingEmailTemplate = tsr.router(contract.billingEmailTemplate, {
     try {
       session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-      const payload = normalizePayload(body);
+      const payload = normalizeCreatePayload(body);
+      ensureTemplateVariablesValid({
+        subject: payload.subject,
+        htmlContent: payload.htmlContent,
+      });
       const [created] = await db.insert(billingEmailTemplates).values(payload).returning();
 
       await logAudit(session, {
@@ -172,6 +226,16 @@ export const billingEmailTemplate = tsr.router(contract.billingEmailTemplate, {
 
       return { status: 201 as const, body: created };
     } catch (e) {
+      if (isUniqueViolation(e)) {
+        return {
+          status: 409 as const,
+          body: {
+            message: 'Ya existe una plantilla con ese nombre',
+            code: 'CONFLICT',
+          },
+        };
+      }
+
       const error = genericTsRestErrorResponse(e, {
         genericMsg: 'Error al crear plantilla de correo',
       });
@@ -216,7 +280,11 @@ export const billingEmailTemplate = tsr.router(contract.billingEmailTemplate, {
         await ensureTemplateNotLinked(existing.id);
       }
 
-      const payload = normalizePayload(body);
+      const payload = normalizeUpdatePayload(body);
+      ensureTemplateVariablesValid({
+        subject: payload.subject,
+        htmlContent: payload.htmlContent,
+      });
       const [updated] = await db
         .update(billingEmailTemplates)
         .set(payload)
@@ -239,6 +307,16 @@ export const billingEmailTemplate = tsr.router(contract.billingEmailTemplate, {
 
       return { status: 200 as const, body: updated };
     } catch (e) {
+      if (isUniqueViolation(e)) {
+        return {
+          status: 409 as const,
+          body: {
+            message: 'Ya existe una plantilla con ese nombre',
+            code: 'CONFLICT',
+          },
+        };
+      }
+
       const error = genericTsRestErrorResponse(e, {
         genericMsg: `Error al actualizar plantilla ${id}`,
       });

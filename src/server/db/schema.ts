@@ -3380,3 +3380,320 @@ export const paymentAllocationPolicyRules = pgTable(
     check('chk_payment_alloc_rule_priority_min', sql`${t.priority} >= 1`),
   ]
 );
+
+// ---------------------------------------------------------------------
+// Firma digital - Plantillas documentales
+// ---------------------------------------------------------------------
+export const documentTemplateStatusEnum = pgEnum('document_template_status', [
+  'DRAFT',
+  'ACTIVE',
+  'INACTIVE',
+]);
+
+export const documentContentFormatEnum = pgEnum('document_content_format', [
+  'HTML_HBS',
+  'PDF_STATIC',
+]);
+
+export const documentTemplates = pgTable(
+  'document_templates',
+  {
+    id: serial('id').primaryKey(),
+    code: varchar('code', { length: 80 }).notNull(),
+    name: varchar('name', { length: 180 }).notNull(),
+    version: integer('version').notNull(),
+    status: documentTemplateStatusEnum('status').notNull().default('DRAFT'),
+    contentFormat: documentContentFormatEnum('content_format').notNull(),
+    templateBody: text('template_body'),
+    templateStorageKey: text('template_storage_key'),
+    legalTextHash: varchar('legal_text_hash', { length: 64 }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_document_templates_code_version').on(t.code, t.version),
+    check('chk_document_templates_version_min', sql`${t.version} > 0`),
+    check(
+      'chk_document_templates_content',
+      sql`
+        (
+          ${t.contentFormat} = 'HTML_HBS'
+          AND ${t.templateBody} IS NOT NULL
+          AND ${t.templateStorageKey} IS NULL
+        )
+        OR
+        (
+          ${t.contentFormat} = 'PDF_STATIC'
+          AND ${t.templateStorageKey} IS NOT NULL
+          AND ${t.templateBody} IS NULL
+        )
+      `
+    ),
+  ]
+);
+
+export const signerRoleEnum = pgEnum('signer_role', [
+  'BORROWER',
+  'CO_DEBTOR',
+  'SPOUSE',
+  'EMPLOYER_REPRESENTATIVE',
+  'ENTITY_OFFICER',
+]);
+
+export const templateSignerRules = pgTable(
+  'template_signer_rules',
+  {
+    id: serial('id').primaryKey(),
+    documentTemplateId: integer('document_template_id')
+      .notNull()
+      .references(() => documentTemplates.id, { onDelete: 'cascade' }),
+    signerRole: signerRoleEnum('signer_role').notNull(),
+    required: boolean('required').notNull().default(true),
+    signOrder: integer('sign_order').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_template_signer_rules_template_role_order').on(
+      t.documentTemplateId,
+      t.signerRole,
+      t.signOrder
+    ),
+    index('idx_template_signer_rules_template_order').on(t.documentTemplateId, t.signOrder),
+    check('chk_template_signer_rules_sign_order_min', sql`${t.signOrder} > 0`),
+  ]
+);
+
+export const creditProductDocumentRules = pgTable(
+  'credit_product_document_rules',
+  {
+    id: serial('id').primaryKey(),
+    creditProductId: integer('credit_product_id')
+      .notNull()
+      .references(() => creditProducts.id, { onDelete: 'cascade' }),
+    documentTemplateId: integer('document_template_id')
+      .notNull()
+      .references(() => documentTemplates.id, { onDelete: 'restrict' }),
+    required: boolean('required').notNull().default(true),
+    documentOrder: integer('document_order').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_credit_product_document_rules').on(t.creditProductId, t.documentTemplateId),
+    index('idx_credit_product_document_rules_product_order').on(t.creditProductId, t.documentOrder),
+    check('chk_credit_product_document_rules_order_min', sql`${t.documentOrder} > 0`),
+  ]
+);
+
+export const loanDocumentStatusEnum = pgEnum('loan_document_status', [
+  'GENERATED',
+  'SENT_FOR_SIGNATURE',
+  'PARTIALLY_SIGNED',
+  'SIGNED',
+  'REJECTED',
+  'EXPIRED',
+  'CANCELED',
+  'VOID',
+]);
+
+export const loanDocumentInstances = pgTable(
+  'loan_document_instances',
+  {
+    id: serial('id').primaryKey(),
+    loanId: integer('loan_id')
+      .notNull()
+      .references(() => loans.id, { onDelete: 'cascade' }),
+    documentTemplateId: integer('document_template_id')
+      .notNull()
+      .references(() => documentTemplates.id, { onDelete: 'restrict' }),
+    documentTemplateVersion: integer('document_template_version').notNull(),
+    revision: integer('revision').notNull().default(1),
+    documentCode: varchar('document_code', { length: 80 }).notNull(),
+    documentName: varchar('document_name', { length: 180 }).notNull(),
+    status: loanDocumentStatusEnum('status').notNull().default('GENERATED'),
+    unsignedStorageKey: text('unsigned_storage_key').notNull(),
+    unsignedSha256: varchar('unsigned_sha256', { length: 64 }).notNull(),
+    signedStorageKey: text('signed_storage_key'),
+    signedSha256: varchar('signed_sha256', { length: 64 }),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
+    sentForSignatureAt: timestamp('sent_for_signature_at', { withTimezone: true }),
+    signedAt: timestamp('signed_at', { withTimezone: true }),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_loan_document_instances_loan_code_revision').on(
+      t.loanId,
+      t.documentCode,
+      t.revision
+    ),
+    index('idx_loan_document_instances_loan').on(t.loanId),
+    index('idx_loan_document_instances_status').on(t.status),
+    check('chk_loan_document_instances_template_version_min', sql`${t.documentTemplateVersion} > 0`),
+    check('chk_loan_document_instances_revision_min', sql`${t.revision} > 0`),
+  ]
+);
+
+export const signatureProviderEnum = pgEnum('signature_provider', [
+  'DOCUSIGN',
+  'YOUSIGN',
+  'ADOBE_SIGN',
+  'CUSTOM',
+]);
+
+export const signatureEnvelopeStatusEnum = pgEnum('signature_envelope_status', [
+  'DRAFT',
+  'SENT',
+  'PARTIALLY_SIGNED',
+  'SIGNED',
+  'REJECTED',
+  'EXPIRED',
+  'CANCELED',
+  'ERROR',
+]);
+
+export const signatureEnvelopes = pgTable(
+  'signature_envelopes',
+  {
+    id: serial('id').primaryKey(),
+    loanId: integer('loan_id')
+      .notNull()
+      .references(() => loans.id, { onDelete: 'cascade' }),
+    provider: signatureProviderEnum('provider').notNull(),
+    providerEnvelopeId: varchar('provider_envelope_id', { length: 180 }).notNull(),
+    status: signatureEnvelopeStatusEnum('status').notNull().default('DRAFT'),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    canceledAt: timestamp('canceled_at', { withTimezone: true }),
+    expiredAt: timestamp('expired_at', { withTimezone: true }),
+    errorMessage: text('error_message'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_signature_envelopes_provider_id').on(t.provider, t.providerEnvelopeId),
+    index('idx_signature_envelopes_loan').on(t.loanId),
+    index('idx_signature_envelopes_status').on(t.status),
+  ]
+);
+
+export const signatureEnvelopeDocuments = pgTable(
+  'signature_envelope_documents',
+  {
+    id: serial('id').primaryKey(),
+    signatureEnvelopeId: integer('signature_envelope_id')
+      .notNull()
+      .references(() => signatureEnvelopes.id, { onDelete: 'cascade' }),
+    loanDocumentInstanceId: integer('loan_document_instance_id')
+      .notNull()
+      .references(() => loanDocumentInstances.id, { onDelete: 'cascade' }),
+    docOrder: integer('doc_order').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uniq_signature_envelope_documents').on(t.signatureEnvelopeId, t.loanDocumentInstanceId),
+    index('idx_signature_envelope_documents_order').on(t.signatureEnvelopeId, t.docOrder),
+    check('chk_signature_envelope_documents_doc_order_min', sql`${t.docOrder} > 0`),
+  ]
+);
+
+export const signatureSignerStatusEnum = pgEnum('signature_signer_status', [
+  'PENDING',
+  'SENT',
+  'VIEWED',
+  'SIGNED',
+  'REJECTED',
+  'EXPIRED',
+  'CANCELED',
+]);
+
+export const signatureSigners = pgTable(
+  'signature_signers',
+  {
+    id: serial('id').primaryKey(),
+    signatureEnvelopeId: integer('signature_envelope_id')
+      .notNull()
+      .references(() => signatureEnvelopes.id, { onDelete: 'cascade' }),
+    signerRole: signerRoleEnum('signer_role').notNull(),
+    signOrder: integer('sign_order').notNull(),
+    required: boolean('required').notNull().default(true),
+    providerSignerId: varchar('provider_signer_id', { length: 180 }),
+    thirdPartyId: integer('third_party_id').references(() => thirdParties.id, {
+      onDelete: 'set null',
+    }),
+    fullName: varchar('full_name', { length: 180 }).notNull(),
+    email: varchar('email', { length: 180 }),
+    phone: varchar('phone', { length: 40 }),
+    documentTypeCode: varchar('document_type_code', { length: 20 }),
+    documentNumber: varchar('document_number', { length: 40 }),
+    status: signatureSignerStatusEnum('status').notNull().default('PENDING'),
+    signedAt: timestamp('signed_at', { withTimezone: true }),
+    rejectedReason: text('rejected_reason'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_signature_signers_envelope_order').on(t.signatureEnvelopeId, t.signOrder),
+    index('idx_signature_signers_provider_signer').on(t.providerSignerId),
+    check('chk_signature_signers_sign_order_min', sql`${t.signOrder} > 0`),
+  ]
+);
+
+export const signatureEvents = pgTable(
+  'signature_events',
+  {
+    id: serial('id').primaryKey(),
+    signatureEnvelopeId: integer('signature_envelope_id').references(() => signatureEnvelopes.id, {
+      onDelete: 'set null',
+    }),
+    provider: signatureProviderEnum('provider').notNull(),
+    providerEventId: varchar('provider_event_id', { length: 180 }),
+    eventType: varchar('event_type', { length: 120 }).notNull(),
+    eventAt: timestamp('event_at', { withTimezone: true }),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+    payload: jsonb('payload').notNull(),
+    webhookSignatureValid: boolean('webhook_signature_valid'),
+    processed: boolean('processed').notNull().default(false),
+    processedAt: timestamp('processed_at', { withTimezone: true }),
+    processingError: text('processing_error'),
+  },
+  (t) => [
+    uniqueIndex('uniq_signature_events_provider_event').on(t.provider, t.providerEventId),
+    index('idx_signature_events_envelope').on(t.signatureEnvelopeId),
+  ]
+);
+
+export const signatureArtifactTypeEnum = pgEnum('signature_artifact_type', [
+  'SIGNED_PDF',
+  'CERTIFICATE',
+  'AUDIT_TRAIL',
+  'TIMESTAMP_PROOF',
+]);
+
+export const signatureArtifacts = pgTable(
+  'signature_artifacts',
+  {
+    id: serial('id').primaryKey(),
+    signatureEnvelopeId: integer('signature_envelope_id')
+      .notNull()
+      .references(() => signatureEnvelopes.id, { onDelete: 'cascade' }),
+    loanDocumentInstanceId: integer('loan_document_instance_id').references(
+      () => loanDocumentInstances.id,
+      { onDelete: 'set null' }
+    ),
+    provider: signatureProviderEnum('provider').notNull(),
+    providerArtifactId: varchar('provider_artifact_id', { length: 180 }),
+    artifactType: signatureArtifactTypeEnum('artifact_type').notNull(),
+    storageKey: text('storage_key').notNull(),
+    mimeType: varchar('mime_type', { length: 120 }).notNull(),
+    sizeBytes: integer('size_bytes'),
+    sha256: varchar('sha256', { length: 64 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uniq_signature_artifacts_envelope_type_key').on(
+      t.signatureEnvelopeId,
+      t.artifactType,
+      t.storageKey
+    ),
+    index('idx_signature_artifacts_document').on(t.loanDocumentInstanceId),
+    index('idx_signature_artifacts_envelope').on(t.signatureEnvelopeId),
+    check('chk_signature_artifacts_size_bytes_min', sql`${t.sizeBytes} IS NULL OR ${t.sizeBytes} >= 0`),
+  ]
+);

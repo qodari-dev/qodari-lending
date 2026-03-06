@@ -80,6 +80,15 @@ import {
   paymentAllocationPolicyRules,
   cities,
   identificationTypes,
+  documentTemplates,
+  templateSignerRules,
+  creditProductDocumentRules,
+  loanDocumentInstances,
+  signatureEnvelopes,
+  signatureEnvelopeDocuments,
+  signatureSigners,
+  signatureEvents,
+  signatureArtifacts,
 } from './schema';
 
 // ---------------------------------------------------------------------
@@ -445,6 +454,7 @@ export const creditProductsRelations = relations(creditProducts, ({ one, many })
   }),
   creditProductCategories: many(creditProductCategories),
   creditProductDocuments: many(creditProductDocuments),
+  creditProductDocumentRules: many(creditProductDocumentRules),
   creditProductAccounts: many(creditProductAccounts),
   creditProductLateInterestRules: many(creditProductLateInterestRules),
   creditProductBillingConcepts: many(creditProductBillingConcepts),
@@ -684,6 +694,8 @@ export const loansRelations = relations(loans, ({ one, many }) => ({
   loanAgreementHistory: many(loanAgreementHistory),
   loanStatusHistory: many(loanStatusHistory),
   loanBillingConcepts: many(loanBillingConcepts),
+  loanDocumentInstances: many(loanDocumentInstances),
+  signatureEnvelopes: many(signatureEnvelopes),
 }));
 
 // ---------------------------------------------------------------------
@@ -1291,3 +1303,100 @@ export const paymentAllocationPolicyRulesRelations = relations(
     }),
   })
 );
+
+// ---------------------------------------------------------------------
+// Firma digital - Plantillas documentales
+// ---------------------------------------------------------------------
+export const documentTemplatesRelations = relations(documentTemplates, ({ many }) => ({
+  templateSignerRules: many(templateSignerRules),
+  creditProductDocumentRules: many(creditProductDocumentRules),
+  loanDocumentInstances: many(loanDocumentInstances),
+}));
+
+export const templateSignerRulesRelations = relations(templateSignerRules, ({ one }) => ({
+  documentTemplate: one(documentTemplates, {
+    fields: [templateSignerRules.documentTemplateId],
+    references: [documentTemplates.id],
+  }),
+}));
+
+export const creditProductDocumentRulesRelations = relations(
+  creditProductDocumentRules,
+  ({ one }) => ({
+    creditProduct: one(creditProducts, {
+      fields: [creditProductDocumentRules.creditProductId],
+      references: [creditProducts.id],
+    }),
+    documentTemplate: one(documentTemplates, {
+      fields: [creditProductDocumentRules.documentTemplateId],
+      references: [documentTemplates.id],
+    }),
+  })
+);
+
+export const loanDocumentInstancesRelations = relations(loanDocumentInstances, ({ one, many }) => ({
+  loan: one(loans, {
+    fields: [loanDocumentInstances.loanId],
+    references: [loans.id],
+  }),
+  documentTemplate: one(documentTemplates, {
+    fields: [loanDocumentInstances.documentTemplateId],
+    references: [documentTemplates.id],
+  }),
+  signatureEnvelopeDocuments: many(signatureEnvelopeDocuments),
+  signatureArtifacts: many(signatureArtifacts),
+}));
+
+export const signatureEnvelopesRelations = relations(signatureEnvelopes, ({ one, many }) => ({
+  loan: one(loans, {
+    fields: [signatureEnvelopes.loanId],
+    references: [loans.id],
+  }),
+  signatureEnvelopeDocuments: many(signatureEnvelopeDocuments),
+  signatureSigners: many(signatureSigners),
+  signatureEvents: many(signatureEvents),
+  signatureArtifacts: many(signatureArtifacts),
+}));
+
+export const signatureEnvelopeDocumentsRelations = relations(
+  signatureEnvelopeDocuments,
+  ({ one }) => ({
+    signatureEnvelope: one(signatureEnvelopes, {
+      fields: [signatureEnvelopeDocuments.signatureEnvelopeId],
+      references: [signatureEnvelopes.id],
+    }),
+    loanDocumentInstance: one(loanDocumentInstances, {
+      fields: [signatureEnvelopeDocuments.loanDocumentInstanceId],
+      references: [loanDocumentInstances.id],
+    }),
+  })
+);
+
+export const signatureSignersRelations = relations(signatureSigners, ({ one }) => ({
+  signatureEnvelope: one(signatureEnvelopes, {
+    fields: [signatureSigners.signatureEnvelopeId],
+    references: [signatureEnvelopes.id],
+  }),
+  thirdParty: one(thirdParties, {
+    fields: [signatureSigners.thirdPartyId],
+    references: [thirdParties.id],
+  }),
+}));
+
+export const signatureEventsRelations = relations(signatureEvents, ({ one }) => ({
+  signatureEnvelope: one(signatureEnvelopes, {
+    fields: [signatureEvents.signatureEnvelopeId],
+    references: [signatureEnvelopes.id],
+  }),
+}));
+
+export const signatureArtifactsRelations = relations(signatureArtifacts, ({ one }) => ({
+  signatureEnvelope: one(signatureEnvelopes, {
+    fields: [signatureArtifacts.signatureEnvelopeId],
+    references: [signatureEnvelopes.id],
+  }),
+  loanDocumentInstance: one(loanDocumentInstances, {
+    fields: [signatureArtifacts.loanDocumentInstanceId],
+    references: [loanDocumentInstances.id],
+  }),
+}));

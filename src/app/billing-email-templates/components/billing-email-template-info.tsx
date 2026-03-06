@@ -1,9 +1,9 @@
 import { DescriptionList, DescriptionSection } from '@/components/description-list';
+import { HtmlTemplatePreview } from '@/components/html-template/html-template-preview';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { BillingEmailTemplate } from '@/schemas/billing-email-template';
 import { formatDate } from '@/utils/formatters';
-import { HTML_PREVIEW_CLASSES } from './html-preview-styles';
 
 export function BillingEmailTemplateInfo({
   billingEmailTemplate,
@@ -54,10 +54,7 @@ export function BillingEmailTemplateInfo({
           <DescriptionList sections={sections} columns={2} />
           <div className="space-y-2">
             <p className="text-muted-foreground text-sm font-medium">Vista previa HTML</p>
-            <div
-              className={`rounded-md border p-4 text-sm ${HTML_PREVIEW_CLASSES}`}
-              dangerouslySetInnerHTML={{ __html: billingEmailTemplate.htmlContent }}
-            />
+            <HtmlTemplatePreview htmlContent={billingEmailTemplate.htmlContent} />
           </div>
         </div>
       </SheetContent>

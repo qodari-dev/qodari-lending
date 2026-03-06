@@ -22,7 +22,7 @@ export const env = createEnv({
     IAM_JWT_SECRET: z.string(),
     IAM_M2M_CLIENT_ID: z.string(),
     IAM_M2M_CLIENT_SECRET: z.string(),
-    SUBSIDY_PROVIDER: z.enum(['MOCK', 'COMFENALCO', 'SYSEU']).optional().default('MOCK'),
+    SUBSIDY_PROVIDER: z.enum(['COMFENALCO', 'SYSEU']).optional(),
     COMFENALCO_URL: z.url().optional(),
     COMFENALCO_APP_LLAVE: z.string().optional(),
     COMFENALCO_APP_APPTOKEN: z.string().optional(),

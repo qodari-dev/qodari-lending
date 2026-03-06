@@ -4,6 +4,7 @@ import {
   creditProductCategories,
   creditProductLateInterestRules,
   creditProductDocuments,
+  creditProductDocumentRules,
   creditProductAccounts,
   creditProductRefinancePolicies,
   creditProductChargeOffPolicies,
@@ -14,7 +15,7 @@ import {
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { tsr } from '@ts-rest/serverless/next';
-import { eq, sql } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 import { logAudit } from '@/server/utils/audit-logger';
@@ -97,6 +98,15 @@ const CREDIT_PRODUCT_INCLUDES = createIncludeMap<typeof db.query.creditProducts>
       with: {
         documentType: true,
       },
+    },
+  },
+  creditProductDocumentRules: {
+    relation: 'creditProductDocumentRules',
+    config: {
+      with: {
+        documentTemplate: true,
+      },
+      orderBy: [asc(creditProductDocumentRules.documentOrder)],
     },
   },
   creditProductAccounts: {
@@ -212,6 +222,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         creditProductCategories: categoriesData,
         creditProductLateInterestRules: lateInterestRulesData,
         creditProductRequiredDocuments: requiredDocumentsData,
+        creditProductDocumentRules: documentRulesData,
         creditProductAccounts: accountsData,
         creditProductBillingConcepts: billingConceptsData,
         ...productData
@@ -242,6 +253,15 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           await tx.insert(creditProductDocuments).values(
             requiredDocumentsData.map((requiredDocument) => ({
               ...requiredDocument,
+              creditProductId: product.id,
+            }))
+          );
+        }
+
+        if (documentRulesData?.length) {
+          await tx.insert(creditProductDocumentRules).values(
+            documentRulesData.map((documentRule) => ({
+              ...documentRule,
               creditProductId: product.id,
             }))
           );
@@ -295,6 +315,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductCategories: categoriesData ?? [],
           _creditProductLateInterestRules: lateInterestRulesData ?? [],
           _creditProductRequiredDocuments: requiredDocumentsData ?? [],
+          _creditProductDocumentRules: documentRulesData ?? [],
           _creditProductAccounts: accountsData ?? [],
           _creditProductBillingConcepts: billingConceptsData ?? [],
           _creditProductRefinancePolicy: refinancePolicyData ?? null,
@@ -348,39 +369,11 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         });
       }
 
-      const [existingLoanApplication, existingPortfolioAgingSnapshot] = await Promise.all([
-        db.query.loanApplications.findFirst({
-          columns: { id: true },
-          where: eq(loanApplications.creditProductId, id),
-        }),
-        db.query.portfolioAgingSnapshots.findFirst({
-          columns: { id: true },
-          where: eq(portfolioAgingSnapshots.creditProductId, id),
-        }),
-      ]);
-
-      if (existingLoanApplication) {
-        throwHttpError({
-          status: 409,
-          message:
-            'No se puede eliminar la linea de credito porque tiene solicitudes o creditos asociados',
-          code: 'CONFLICT',
-        });
-      }
-
-      if (existingPortfolioAgingSnapshot) {
-        throwHttpError({
-          status: 409,
-          message:
-            'No se puede eliminar la linea de credito porque tiene historial de cartera asociado',
-          code: 'CONFLICT',
-        });
-      }
-
       const [
         existingCategories,
         existingLateInterestRules,
         existingDocuments,
+        existingDocumentRules,
         existingAccounts,
         existingBillingConcepts,
         existingRefinancePolicy,
@@ -394,6 +387,9 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         }),
         db.query.creditProductDocuments.findMany({
           where: eq(creditProductDocuments.creditProductId, id),
+        }),
+        db.query.creditProductDocumentRules.findMany({
+          where: eq(creditProductDocumentRules.creditProductId, id),
         }),
         db.query.creditProductAccounts.findMany({
           where: eq(creditProductAccounts.creditProductId, id),
@@ -415,6 +411,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         creditProductCategories: categoriesData,
         creditProductLateInterestRules: lateInterestRulesData,
         creditProductRequiredDocuments: requiredDocumentsData,
+        creditProductDocumentRules: documentRulesData,
         creditProductAccounts: accountsData,
         creditProductBillingConcepts: billingConceptsData,
         ...productData
@@ -466,6 +463,21 @@ export const creditProduct = tsr.router(contract.creditProduct, {
             await tx.insert(creditProductDocuments).values(
               requiredDocumentsData.map((requiredDocument) => ({
                 ...requiredDocument,
+                creditProductId: id,
+              }))
+            );
+          }
+        }
+
+        if (documentRulesData) {
+          await tx
+            .delete(creditProductDocumentRules)
+            .where(eq(creditProductDocumentRules.creditProductId, id));
+
+          if (documentRulesData.length) {
+            await tx.insert(creditProductDocumentRules).values(
+              documentRulesData.map((documentRule) => ({
+                ...documentRule,
                 creditProductId: id,
               }))
             );
@@ -544,6 +556,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductCategories: existingCategories,
           _creditProductLateInterestRules: existingLateInterestRules,
           _creditProductRequiredDocuments: existingDocuments,
+          _creditProductDocumentRules: existingDocumentRules,
           _creditProductAccounts: existingAccounts,
           _creditProductBillingConcepts: existingBillingConcepts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
@@ -555,6 +568,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductLateInterestRules:
             lateInterestRulesData ?? existingLateInterestRules,
           _creditProductRequiredDocuments: requiredDocumentsData ?? existingDocuments,
+          _creditProductDocumentRules: documentRulesData ?? existingDocumentRules,
           _creditProductAccounts: accountsData ?? existingAccounts,
           _creditProductBillingConcepts:
             billingConceptsData ?? existingBillingConcepts,
@@ -616,10 +630,40 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         });
       }
 
+      const [existingLoanApplication, existingPortfolioAgingSnapshot] = await Promise.all([
+        db.query.loanApplications.findFirst({
+          columns: { id: true },
+          where: eq(loanApplications.creditProductId, id),
+        }),
+        db.query.portfolioAgingSnapshots.findFirst({
+          columns: { id: true },
+          where: eq(portfolioAgingSnapshots.creditProductId, id),
+        }),
+      ]);
+
+      if (existingLoanApplication) {
+        throwHttpError({
+          status: 409,
+          message:
+            'No se puede eliminar la linea de credito porque tiene solicitudes o creditos asociados',
+          code: 'CONFLICT',
+        });
+      }
+
+      if (existingPortfolioAgingSnapshot) {
+        throwHttpError({
+          status: 409,
+          message:
+            'No se puede eliminar la linea de credito porque tiene historial de cartera asociado',
+          code: 'CONFLICT',
+        });
+      }
+
       const [
         existingCategories,
         existingLateInterestRules,
         existingDocuments,
+        existingDocumentRules,
         existingAccounts,
         existingBillingConcepts,
         existingRefinancePolicy,
@@ -633,6 +677,9 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         }),
         db.query.creditProductDocuments.findMany({
           where: eq(creditProductDocuments.creditProductId, id),
+        }),
+        db.query.creditProductDocumentRules.findMany({
+          where: eq(creditProductDocumentRules.creditProductId, id),
         }),
         db.query.creditProductAccounts.findMany({
           where: eq(creditProductAccounts.creditProductId, id),
@@ -654,6 +701,9 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           .delete(creditProductLateInterestRules)
           .where(eq(creditProductLateInterestRules.creditProductId, id));
         await tx.delete(creditProductDocuments).where(eq(creditProductDocuments.creditProductId, id));
+        await tx
+          .delete(creditProductDocumentRules)
+          .where(eq(creditProductDocumentRules.creditProductId, id));
         await tx.delete(creditProductAccounts).where(eq(creditProductAccounts.creditProductId, id));
         await tx
           .delete(creditProductBillingConcepts)
@@ -680,6 +730,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductCategories: existingCategories,
           _creditProductLateInterestRules: existingLateInterestRules,
           _creditProductRequiredDocuments: existingDocuments,
+          _creditProductDocumentRules: existingDocumentRules,
           _creditProductAccounts: existingAccounts,
           _creditProductBillingConcepts: existingBillingConcepts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,
@@ -690,6 +741,7 @@ export const creditProduct = tsr.router(contract.creditProduct, {
           _creditProductCategories: existingCategories,
           _creditProductLateInterestRules: existingLateInterestRules,
           _creditProductRequiredDocuments: existingDocuments,
+          _creditProductDocumentRules: existingDocumentRules,
           _creditProductAccounts: existingAccounts,
           _creditProductBillingConcepts: existingBillingConcepts,
           _creditProductRefinancePolicy: existingRefinancePolicy ?? null,

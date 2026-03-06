@@ -2,10 +2,20 @@
 
 import { useCallback, useState } from 'react';
 import { format } from 'date-fns';
-import { CalendarIcon, FileDown } from 'lucide-react';
+import { CalendarIcon, Download, FileDown, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { DescriptionList, DescriptionSection } from '@/components/description-list';
 import { LoanApplicationDetails } from '@/app/loan-applications/components/loan-application-details';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -22,7 +32,12 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCreditExtractReportByLoanId } from '@/hooks/queries/use-credit-report-queries';
-import { useLoan } from '@/hooks/queries/use-loan-queries';
+import {
+  useLoan,
+  usePresignLoanSignatureFileView,
+  useResendLoanSignatureEnvelope,
+  useSendLoanToSignature,
+} from '@/hooks/queries/use-loan-queries';
 import {
   billingConceptCalcMethodLabels,
   billingConceptFinancingModeLabels,
@@ -38,6 +53,13 @@ import {
   LoanStatus,
 } from '@/schemas/loan';
 import { BankAccountType, bankAccountTypeLabels } from '@/schemas/loan-application';
+import { signerRoleLabels } from '@/schemas/document-template';
+import {
+  loanDocumentStatusLabels,
+  signatureEnvelopeStatusLabels,
+  signatureSignerStatusLabels,
+  signatureProviderLabels,
+} from '@/schemas/signature-webhook';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatDate, formatDateTime, formatPercent } from '@/utils/formatters';
 import { getThirdPartyLabel } from '@/utils/third-party';
@@ -63,6 +85,29 @@ const loanDocumentLabels: Record<LoanDocumentType, string> = {
   aceptacion: 'Aceptación del crédito',
   libranza: 'Libranza',
 };
+
+function getSignatureBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (status === 'SIGNED') return 'default';
+  if (status === 'SENT' || status === 'PARTIALLY_SIGNED' || status === 'VIEWED') return 'secondary';
+  if (status === 'REJECTED' || status === 'ERROR') return 'destructive';
+  return 'outline';
+}
+
+function toTimestamp(value: string | Date | null | undefined): number {
+  if (!value) return 0;
+  const date = value instanceof Date ? value : new Date(value);
+  const time = date.getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function extensionFromMimeType(mimeType: string): string {
+  const normalized = mimeType.toLowerCase();
+  if (normalized.includes('pdf')) return 'pdf';
+  if (normalized.includes('json')) return 'json';
+  if (normalized.includes('xml')) return 'xml';
+  if (normalized.includes('zip')) return 'zip';
+  return 'bin';
+}
 
 function StatusBadge({ status }: { status: LoanStatus }) {
   return (
@@ -185,6 +230,8 @@ const LOAN_DETAIL_INCLUDES: LoanInclude[] = [
   'loanAgreementHistory',
   'loanStatusHistory',
   'loanBillingConcepts',
+  'loanDocumentInstances',
+  'signatureEnvelopes',
   'loanRefinancingLinksRefinanced',
   'loanRefinancingLinksReference',
   'loanApplication',
@@ -200,6 +247,14 @@ export function LoanInfo({
   onOpened(opened: boolean): void;
 }) {
   const loanId = loan?.id ?? 0;
+  const [signatureActionKey, setSignatureActionKey] = useState<string | null>(null);
+  const [newSignatureRequestTarget, setNewSignatureRequestTarget] = useState<{
+    envelopeId: number;
+    providerEnvelopeId: string;
+  } | null>(null);
+  const { mutateAsync: presignSignatureFileView } = usePresignLoanSignatureFileView();
+  const { mutateAsync: resendSignatureEnvelope } = useResendLoanSignatureEnvelope();
+  const { mutateAsync: sendLoanToSignature } = useSendLoanToSignature();
 
   const { data: detailData, isLoading: isLoadingDetail } = useLoan(loanId, {
     include: LOAN_DETAIL_INCLUDES,
@@ -212,6 +267,7 @@ export function LoanInfo({
   } = useCreditExtractReportByLoanId(loanId, opened && Boolean(loanId));
 
   const detail = detailData?.body ?? loan;
+  const effectiveLoanId = detail?.id ?? loanId;
   const extractReport = extractReportData?.body;
   const loanProcessStatesRaw = (detail as { loanProcessStates?: unknown } | undefined)
     ?.loanProcessStates;
@@ -233,6 +289,130 @@ export function LoanInfo({
       triggerSource: string;
     } | null;
   }>;
+  const signatureDocuments = [...(detail?.loanDocumentInstances ?? [])].sort(
+    (a, b) => toTimestamp(b.generatedAt) - toTimestamp(a.generatedAt)
+  );
+  const signatureEnvelopes = [...(detail?.signatureEnvelopes ?? [])].sort(
+    (a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt)
+  );
+  const envelopeByDocumentId = new Map<number, Array<(typeof signatureEnvelopes)[number]>>();
+  for (const envelope of signatureEnvelopes) {
+    for (const envelopeDocument of envelope.signatureEnvelopeDocuments ?? []) {
+      const current = envelopeByDocumentId.get(envelopeDocument.loanDocumentInstanceId) ?? [];
+      current.push(envelope);
+      envelopeByDocumentId.set(envelopeDocument.loanDocumentInstanceId, current);
+    }
+  }
+  const signatureEvents = signatureEnvelopes
+    .flatMap((envelope) =>
+      (envelope.signatureEvents ?? []).map((event) => ({
+        envelopeId: envelope.id,
+        envelopeProviderId: envelope.providerEnvelopeId,
+        provider: envelope.provider,
+        event,
+      }))
+    )
+    .sort(
+      (a, b) =>
+        toTimestamp(b.event.eventAt ?? b.event.receivedAt) -
+        toTimestamp(a.event.eventAt ?? a.event.receivedAt)
+    );
+  const signatureSignerRows = signatureEnvelopes.flatMap((envelope) =>
+    (envelope.signatureSigners ?? []).map((signer) => ({
+      envelopeId: envelope.id,
+      envelopeProviderId: envelope.providerEnvelopeId,
+      signer,
+    }))
+  );
+
+  const signedDocumentsCount = signatureDocuments.filter((item) => item.status === 'SIGNED').length;
+  const pendingDocumentsCount = signatureDocuments.filter(
+    (item) => !['SIGNED', 'CANCELED', 'VOID'].includes(item.status)
+  ).length;
+  const signedSignersCount = signatureEnvelopes.reduce(
+    (sum, envelope) =>
+      sum + (envelope.signatureSigners ?? []).filter((signer) => signer.status === 'SIGNED').length,
+    0
+  );
+  const totalSignersCount = signatureEnvelopes.reduce(
+    (sum, envelope) => sum + (envelope.signatureSigners?.length ?? 0),
+    0
+  );
+  const handleDownloadSignatureFile = useCallback(
+    async (fileKey: string, fileName: string) => {
+      if (!effectiveLoanId) return;
+
+      try {
+        setSignatureActionKey(`download:${fileKey}`);
+
+        const response = await presignSignatureFileView({
+          params: { id: effectiveLoanId },
+          body: { fileKey },
+        });
+        const viewUrl = response.body.viewUrl;
+
+        const anchor = document.createElement('a');
+        anchor.href = viewUrl;
+        anchor.download = fileName;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      } catch {
+        // mutation hook handles user-facing errors
+      } finally {
+        setSignatureActionKey(null);
+      }
+    },
+    [effectiveLoanId, presignSignatureFileView]
+  );
+  const handleResendSignatureEnvelope = useCallback(
+    async (envelopeId: number, action: 'REMINDER' | 'RETRY') => {
+      if (!effectiveLoanId) return;
+
+      try {
+        setSignatureActionKey(`resend:${action}:${envelopeId}`);
+        await resendSignatureEnvelope({
+          params: {
+            id: effectiveLoanId,
+            envelopeId,
+          },
+          body: {
+            action,
+          },
+        });
+      } catch {
+        // mutation hook handles user-facing errors
+      } finally {
+        setSignatureActionKey(null);
+      }
+    },
+    [effectiveLoanId, resendSignatureEnvelope]
+  );
+  const handleCreateNewSignatureRequest = useCallback(async () => {
+    if (!effectiveLoanId) return;
+
+    try {
+      setSignatureActionKey('new-request');
+      await sendLoanToSignature({
+        params: { id: effectiveLoanId },
+      });
+    } catch {
+      // mutation hook handles user-facing errors
+    } finally {
+      setSignatureActionKey(null);
+    }
+  }, [effectiveLoanId, sendLoanToSignature]);
+  const confirmCreateNewSignatureRequest = useCallback(async () => {
+    if (!newSignatureRequestTarget) return;
+
+    try {
+      await handleCreateNewSignatureRequest();
+    } finally {
+      setNewSignatureRequestTarget(null);
+    }
+  }, [handleCreateNewSignatureRequest, newSignatureRequestTarget]);
 
   if (!loan) return null;
 
@@ -387,6 +567,7 @@ export function LoanInfo({
                 <TabsTrigger value="refinancing">Refinanciacion</TabsTrigger>
                 <TabsTrigger value="codebtors">Codeudores</TabsTrigger>
                 <TabsTrigger value="application">Solicitud</TabsTrigger>
+                <TabsTrigger value="signature">Firma digital</TabsTrigger>
                 <TabsTrigger value="documents">Impresiones</TabsTrigger>
               </TabsList>
 
@@ -960,6 +1141,329 @@ export function LoanInfo({
                 )}
               </TabsContent>
 
+              <TabsContent value="signature" className="space-y-4 pt-2">
+                {signatureDocuments.length || signatureEnvelopes.length ? (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-4">
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Documentos</div>
+                        <div className="text-base font-semibold">{signatureDocuments.length}</div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Firmados</div>
+                        <div className="text-base font-semibold">{signedDocumentsCount}</div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Pendientes</div>
+                        <div className="text-base font-semibold">{pendingDocumentsCount}</div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-muted-foreground text-xs">Firmantes</div>
+                        <div className="text-base font-semibold">
+                          {signedSignersCount}/{totalSignersCount}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">Documentos enviados a firma</h3>
+                      {signatureDocuments.length ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Documento</TableHead>
+                              <TableHead>Plantilla</TableHead>
+                              <TableHead>Revision</TableHead>
+                              <TableHead>Estado</TableHead>
+                              <TableHead>Sobres</TableHead>
+                              <TableHead>Generado</TableHead>
+                              <TableHead>Enviado</TableHead>
+                              <TableHead>Firmado</TableHead>
+                              <TableHead>Descargas</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {signatureDocuments.map((item) => {
+                              const linkedEnvelopes = envelopeByDocumentId.get(item.id) ?? [];
+                              const signedFileName = `${item.documentCode}-firmado-r${item.revision}.pdf`;
+
+                              return (
+                                <TableRow key={item.id}>
+                                  <TableCell>
+                                    <div className="font-medium">{item.documentName}</div>
+                                    <div className="text-muted-foreground text-xs">
+                                      {item.documentCode}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    {item.documentTemplate
+                                      ? `${item.documentTemplate.code} v${item.documentTemplate.version}`
+                                      : item.documentTemplateId}
+                                  </TableCell>
+                                  <TableCell>{item.revision}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={getSignatureBadgeVariant(item.status)}>
+                                      {loanDocumentStatusLabels[item.status] ?? item.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {linkedEnvelopes.length
+                                      ? linkedEnvelopes.map((envelope) => envelope.providerEnvelopeId).join(', ')
+                                      : '-'}
+                                  </TableCell>
+                                  <TableCell>{formatDateTime(item.generatedAt)}</TableCell>
+                                  <TableCell>{formatDateTime(item.sentForSignatureAt)}</TableCell>
+                                  <TableCell>{formatDateTime(item.signedAt)}</TableCell>
+                                  <TableCell>
+                                    {item.signedStorageKey ? (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={
+                                          signatureActionKey === `download:${item.signedStorageKey}`
+                                        }
+                                        onClick={() =>
+                                          handleDownloadSignatureFile(
+                                            item.signedStorageKey as string,
+                                            signedFileName
+                                          )
+                                        }
+                                      >
+                                        <Download className="mr-2 size-4" />
+                                        Firmado
+                                      </Button>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                          No hay documentos de firma digital para este credito.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">Sobres de firma</h3>
+                      {signatureEnvelopes.length ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Proveedor</TableHead>
+                              <TableHead>ID proveedor</TableHead>
+                              <TableHead>Estado</TableHead>
+                              <TableHead>Documentos</TableHead>
+                              <TableHead>Firmantes</TableHead>
+                              <TableHead>Enviado</TableHead>
+                              <TableHead>Completado</TableHead>
+                              <TableHead>Evidencias</TableHead>
+                              <TableHead>Error</TableHead>
+                              <TableHead>Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {signatureEnvelopes.map((item) => {
+                              const totalSigners = item.signatureSigners?.length ?? 0;
+                              const signedSigners =
+                                item.signatureSigners?.filter((signer) => signer.status === 'SIGNED')
+                                  .length ?? 0;
+                              const evidenceArtifacts = (item.signatureArtifacts ?? []).filter(
+                                (artifact) => artifact.artifactType !== 'SIGNED_PDF'
+                              );
+                              const envelopeAction =
+                                item.status === 'ERROR'
+                                  ? { kind: 'RETRY' as const, label: 'Reintentar envio' }
+                                  : item.status === 'SENT' || item.status === 'PARTIALLY_SIGNED'
+                                    ? { kind: 'REMINDER' as const, label: 'Enviar recordatorio' }
+                                    : item.status === 'REJECTED' ||
+                                        item.status === 'EXPIRED' ||
+                                        item.status === 'CANCELED'
+                                      ? {
+                                          kind: 'NEW_REQUEST' as const,
+                                          label: 'Nueva solicitud',
+                                        }
+                                      : null;
+
+                              return (
+                                <TableRow key={item.id}>
+                                  <TableCell>{signatureProviderLabels[item.provider] ?? item.provider}</TableCell>
+                                  <TableCell>{item.providerEnvelopeId}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={getSignatureBadgeVariant(item.status)}>
+                                      {signatureEnvelopeStatusLabels[item.status] ?? item.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>{item.signatureEnvelopeDocuments?.length ?? 0}</TableCell>
+                                  <TableCell>
+                                    {signedSigners}/{totalSigners}
+                                  </TableCell>
+                                  <TableCell>{formatDateTime(item.sentAt)}</TableCell>
+                                  <TableCell>{formatDateTime(item.completedAt)}</TableCell>
+                                  <TableCell>
+                                    {evidenceArtifacts.length ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {evidenceArtifacts.map((artifact) => {
+                                          const artifactFileName = `${item.providerEnvelopeId}-${artifact.artifactType.toLowerCase()}.${extensionFromMimeType(artifact.mimeType)}`;
+
+                                          return (
+                                            <Button
+                                              key={artifact.id}
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              disabled={
+                                                signatureActionKey ===
+                                                `download:${artifact.storageKey}`
+                                              }
+                                              onClick={() =>
+                                                handleDownloadSignatureFile(
+                                                  artifact.storageKey,
+                                                  artifactFileName
+                                                )
+                                              }
+                                            >
+                                              <Download className="mr-2 size-4" />
+                                              {artifact.artifactType}
+                                            </Button>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{item.errorMessage ?? '-'}</TableCell>
+                                  <TableCell>
+                                    {envelopeAction ? (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={
+                                          signatureActionKey ===
+                                          (envelopeAction.kind === 'NEW_REQUEST'
+                                            ? 'new-request'
+                                            : `resend:${envelopeAction.kind}:${item.id}`)
+                                        }
+                                        onClick={() => {
+                                          if (envelopeAction.kind === 'NEW_REQUEST') {
+                                            setNewSignatureRequestTarget({
+                                              envelopeId: item.id,
+                                              providerEnvelopeId: item.providerEnvelopeId,
+                                            });
+                                            return;
+                                          }
+                                          void handleResendSignatureEnvelope(item.id, envelopeAction.kind);
+                                        }}
+                                      >
+                                        <RefreshCw className="mr-2 size-4" />
+                                        {envelopeAction.label}
+                                      </Button>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                          No hay sobres registrados para este credito.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">Firmantes</h3>
+                      {signatureSignerRows.length ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Sobre</TableHead>
+                              <TableHead>Rol</TableHead>
+                              <TableHead>Nombre</TableHead>
+                              <TableHead>Estado</TableHead>
+                              <TableHead>Contacto</TableHead>
+                              <TableHead>Firmado</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {signatureSignerRows.map((row) => (
+                              <TableRow key={row.signer.id}>
+                                <TableCell>{row.envelopeProviderId || row.envelopeId}</TableCell>
+                                <TableCell>
+                                  {signerRoleLabels[row.signer.signerRole] ?? row.signer.signerRole}
+                                </TableCell>
+                                <TableCell>{row.signer.fullName}</TableCell>
+                                <TableCell>
+                                  <Badge variant={getSignatureBadgeVariant(row.signer.status)}>
+                                    {signatureSignerStatusLabels[row.signer.status] ?? row.signer.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{row.signer.email ?? row.signer.phone ?? '-'}</TableCell>
+                                <TableCell>{formatDateTime(row.signer.signedAt)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                          No hay firmantes registrados.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">Eventos</h3>
+                      {signatureEvents.length ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Fecha</TableHead>
+                              <TableHead>Proveedor</TableHead>
+                              <TableHead>Sobre</TableHead>
+                              <TableHead>Evento</TableHead>
+                              <TableHead>Procesado</TableHead>
+                              <TableHead>Error</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {signatureEvents.slice(0, 30).map((row) => (
+                              <TableRow key={row.event.id}>
+                                <TableCell>
+                                  {formatDateTime(row.event.eventAt ?? row.event.receivedAt)}
+                                </TableCell>
+                                <TableCell>{signatureProviderLabels[row.provider] ?? row.provider}</TableCell>
+                                <TableCell>{row.envelopeProviderId || row.envelopeId}</TableCell>
+                                <TableCell>{row.event.eventType}</TableCell>
+                                <TableCell>{row.event.processed ? 'Si' : 'No'}</TableCell>
+                                <TableCell>{row.event.processingError ?? '-'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                          No hay eventos registrados.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                    Este credito no tiene gestion de firma digital registrada.
+                  </div>
+                )}
+              </TabsContent>
+
               <TabsContent value="documents" className="pt-2">
                 <LoanDocumentsTab loanId={detail.id} creditNumber={detail.creditNumber} />
               </TabsContent>
@@ -970,6 +1474,39 @@ export function LoanInfo({
             No fue posible cargar la informacion.
           </div>
         )}
+
+        <AlertDialog
+          open={Boolean(newSignatureRequestTarget)}
+          onOpenChange={(open) => {
+            if (!open) setNewSignatureRequestTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Crear nueva solicitud de firma</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se creara un nuevo sobre de firma para este credito.
+                {newSignatureRequestTarget
+                  ? ` Sobre actual: ${newSignatureRequestTarget.providerEnvelopeId} (ID interno ${newSignatureRequestTarget.envelopeId}).`
+                  : ''}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={signatureActionKey === 'new-request'}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void confirmCreateNewSignatureRequest();
+                }}
+                disabled={signatureActionKey === 'new-request'}
+              >
+                {signatureActionKey === 'new-request' ? 'Creando...' : 'Crear solicitud'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

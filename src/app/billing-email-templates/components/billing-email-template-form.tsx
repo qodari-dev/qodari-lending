@@ -2,6 +2,8 @@
 
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { HtmlTemplateEditor } from '@/components/html-template/html-template-editor';
+import { HtmlTemplatePreview } from '@/components/html-template/html-template-preview';
 import { Input } from '@/components/ui/input';
 import {
   Sheet,
@@ -18,31 +20,15 @@ import {
   useCreateBillingEmailTemplate,
   useUpdateBillingEmailTemplate,
 } from '@/hooks/queries/use-billing-email-template-queries';
-import { cn } from '@/lib/utils';
 import { BillingEmailTemplate, CreateBillingEmailTemplateBodySchema } from '@/schemas/billing-email-template';
+import { BILLING_EMAIL_TEMPLATE_VARIABLES } from '@/utils/billing-email-template-variables';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useId } from 'react';
 import { Controller, FormProvider, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
-import { BillingHtmlEditor } from './billing-html-editor';
-import { HTML_PREVIEW_CLASSES } from './html-preview-styles';
 
 type FormValues = z.infer<typeof CreateBillingEmailTemplateBodySchema>;
-
-const TEMPLATE_VARIABLES = [
-  'nit',
-  'razon_social',
-  'direccion',
-  'telefono',
-  'convenio_codigo',
-  'ciclo',
-  'dia_corte',
-  'dia_envio',
-  'dia_pago_esperado',
-  'periodo',
-  'fecha_envio',
-] as const;
 
 function variableToken(variable: string) {
   return `{{${variable}}}`;
@@ -159,7 +145,7 @@ export function BillingEmailTemplateForm({
                     <FieldLabel htmlFor="subject">Asunto</FieldLabel>
                     <Input {...field} maxLength={255} aria-invalid={fieldState.invalid} />
                     <div className="flex flex-wrap gap-1">
-                      {TEMPLATE_VARIABLES.map((variable) => (
+                      {BILLING_EMAIL_TEMPLATE_VARIABLES.map((variable) => (
                         <Button
                           key={`subject-${variable}`}
                           type="button"
@@ -183,10 +169,10 @@ export function BillingEmailTemplateForm({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="htmlContent">Contenido HTML</FieldLabel>
-                    <BillingHtmlEditor
+                    <HtmlTemplateEditor
                       value={field.value ?? ''}
                       onChange={field.onChange}
-                      variables={TEMPLATE_VARIABLES}
+                      variables={BILLING_EMAIL_TEMPLATE_VARIABLES}
                       invalid={fieldState.invalid}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -216,16 +202,7 @@ export function BillingEmailTemplateForm({
 
               <div className="space-y-2">
                 <p className="text-muted-foreground text-sm font-medium">Vista previa HTML</p>
-                <div
-                  className={cn(
-                    'rounded-md border p-4 text-sm',
-                    HTML_PREVIEW_CLASSES,
-                    !htmlPreview?.trim() && 'text-muted-foreground'
-                  )}
-                  dangerouslySetInnerHTML={{
-                    __html: htmlPreview?.trim() ? htmlPreview : '<p>Sin contenido</p>',
-                  }}
-                />
+                <HtmlTemplatePreview htmlContent={htmlPreview ?? ''} />
               </div>
             </FieldGroup>
           </form>

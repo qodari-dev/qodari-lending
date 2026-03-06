@@ -153,6 +153,7 @@ const CREDIT_PRODUCT_INCLUDE_OPTIONS = [
   'creditProductCategories',
   'creditProductLateInterestRules',
   'creditProductRequiredDocuments',
+  'creditProductDocumentRules',
   'creditProductAccounts',
   'creditProductBillingConcepts',
 ] as const;
@@ -207,6 +208,16 @@ export const CreditProductRequiredDocumentInputSchema = z.object({
 
 export type CreditProductRequiredDocumentInput = z.infer<
   typeof CreditProductRequiredDocumentInputSchema
+>;
+
+export const CreditProductDocumentRuleInputSchema = z.object({
+  documentTemplateId: z.number().int().positive(),
+  required: z.boolean(),
+  documentOrder: z.number().int().positive(),
+});
+
+export type CreditProductDocumentRuleInput = z.infer<
+  typeof CreditProductDocumentRuleInputSchema
 >;
 
 export const CreditProductAccountInputSchema = z.object({
@@ -291,6 +302,7 @@ const CreditProductBaseSchema = z.object({
   creditProductCategories: CreditProductCategoryInputSchema.array().optional(),
   creditProductLateInterestRules: CreditProductLateInterestRuleInputSchema.array().optional(),
   creditProductRequiredDocuments: CreditProductRequiredDocumentInputSchema.array().optional(),
+  creditProductDocumentRules: CreditProductDocumentRuleInputSchema.array().optional(),
   creditProductAccounts: CreditProductAccountInputSchema.array().optional(),
   creditProductBillingConcepts: CreditProductBillingConceptInputSchema.array().optional(),
 });
@@ -321,6 +333,10 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
       }[];
       creditProductRequiredDocuments?: {
         documentTypeId: number;
+      }[];
+      creditProductDocumentRules?: {
+        documentTemplateId: number;
+        documentOrder: number;
       }[];
       creditProductAccounts?: unknown[];
       creditProductBillingConcepts?: {
@@ -405,6 +421,31 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
         break;
       }
       docIds.add(doc.documentTypeId);
+    }
+
+    const documentRules = data.creditProductDocumentRules ?? [];
+    const templateIds = new Set<number>();
+    const documentOrders = new Set<number>();
+    for (const rule of documentRules) {
+      if (templateIds.has(rule.documentTemplateId)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'No puede repetir la plantilla de firma',
+          path: ['creditProductDocumentRules'],
+        });
+        break;
+      }
+      templateIds.add(rule.documentTemplateId);
+
+      if (documentOrders.has(rule.documentOrder)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'No puede repetir el orden de documento',
+          path: ['creditProductDocumentRules'],
+        });
+        break;
+      }
+      documentOrders.add(rule.documentOrder);
     }
 
     const accounts = data.creditProductAccounts ?? [];

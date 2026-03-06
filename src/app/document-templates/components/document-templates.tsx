@@ -1,7 +1,6 @@
 'use client';
 
-import { api } from '@/clients/api';
-import { DataTable, useDataTable, ExportDropdown } from '@/components/data-table';
+import { DataTable, useDataTable } from '@/components/data-table';
 import { PageContent, PageHeader } from '@/components/layout';
 import {
   AlertDialog,
@@ -15,17 +14,20 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  useCreditProducts,
-  useDeleteCreditProduct,
-} from '@/hooks/queries/use-credit-product-queries';
-import { CreditProduct, CreditProductInclude, CreditProductSortField } from '@/schemas/credit-product';
+  useDeleteDocumentTemplate,
+  useDocumentTemplates,
+} from '@/hooks/queries/use-document-template-queries';
+import {
+  DocumentTemplate,
+  DocumentTemplateInclude,
+  DocumentTemplateSortField,
+} from '@/schemas/document-template';
 import { RowData, TableMeta } from '@tanstack/react-table';
-import * as React from 'react';
-import { creditProductColumns } from './credit-product-columns';
-import { CreditProductForm } from './credit-product-form';
-import { CreditProductInfo } from './credit-product-info';
-import { creditProductExportConfig } from './credit-product-export-config';
-import { CreditProductsToolbar } from './credit-product-toolbar';
+import React from 'react';
+import { documentTemplateColumns } from './document-template-columns';
+import { DocumentTemplateForm } from './document-template-form';
+import { DocumentTemplateInfo } from './document-template-info';
+import { DocumentTemplateToolbar } from './document-template-toolbar';
 
 declare module '@tanstack/table-core' {
   interface TableMeta<TData extends RowData> {
@@ -35,8 +37,8 @@ declare module '@tanstack/table-core' {
   }
 }
 
-export function CreditProducts() {
-  const [creditProduct, setCreditProduct] = React.useState<CreditProduct>();
+export function DocumentTemplates() {
+  const [documentTemplate, setDocumentTemplate] = React.useState<DocumentTemplate>();
 
   const {
     pageIndex,
@@ -47,88 +49,59 @@ export function CreditProducts() {
     handlePaginationChange,
     handleSortingChange,
     handleSearchChange,
-  } = useDataTable<CreditProductSortField, CreditProductInclude>({
+  } = useDataTable<DocumentTemplateSortField, DocumentTemplateInclude>({
     defaultPageSize: 20,
-    defaultIncludes: [
-      'creditFund',
-      'paymentAllocationPolicy',
-      'capitalDistribution',
-      'interestDistribution',
-      'lateInterestDistribution',
-      'creditProductRefinancePolicy',
-      'creditProductChargeOffPolicy',
-      'creditProductCategories',
-      'creditProductLateInterestRules',
-      'creditProductRequiredDocuments',
-      'creditProductDocumentRules',
-      'creditProductAccounts',
-      'creditProductBillingConcepts',
-    ],
+    defaultIncludes: ['templateSignerRules', 'creditProductDocumentRules'],
     defaultSorting: [{ field: 'createdAt', order: 'desc' }],
   });
 
-  const { data, isLoading, isFetching, refetch } = useCreditProducts(queryParams);
-
-  const { mutateAsync: deleteCreditProduct, isPending: isDeleting } = useDeleteCreditProduct();
+  const { data, isLoading, isFetching, refetch } = useDocumentTemplates(queryParams);
+  const { mutateAsync: deleteDocumentTemplate, isPending: isDeleting } = useDeleteDocumentTemplate();
 
   const [openedInfoSheet, setOpenedInfoSheet] = React.useState(false);
   const handleInfoSheetChange = React.useCallback(
     (open: boolean) => {
-      if (!open) {
-        setCreditProduct(undefined);
-      }
+      if (!open) setDocumentTemplate(undefined);
       setOpenedInfoSheet(open);
     },
-    [setCreditProduct, setOpenedInfoSheet]
+    [setDocumentTemplate]
   );
 
   const [openedFormSheet, setOpenedFormSheet] = React.useState(false);
   const handleFormSheetChange = React.useCallback(
     (open: boolean) => {
-      if (!open) {
-        setCreditProduct(undefined);
-      }
+      if (!open) setDocumentTemplate(undefined);
       setOpenedFormSheet(open);
     },
-    [setCreditProduct, setOpenedFormSheet]
+    [setDocumentTemplate]
   );
 
   const [openedDeleteDialog, setOpenedDeleteDialog] = React.useState(false);
   const handleDelete = React.useCallback(async () => {
-    if (!creditProduct?.id) return;
-    await deleteCreditProduct({ params: { id: creditProduct.id } });
-    setCreditProduct(undefined);
+    if (!documentTemplate?.id) return;
+    await deleteDocumentTemplate({ params: { id: documentTemplate.id } });
+    setDocumentTemplate(undefined);
     setOpenedDeleteDialog(false);
-  }, [creditProduct, setCreditProduct, setOpenedDeleteDialog, deleteCreditProduct]);
+  }, [documentTemplate, deleteDocumentTemplate]);
 
-  const handleCreate = () => {
-    handleFormSheetChange(true);
-  };
+  const handleCreate = () => handleFormSheetChange(true);
 
-  const handleRowOpen = React.useCallback((row: CreditProduct) => {
-    setCreditProduct(row);
+  const handleRowOpen = React.useCallback((row: DocumentTemplate) => {
+    setDocumentTemplate(row);
     setOpenedInfoSheet(true);
   }, []);
 
-  const handleRowEdit = React.useCallback((row: CreditProduct) => {
-    setCreditProduct(row);
+  const handleRowEdit = React.useCallback((row: DocumentTemplate) => {
+    setDocumentTemplate(row);
     setOpenedFormSheet(true);
   }, []);
 
-  const handleRowDelete = React.useCallback((row: CreditProduct) => {
-    setCreditProduct(row);
+  const handleRowDelete = React.useCallback((row: DocumentTemplate) => {
+    setDocumentTemplate(row);
     setOpenedDeleteDialog(true);
   }, []);
-  const fetchAllData = React.useCallback(async () => {
-    const res = await api.creditProduct.list.query({
-      query: { ...queryParams, page: 1, limit: 10000 },
-    });
-    return (res.body as { data: CreditProduct[] })?.data ?? [];
-  }, [queryParams]);
 
-
-
-  const tableMeta = React.useMemo<TableMeta<CreditProduct>>(
+  const tableMeta = React.useMemo<TableMeta<DocumentTemplate>>(
     () => ({
       onRowView: handleRowOpen,
       onRowDelete: handleRowDelete,
@@ -140,12 +113,12 @@ export function CreditProducts() {
   return (
     <>
       <PageHeader
-        title="Tipos de Creditos"
-        description="Administre lineas de credito, categorias, reglas de mora, documentos y cuentas."
+        title="Plantillas de firma"
+        description="Administre plantillas documentales y su configuracion de firmantes."
       />
       <PageContent>
         <DataTable
-          columns={creditProductColumns}
+          columns={documentTemplateColumns}
           data={data?.body?.data ?? []}
           pageCount={data?.body?.meta.totalPages ?? 0}
           pageIndex={pageIndex}
@@ -158,18 +131,12 @@ export function CreditProducts() {
           enableRowSelection
           pageSizeOptions={[10, 20, 30, 50]}
           toolbar={
-            <CreditProductsToolbar
+            <DocumentTemplateToolbar
               searchValue={searchValue}
               onSearchChange={handleSearchChange}
               onCreate={handleCreate}
               onRefresh={() => refetch()}
               isRefreshing={isFetching && !isLoading}
-              exportActions={
-                <ExportDropdown
-                  config={creditProductExportConfig}
-                  fetchAllData={fetchAllData}
-                />
-              }
             />
           }
           emptyMessage="No hay informacion. Intente ajustar los filtros."
@@ -177,13 +144,13 @@ export function CreditProducts() {
         />
       </PageContent>
 
-      <CreditProductInfo
-        creditProduct={creditProduct}
+      <DocumentTemplateInfo
+        documentTemplate={documentTemplate}
         opened={openedInfoSheet}
         onOpened={handleInfoSheetChange}
       />
-      <CreditProductForm
-        creditProduct={creditProduct}
+      <DocumentTemplateForm
+        documentTemplate={documentTemplate}
         opened={openedFormSheet}
         onOpened={handleFormSheetChange}
       />
@@ -193,8 +160,8 @@ export function CreditProducts() {
           <AlertDialogHeader>
             <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion no se puede deshacer. Esto eliminara permanentemente el tipo de credito
-              &quot;{creditProduct?.name}&quot; y su configuracion asociada.
+              Esta accion no se puede deshacer. Se eliminara permanentemente la plantilla
+              &quot;{documentTemplate?.code}&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

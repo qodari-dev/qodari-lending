@@ -73,6 +73,7 @@ import { CreditProductAccountsForm } from './credit-product-accounts-form';
 import { CreditProductBillingConceptsForm } from './credit-product-billing-concepts-form';
 import { CreditProductCategoriesForm } from './credit-product-categories-form';
 import { CreditProductChargeOffPolicyForm } from './credit-product-charge-off-policy-form';
+import { CreditProductDocumentRulesForm } from './credit-product-document-rules-form';
 import { CreditProductLateInterestRulesForm } from './credit-product-late-interest-rules-form';
 import { CreditProductRefinancePolicyForm } from './credit-product-refinance-policy-form';
 import { CreditProductRequiredDocumentsForm } from './credit-product-required-documents-form';
@@ -136,6 +137,7 @@ export function CreditProductForm({
       creditProductCategories: [],
       creditProductLateInterestRules: [],
       creditProductRequiredDocuments: [],
+      creditProductDocumentRules: [],
       creditProductAccounts: [],
       creditProductBillingConcepts: [],
     },
@@ -197,6 +199,19 @@ export function CreditProductForm({
               })
             | undefined
         )?.creditProductDocuments ?? [];
+
+      const currentDocumentRules =
+        (
+          creditProduct as
+            | (CreditProduct & {
+                creditProductDocumentRules?: {
+                  documentTemplateId: number;
+                  required: boolean;
+                  documentOrder: number;
+                }[];
+              })
+            | undefined
+        )?.creditProductDocumentRules ?? [];
 
       form.reset({
         name: creditProduct?.name ?? '',
@@ -277,6 +292,11 @@ export function CreditProductForm({
           documentTypeId: document.documentTypeId,
           isRequired: document.isRequired,
         })),
+        creditProductDocumentRules: currentDocumentRules.map((rule) => ({
+          documentTemplateId: rule.documentTemplateId,
+          required: rule.required,
+          documentOrder: rule.documentOrder,
+        })),
         creditProductAccounts:
           creditProduct?.creditProductAccounts?.map((account) => ({
             capitalGlAccountId: account.capitalGlAccountId,
@@ -333,6 +353,7 @@ export function CreditProductForm({
                 <TabsTrigger value="categories">Categorias</TabsTrigger>
                 <TabsTrigger value="lateInterestRules">Reglas mora</TabsTrigger>
                 <TabsTrigger value="requiredDocuments">Documentos</TabsTrigger>
+                <TabsTrigger value="documentRules">Plantillas firma</TabsTrigger>
                 <TabsTrigger value="refinancePolicy">Refinanciacion</TabsTrigger>
                 <TabsTrigger value="chargeOffPolicy">Castigo cartera</TabsTrigger>
                 <TabsTrigger value="accounts">Cuentas</TabsTrigger>
@@ -1035,6 +1056,10 @@ export function CreditProductForm({
 
               <TabsContent value="requiredDocuments" className="pt-2">
                 <CreditProductRequiredDocumentsForm />
+              </TabsContent>
+
+              <TabsContent value="documentRules" className="pt-2">
+                <CreditProductDocumentRulesForm />
               </TabsContent>
 
               <TabsContent value="refinancePolicy" className="pt-2">

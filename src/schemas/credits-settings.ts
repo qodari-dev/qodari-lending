@@ -49,6 +49,12 @@ export const UpdateCreditsSettingsBodySchema = z.object({
   accountingEnabled: z.boolean().optional(),
   minDaysBeforeFirstCollection: z.number().int().min(0).max(365).optional(),
 
+  // Basic company data
+  companyDocumentNumber: z.string().max(20).nullable().optional(),
+  companyName: z.string().max(255).nullable().optional(),
+  companyAddress: z.string().max(255).nullable().optional(),
+  companyPhone: z.string().max(20).nullable().optional(),
+
   // GL Accounts
   cashGlAccountId: z.number().nullable().optional(),
   majorGlAccountId: z.number().nullable().optional(),

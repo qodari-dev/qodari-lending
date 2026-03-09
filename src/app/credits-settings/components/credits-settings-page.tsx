@@ -84,6 +84,10 @@ export function CreditsSettingsPage() {
         subsidyEnabled: settings.subsidyEnabled ?? false,
         accountingEnabled: settings.accountingEnabled ?? true,
         minDaysBeforeFirstCollection: settings.minDaysBeforeFirstCollection ?? 7,
+        companyDocumentNumber: settings.companyDocumentNumber ?? '',
+        companyName: settings.companyName ?? '',
+        companyAddress: settings.companyAddress ?? '',
+        companyPhone: settings.companyPhone ?? '',
         cashGlAccountId: settings.cashGlAccountId ?? undefined,
         majorGlAccountId: settings.majorGlAccountId ?? undefined,
         minimumMajorPaidAmount: settings.minimumMajorPaidAmount ?? null,
@@ -166,6 +170,65 @@ export function CreditsSettingsPage() {
                 </Button>
               )}
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Datos Basicos</CardTitle>
+                <CardDescription>
+                  Información básica de la empresa para reportes y documentos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FieldGroup>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Controller
+                      name="companyDocumentNumber"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Numero de Documento</FieldLabel>
+                          <Input {...field} value={field.value ?? ''} disabled={!canUpdate} />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="companyName"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Nombre de la Empresa</FieldLabel>
+                          <Input {...field} value={field.value ?? ''} disabled={!canUpdate} />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="companyAddress"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Direccion</FieldLabel>
+                          <Input {...field} value={field.value ?? ''} disabled={!canUpdate} />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="companyPhone"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Telefono</FieldLabel>
+                          <Input {...field} value={field.value ?? ''} disabled={!canUpdate} />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                  </div>
+                </FieldGroup>
+              </CardContent>
+            </Card>
 
             {/* Configuración General */}
             <Card>

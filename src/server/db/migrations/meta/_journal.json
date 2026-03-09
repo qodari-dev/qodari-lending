@@ -225,6 +225,13 @@
       "when": 1772833782180,
       "tag": "0031_parallel_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1773063804164,
+      "tag": "0032_absent_mad_thinker",
+      "breakpoints": true
     }
   ]
 }

@@ -2361,6 +2361,12 @@ export const creditsSettings = pgTable('credits_settings', {
   // Días mínimos entre la fecha de aprobación/desembolso y el primer recaudo.
   minDaysBeforeFirstCollection: integer('min_days_before_first_collection').notNull().default(7),
 
+  // Datos básicos de la empresa para reportes y documentos.
+  companyDocumentNumber: varchar('company_document_number', { length: 20 }),
+  companyName: varchar('company_name', { length: 255 }),
+  companyAddress: varchar('company_address', { length: 255 }),
+  companyPhone: varchar('company_phone', { length: 20 }),
+
   // Auxiliares (glAccounts)
   cashGlAccountId: integer('cash_gl_account_id').references(() => glAccounts.id, {
     onDelete: 'restrict',

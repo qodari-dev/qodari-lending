@@ -232,6 +232,20 @@
       "when": 1773063804164,
       "tag": "0032_absent_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1773114353143,
+      "tag": "0033_harsh_lady_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1773158803033,
+      "tag": "0034_silly_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

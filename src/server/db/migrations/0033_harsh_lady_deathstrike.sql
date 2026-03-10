@@ -1,0 +1,1 @@
+ALTER TABLE "loans" ADD COLUMN "disbursement_amount" numeric(14, 2);

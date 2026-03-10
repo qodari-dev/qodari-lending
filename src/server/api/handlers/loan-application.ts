@@ -69,6 +69,11 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-o
 import { contract } from '../contracts';
 import { env } from '@/env';
 import {
+  pickApplicableBillingRule,
+} from '@/server/utils/billing-concept-resolver';
+import { calculateOneTimeConceptAmount } from '@/server/utils/accounting-utils';
+import { roundMoney } from '@/server/utils/value-utils';
+import {
   approveIntermediateLevel,
   assertAssignedApprover,
   ensurePendingAssignment,
@@ -426,47 +431,6 @@ function generateCreditNumber(prefix: string): string {
   const rnd = Math.floor(Math.random() * 900 + 100);
   const normalizedPrefix = prefix.trim().toUpperCase().slice(0, 5);
   return `${normalizedPrefix}${yy}${mm}${dd}${hh}${mi}${ss}${rnd}`;
-}
-
-function pickApplicableBillingRule(args: {
-  rules: Array<{
-    id: number;
-    billingConceptId: number;
-    rate: string | null;
-    amount: string | null;
-    valueFrom: string | null;
-    valueTo: string | null;
-    effectiveFrom: string | Date | null;
-    effectiveTo: string | Date | null;
-  }>;
-  conceptId: number;
-  asOfDate: string;
-}) {
-  const toDateOnly = (value: string | Date | null) => {
-    if (!value) return null;
-    if (typeof value === 'string') return value;
-    return formatDateOnly(value);
-  };
-
-  const applicable = args.rules.filter((rule) => {
-    if (rule.billingConceptId !== args.conceptId) return false;
-    const effectiveFrom = toDateOnly(rule.effectiveFrom);
-    const effectiveTo = toDateOnly(rule.effectiveTo);
-    if (effectiveFrom && effectiveFrom > args.asOfDate) return false;
-    if (effectiveTo && effectiveTo < args.asOfDate) return false;
-    return true;
-  });
-
-  if (!applicable.length) return null;
-
-  applicable.sort((a, b) => {
-    const aFrom = toDateOnly(a.effectiveFrom) ?? '0000-01-01';
-    const bFrom = toDateOnly(b.effectiveFrom) ?? '0000-01-01';
-    if (bFrom !== aFrom) return bFrom.localeCompare(aFrom);
-    return b.id - a.id;
-  });
-
-  return applicable[0] ?? null;
 }
 
 type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -1980,50 +1944,14 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
 
-      const insuranceCalculation = await resolveInsuranceFactor({
-        creditProductId: existing.creditProductId,
-        insuranceCompanyId: existing.insuranceCompanyId,
-        installments: approvedInstallments,
-        requestedAmount: approvedAmount,
-        product,
-      });
-
-      const schedule = calculateCreditSimulation({
-        financingType: product.financingType,
-        principal: approvedAmount,
-        annualRatePercent: toNumber(existing.financingFactor),
-        interestRateType: product.interestRateType,
-        interestDayCountConvention: product.interestDayCountConvention,
-        installments: approvedInstallments,
-        firstPaymentDate: finalBody.firstCollectionDate,
-        disbursementDate: new Date(`${today}T00:00:00`),
-        daysInterval: paymentFrequencyIntervalDays,
-        paymentScheduleMode: paymentFrequency.scheduleMode,
-        dayOfMonth: paymentFrequency.dayOfMonth,
-        semiMonthDay1: paymentFrequency.semiMonthDay1,
-        semiMonthDay2: paymentFrequency.semiMonthDay2,
-        useEndOfMonthFallback: paymentFrequency.useEndOfMonthFallback,
-        insuranceAccrualMethod: product.insuranceAccrualMethod,
-        insuranceRatePercent: insuranceCalculation.insuranceRatePercent,
-        insuranceFixedAmount: insuranceCalculation.insuranceFixedAmount,
-        insuranceMinimumAmount: insuranceCalculation.insuranceMinimumAmount,
-      });
-
-      const firstInstallment = schedule.installments[0];
-      const lastInstallment = schedule.installments[schedule.installments.length - 1];
-
-      if (!firstInstallment || !lastInstallment) {
-        throwHttpError({
-          status: 400,
-          message: 'No fue posible generar la tabla de amortizacion',
-          code: 'BAD_REQUEST',
-        });
-      }
-
       const statusDate = today;
       const firstCollectionDate = formatDateOnly(finalBody.firstCollectionDate);
       const approvedDate = statusDate;
 
+      // -----------------------------------------------------------------------
+      // Billing concept resolution (BEFORE simulation so FINANCED_IN_LOAN can
+      // adjust the principal and amortization includes interest on those amounts)
+      // -----------------------------------------------------------------------
       const productBillingConceptRows = await db.query.creditProductBillingConcepts.findMany({
         where: and(
           eq(creditProductBillingConcepts.creditProductId, existing.creditProductId),
@@ -2079,12 +2007,23 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           });
         }
 
+        const effectiveFrequency = item.overrideFrequency ?? concept.defaultFrequency;
+        const effectiveFinancingMode = item.overrideFinancingMode ?? concept.defaultFinancingMode;
+
+        if (effectiveFinancingMode !== 'BILLED_SEPARATELY' && effectiveFrequency !== 'ONE_TIME') {
+          throwHttpError({
+            status: 400,
+            message: `Concepto "${concept.name}": ${effectiveFinancingMode} solo aplica para frecuencia unica vez`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
         return {
           billingConceptId: item.billingConceptId,
           sourceCreditProductConceptId: item.id,
           sourceRuleId: selectedRule?.id ?? null,
-          frequency: item.overrideFrequency ?? concept.defaultFrequency,
-          financingMode: item.overrideFinancingMode ?? concept.defaultFinancingMode,
+          frequency: effectiveFrequency,
+          financingMode: effectiveFinancingMode,
           glAccountId: item.overrideGlAccountId ?? concept.defaultGlAccountId ?? null,
           calcMethod: concept.calcMethod,
           baseAmount: concept.baseAmount ?? null,
@@ -2097,8 +2036,108 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           maxAmount: concept.maxAmount ?? null,
           roundingMode: concept.roundingMode,
           roundingDecimals: concept.roundingDecimals,
+          computedAmount: null as string | null,
         };
       });
+
+      // -----------------------------------------------------------------------
+      // FINANCED_IN_LOAN: compute amounts and build effectivePrincipal.
+      // These amounts are added to the principal so the amortization schedule
+      // charges interest on them automatically.
+      // -----------------------------------------------------------------------
+      let totalFinancedAmount = 0;
+      for (const snapshot of loanBillingConceptSnapshots) {
+        if (
+          snapshot.financingMode === 'FINANCED_IN_LOAN' &&
+          snapshot.frequency === 'ONE_TIME'
+        ) {
+          const conceptAmount = calculateOneTimeConceptAmount({
+            concept: {
+              calcMethod: snapshot.calcMethod,
+              baseAmount: snapshot.baseAmount,
+              rate: snapshot.rate,
+              amount: snapshot.amount,
+              minAmount: snapshot.minAmount,
+              maxAmount: snapshot.maxAmount,
+              roundingMode: snapshot.roundingMode,
+              roundingDecimals: snapshot.roundingDecimals,
+            },
+            principal: approvedAmount,
+            firstInstallmentAmount: 0, // blocked by validation for FINANCED_IN_LOAN
+          });
+          snapshot.computedAmount = toDecimalString(conceptAmount);
+          totalFinancedAmount = roundMoney(totalFinancedAmount + conceptAmount);
+        }
+      }
+
+      const effectivePrincipal = roundMoney(approvedAmount + totalFinancedAmount);
+
+      // -----------------------------------------------------------------------
+      // Insurance + Simulation (principal includes financed concept amounts)
+      // -----------------------------------------------------------------------
+      const insuranceCalculation = await resolveInsuranceFactor({
+        creditProductId: existing.creditProductId,
+        insuranceCompanyId: existing.insuranceCompanyId,
+        installments: approvedInstallments,
+        requestedAmount: approvedAmount,
+        product,
+      });
+
+      const schedule = calculateCreditSimulation({
+        financingType: product.financingType,
+        principal: effectivePrincipal,
+        annualRatePercent: toNumber(existing.financingFactor),
+        interestRateType: product.interestRateType,
+        interestDayCountConvention: product.interestDayCountConvention,
+        installments: approvedInstallments,
+        firstPaymentDate: finalBody.firstCollectionDate,
+        disbursementDate: new Date(`${today}T00:00:00`),
+        daysInterval: paymentFrequencyIntervalDays,
+        paymentScheduleMode: paymentFrequency.scheduleMode,
+        dayOfMonth: paymentFrequency.dayOfMonth,
+        semiMonthDay1: paymentFrequency.semiMonthDay1,
+        semiMonthDay2: paymentFrequency.semiMonthDay2,
+        useEndOfMonthFallback: paymentFrequency.useEndOfMonthFallback,
+        insuranceAccrualMethod: product.insuranceAccrualMethod,
+        insuranceRatePercent: insuranceCalculation.insuranceRatePercent,
+        insuranceFixedAmount: insuranceCalculation.insuranceFixedAmount,
+        insuranceMinimumAmount: insuranceCalculation.insuranceMinimumAmount,
+      });
+
+      const firstInstallment = schedule.installments[0];
+      const lastInstallment = schedule.installments[schedule.installments.length - 1];
+
+      if (!firstInstallment || !lastInstallment) {
+        throwHttpError({
+          status: 400,
+          message: 'No fue posible generar la tabla de amortizacion',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // Populate computedAmount for remaining ONE_TIME concepts (DISCOUNT,
+      // BILLED_SEPARATELY) — now that we have the schedule with installments.
+      // -----------------------------------------------------------------------
+      for (const snapshot of loanBillingConceptSnapshots) {
+        if (snapshot.frequency === 'ONE_TIME' && !snapshot.computedAmount) {
+          const conceptAmount = calculateOneTimeConceptAmount({
+            concept: {
+              calcMethod: snapshot.calcMethod,
+              baseAmount: snapshot.baseAmount,
+              rate: snapshot.rate,
+              amount: snapshot.amount,
+              minAmount: snapshot.minAmount,
+              maxAmount: snapshot.maxAmount,
+              roundingMode: snapshot.roundingMode,
+              roundingDecimals: snapshot.roundingDecimals,
+            },
+            principal: effectivePrincipal,
+            firstInstallmentAmount: firstInstallment.payment,
+          });
+          snapshot.computedAmount = toDecimalString(conceptAmount);
+        }
+      }
 
       const [updated] = await db.transaction(async (tx) => {
         const stateForApproval = await tx.query.loanApplications.findFirst({
@@ -2197,7 +2236,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             creditStartDate: statusDate,
             maturityDate: lastInstallment.dueDate,
             firstCollectionDate,
-            principalAmount: toDecimalString(approvedAmount),
+            principalAmount: toDecimalString(effectivePrincipal),
             initialTotalAmount: toDecimalString(schedule.summary.totalPayment),
             insuranceCompanyId: existing.insuranceCompanyId,
             insuranceValue: toDecimalString(schedule.summary.totalInsurance),

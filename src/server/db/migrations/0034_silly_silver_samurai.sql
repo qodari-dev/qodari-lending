@@ -1,0 +1,1 @@
+ALTER TABLE "loan_billing_concepts" ADD COLUMN "computed_amount" numeric(14, 2);

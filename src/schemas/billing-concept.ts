@@ -260,6 +260,8 @@ const addBillingConceptValidation = <T extends z.ZodTypeAny>(schema: T) =>
       calcMethod?: BillingConceptCalcMethod;
       baseAmount?: BillingConceptBaseAmount | null;
       rangeMetric?: BillingConceptRangeMetric | null;
+      defaultFrequency?: BillingConceptFrequency;
+      defaultFinancingMode?: BillingConceptFinancingMode;
       minAmount?: string | null;
       maxAmount?: string | null;
       billingConceptRules?: {
@@ -272,6 +274,36 @@ const addBillingConceptValidation = <T extends z.ZodTypeAny>(schema: T) =>
         isActive?: boolean;
       }[];
     };
+
+    // Frequency + FinancingMode combination validation
+    if (data.defaultFrequency && data.defaultFinancingMode) {
+      if (
+        data.defaultFinancingMode !== 'BILLED_SEPARATELY' &&
+        data.defaultFrequency !== 'ONE_TIME'
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `${billingConceptFinancingModeLabels[data.defaultFinancingMode]} solo aplica para frecuencia unica vez`,
+          path: ['defaultFrequency'],
+        });
+        return;
+      }
+    }
+
+    // FINANCED_IN_LOAN cannot use baseAmount values that depend on the simulation (circular)
+    if (
+      data.defaultFinancingMode === 'FINANCED_IN_LOAN' &&
+      data.baseAmount &&
+      (data.baseAmount === 'INSTALLMENT_AMOUNT' || data.baseAmount === 'OUTSTANDING_BALANCE')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'Financiado en credito no permite base "Valor cuota" ni "Saldo" (dependencia circular)',
+        path: ['baseAmount'],
+      });
+      return;
+    }
 
     const rules = data.billingConceptRules ?? [];
     const activeRules = rules.filter((rule) => rule.isActive !== false);

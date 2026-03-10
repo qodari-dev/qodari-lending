@@ -4,6 +4,8 @@ import {
   resolveInsuranceFactorFromRange,
 } from '@/utils/credit-simulation';
 import {
+  billingConceptRules,
+  creditProductBillingConcepts,
   creditProductCategories,
   creditProducts,
   db,
@@ -15,16 +17,18 @@ import {
   thirdParties,
 } from '@/server/db';
 import { getSubsidyWorkerStudy } from '@/server/services/subsidy/subsidy-service';
+import { calculateOneTimeConceptAmount } from '@/server/utils/accounting-utils';
+import { pickApplicableBillingRule } from '@/server/utils/billing-concept-resolver';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
 import { formatCurrency } from '@/utils/formatters';
 import { calculatePaymentCapacity } from '@/utils/payment-capacity';
 import { resolvePaymentFrequencyIntervalDays } from '@/utils/payment-frequency';
 import { getThirdPartyLabel } from '@/utils/third-party';
-import { roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 // ---------------------------------------------------------------------------
@@ -201,9 +205,94 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
 
       const financingFactor = toNumber(category.financingFactor);
 
+      // -----------------------------------------------------------------------
+      // FINANCED_IN_LOAN: resolve concepts and add to principal so the
+      // amortization schedule includes interest on those amounts.
+      // -----------------------------------------------------------------------
+      const productBillingConceptRows = await db.query.creditProductBillingConcepts.findMany({
+        where: and(
+          eq(creditProductBillingConcepts.creditProductId, body.creditProductId),
+          eq(creditProductBillingConcepts.isEnabled, true)
+        ),
+        with: {
+          billingConcept: true,
+          overrideBillingConceptRule: true,
+        },
+      });
+
+      const financedConceptRows = productBillingConceptRows.filter((item) => {
+        if (!item.billingConcept?.isActive) return false;
+        const effectiveMode = item.overrideFinancingMode ?? item.billingConcept.defaultFinancingMode;
+        const effectiveFreq = item.overrideFrequency ?? item.billingConcept.defaultFrequency;
+        return effectiveMode === 'FINANCED_IN_LOAN' && effectiveFreq === 'ONE_TIME';
+      });
+
+      const financedConceptIds = Array.from(
+        new Set(financedConceptRows.map((item) => item.billingConceptId))
+      );
+
+      const financedRules =
+        financedConceptIds.length > 0
+          ? await db.query.billingConceptRules.findMany({
+              where: and(
+                inArray(billingConceptRules.billingConceptId, financedConceptIds),
+                eq(billingConceptRules.isActive, true)
+              ),
+            })
+          : [];
+
+      const asOfDate = formatDateOnly(new Date());
+      let totalFinancedAmount = 0;
+      const financedConcepts: Array<{
+        billingConceptId: number;
+        name: string;
+        amount: number;
+      }> = [];
+
+      for (const item of financedConceptRows) {
+        const concept = item.billingConcept;
+        if (!concept) continue;
+
+        const selectedRule =
+          item.overrideBillingConceptRule ??
+          pickApplicableBillingRule({
+            rules: financedRules,
+            conceptId: item.billingConceptId,
+            asOfDate,
+          });
+
+        if (!selectedRule && !concept.isSystem) continue;
+
+        const conceptAmount = calculateOneTimeConceptAmount({
+          concept: {
+            calcMethod: concept.calcMethod,
+            baseAmount: concept.baseAmount,
+            rate: selectedRule?.rate ?? null,
+            amount: selectedRule?.amount ?? null,
+            minAmount: concept.minAmount,
+            maxAmount: concept.maxAmount,
+            roundingMode: concept.roundingMode,
+            roundingDecimals: concept.roundingDecimals,
+          },
+          principal: body.creditAmount,
+          firstInstallmentAmount: 0, // blocked by validation for FINANCED_IN_LOAN
+        });
+
+        if (conceptAmount > 0) {
+          financedConcepts.push({
+            billingConceptId: concept.id,
+            name: concept.name,
+            amount: conceptAmount,
+          });
+          totalFinancedAmount = roundMoney(totalFinancedAmount + conceptAmount);
+        }
+      }
+
+      const effectivePrincipal = roundMoney(body.creditAmount + totalFinancedAmount);
+
       const calculation = calculateCreditSimulation({
         financingType: product.financingType,
-        principal: body.creditAmount,
+        principal: effectivePrincipal,
         annualRatePercent: financingFactor,
         interestRateType: product.interestRateType,
         interestDayCountConvention: product.interestDayCountConvention,
@@ -250,6 +339,9 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
           },
           summary: calculation.summary,
           installments: calculation.installments,
+          requestedCreditAmount: body.creditAmount,
+          totalFinancedAmount,
+          financedConcepts,
         },
       };
     } catch (e) {

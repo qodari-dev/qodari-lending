@@ -438,6 +438,12 @@ export function LoanInfo({
             { label: 'Fecha estado', value: formatDate(detail.statusDate) },
             { label: 'Cuotas', value: detail.installments },
             { label: 'Capital', value: formatCurrency(detail.principalAmount) },
+            {
+              label: 'Desembolso',
+              value: detail.disbursementAmount
+                ? formatCurrency(detail.disbursementAmount)
+                : '-',
+            },
             { label: 'Total inicial', value: formatCurrency(detail.initialTotalAmount) },
             { label: 'Seguro', value: formatCurrency(detail.insuranceValue) },
           ],

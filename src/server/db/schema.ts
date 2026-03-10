@@ -1503,6 +1503,10 @@ export const loans = pgTable(
       precision: 14,
       scale: 2,
     }).notNull(),
+    disbursementAmount: decimal('disbursement_amount', {
+      precision: 14,
+      scale: 2,
+    }),
 
     // Seguro
     insuranceCompanyId: integer('insurance_company_id').references(() => insuranceCompanies.id, {
@@ -2658,6 +2662,9 @@ export const loanBillingConcepts = pgTable(
     maxAmount: decimal('max_amount', { precision: 14, scale: 2 }),
     roundingMode: billingConceptRoundingModeEnum('rounding_mode').notNull().default('NEAREST'),
     roundingDecimals: integer('rounding_decimals').notNull().default(2),
+
+    /** Pre-computed amount at approval time for ONE_TIME concepts. */
+    computedAmount: decimal('computed_amount', { precision: 14, scale: 2 }),
 
     ...timestamps,
   },

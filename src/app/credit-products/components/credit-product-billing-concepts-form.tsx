@@ -105,6 +105,14 @@ export function CreditProductBillingConceptsForm() {
     control: dialogForm.control,
     name: 'billingConceptId',
   });
+  const watchedOverrideFrequency = useWatch({
+    control: dialogForm.control,
+    name: 'overrideFrequency',
+  });
+  const watchedOverrideFinancingMode = useWatch({
+    control: dialogForm.control,
+    name: 'overrideFinancingMode',
+  });
 
   const { data: billingConceptsData } = useBillingConcepts({
     limit: 1000,
@@ -161,6 +169,59 @@ export function CreditProductBillingConceptsForm() {
         })) ?? []
     );
   }, [selectedBillingConceptId, billingConcepts]);
+
+  // -----------------------------------------------------------------------
+  // Frequency × FinancingMode restriction:
+  // DISCOUNT / FINANCED → only ONE_TIME
+  // MONTHLY / PER_INSTALLMENT → only BILLED_SEPARATELY
+  // -----------------------------------------------------------------------
+  const selectedConcept = useMemo(
+    () => billingConcepts.find((item) => item.id === selectedBillingConceptId) ?? null,
+    [billingConcepts, selectedBillingConceptId]
+  );
+
+  const effectiveFinancingMode =
+    watchedOverrideFinancingMode ?? selectedConcept?.defaultFinancingMode ?? null;
+  const effectiveFrequency =
+    watchedOverrideFrequency ?? selectedConcept?.defaultFrequency ?? null;
+
+  const allowedFrequencyOptions = useMemo(() => {
+    if (
+      effectiveFinancingMode === 'DISCOUNT_FROM_DISBURSEMENT' ||
+      effectiveFinancingMode === 'FINANCED_IN_LOAN'
+    ) {
+      return BILLING_CONCEPT_FREQUENCY_OPTIONS.filter((opt) => opt === 'ONE_TIME');
+    }
+    return [...BILLING_CONCEPT_FREQUENCY_OPTIONS];
+  }, [effectiveFinancingMode]);
+
+  const allowedFinancingModeOptions = useMemo(() => {
+    if (effectiveFrequency === 'MONTHLY' || effectiveFrequency === 'PER_INSTALLMENT') {
+      return BILLING_CONCEPT_FINANCING_MODE_OPTIONS.filter(
+        (opt) => opt === 'BILLED_SEPARATELY'
+      );
+    }
+    return [...BILLING_CONCEPT_FINANCING_MODE_OPTIONS];
+  }, [effectiveFrequency]);
+
+  // Auto-clear override if it became invalid due to the other field changing
+  useEffect(() => {
+    if (
+      watchedOverrideFrequency &&
+      !allowedFrequencyOptions.includes(watchedOverrideFrequency)
+    ) {
+      dialogForm.setValue('overrideFrequency', null, { shouldDirty: true });
+    }
+  }, [dialogForm, watchedOverrideFrequency, allowedFrequencyOptions]);
+
+  useEffect(() => {
+    if (
+      watchedOverrideFinancingMode &&
+      !allowedFinancingModeOptions.includes(watchedOverrideFinancingMode)
+    ) {
+      dialogForm.setValue('overrideFinancingMode', null, { shouldDirty: true });
+    }
+  }, [dialogForm, watchedOverrideFinancingMode, allowedFinancingModeOptions]);
 
   useEffect(() => {
     const currentRuleId = dialogForm.getValues('overrideRuleId');
@@ -327,7 +388,7 @@ export function CreditProductBillingConceptsForm() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={NONE_VALUE}>Sin override</SelectItem>
-                        {BILLING_CONCEPT_FREQUENCY_OPTIONS.map((option) => (
+                        {allowedFrequencyOptions.map((option) => (
                           <SelectItem key={option} value={option}>
                             {billingConceptFrequencyLabels[option]}
                           </SelectItem>
@@ -356,7 +417,7 @@ export function CreditProductBillingConceptsForm() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={NONE_VALUE}>Sin override</SelectItem>
-                        {BILLING_CONCEPT_FINANCING_MODE_OPTIONS.map((option) => (
+                        {allowedFinancingModeOptions.map((option) => (
                           <SelectItem key={option} value={option}>
                             {billingConceptFinancingModeLabels[option]}
                           </SelectItem>

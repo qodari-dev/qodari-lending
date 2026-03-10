@@ -2169,8 +2169,24 @@ export const loan = tsr.router(contract.loan, {
           billingConcept: true,
         },
       });
+      // ONE_TIME BILLED_SEPARATELY: chargeable entries (DEBIT cartera + CREDIT concept GL)
+      const oneTimeBilledSeparatelyConcepts = loanConceptSnapshots.filter(
+        (item) =>
+          item.frequency === 'ONE_TIME' &&
+          item.financingMode === 'BILLED_SEPARATELY'
+      );
+      // ONE_TIME FINANCED_IN_LOAN: adjustment entries (DEBIT credit-lines + CREDIT concept GL)
+      // Amount is already included in principalAmount; these entries reverse the bank credit.
       const oneTimeFinancedConcepts = loanConceptSnapshots.filter(
-        (item) => item.frequency === 'ONE_TIME' && item.financingMode === 'FINANCED_IN_LOAN'
+        (item) =>
+          item.frequency === 'ONE_TIME' &&
+          item.financingMode === 'FINANCED_IN_LOAN'
+      );
+      // ONE_TIME DISCOUNT_FROM_DISBURSEMENT: adjustment entries (DEBIT credit-lines + CREDIT concept GL)
+      const oneTimeDiscountConcepts = loanConceptSnapshots.filter(
+        (item) =>
+          item.frequency === 'ONE_TIME' &&
+          item.financingMode === 'DISCOUNT_FROM_DISBURSEMENT'
       );
 
       const documentCode = buildLiquidationDocumentCode(existingLoan.id);
@@ -2184,6 +2200,106 @@ export const loan = tsr.router(contract.loan, {
           toNumber(firstInstallment.insuranceAmount)
         : 0;
       let oneTimeConceptAmountTotal = 0;
+
+      // Pre-calculate discount-from-disbursement amounts (needed for disbursementAmount)
+      let totalDiscountAmount = 0;
+      const discountConceptAmounts: Array<{
+        concept: (typeof oneTimeDiscountConcepts)[number];
+        amount: number;
+      }> = [];
+
+      for (const concept of oneTimeDiscountConcepts) {
+        if (!concept.glAccountId) {
+          throwHttpError({
+            status: 400,
+            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name} no tiene auxiliar configurado para liquidacion`,
+            code: 'BAD_REQUEST',
+          });
+        }
+        if (concept.glAccount?.detailType === 'RECEIVABLE') {
+          throwHttpError({
+            status: 400,
+            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name}: descontar de desembolso no puede usar una cuenta de cartera`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        const conceptAmount = calculateOneTimeConceptAmount({
+          concept: {
+            calcMethod: concept.calcMethod,
+            baseAmount: concept.baseAmount,
+            rate: concept.rate,
+            amount: concept.amount,
+            minAmount: concept.minAmount,
+            maxAmount: concept.maxAmount,
+            roundingMode: concept.roundingMode,
+            roundingDecimals: concept.roundingDecimals,
+          },
+          principal: principalAmount,
+          firstInstallmentAmount,
+        });
+
+        if (conceptAmount > 0) {
+          discountConceptAmounts.push({ concept, amount: conceptAmount });
+          totalDiscountAmount = roundMoney(totalDiscountAmount + conceptAmount);
+        }
+      }
+
+      // Pre-calculate financed-in-loan amounts (use computedAmount from approval snapshot)
+      let totalFinancedAmount = 0;
+      const financedConceptAmounts: Array<{
+        concept: (typeof oneTimeFinancedConcepts)[number];
+        amount: number;
+      }> = [];
+
+      for (const concept of oneTimeFinancedConcepts) {
+        if (!concept.glAccountId) {
+          throwHttpError({
+            status: 400,
+            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name} no tiene auxiliar configurado para liquidacion`,
+            code: 'BAD_REQUEST',
+          });
+        }
+        if (concept.glAccount?.detailType === 'RECEIVABLE') {
+          throwHttpError({
+            status: 400,
+            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name}: financiado en credito no puede usar una cuenta de cartera`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        // Use pre-computed amount from approval; fall back to recalculation if missing
+        const conceptAmount = concept.computedAmount
+          ? toNumber(concept.computedAmount)
+          : calculateOneTimeConceptAmount({
+              concept: {
+                calcMethod: concept.calcMethod,
+                baseAmount: concept.baseAmount,
+                rate: concept.rate,
+                amount: concept.amount,
+                minAmount: concept.minAmount,
+                maxAmount: concept.maxAmount,
+                roundingMode: concept.roundingMode,
+                roundingDecimals: concept.roundingDecimals,
+              },
+              principal: principalAmount,
+              firstInstallmentAmount,
+            });
+
+        if (conceptAmount > 0) {
+          financedConceptAmounts.push({ concept, amount: conceptAmount });
+          totalFinancedAmount = roundMoney(totalFinancedAmount + conceptAmount);
+        }
+      }
+
+      const disbursementAmount = roundMoney(principalAmount - totalFinancedAmount - totalDiscountAmount);
+      if (disbursementAmount <= 0) {
+        throwHttpError({
+          status: 400,
+          message: 'El monto a desembolsar no puede ser cero o negativo despues de descontar conceptos',
+          code: 'BAD_REQUEST',
+        });
+      }
 
       let sequence = 1;
       const accountingEntriesPayload: Array<typeof accountingEntries.$inferInsert> = [];
@@ -2289,7 +2405,144 @@ export const loan = tsr.router(contract.loan, {
         }
       }
 
-      for (const concept of oneTimeFinancedConcepts) {
+      // DISCOUNT_FROM_DISBURSEMENT: adjustment entries (DEBIT credit-lines + CREDIT concept GL)
+      for (const { concept, amount: conceptAmount } of discountConceptAmounts) {
+        oneTimeConceptAmountTotal = roundMoney(oneTimeConceptAmountTotal + conceptAmount);
+
+        // DEBIT to credit distribution lines (reverses part of bank/disbursement credit)
+        const reversalAmounts = allocateAmountByPercentage({
+          totalAmount: conceptAmount,
+          lines: creditLines,
+        });
+
+        for (const line of creditLines) {
+          const lineAmount = reversalAmounts.get(line.id) ?? 0;
+          if (lineAmount <= 0) continue;
+
+          accountingEntriesPayload.push({
+            processType: 'CREDIT',
+            documentCode,
+            sequence,
+            entryDate,
+            glAccountId: line.glAccountId,
+            costCenterId: existingLoan.costCenterId ?? null,
+            thirdPartyId: existingLoan.thirdPartyId,
+            description:
+              `Descuento desembolso concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
+                0,
+                255
+              ),
+            nature: 'DEBIT',
+            amount: toDecimalString(lineAmount),
+            loanId: existingLoan.id,
+            installmentNumber: firstInstallment?.installmentNumber ?? 1,
+            dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
+            status: 'DRAFT',
+            statusDate: entryDate,
+            sourceType: 'LOAN_APPROVAL',
+            sourceId: String(existingLoan.id),
+          });
+          sequence += 1;
+        }
+
+        // CREDIT to concept GL account (fee/income recognition)
+        accountingEntriesPayload.push({
+          processType: 'CREDIT',
+          documentCode,
+          sequence,
+          entryDate,
+          glAccountId: concept.glAccountId!,
+          costCenterId: existingLoan.costCenterId ?? null,
+          thirdPartyId: existingLoan.thirdPartyId,
+          description:
+            `Descuento desembolso concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
+              0,
+              255
+            ),
+          nature: 'CREDIT',
+          amount: toDecimalString(conceptAmount),
+          loanId: existingLoan.id,
+          installmentNumber: firstInstallment?.installmentNumber ?? 1,
+          dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
+          status: 'DRAFT',
+          statusDate: entryDate,
+          sourceType: 'LOAN_APPROVAL',
+          sourceId: String(existingLoan.id),
+        });
+        sequence += 1;
+      }
+
+      // FINANCED_IN_LOAN: adjustment entries (DEBIT credit-lines + CREDIT concept GL)
+      // Amount is already included in principalAmount; these entries reverse the bank credit
+      // portion so the net bank outflow equals disbursementAmount.
+      for (const { concept, amount: conceptAmount } of financedConceptAmounts) {
+        oneTimeConceptAmountTotal = roundMoney(oneTimeConceptAmountTotal + conceptAmount);
+
+        // DEBIT to credit distribution lines (reverses part of bank/disbursement credit)
+        const reversalAmounts = allocateAmountByPercentage({
+          totalAmount: conceptAmount,
+          lines: creditLines,
+        });
+
+        for (const line of creditLines) {
+          const lineAmount = reversalAmounts.get(line.id) ?? 0;
+          if (lineAmount <= 0) continue;
+
+          accountingEntriesPayload.push({
+            processType: 'CREDIT',
+            documentCode,
+            sequence,
+            entryDate,
+            glAccountId: line.glAccountId,
+            costCenterId: existingLoan.costCenterId ?? null,
+            thirdPartyId: existingLoan.thirdPartyId,
+            description:
+              `Financiado en credito concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
+                0,
+                255
+              ),
+            nature: 'DEBIT',
+            amount: toDecimalString(lineAmount),
+            loanId: existingLoan.id,
+            installmentNumber: firstInstallment?.installmentNumber ?? 1,
+            dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
+            status: 'DRAFT',
+            statusDate: entryDate,
+            sourceType: 'LOAN_APPROVAL',
+            sourceId: String(existingLoan.id),
+          });
+          sequence += 1;
+        }
+
+        // CREDIT to concept GL account (fee/income recognition)
+        accountingEntriesPayload.push({
+          processType: 'CREDIT',
+          documentCode,
+          sequence,
+          entryDate,
+          glAccountId: concept.glAccountId!,
+          costCenterId: existingLoan.costCenterId ?? null,
+          thirdPartyId: existingLoan.thirdPartyId,
+          description:
+            `Financiado en credito concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
+              0,
+              255
+            ),
+          nature: 'CREDIT',
+          amount: toDecimalString(conceptAmount),
+          loanId: existingLoan.id,
+          installmentNumber: firstInstallment?.installmentNumber ?? 1,
+          dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
+          status: 'DRAFT',
+          statusDate: entryDate,
+          sourceType: 'LOAN_APPROVAL',
+          sourceId: String(existingLoan.id),
+        });
+        sequence += 1;
+      }
+
+      // BILLED_SEPARATELY: chargeable entries (DEBIT cartera + CREDIT concept GL)
+      for (const concept of oneTimeBilledSeparatelyConcepts) {
         if (!concept.glAccountId) {
           throwHttpError({
             status: 400,
@@ -2305,20 +2558,23 @@ export const loan = tsr.router(contract.loan, {
           });
         }
 
-        const conceptAmount = calculateOneTimeConceptAmount({
-          concept: {
-            calcMethod: concept.calcMethod,
-            baseAmount: concept.baseAmount,
-            rate: concept.rate,
-            amount: concept.amount,
-            minAmount: concept.minAmount,
-            maxAmount: concept.maxAmount,
-            roundingMode: concept.roundingMode,
-            roundingDecimals: concept.roundingDecimals,
-          },
-          principal: principalAmount,
-          firstInstallmentAmount,
-        });
+        // Use pre-computed amount from approval; fall back to recalculation if missing
+        const conceptAmount = concept.computedAmount
+          ? toNumber(concept.computedAmount)
+          : calculateOneTimeConceptAmount({
+              concept: {
+                calcMethod: concept.calcMethod,
+                baseAmount: concept.baseAmount,
+                rate: concept.rate,
+                amount: concept.amount,
+                minAmount: concept.minAmount,
+                maxAmount: concept.maxAmount,
+                roundingMode: concept.roundingMode,
+                roundingDecimals: concept.roundingDecimals,
+              },
+              principal: principalAmount,
+              firstInstallmentAmount,
+            });
 
         if (conceptAmount <= 0) continue;
         oneTimeConceptAmountTotal = roundMoney(oneTimeConceptAmountTotal + conceptAmount);
@@ -2470,6 +2726,7 @@ export const loan = tsr.router(contract.loan, {
           .set({
             status: 'ACTIVE',
             disbursementStatus: 'LIQUIDATED',
+            disbursementAmount: toDecimalString(disbursementAmount),
             statusDate: entryDate,
             statusChangedByUserId: userId,
             statusChangedByUserName: userName || userId,
@@ -2495,8 +2752,13 @@ export const loan = tsr.router(contract.loan, {
           metadata: {
             accountingDocumentCode: documentCode,
             entriesGenerated: accountingEntriesPayload.length,
-            oneTimeConceptsCount: oneTimeFinancedConcepts.length,
+            oneTimeBilledSeparatelyConceptsCount: oneTimeBilledSeparatelyConcepts.length,
+            oneTimeFinancedConceptsCount: oneTimeFinancedConcepts.length,
+            oneTimeDiscountConceptsCount: oneTimeDiscountConcepts.length,
             oneTimeConceptsAmount: toDecimalString(oneTimeConceptAmountTotal),
+            disbursementAmount: toDecimalString(disbursementAmount),
+            totalFinancedAmount: toDecimalString(totalFinancedAmount),
+            totalDiscountAmount: toDecimalString(totalDiscountAmount),
           },
         });
 
@@ -2516,8 +2778,13 @@ export const loan = tsr.router(contract.loan, {
         metadata: {
           accountingDocumentCode: documentCode,
           entriesGenerated: accountingEntriesPayload.length,
-          oneTimeConceptsCount: oneTimeFinancedConcepts.length,
+          oneTimeBilledSeparatelyConceptsCount: oneTimeBilledSeparatelyConcepts.length,
+          oneTimeFinancedConceptsCount: oneTimeFinancedConcepts.length,
+          oneTimeDiscountConceptsCount: oneTimeDiscountConcepts.length,
           oneTimeConceptsAmount: toDecimalString(oneTimeConceptAmountTotal),
+          disbursementAmount: toDecimalString(disbursementAmount),
+          totalFinancedAmount: toDecimalString(totalFinancedAmount),
+          totalDiscountAmount: toDecimalString(totalDiscountAmount),
           portfolioRows: portfolioDelta.size,
         },
         ipAddress,

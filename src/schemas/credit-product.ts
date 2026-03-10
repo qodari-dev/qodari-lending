@@ -341,6 +341,12 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
       creditProductAccounts?: unknown[];
       creditProductBillingConcepts?: {
         billingConceptId: number;
+        overrideFrequency?: 'ONE_TIME' | 'MONTHLY' | 'PER_INSTALLMENT' | null;
+        overrideFinancingMode?:
+          | 'DISCOUNT_FROM_DISBURSEMENT'
+          | 'FINANCED_IN_LOAN'
+          | 'BILLED_SEPARATELY'
+          | null;
       }[];
     };
 
@@ -469,6 +475,22 @@ const addCreditProductValidation = <T extends z.ZodTypeAny>(schema: T) =>
         break;
       }
       billingConceptIds.add(concept.billingConceptId);
+
+      // Validate override frequency + financingMode combination
+      if (concept.overrideFrequency && concept.overrideFinancingMode) {
+        if (
+          concept.overrideFinancingMode !== 'BILLED_SEPARATELY' &&
+          concept.overrideFrequency !== 'ONE_TIME'
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              'Descontar de desembolso y Financiado en credito solo aplican para frecuencia unica vez',
+            path: ['creditProductBillingConcepts'],
+          });
+          break;
+        }
+      }
     }
 
     const policy = data.creditProductRefinancePolicy;

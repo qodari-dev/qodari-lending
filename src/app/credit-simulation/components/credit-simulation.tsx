@@ -625,6 +625,48 @@ export function CreditSimulation() {
                         value={formatCurrency(result.summary.maxInstallmentPayment)}
                       />
                     </div>
+
+                    {result.financedConcepts.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                          Conceptos financiados en credito
+                        </p>
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Concepto</TableHead>
+                                <TableHead className="text-right">Valor</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {result.financedConcepts.map((item) => (
+                                <TableRow key={item.billingConceptId}>
+                                  <TableCell>{item.name}</TableCell>
+                                  <TableCell className="text-right">
+                                    {formatCurrency(item.amount)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              <TableRow className="font-semibold">
+                                <TableCell>Total financiado</TableCell>
+                                <TableCell className="text-right">
+                                  {formatCurrency(result.totalFinancedAmount)}
+                                </TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <div className="text-muted-foreground flex items-start gap-1.5 text-xs">
+                          <Info className="mt-0.5 h-3 w-3 shrink-0" />
+                          <span>
+                            Monto solicitado: {formatCurrency(result.requestedCreditAmount)}.
+                            Capital total (incluye financiados):{' '}
+                            {formatCurrency(result.summary.principal)}.
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-muted-foreground text-sm">

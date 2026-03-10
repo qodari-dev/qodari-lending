@@ -57,6 +57,12 @@ export const CreditSimulationCapacitySchema = z.object({
   warningMessage: z.string().nullable(),
 });
 
+export const FinancedConceptSummarySchema = z.object({
+  billingConceptId: z.number().int().positive(),
+  name: z.string(),
+  amount: z.number().nonnegative(),
+});
+
 export const CalculateCreditSimulationResponseSchema = z.object({
   financingType: z.enum(FINANCING_TYPE_OPTIONS),
   financingFactor: z.number(),
@@ -65,6 +71,12 @@ export const CalculateCreditSimulationResponseSchema = z.object({
   capacity: CreditSimulationCapacitySchema,
   summary: CreditSimulationSummarySchema,
   installments: z.array(CreditSimulationInstallmentSchema),
+  /** Original credit amount requested (before adding financed concepts). */
+  requestedCreditAmount: z.number().nonnegative(),
+  /** Total amount of FINANCED_IN_LOAN concepts added to the principal. */
+  totalFinancedAmount: z.number().nonnegative(),
+  /** Breakdown of each FINANCED_IN_LOAN concept included in the principal. */
+  financedConcepts: z.array(FinancedConceptSummarySchema),
 });
 
 export const WorkerStudyContributionSchema = z.object({

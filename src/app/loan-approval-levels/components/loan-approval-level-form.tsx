@@ -102,7 +102,7 @@ export function LoanApprovalLevelForm({
     defaultValues: {
       userId: undefined,
       userName: '',
-      sortOrder: 0,
+      sortOrder: 1,
       isActive: true,
     },
   });
@@ -138,7 +138,7 @@ export function LoanApprovalLevelForm({
       userDialogForm.reset({
         userId: undefined,
         userName: '',
-        sortOrder: 0,
+        sortOrder: 1,
         isActive: true,
       });
       setEditingIndex(null);
@@ -149,7 +149,7 @@ export function LoanApprovalLevelForm({
     userDialogForm.reset({
       userId: undefined,
       userName: '',
-      sortOrder: fields.length,
+      sortOrder: fields.length + 1,
       isActive: true,
     });
     setEditingIndex(null);
@@ -392,9 +392,15 @@ export function LoanApprovalLevelForm({
                         <Input
                           id="sortOrder"
                           type="number"
-                          min={0}
-                          value={field.value ?? 0}
-                          onChange={(event) => field.onChange(Number(event.target.value || 0))}
+                          min={1}
+                          value={field.value ?? ''}
+                          onChange={(event) =>
+                            field.onChange(
+                              event.target.value === ''
+                                ? undefined
+                                : Number(event.target.value)
+                            )
+                          }
                           aria-invalid={fieldState.invalid}
                         />
                         {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}

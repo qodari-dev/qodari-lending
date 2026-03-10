@@ -70,10 +70,27 @@ function normalizePayload(
     users: payload.users?.map((user) => ({
       ...user,
       userName: user.userName.trim(),
-      sortOrder: user.sortOrder ?? 0,
+      sortOrder: user.sortOrder ?? 1,
       isActive: user.isActive ?? true,
     })),
   };
+}
+
+async function ensureUniqueLevelOrder(candidateId: number | null, levelOrder: number) {
+  const existing = await db.query.loanApprovalLevels.findFirst({
+    where: eq(loanApprovalLevels.levelOrder, levelOrder),
+    columns: {
+      id: true,
+    },
+  });
+
+  if (existing && existing.id !== candidateId) {
+    throwHttpError({
+      status: 400,
+      message: 'Ya existe otro nivel con ese orden. Debe usar un orden diferente.',
+      code: 'BAD_REQUEST',
+    });
+  }
 }
 
 async function ensureNoAmountOrderConflict(
@@ -257,6 +274,7 @@ export const loanApprovalLevel = tsr.router(contract.loanApprovalLevel, {
         });
       }
 
+      await ensureUniqueLevelOrder(null, payload.levelOrder!);
       await ensureNoAmountOrderConflict(null, {
         levelOrder: payload.levelOrder!,
         isActive: payload.isActive ?? true,
@@ -379,6 +397,7 @@ export const loanApprovalLevel = tsr.router(contract.loanApprovalLevel, {
             : payload.maxApprovalAmount,
       };
 
+      await ensureUniqueLevelOrder(id, nextState.levelOrder);
       await ensureNoAmountOrderConflict(id, nextState);
 
       const nextUsers = payload.users ?? existing.users;

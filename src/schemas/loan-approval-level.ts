@@ -56,7 +56,7 @@ function isValidDecimal(value: string | null | undefined): boolean {
 export const LoanApprovalLevelUserInputSchema = z.object({
   userId: z.uuid(),
   userName: z.string().min(1).max(255),
-  sortOrder: z.number().int().min(0).default(0),
+  sortOrder: z.number().int().min(1, 'El orden del usuario debe ser mayor o igual a 1').default(1),
   isActive: z.boolean().default(true),
 });
 

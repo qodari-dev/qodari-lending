@@ -261,23 +261,43 @@ export function CreditProductInfo({
 
   return (
     <Sheet open={opened} onOpenChange={(open) => onOpened(open)}>
-      <SheetContent className="overflow-y-scroll sm:max-w-4xl">
+      <SheetContent className="w-[calc(100vw-2rem)] overflow-y-scroll sm:max-w-6xl">
         <SheetHeader>
           <SheetTitle>Informacion</SheetTitle>
         </SheetHeader>
         <div className="px-4">
           <Tabs defaultValue="product" className="w-full">
-            <TabsList className="mb-4 w-full justify-start overflow-x-auto">
-              <TabsTrigger value="product">Producto</TabsTrigger>
-              <TabsTrigger value="categories">Categorias</TabsTrigger>
-              <TabsTrigger value="lateRules">Reglas mora</TabsTrigger>
-              <TabsTrigger value="documents">Documentos</TabsTrigger>
-              <TabsTrigger value="documentRules">Plantillas firma</TabsTrigger>
-              <TabsTrigger value="accounts">Cuentas</TabsTrigger>
-              <TabsTrigger value="billingConcepts">Conceptos</TabsTrigger>
-              <TabsTrigger value="refinance">Refinanciacion</TabsTrigger>
-              <TabsTrigger value="chargeOff">Castigo cartera</TabsTrigger>
-            </TabsList>
+            <div className="sticky top-0 z-10 -mx-4 mb-4 overflow-x-auto bg-background px-4 pb-2">
+              <TabsList variant="line" className="inline-flex min-w-max justify-start gap-2">
+                <TabsTrigger className="flex-none" value="product">
+                  Producto
+                </TabsTrigger>
+                <TabsTrigger className="flex-none" value="categories">
+                  Categorias
+                </TabsTrigger>
+                <TabsTrigger className="flex-none" value="lateRules">
+                  Reglas mora
+                </TabsTrigger>
+                <TabsTrigger className="flex-none" value="documents">
+                  Documentos
+                </TabsTrigger>
+                <TabsTrigger className="flex-none" value="documentRules">
+                  Plantillas firma
+                </TabsTrigger>
+                <TabsTrigger className="flex-none" value="accounts">
+                  Cuentas
+                </TabsTrigger>
+                <TabsTrigger className="flex-none" value="billingConcepts">
+                  Conceptos
+                </TabsTrigger>
+                <TabsTrigger className="flex-none" value="refinance">
+                  Refinanciacion
+                </TabsTrigger>
+                <TabsTrigger className="flex-none" value="chargeOff">
+                  Castigo cartera
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="product">
               <DescriptionList sections={sections} columns={2} />

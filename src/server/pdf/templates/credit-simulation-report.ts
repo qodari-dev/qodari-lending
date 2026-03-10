@@ -15,6 +15,7 @@ export type CreditSimulationPdfData = z.infer<typeof CalculateCreditSimulationRe
 };
 
 type InstallmentRow = CreditSimulationPdfData['installments'][number];
+type FinancedConceptRow = CreditSimulationPdfData['financedConcepts'][number];
 
 const columns: TableColumn<InstallmentRow>[] = [
   { header: 'Cuota', width: '7%', getValue: (r) => String(r.installmentNumber) },
@@ -58,6 +59,20 @@ const columns: TableColumn<InstallmentRow>[] = [
   },
 ];
 
+const financedConceptColumns: TableColumn<FinancedConceptRow>[] = [
+  {
+    header: 'Concepto',
+    width: '70%',
+    getValue: (r) => r.name,
+  },
+  {
+    header: 'Valor',
+    width: '30%',
+    textAlign: 'right',
+    getValue: (r) => formatCurrency(r.amount),
+  },
+];
+
 export const creditSimulationReportTemplate: PdfTemplateBuilder<CreditSimulationPdfData> = (
   data,
   rpdf,
@@ -97,6 +112,29 @@ export const creditSimulationReportTemplate: PdfTemplateBuilder<CreditSimulation
         { label: 'Cuota minima', value: formatCurrency(summary.minInstallmentPayment) },
         { label: 'Capacidad de pago', value: formatCurrency(data.capacity.paymentCapacity) },
       ]),
+
+      ...(data.financedConcepts.length > 0
+        ? [
+            h(
+              Text,
+              { style: styles.sectionTitle, key: 'sec-financed-concepts' },
+              'Conceptos financiados en credito',
+            ),
+            PdfTable(rpdf, styles, {
+              columns: financedConceptColumns,
+              rows: data.financedConcepts,
+              emptyMessage: 'Sin conceptos financiados.',
+              keyExtractor: (r) => `financed-${r.billingConceptId}`,
+              tableKey: 'financed-concepts',
+              footerValues: ['Total financiado', formatCurrency(data.totalFinancedAmount)],
+            }),
+            h(
+              Text,
+              { style: styles.small, key: 'financed-concepts-note' },
+              `Monto solicitado: ${formatCurrency(data.requestedCreditAmount)}. Capital total (incluye financiados): ${formatCurrency(summary.principal)}.`,
+            ),
+          ]
+        : []),
 
       h(
         Text,

@@ -335,7 +335,10 @@ export function CreditProductForm({
 
   return (
     <Sheet open={opened} onOpenChange={onOpened}>
-      <SheetContent ref={sheetContentRef} className="overflow-y-scroll sm:max-w-4xl">
+      <SheetContent
+        ref={sheetContentRef}
+        className="w-[calc(100vw-2rem)] overflow-y-scroll sm:max-w-6xl"
+      >
         <SheetHeader>
           <SheetTitle>
             {creditProduct ? 'Editar Tipo de Credito' : 'Nuevo Tipo de Credito'}
@@ -348,17 +351,37 @@ export function CreditProductForm({
         <FormProvider {...form}>
           <form id={formId} onSubmit={form.handleSubmit(onSubmit, onSubmitError)} className="px-4">
             <Tabs defaultValue="product" className="w-full">
-              <TabsList className="mb-4 w-full">
-                <TabsTrigger value="product">Producto</TabsTrigger>
-                <TabsTrigger value="categories">Categorias</TabsTrigger>
-                <TabsTrigger value="lateInterestRules">Reglas mora</TabsTrigger>
-                <TabsTrigger value="requiredDocuments">Documentos</TabsTrigger>
-                <TabsTrigger value="documentRules">Plantillas firma</TabsTrigger>
-                <TabsTrigger value="refinancePolicy">Refinanciacion</TabsTrigger>
-                <TabsTrigger value="chargeOffPolicy">Castigo cartera</TabsTrigger>
-                <TabsTrigger value="accounts">Cuentas</TabsTrigger>
-                <TabsTrigger value="billingConcepts">Conceptos</TabsTrigger>
-              </TabsList>
+              <div className="sticky top-0 z-10 -mx-4 mb-4 overflow-x-auto bg-background px-4 pb-2">
+                <TabsList variant="line" className="inline-flex min-w-max justify-start gap-2">
+                  <TabsTrigger className="flex-none" value="product">
+                    Producto
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-none" value="categories">
+                    Categorias
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-none" value="lateInterestRules">
+                    Reglas mora
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-none" value="requiredDocuments">
+                    Documentos
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-none" value="documentRules">
+                    Plantillas firma
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-none" value="refinancePolicy">
+                    Refinanciacion
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-none" value="chargeOffPolicy">
+                    Castigo cartera
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-none" value="accounts">
+                    Cuentas
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-none" value="billingConcepts">
+                    Conceptos
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="product" className="space-y-4 pt-2">
                 <FieldGroup>

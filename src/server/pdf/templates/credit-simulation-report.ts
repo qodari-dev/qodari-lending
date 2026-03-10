@@ -11,6 +11,7 @@ const h = React.createElement;
 
 export type CreditSimulationPdfData = z.infer<typeof CalculateCreditSimulationResponseSchema> & {
   printDate: string;
+  companyName?: string;
 };
 
 type InstallmentRow = CreditSimulationPdfData['installments'][number];
@@ -74,9 +75,9 @@ export const creditSimulationReportTemplate: PdfTemplateBuilder<CreditSimulation
 
   return PageShell(rpdf, {
     styles,
+    headerTitle: 'Simulacion de credito',
+    companyName: data.companyName,
     children: [
-      h(Text, { style: styles.title, key: 'title' }, 'SIMULACION DE CREDITO'),
-
       h(Text, { style: styles.sectionTitle, key: 'sec-params' }, 'Parametros'),
       ...MetaLines(rpdf, styles, [
         { label: 'Tipo de financiamiento', value: financingTypeLabels[data.financingType] },
@@ -123,12 +124,7 @@ export const creditSimulationReportTemplate: PdfTemplateBuilder<CreditSimulation
 
       h(
         Text,
-        { style: { ...styles.small, marginTop: 20 }, key: 'print-date' },
-        `Fecha de generacion: ${formatDate(data.printDate)}`,
-      ),
-      h(
-        Text,
-        { style: styles.small, key: 'disclaimer' },
+        { style: { ...styles.small, marginTop: 20 }, key: 'disclaimer' },
         'Este documento es una simulacion y no constituye una oferta de credito.',
       ),
     ],

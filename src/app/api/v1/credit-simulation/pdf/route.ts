@@ -5,6 +5,7 @@ import {
   creditSimulationReportTemplate,
   type CreditSimulationPdfData,
 } from '@/server/pdf/templates/credit-simulation-report';
+import { getReportCompanyName } from '@/server/utils/credits-settings-helpers';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,12 +24,16 @@ export async function POST(request: NextRequest) {
   try {
     await getAuthContextAndValidatePermission(request, metadata);
 
-    const raw = await request.json();
+    const [raw, companyName] = await Promise.all([
+      request.json(),
+      getReportCompanyName(),
+    ]);
     const parsed = CalculateCreditSimulationResponseSchema.parse(raw);
 
     const pdfData: CreditSimulationPdfData = {
       ...parsed,
       printDate: new Date().toISOString(),
+      companyName,
     };
 
     return await renderTemplate(pdfData, creditSimulationReportTemplate, 'simulacion-de-credito');

@@ -31,7 +31,10 @@ export const pdfSpacing = {
 export function createBaseStyles(rpdf: ReactPdfModule) {
   return rpdf.StyleSheet.create({
     page: {
-      padding: pdfSpacing.page,
+      paddingTop: pdfSpacing.page,
+      paddingLeft: pdfSpacing.page,
+      paddingRight: pdfSpacing.page,
+      paddingBottom: pdfSpacing.page + 24,
       fontSize: pdfFontSizes.body,
       color: pdfColors.text,
     },
@@ -152,8 +155,37 @@ export function createBaseStyles(rpdf: ReactPdfModule) {
       borderBottomColor: pdfColors.border,
     },
     logoImage: {
-      width: 56,
-      height: 56,
+      width: 40,
+      height: 40,
+    },
+    headerTitleGroup: {
+      marginLeft: 10,
+      justifyContent: 'center',
+    },
+    headerTitleText: {
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
+    headerSubtitleText: {
+      fontSize: pdfFontSizes.small,
+      color: pdfColors.muted,
+      marginTop: 1,
+    },
+    // -- Page footer --
+    pageFooter: {
+      position: 'absolute',
+      bottom: pdfSpacing.page,
+      left: pdfSpacing.page,
+      right: pdfSpacing.page,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      borderTopWidth: 1,
+      borderTopColor: pdfColors.border,
+      paddingTop: 6,
+    },
+    pageFooterText: {
+      fontSize: 8,
+      color: pdfColors.muted,
     },
   });
 }

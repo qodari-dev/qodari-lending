@@ -7,6 +7,10 @@ import { PageShell, MetaLines, SummaryGrid, PdfTable, TableColumn } from '../com
 
 const h = React.createElement;
 
+export type CreditExtractPdfData = CreditExtractReportResponse & {
+  companyName?: string;
+};
+
 const movementColumns: TableColumn<CreditExtractReportResponse['clientStatement']['movements'][number]>[] = [
   {
     header: 'Fecha',
@@ -50,7 +54,7 @@ const movementColumns: TableColumn<CreditExtractReportResponse['clientStatement'
   },
 ];
 
-export const creditExtractTemplate: PdfTemplateBuilder<CreditExtractReportResponse> = (
+export const creditExtractTemplate: PdfTemplateBuilder<CreditExtractPdfData> = (
   data,
   rpdf,
 ) => {
@@ -59,14 +63,14 @@ export const creditExtractTemplate: PdfTemplateBuilder<CreditExtractReportRespon
 
   return PageShell(rpdf, {
     styles,
+    headerTitle: 'Extracto de credito',
+    companyName: data.companyName,
     children: [
-      h(Text, { style: styles.title, key: 'title' }, 'Extracto de credito'),
       ...MetaLines(rpdf, styles, [
         { label: 'Credito', value: data.loan.creditNumber },
         { label: 'Titular', value: data.loan.borrowerName },
         { label: 'Documento', value: data.loan.borrowerDocumentNumber ?? '-' },
         { label: 'Estado', value: data.loan.status },
-        { label: 'Generado', value: formatDate(data.generatedAt) },
         { label: 'Oficina', value: data.loan.affiliationOfficeName ?? '-' },
         { label: 'Convenio', value: data.loan.agreementLabel ?? '-' },
       ]),

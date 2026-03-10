@@ -1,7 +1,7 @@
 import React from 'react';
 import type { PdfTemplateBuilder } from '../types';
 import { createBaseStyles } from '../theme';
-import { formatCurrency, formatDate, formatDateTime, formatNumber } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatNumber } from '@/utils/formatters';
 import { PageShell, MetaLines, SummaryGrid, PdfTable, type TableColumn } from '../components';
 import { WorkerStudyResponseSchema } from '@/schemas/credit-simulation';
 import {
@@ -18,7 +18,9 @@ import type { z } from 'zod';
 
 const h = React.createElement;
 
-export type WorkerStudyPdfData = z.infer<typeof WorkerStudyResponseSchema>;
+export type WorkerStudyPdfData = z.infer<typeof WorkerStudyResponseSchema> & {
+  companyName?: string;
+};
 
 type Contribution = WorkerStudyPdfData['contributions'][number];
 type CompanyHistory = WorkerStudyPdfData['companyHistory'][number];
@@ -150,9 +152,9 @@ export const workerStudyReportTemplate: PdfTemplateBuilder<WorkerStudyPdfData> =
 
   return PageShell(rpdf, {
     styles,
+    headerTitle: 'Estudio de trabajador',
+    companyName: data.companyName,
     children: [
-      h(Text, { style: styles.title, key: 'title' }, 'ESTUDIO DE TRABAJADOR'),
-
       // -- Worker info --
       ...MetaLines(rpdf, styles, [
         { label: 'Nombre', value: data.worker.fullName },
@@ -160,7 +162,6 @@ export const workerStudyReportTemplate: PdfTemplateBuilder<WorkerStudyPdfData> =
           label: 'Documento',
           value: `${data.worker.identificationTypeCode} ${data.worker.documentNumber}`,
         },
-        { label: 'Generado', value: formatDateTime(data.generatedAt) },
       ]),
 
       // -- Salary & trajectory --
@@ -251,12 +252,6 @@ export const workerStudyReportTemplate: PdfTemplateBuilder<WorkerStudyPdfData> =
           ]
         : []),
 
-      // -- Footer --
-      h(
-        Text,
-        { style: { ...styles.small, marginTop: 20 }, key: 'print-date' },
-        `Fecha de generacion: ${formatDateTime(data.generatedAt)}`,
-      ),
     ],
   });
 };

@@ -1,9 +1,6 @@
-import React from 'react';
 import { PdfTemplateBuilder } from '../types';
 import { createBaseStyles } from '../theme';
-import { PageShell, MetaLines, PdfTable, TableColumn } from '../components';
-
-const h = React.createElement;
+import { PageShell, PdfTable, TableColumn } from '../components';
 
 // ============================================================================
 // Data shape for generic table report
@@ -11,6 +8,7 @@ const h = React.createElement;
 
 export interface TableReportData {
   title: string;
+  companyName?: string;
   columns: Array<{
     header: string;
     width?: number;
@@ -31,7 +29,6 @@ interface IndexedRow {
 }
 
 export const tableReportTemplate: PdfTemplateBuilder<TableReportData> = (data, rpdf) => {
-  const { Text } = rpdf;
   const styles = createBaseStyles(rpdf);
 
   // Build column definitions for PdfTable.
@@ -47,23 +44,11 @@ export const tableReportTemplate: PdfTemplateBuilder<TableReportData> = (data, r
 
   const indexedRows: IndexedRow[] = data.rows.map((values, idx) => ({ idx, values }));
 
-  const generatedAt = new Date().toLocaleDateString('es-CO', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
   return PageShell(rpdf, {
     styles,
+    headerTitle: data.title,
+    companyName: data.companyName,
     children: [
-      h(Text, { style: styles.title, key: 'title' }, data.title),
-      ...MetaLines(rpdf, styles, [
-        { label: 'Generado', value: generatedAt },
-        { label: 'Total registros', value: String(data.totalCount) },
-      ]),
-      h(Text, { style: { marginBottom: 4 }, key: 'spacer' }, ''),
       PdfTable(rpdf, styles, {
         columns: pdfColumns,
         rows: indexedRows,

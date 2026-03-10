@@ -147,23 +147,67 @@ export function PageShell(
     pageSize?: string;
     /** Show the company logo at the top of the first page. Defaults to true. */
     showLogo?: boolean;
+    /** Title displayed next to the logo in the header. */
+    headerTitle?: string;
+    /** Company name displayed under the header title. */
+    companyName?: string;
   }
 ): React.ReactElement {
-  const { Document, Page, View, Image } = rpdf;
+  const { Document, Page, View, Image, Text } = rpdf;
   const styles = options.styles ?? createBaseStyles(rpdf);
   const showLogo = options.showLogo ?? true;
 
   const pageChildren: React.ReactNode[] = [];
 
   if (showLogo) {
+    const headerChildren: React.ReactNode[] = [
+      h(Image, { src: COMPANY_LOGO_PATH, style: styles.logoImage, key: '__logo-img' }),
+    ];
+
+    if (options.headerTitle || options.companyName) {
+      const titleGroupChildren: React.ReactNode[] = [];
+      if (options.headerTitle) {
+        titleGroupChildren.push(
+          h(Text, { style: styles.headerTitleText, key: '__header-title' }, options.headerTitle),
+        );
+      }
+      if (options.companyName) {
+        titleGroupChildren.push(
+          h(Text, { style: styles.headerSubtitleText, key: '__header-subtitle' }, options.companyName),
+        );
+      }
+      headerChildren.push(
+        h(View, { style: styles.headerTitleGroup, key: '__header-title-group' }, ...titleGroupChildren),
+      );
+    }
+
     pageChildren.push(
-      h(View, { style: styles.logoHeader, key: '__logo-header', fixed: true },
-        h(Image, { src: COMPANY_LOGO_PATH, style: styles.logoImage }),
-      ),
+      h(View, { style: styles.logoHeader, key: '__logo-header', fixed: true }, ...headerChildren),
     );
   }
 
   pageChildren.push(...options.children);
+
+  // Fixed footer with generated date + page numbers
+  const generatedAt = new Date().toLocaleDateString('es-CO', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  pageChildren.push(
+    h(View, { style: styles.pageFooter, key: '__page-footer', fixed: true },
+      h(Text, { style: styles.pageFooterText, key: '__footer-date' }, generatedAt),
+      h(Text, {
+        style: styles.pageFooterText,
+        key: '__footer-page',
+        render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+          `Pagina ${pageNumber} de ${totalPages}`,
+      }),
+    ),
+  );
 
   return h(
     Document,

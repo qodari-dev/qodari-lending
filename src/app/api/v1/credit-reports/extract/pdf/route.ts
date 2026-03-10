@@ -1,9 +1,11 @@
 import { TsRestMetaData } from '@/schemas/ts-rest';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { getReportCompanyName } from '@/server/utils/credits-settings-helpers';
 import { getCreditExtractReportData } from '@/server/api/handlers/credit-report';
 import { renderTemplate } from '@/server/pdf/render';
 import { creditExtractTemplate } from '@/server/pdf/templates/credit-extract';
+import { CreditExtractPdfData } from '@/server/pdf/templates/credit-extract';
 import { sanitizeFilename } from '@/server/pdf/format';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -30,10 +32,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const report = await getCreditExtractReportData(creditNumber);
+    const [report, companyName] = await Promise.all([
+      getCreditExtractReportData(creditNumber),
+      getReportCompanyName(),
+    ]);
+
+    const pdfData: CreditExtractPdfData = {
+      ...report,
+      companyName,
+    };
 
     return await renderTemplate(
-      report,
+      pdfData,
       creditExtractTemplate,
       `extracto-${sanitizeFilename(report.loan.creditNumber)}`,
     );

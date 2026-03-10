@@ -1,6 +1,7 @@
 import { TsRestMetaData } from '@/schemas/ts-rest';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { getReportCompanyName } from '@/server/utils/credits-settings-helpers';
 import { renderTemplate } from '@/server/pdf/render';
 import { tableReportTemplate, TableReportData } from '@/server/pdf/templates/table-report';
 import { sanitizeFilename } from '@/server/pdf/format';
@@ -31,11 +32,15 @@ export async function POST(request: NextRequest) {
   try {
     await getAuthContextAndValidatePermission(request, metadata);
 
-    const raw = await request.json();
+    const [raw, companyName] = await Promise.all([
+      request.json(),
+      getReportCompanyName(),
+    ]);
     const parsed = bodySchema.parse(raw);
 
     const reportData: TableReportData = {
       title: parsed.title,
+      companyName,
       columns: parsed.columns,
       rows: parsed.rows,
       totalCount: parsed.totalCount,

@@ -1,5 +1,6 @@
 'use client';
 
+import { CausationProcessRunMonitor } from '@/app/causation/components/causation-process-run-monitor';
 import { PageContent, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,21 +15,12 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   useBillingConceptsRunStatus,
   useProcessCausationBillingConcepts,
 } from '@/hooks/queries/use-causation-queries';
 import { useCreditProducts } from '@/hooks/queries/use-credit-product-queries';
 import { useLoans } from '@/hooks/queries/use-loan-queries';
 import { ProcessCausationBillingConceptsBodySchema } from '@/schemas/causation';
-import { formatCurrency, formatDate } from '@/utils/formatters';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { zodResolver } from '@hookform/resolvers/zod';
 import React from 'react';
@@ -46,8 +38,7 @@ const scopeLabels: Record<FormValues['scopeType'], string> = {
 };
 
 export function CausationBillingConcepts() {
-  const [runId, setRunId] = React.useState<number | null>(null);
-  const [lastNotifiedStatus, setLastNotifiedStatus] = React.useState<string | null>(null);
+  const [selectedRunId, setSelectedRunId] = React.useState<number | null>(null);
 
   const today = React.useMemo(() => new Date(), []);
 
@@ -101,24 +92,9 @@ export function CausationBillingConcepts() {
 
   const { mutateAsync: processBillingConcepts, isPending: isProcessing } =
     useProcessCausationBillingConcepts();
-  const { data: runStatusData, isFetching: isFetchingRunStatus } = useBillingConceptsRunStatus(runId);
+  const { data: runStatusData, isFetching: isFetchingRunStatus } =
+    useBillingConceptsRunStatus(selectedRunId);
   const runStatus = runStatusData?.body;
-
-  React.useEffect(() => {
-    if (!runStatus) return;
-    if (runStatus.status === lastNotifiedStatus) return;
-
-    if (runStatus.status === 'COMPLETED') {
-      toast.success(`Causacion finalizada. Creditos causados: ${runStatus.accruedCredits}`);
-      setLastNotifiedStatus(runStatus.status);
-      return;
-    }
-
-    if (runStatus.status === 'FAILED' || runStatus.status === 'CANCELED') {
-      toast.error(runStatus.message || 'La causacion finalizo con error');
-      setLastNotifiedStatus(runStatus.status);
-    }
-  }, [lastNotifiedStatus, runStatus]);
 
   const onSubmit = async (values: FormValues) => {
     const response = await processBillingConcepts({
@@ -129,8 +105,7 @@ export function CausationBillingConcepts() {
       },
     });
 
-    setRunId(response.body.processRunId);
-    setLastNotifiedStatus(null);
+    setSelectedRunId(response.body.processRunId);
     toast.success(`Corrida encolada. Run #${response.body.processRunId}`);
   };
 
@@ -279,91 +254,14 @@ export function CausationBillingConcepts() {
           </CardContent>
         </Card>
 
-        {runId ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Estado de ejecucion</CardTitle>
-              <CardDescription>
-                Run #{runId} {isFetchingRunStatus ? '- actualizando...' : ''}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {runStatus ? (
-                <>
-                  <div className="grid gap-3 md:grid-cols-6">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Estado</p>
-                      <p className="font-medium">{runStatus.status}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Alcance</p>
-                      <p className="font-medium">{scopeLabels[runStatus.scopeType]}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Fecha</p>
-                      <p className="font-medium">{formatDate(runStatus.processDate)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Fecha movimiento</p>
-                      <p className="font-medium">{formatDate(runStatus.transactionDate)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Creditos revisados</p>
-                      <p className="font-medium">{runStatus.reviewedCredits}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Creditos causados</p>
-                      <p className="font-medium">{runStatus.accruedCredits}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Creditos con error</p>
-                      <p className="font-medium">{runStatus.failedCredits}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Valor causado</p>
-                      <p className="font-medium">{formatCurrency(runStatus.totalAccruedAmount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Inicio ejecucion</p>
-                      <p className="font-medium">{runStatus.startedAt ? formatDate(runStatus.startedAt) : '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Fin ejecucion</p>
-                      <p className="font-medium">{runStatus.finishedAt ? formatDate(runStatus.finishedAt) : '-'}</p>
-                    </div>
-                    <div className="md:col-span-6">
-                      <p className="text-muted-foreground text-xs">Mensaje</p>
-                      <p className="font-medium">{runStatus.message}</p>
-                    </div>
-                  </div>
-
-                  {runStatus.errors.length ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>ID credito</TableHead>
-                          <TableHead>Numero credito</TableHead>
-                          <TableHead>Motivo</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {runStatus.errors.map((error, index) => (
-                          <TableRow key={`${error.loanId}-${index}`}>
-                            <TableCell>{error.loanId}</TableCell>
-                            <TableCell>{error.creditNumber}</TableCell>
-                            <TableCell>{error.reason}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : null}
-                </>
-              ) : (
-                <div className="text-muted-foreground text-sm">Consultando estado de la corrida...</div>
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
+        <CausationProcessRunMonitor
+          processTypeFilter="OTHER"
+          selectedRunId={selectedRunId}
+          onSelectedRunIdChange={setSelectedRunId}
+          runStatus={runStatus}
+          isFetchingRunStatus={isFetchingRunStatus}
+          scopeLabels={scopeLabels}
+        />
       </PageContent>
     </>
   );

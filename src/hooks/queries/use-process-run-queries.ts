@@ -24,18 +24,28 @@ function defaultQuery(filters?: Partial<ListProcessRunsQuery>) {
   return query;
 }
 
-export function useProcessRuns(filters: Partial<ListProcessRunsQuery> = {}) {
+type ProcessRunQueryOptions = {
+  enabled?: boolean;
+  refetchInterval?: number | false;
+};
+
+export function useProcessRuns(
+  filters: Partial<ListProcessRunsQuery> = {},
+  options?: ProcessRunQueryOptions
+) {
   const query = defaultQuery(filters);
 
   return api.processRun.list.useQuery({
     queryKey: processRunsKeys.list(query),
     queryData: { query },
+    enabled: options?.enabled ?? true,
+    refetchInterval: options?.refetchInterval ?? false,
   });
 }
 
 export function useProcessRun(
   id: number,
-  options?: Partial<Pick<ListProcessRunsQuery, 'include'>> & { enabled?: boolean }
+  options?: Partial<Pick<ListProcessRunsQuery, 'include'>> & ProcessRunQueryOptions
 ) {
   return api.processRun.getById.useQuery({
     queryKey: processRunsKeys.detail(id),
@@ -44,6 +54,7 @@ export function useProcessRun(
       query: { include: options?.include ?? ['accountingPeriod'] },
     },
     enabled: options?.enabled ?? !!id,
+    refetchInterval: options?.refetchInterval ?? false,
   });
 }
 

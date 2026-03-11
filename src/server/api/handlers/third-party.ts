@@ -16,6 +16,7 @@ import {
   FieldMap,
   QueryConfig,
 } from '@/server/utils/query/query-builder';
+import type { ThirdParties } from '@/server/db/types';
 
 // ============================================
 // CONFIG
@@ -93,7 +94,7 @@ const THIRD_PARTY_INCLUDES = createIncludeMap<typeof db.query.thirdParties>()({
     },
   },
   loans: {
-    relation: 'loans',
+    relation: 'loansBorrowed',
     config: {
       with: {
         creditFund: true,
@@ -101,6 +102,20 @@ const THIRD_PARTY_INCLUDES = createIncludeMap<typeof db.query.thirdParties>()({
     },
   },
 });
+
+function normalizeThirdPartyLoans<T>(item: T): T {
+  const candidate = item as T & {
+    loans?: unknown[];
+    loansBorrowed?: unknown[];
+  };
+
+  if (!candidate.loansBorrowed?.length) {
+    return item;
+  }
+
+  candidate.loans = candidate.loansBorrowed;
+  return candidate;
+}
 
 type ThirdPartyContactInput = Omit<
   Partial<typeof thirdParties.$inferInsert>,
@@ -178,7 +193,7 @@ export const thirdParty = tsr.router(contract.thirdParty, {
         offset,
       } = buildQuery({ page, limit, search, where, sort }, THIRD_PARTY_QUERY_CONFIG);
 
-      const [data, countResult] = await Promise.all([
+      const [rawData, countResult] = await Promise.all([
         db.query.thirdParties.findMany({
           where: whereClause,
           with: buildTypedIncludes(include, THIRD_PARTY_INCLUDES),
@@ -192,6 +207,7 @@ export const thirdParty = tsr.router(contract.thirdParty, {
           .where(whereClause),
       ]);
 
+      const data = rawData.map((item) => normalizeThirdPartyLoans(item)) as ThirdParties[];
       const totalCount = countResult[0]?.count ?? 0;
       const response = {
         status: 200 as const,
@@ -228,7 +244,7 @@ export const thirdParty = tsr.router(contract.thirdParty, {
         });
       }
 
-      return { status: 200, body: thirdParty };
+      return { status: 200, body: normalizeThirdPartyLoans(thirdParty) as ThirdParties };
     } catch (e) {
       return genericTsRestErrorResponse(e, {
         genericMsg: `Error al obtener tercero ${id}`,

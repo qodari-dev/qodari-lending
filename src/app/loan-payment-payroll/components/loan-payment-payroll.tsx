@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -54,6 +55,8 @@ type ImportedFileInfo = {
   matchedCount: number;
   missingCreditNumbers: string[];
 };
+
+type SearchCriterion = 'AGREEMENT' | 'COMPANY_DOCUMENT';
 
 const FormSchema = z.object({
   agreementId: z.number().int().positive().nullable().optional(),
@@ -142,6 +145,7 @@ export function LoanPaymentPayroll() {
   const [fileName, setFileName] = React.useState('');
   const [fileInfo, setFileInfo] = React.useState<ImportedFileInfo | null>(null);
   const [processResponse, setProcessResponse] = React.useState<ProcessLoanPaymentPayrollResult | null>(null);
+  const [searchCriterion, setSearchCriterion] = React.useState<SearchCriterion>('AGREEMENT');
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema) as Resolver<FormValues>,
@@ -176,9 +180,42 @@ export function LoanPaymentPayroll() {
     return items.filter((d) => d.status === 'SENT');
   }, [dispatchesData]);
 
+  const clearLoadedData = React.useCallback(() => {
+    setRows([]);
+    setFileName('');
+    setFileInfo(null);
+    setProcessResponse(null);
+  }, []);
+
   React.useEffect(() => {
     form.setValue('billingDispatchId', undefined);
   }, [form, watchedAgreementId]);
+
+  const handleSearchCriterionChange = React.useCallback(
+    (value: string) => {
+      const nextCriterion = value as SearchCriterion;
+      setSearchCriterion(nextCriterion);
+
+      if (nextCriterion === 'AGREEMENT') {
+        form.setValue('companyDocumentNumber', '', {
+          shouldDirty: true,
+          shouldValidate: false,
+        });
+      } else {
+        form.setValue('agreementId', undefined, {
+          shouldDirty: true,
+          shouldValidate: false,
+        });
+        form.setValue('billingDispatchId', undefined, {
+          shouldDirty: true,
+          shouldValidate: false,
+        });
+      }
+
+      clearLoadedData();
+    },
+    [clearLoadedData, form]
+  );
 
   const { data: agreementsData, isLoading: isLoadingAgreements } = useAgreements({
     limit: 1000,
@@ -282,6 +319,7 @@ export function LoanPaymentPayroll() {
     try {
       setIsLoadingLoans(true);
       setProcessResponse(null);
+      clearLoadedData();
 
       const queryLimit = values.agreementId ? 500 : 2000;
       const loansResponse = await api.loan.list.query({
@@ -311,7 +349,7 @@ export function LoanPaymentPayroll() {
 
       if (!filteredLoanItems.length) {
         toast.error('No se encontraron creditos activos para el criterio seleccionado');
-        setRows([]);
+        clearLoadedData();
         return;
       }
 
@@ -341,7 +379,7 @@ export function LoanPaymentPayroll() {
     } finally {
       setIsLoadingLoans(false);
     }
-  }, [form]);
+  }, [clearLoadedData, form]);
 
   const handlePaymentAmountChange = React.useCallback((loanId: number, value: number) => {
     setRows((currentRows) =>
@@ -503,93 +541,128 @@ export function LoanPaymentPayroll() {
         <Card>
           <CardHeader>
             <CardTitle>Encabezado del recaudo</CardTitle>
-            <CardDescription>Ingrese la informacion base para consultar y distribuir abonos.</CardDescription>
+            <CardDescription>
+              Ingrese la información base para consultar y distribuir abonos.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <FieldGroup className="grid gap-4 md:grid-cols-3">
-              <Controller
-                name="agreementId"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="agreementId">Convenio (opcional)</FieldLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
-                      value={field.value ? String(field.value) : ''}
-                      disabled={isLoadingAgreements}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {agreements.map((item) => (
-                          <SelectItem key={item.id} value={String(item.id)}>
-                            {item.agreementCode} - {item.businessName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
+            <div className="mb-5 space-y-3">
+              <div>
+                <p className="text-sm font-medium">Criterio de consulta</p>
+                <p className="text-muted-foreground text-xs">
+                  Seleccione una sola forma de búsqueda: por convenio o por documento de empresa.
+                </p>
+              </div>
+              <Tabs value={searchCriterion} onValueChange={handleSearchCriterionChange}>
+                <TabsList variant="line" className="inline-flex min-w-max justify-start gap-2">
+                  <TabsTrigger value="AGREEMENT" className="flex-none px-3">
+                    Convenio
+                  </TabsTrigger>
+                  <TabsTrigger value="COMPANY_DOCUMENT" className="flex-none px-3">
+                    Documento empresa
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
 
-              {watchedAgreementId ? (
+            <FieldGroup className="grid gap-4 md:grid-cols-3">
+              {searchCriterion === 'AGREEMENT' ? (
+                <>
+                  <Controller
+                    name="agreementId"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid}>
+                        <FieldLabel htmlFor="agreementId">Convenio</FieldLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                          value={field.value ? String(field.value) : ''}
+                          disabled={isLoadingAgreements}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione un convenio..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {agreements.map((item) => (
+                              <SelectItem key={item.id} value={String(item.id)}>
+                                {item.agreementCode} - {item.businessName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-muted-foreground text-xs">
+                          Al elegir convenio puede asociar una instrucción de cobro ya enviada.
+                        </p>
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+
+                  {watchedAgreementId ? (
+                    <Controller
+                      name="billingDispatchId"
+                      control={form.control}
+                      render={({ field }) => (
+                        <Field>
+                          <FieldLabel htmlFor="billingDispatchId">Instrucción de cobro (opcional)</FieldLabel>
+                          <Select
+                            onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                            value={field.value ? String(field.value) : ''}
+                            disabled={isLoadingDispatches || !sentDispatches.length}
+                          >
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={
+                                  isLoadingDispatches
+                                    ? 'Cargando...'
+                                    : sentDispatches.length
+                                      ? 'Seleccione...'
+                                      : 'Sin instrucciones enviadas'
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sentDispatches.map((d) => (
+                                <SelectItem key={d.id} value={String(d.id)}>
+                                  #{d.dispatchNumber} — {d.period}
+                                  {d.totalBilledAmount
+                                    ? ` — ${formatCurrency(Number(d.totalBilledAmount))}`
+                                    : ''}
+                                  {d.totalCredits ? ` (${d.totalCredits} créditos)` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      )}
+                    />
+                  ) : (
+                    <div className="border-border bg-muted/20 text-muted-foreground rounded-lg border border-dashed px-4 py-3 text-sm">
+                      Seleccione un convenio para habilitar la instrucción de cobro.
+                    </div>
+                  )}
+                </>
+              ) : (
                 <Controller
-                  name="billingDispatchId"
+                  name="companyDocumentNumber"
                   control={form.control}
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel htmlFor="billingDispatchId">Instrucción de cobro (opcional)</FieldLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
-                        value={field.value ? String(field.value) : ''}
-                        disabled={isLoadingDispatches || !sentDispatches.length}
-                      >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              isLoadingDispatches
-                                ? 'Cargando...'
-                                : sentDispatches.length
-                                  ? 'Seleccione...'
-                                  : 'Sin instrucciones enviadas'
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {sentDispatches.map((d) => (
-                            <SelectItem key={d.id} value={String(d.id)}>
-                              #{d.dispatchNumber} — {d.period}
-                              {d.totalBilledAmount ? ` — ${formatCurrency(Number(d.totalBilledAmount))}` : ''}
-                              {d.totalCredits ? ` (${d.totalCredits} créditos)` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid} className="md:col-span-2">
+                      <FieldLabel htmlFor="companyDocumentNumber">Documento empresa</FieldLabel>
+                      <Input
+                        id="companyDocumentNumber"
+                        placeholder="NIT o documento"
+                        {...field}
+                        value={field.value ?? ''}
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        Use este criterio cuando no va a consultar por convenio.
+                      </p>
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
                 />
-              ) : null}
-
-              <Controller
-                name="companyDocumentNumber"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="companyDocumentNumber">
-                      Documento empresa (opcional)
-                    </FieldLabel>
-                    <Input
-                      id="companyDocumentNumber"
-                      placeholder="NIT o documento"
-                      {...field}
-                      value={field.value ?? ''}
-                    />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
+              )}
 
               <Controller
                 name="receiptTypeId"

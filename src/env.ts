@@ -39,6 +39,8 @@ export const env = createEnv({
     CURRENT_INTEREST_CRON: z.string().optional().default('15 0 * * *'),
     CURRENT_INSURANCE_CRON: z.string().optional().default('17 0 * * *'),
     LATE_INTEREST_CRON: z.string().optional().default('20 0 * * *'),
+    SIGNATURE_ENVELOPE_EXPIRY_CRON: z.string().optional().default('0 3 * * *'),
+    SIGNATURE_ENVELOPE_EXPIRY_DAYS: z.coerce.number().int().positive().optional().default(30),
     RESEND_API_KEY: z.string().optional(),
     SCHEDULER_TIMEZONE: z.string().optional().default('America/Bogota'),
     // DigitalOcean Spaces
@@ -100,6 +102,8 @@ export const env = createEnv({
     CURRENT_INTEREST_CRON: process.env.CURRENT_INTEREST_CRON,
     CURRENT_INSURANCE_CRON: process.env.CURRENT_INSURANCE_CRON,
     LATE_INTEREST_CRON: process.env.LATE_INTEREST_CRON,
+    SIGNATURE_ENVELOPE_EXPIRY_CRON: process.env.SIGNATURE_ENVELOPE_EXPIRY_CRON,
+    SIGNATURE_ENVELOPE_EXPIRY_DAYS: process.env.SIGNATURE_ENVELOPE_EXPIRY_DAYS,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     SCHEDULER_TIMEZONE: process.env.SCHEDULER_TIMEZONE,
     // DigitalOcean Spaces

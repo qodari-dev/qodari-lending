@@ -85,10 +85,47 @@ function normalizePayload(body: SignatureWebhookEventBody): unknown {
   };
 }
 
+/**
+ * Validates the webhook signature/HMAC from the provider.
+ * Currently a no-op until a real signature provider is integrated.
+ *
+ * TODO(signature-webhook-security): Implement per-provider HMAC validation:
+ * - DocuSign: X-DocuSign-Signature-1 header with HMAC-SHA256
+ * - YouSign: X-Custom-Signature header with HMAC-SHA256
+ * - AdobeSign: Verify client certificate or webhook URL with token
+ *
+ * @returns true if valid or no validation configured, false if invalid
+ */
+function validateWebhookSignature(
+  _provider: string,
+  _headers: Record<string, string>,
+  _rawBody: string,
+): boolean {
+  // TODO(signature-provider): validate HMAC/signature per provider.
+  // When a real provider is integrated:
+  // 1. Read the shared secret from env (e.g., DOCUSIGN_WEBHOOK_SECRET)
+  // 2. Compute HMAC-SHA256 of rawBody with the secret
+  // 3. Compare against the header value
+  // 4. Return false if mismatch → webhook handler will reject with 401
+  return true;
+}
+
 export const signatureWebhook = tsr.router(contract.signatureWebhook, {
   event: async ({ body }) => {
     try {
-      // TODO(signature-webhook-security): validar firma/hmac del proveedor según headers.
+      // Webhook signature validation placeholder.
+      // When a real provider is configured, pass actual headers and raw body here.
+      const isSignatureValid = validateWebhookSignature(body.provider, {}, '');
+      if (!isSignatureValid) {
+        return {
+          status: 401 as const,
+          body: {
+            message: 'Firma del webhook invalida',
+            code: 'WEBHOOK_SIGNATURE_INVALID',
+          },
+        };
+      }
+
       const eventAt = body.eventAt ?? new Date();
 
       if (body.providerEventId) {

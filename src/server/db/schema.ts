@@ -3713,6 +3713,8 @@ export const signatureEvents = pgTable(
     processed: boolean('processed').notNull().default(false),
     processedAt: timestamp('processed_at', { withTimezone: true }),
     processingError: text('processing_error'),
+    triggeredByUserId: varchar('triggered_by_user_id', { length: 180 }),
+    triggeredByUserName: varchar('triggered_by_user_name', { length: 180 }),
   },
   (t) => [
     uniqueIndex('uniq_signature_events_provider_event').on(t.provider, t.providerEventId),

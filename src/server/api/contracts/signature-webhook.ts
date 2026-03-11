@@ -19,6 +19,7 @@ export const signatureWebhook = c.router(
       responses: {
         200: SignatureWebhookEventResponseSchema,
         400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
         404: TsRestErrorSchema,
         500: TsRestErrorSchema,
       },

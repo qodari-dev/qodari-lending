@@ -267,6 +267,13 @@
       "when": 1773460000000,
       "tag": "0038_billing_system_improvements",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1773560000000,
+      "tag": "0039_signature_system_improvements",
+      "breakpoints": true
     }
   ]
 }

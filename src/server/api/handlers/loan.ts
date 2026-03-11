@@ -738,6 +738,32 @@ export const loan = tsr.router(contract.loan, {
           });
         }
 
+        if (
+          rule.documentTemplate.contentFormat === 'PDF_STATIC' &&
+          !rule.documentTemplate.templateStorageKey
+        ) {
+          throwHttpError({
+            status: 400,
+            message: `La plantilla PDF estática ${rule.documentTemplate.code} v${rule.documentTemplate.version} no tiene archivo configurado (template_storage_key)`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        if (
+          rule.documentTemplate.contentFormat === 'HTML_HBS' &&
+          !rule.documentTemplate.templateBody
+        ) {
+          // Only validate if template code doesn't map to a built-in React template
+          const mappedType = resolveLoanDocumentTypeFromTemplateCode(rule.documentTemplate.code);
+          if (!mappedType) {
+            throwHttpError({
+              status: 400,
+              message: `La plantilla HTML/HBS ${rule.documentTemplate.code} v${rule.documentTemplate.version} no tiene contenido (template_body)`,
+              code: 'BAD_REQUEST',
+            });
+          }
+        }
+
         for (const signerRule of rule.documentTemplate.templateSignerRules) {
           const role = signerRule.signerRole as SignatureSignerRole;
           const current = signerRulesByRole.get(role);
@@ -990,6 +1016,8 @@ export const loan = tsr.router(contract.loan, {
           webhookSignatureValid: true,
           processed: true,
           processedAt: sentAt,
+          triggeredByUserId: userId,
+          triggeredByUserName: userName || userId,
         });
 
         // TODO(signature-provider): crear sobre y enviar documentos al proveedor real via API.
@@ -1173,7 +1201,7 @@ export const loan = tsr.router(contract.loan, {
       }
 
       const now = new Date();
-      const { userId } = getRequiredUserContext(session);
+      const { userId, userName } = getRequiredUserContext(session);
       const isReminderAction = body.action === 'REMINDER';
       const isRetryAction = body.action === 'RETRY';
       if (
@@ -1238,7 +1266,6 @@ export const loan = tsr.router(contract.loan, {
             envelopeId: envelopeUpdated.id,
             previousStatus: existingEnvelope.status,
             currentStatus: envelopeUpdated.status,
-            triggeredByUserId: userId,
             note: isRetryAction
               ? 'TODO: reintento de envio al proveedor real'
               : 'TODO: envio de recordatorio al proveedor real',
@@ -1246,6 +1273,8 @@ export const loan = tsr.router(contract.loan, {
           webhookSignatureValid: true,
           processed: true,
           processedAt: now,
+          triggeredByUserId: userId,
+          triggeredByUserName: userName || userId,
         });
 
         return [envelopeUpdated];

@@ -4,6 +4,7 @@ import { createAndQueueCurrentInsuranceRun } from '@/server/services/causation/c
 import { createAndQueueCurrentInterestRun } from '@/server/services/causation/current-interest-run-service';
 import { createAndQueueLateInterestRun } from '@/server/services/causation/late-interest-run-service';
 import { enqueueAgreementBillingEmails } from '@/server/services/billing-emails/agreement-billing-email-service';
+import { expireStaleSignatureEnvelopes } from '@/server/services/signature/signature-envelope-expiry-service';
 import { CronJob } from 'cron';
 import { addDays } from 'date-fns';
 
@@ -110,6 +111,17 @@ async function enqueueAgreementBillingEmailsRun() {
   }
 }
 
+async function expireStaleSignatureEnvelopesRun() {
+  try {
+    const result = await expireStaleSignatureEnvelopes();
+    if (result.expiredCount > 0) {
+      console.log(`[cron][signature-envelope-expiry] Expirados ${result.expiredCount} sobres`);
+    }
+  } catch (error) {
+    console.error('[cron][signature-envelope-expiry]', error);
+  }
+}
+
 export function startCrons() {
   if (globalThis.__cronsStarted) return;
   globalThis.__cronsStarted = true;
@@ -122,6 +134,7 @@ export function startCrons() {
     { cron: env.CURRENT_INTEREST_CRON, fn: enqueueDailyCurrentInterestRun },
     { cron: env.CURRENT_INSURANCE_CRON, fn: enqueueDailyCurrentInsuranceRun },
     { cron: env.LATE_INTEREST_CRON, fn: enqueueDailyLateInterestRun },
+    { cron: env.SIGNATURE_ENVELOPE_EXPIRY_CRON, fn: expireStaleSignatureEnvelopesRun },
   ];
 
   for (const { cron, fn } of jobs) {

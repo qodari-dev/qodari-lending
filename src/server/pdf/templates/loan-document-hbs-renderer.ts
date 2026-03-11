@@ -148,9 +148,11 @@ export async function renderHandlebarsTemplateToPdfBuffer(args: {
     });
   }
 
+  const PDF_RENDER_TIMEOUT = 30_000; // 30 seconds max for PDF generation
+
   const page = await browser.newPage();
   try {
-    await page.setContent(fullHtml, { waitUntil: 'networkidle' });
+    await page.setContent(fullHtml, { waitUntil: 'networkidle', timeout: PDF_RENDER_TIMEOUT });
 
     const pdfBuffer = await page.pdf({
       format: 'A4',

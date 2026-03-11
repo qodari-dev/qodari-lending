@@ -1,6 +1,4 @@
 {
-  "id": "14160f9e-a210-4028-8dac-325e6c55fd77",
-  "prevId": "9126dc8c-b9e5-4889-b648-7eac2f1262ff",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -987,6 +985,153 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.agreement_billing_email_dispatch_items": {
+      "name": "agreement_billing_email_dispatch_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "dispatch_id": {
+          "name": "dispatch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "loan_id": {
+          "name": "loan_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "credit_number": {
+          "name": "credit_number",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "borrower_name": {
+          "name": "borrower_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "borrower_document": {
+          "name": "borrower_document",
+          "type": "varchar(17)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_balance": {
+          "name": "current_balance",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "installment_amount": {
+          "name": "installment_amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "overdue_amount": {
+          "name": "overdue_amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "days_past_due": {
+          "name": "days_past_due",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_dispatch_items_dispatch": {
+          "name": "idx_dispatch_items_dispatch",
+          "columns": [
+            {
+              "expression": "dispatch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_dispatch_items_loan": {
+          "name": "idx_dispatch_items_loan",
+          "columns": [
+            {
+              "expression": "loan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agreement_billing_email_dispatch_items_dispatch_id_agreement_billing_email_dispatches_id_fk": {
+          "name": "agreement_billing_email_dispatch_items_dispatch_id_agreement_billing_email_dispatches_id_fk",
+          "tableFrom": "agreement_billing_email_dispatch_items",
+          "tableTo": "agreement_billing_email_dispatches",
+          "columnsFrom": [
+            "dispatch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "agreement_billing_email_dispatch_items_loan_id_loans_id_fk": {
+          "name": "agreement_billing_email_dispatch_items_loan_id_loans_id_fk",
+          "tableFrom": "agreement_billing_email_dispatch_items",
+          "tableTo": "loans",
+          "columnsFrom": [
+            "loan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.agreement_billing_email_dispatches": {
       "name": "agreement_billing_email_dispatches",
       "schema": "",
@@ -1043,6 +1188,13 @@
           "notNull": true,
           "default": "'MANUAL'"
         },
+        "dispatch_number": {
+          "name": "dispatch_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "attempts": {
           "name": "attempts",
           "type": "integer",
@@ -1083,6 +1235,18 @@
         "last_error": {
           "name": "last_error",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_billed_amount": {
+          "name": "total_billed_amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_credits": {
+          "name": "total_credits",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -1195,7 +1359,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "agreement_billing_email_dispatches_billing_cycle_profile_id_billing_cycle_profiles_id_fk": {
@@ -1208,7 +1372,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "agreement_billing_email_dispatches_billing_cycle_profile_cycle_id_billing_cycle_profile_cycles_id_fk": {
@@ -1221,7 +1385,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -1236,6 +1400,10 @@
         "chk_agreement_billing_email_dispatch_attempts_min": {
           "name": "chk_agreement_billing_email_dispatch_attempts_min",
           "value": "\"agreement_billing_email_dispatches\".\"attempts\" >= 0"
+        },
+        "chk_agreement_billing_email_dispatch_number_min": {
+          "name": "chk_agreement_billing_email_dispatch_number_min",
+          "value": "\"agreement_billing_email_dispatches\".\"dispatch_number\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -1427,7 +1595,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -2158,7 +2326,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -8127,6 +8295,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "billing_dispatch_id": {
+          "name": "billing_dispatch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by_user_id": {
           "name": "created_by_user_id",
           "type": "uuid",
@@ -8286,6 +8460,19 @@
             "id"
           ],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "loan_payments_billing_dispatch_id_agreement_billing_email_dispatches_id_fk": {
+          "name": "loan_payments_billing_dispatch_id_agreement_billing_email_dispatches_id_fk",
+          "tableFrom": "loan_payments",
+          "tableTo": "agreement_billing_email_dispatches",
+          "columnsFrom": [
+            "billing_dispatch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "loan_payments_gl_account_id_gl_accounts_id_fk": {
@@ -12032,6 +12219,18 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "triggered_by_user_id": {
+          "name": "triggered_by_user_id",
+          "type": "varchar(180)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "triggered_by_user_name": {
+          "name": "triggered_by_user_name",
+          "type": "varchar(180)",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -13522,8 +13721,10 @@
   "policies": {},
   "views": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
-  }
+    "tables": {},
+    "columns": {}
+  },
+  "id": "af3218cf-cfa0-4884-b171-2841897d375e",
+  "prevId": "14160f9e-a210-4028-8dac-325e6c55fd77"
 }

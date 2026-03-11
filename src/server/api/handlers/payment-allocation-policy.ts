@@ -1,5 +1,7 @@
 import { contract } from '@/server/api/contracts';
 import {
+  billingConcepts,
+  creditProducts,
   db,
   paymentAllocationPolicies,
   paymentAllocationPolicyRules,
@@ -17,7 +19,7 @@ import {
 } from '@/server/utils/query/query-builder';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { tsr } from '@ts-rest/serverless/next';
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 type PaymentAllocationPolicyColumn = keyof typeof paymentAllocationPolicies.$inferSelect;
 
@@ -62,6 +64,39 @@ function normalizePolicyPayload<T extends Partial<{ name: string; note: string |
     ...(payload.name !== undefined ? { name: payload.name.trim() } : {}),
     ...(payload.note !== undefined ? { note: payload.note?.trim() || null } : {}),
   } as T;
+}
+
+/** Returns how many credit products reference this policy. */
+async function getPolicyUsageCount(policyId: number): Promise<number> {
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(creditProducts)
+    .where(eq(creditProducts.paymentAllocationPolicyId, policyId));
+  return result?.count ?? 0;
+}
+
+/** Validates that every active system billing concept is covered by the given rules. */
+async function validateSystemConceptsCoverage(
+  rules: { billingConceptId: number }[]
+): Promise<void> {
+  const systemConcepts = await db.query.billingConcepts.findMany({
+    where: and(eq(billingConcepts.isSystem, true), eq(billingConcepts.isActive, true)),
+    columns: { id: true, code: true, name: true },
+  });
+
+  if (systemConcepts.length === 0) return;
+
+  const coveredIds = new Set(rules.map((r) => r.billingConceptId));
+  const missing = systemConcepts.filter((c) => !coveredIds.has(c.id));
+
+  if (missing.length > 0) {
+    const names = missing.map((c) => `${c.code} - ${c.name}`).join(', ');
+    throwHttpError({
+      status: 400,
+      message: `Toda política debe incluir reglas para los conceptos del sistema: ${names}`,
+      code: 'BAD_REQUEST',
+    });
+  }
 }
 
 export const paymentAllocationPolicy = tsr.router(contract.paymentAllocationPolicy, {
@@ -145,6 +180,10 @@ export const paymentAllocationPolicy = tsr.router(contract.paymentAllocationPoli
       const { paymentAllocationPolicyRules: rulesData, ...policyData } = body;
       const payload = normalizePolicyPayload(policyData);
 
+      if (rulesData?.length) {
+        await validateSystemConceptsCoverage(rulesData);
+      }
+
       const [created] = await db.transaction(async (tx) => {
         const [policy] = await tx.insert(paymentAllocationPolicies).values(payload).returning();
 
@@ -225,6 +264,23 @@ export const paymentAllocationPolicy = tsr.router(contract.paymentAllocationPoli
 
       const { paymentAllocationPolicyRules: rulesData, ...policyData } = body;
       const payload = normalizePolicyPayload(policyData);
+
+      // Cannot deactivate a policy that is in use by credit products
+      if (body.isActive === false && existing.isActive === true) {
+        const usageCount = await getPolicyUsageCount(id);
+        if (usageCount > 0) {
+          throwHttpError({
+            status: 409,
+            message: `No se puede desactivar: política asignada a ${usageCount} producto(s) de crédito. Cree una nueva y actualice los productos.`,
+            code: 'CONFLICT',
+          });
+        }
+      }
+
+      // Validate system concepts coverage when rules are provided
+      if (rulesData?.length) {
+        await validateSystemConceptsCoverage(rulesData);
+      }
 
       const [updated] = await db.transaction(async (tx) => {
         const [policyUpdated] = await tx
@@ -314,15 +370,31 @@ export const paymentAllocationPolicy = tsr.router(contract.paymentAllocationPoli
         });
       }
 
+      // Cannot delete a policy in use by credit products
+      const usageCount = await getPolicyUsageCount(id);
+      if (usageCount > 0) {
+        throwHttpError({
+          status: 409,
+          message: `No se puede eliminar: política asignada a ${usageCount} producto(s) de crédito`,
+          code: 'CONFLICT',
+        });
+      }
+
       const existingRules = await db.query.paymentAllocationPolicyRules.findMany({
         where: eq(paymentAllocationPolicyRules.paymentAllocationPolicyId, id),
         orderBy: [asc(paymentAllocationPolicyRules.priority)],
       });
 
-      const [deleted] = await db
-        .delete(paymentAllocationPolicies)
-        .where(eq(paymentAllocationPolicies.id, id))
-        .returning();
+      const [deleted] = await db.transaction(async (tx) => {
+        // Delete rules first, then the policy
+        await tx
+          .delete(paymentAllocationPolicyRules)
+          .where(eq(paymentAllocationPolicyRules.paymentAllocationPolicyId, id));
+        return tx
+          .delete(paymentAllocationPolicies)
+          .where(eq(paymentAllocationPolicies.id, id))
+          .returning();
+      });
 
       logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,

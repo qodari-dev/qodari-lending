@@ -1,4 +1,5 @@
 import {
+  billingConcepts,
   db,
   creditProducts,
   creditProductCategories,
@@ -10,12 +11,13 @@ import {
   creditProductChargeOffPolicies,
   creditProductBillingConcepts,
   loanApplications,
+  paymentAllocationPolicyRules,
   portfolioAgingSnapshots,
 } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { tsr } from '@ts-rest/serverless/next';
-import { asc, eq, sql } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 import { logAudit } from '@/server/utils/audit-logger';
@@ -132,6 +134,45 @@ const CREDIT_PRODUCT_INCLUDES = createIncludeMap<typeof db.query.creditProducts>
 });
 
 // ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Validates that the payment allocation policy covers all billing concepts
+ * assigned to the product. If any product concept is not represented by a
+ * rule in the policy, that concept can never be paid → throw 400.
+ */
+async function validatePolicyCoversProductConcepts(
+  policyId: number,
+  productBillingConceptIds: number[]
+): Promise<void> {
+  if (productBillingConceptIds.length === 0) return;
+
+  const policyRules = await db.query.paymentAllocationPolicyRules.findMany({
+    where: eq(paymentAllocationPolicyRules.paymentAllocationPolicyId, policyId),
+    columns: { billingConceptId: true },
+  });
+
+  const coveredIds = new Set(policyRules.map((r) => r.billingConceptId));
+  const uncoveredIds = productBillingConceptIds.filter((id) => !coveredIds.has(id));
+
+  if (uncoveredIds.length === 0) return;
+
+  // Fetch names for a descriptive error message
+  const uncoveredConcepts = await db.query.billingConcepts.findMany({
+    where: inArray(billingConcepts.id, uncoveredIds),
+    columns: { code: true, name: true },
+  });
+
+  const names = uncoveredConcepts.map((c) => `${c.code} - ${c.name}`).join(', ');
+  throwHttpError({
+    status: 400,
+    message: `La política de aplicación no cubre los conceptos: ${names}. El pago de estos conceptos sería imposible.`,
+    code: 'BAD_REQUEST',
+  });
+}
+
+// ============================================
 // HANDLER
 // ============================================
 
@@ -227,6 +268,14 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         creditProductBillingConcepts: billingConceptsData,
         ...productData
       } = body;
+
+      // Validate policy covers all product billing concepts
+      if (billingConceptsData?.length && productData.paymentAllocationPolicyId) {
+        await validatePolicyCoversProductConcepts(
+          productData.paymentAllocationPolicyId,
+          billingConceptsData.map((bc) => bc.billingConceptId)
+        );
+      }
 
       const [created] = await db.transaction(async (tx) => {
         const [product] = await tx.insert(creditProducts).values(productData).returning();
@@ -416,6 +465,17 @@ export const creditProduct = tsr.router(contract.creditProduct, {
         creditProductBillingConcepts: billingConceptsData,
         ...productData
       } = body;
+
+      // Validate policy covers all product billing concepts when either changes
+      const effectivePolicyId =
+        productData.paymentAllocationPolicyId ?? existing.paymentAllocationPolicyId;
+      const effectiveConceptIds = billingConceptsData
+        ? billingConceptsData.map((bc) => bc.billingConceptId)
+        : existingBillingConcepts.map((bc) => bc.billingConceptId);
+
+      if (effectiveConceptIds.length > 0) {
+        await validatePolicyCoversProductConcepts(effectivePolicyId, effectiveConceptIds);
+      }
 
       const [updated] = await db.transaction(async (tx) => {
         const [productUpdated] = await tx

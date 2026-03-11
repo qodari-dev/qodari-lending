@@ -385,20 +385,33 @@ export async function createLoanPaymentTx(
       policyRemainder = applyToEntries(eligible, policyRemainder);
     }
 
-    // ── Handle remaining after all rules ──
+    // ── Handle remaining after all rules (surplus applied back-to-front) ──
     if (policyRemainder > 0.01) {
       const handling = allocationPolicy?.overpaymentHandling ?? 'EXCESS_BALANCE';
 
+      // Surplus applies from last installment to first (back-to-front)
+      // so overpayments reduce the loan term rather than advancing the schedule.
+      const sortBackToFront = (entries: typeof openPortfolio) =>
+        [...entries].sort((a, b) => {
+          const dateCmp = b.dueDate.localeCompare(a.dueDate);
+          if (dateCmp !== 0) return dateCmp;
+          return b.installmentNumber - a.installmentNumber;
+        });
+
       if (handling === 'APPLY_TO_PRINCIPAL') {
-        const capitalEntries = openPortfolio.filter(
-          (e) =>
-            e.glAccountId === cpAccounts.capitalGlAccountId &&
-            (effectiveBalances.get(e.id) ?? 0) > 0
+        const capitalEntries = sortBackToFront(
+          openPortfolio.filter(
+            (e) =>
+              e.glAccountId === cpAccounts.capitalGlAccountId &&
+              (effectiveBalances.get(e.id) ?? 0) > 0
+          )
         );
         policyRemainder = applyToEntries(capitalEntries, policyRemainder);
       } else if (handling === 'APPLY_TO_FUTURE_INSTALLMENTS') {
-        const remainingEntries = openPortfolio.filter(
-          (e) => (effectiveBalances.get(e.id) ?? 0) > 0
+        const remainingEntries = sortBackToFront(
+          openPortfolio.filter(
+            (e) => (effectiveBalances.get(e.id) ?? 0) > 0
+          )
         );
         policyRemainder = applyToEntries(remainingEntries, policyRemainder);
       }

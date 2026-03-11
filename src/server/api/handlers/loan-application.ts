@@ -2203,6 +2203,26 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           });
         }
 
+        // Validate approvedAmount does not exceed the level's maxApprovalAmount
+        const currentLevel = await tx.query.loanApprovalLevels.findFirst({
+          where: eq(loanApprovalLevels.id, pendingApplication.currentApprovalLevelId),
+          columns: { maxApprovalAmount: true, name: true },
+        });
+
+        if (
+          currentLevel?.maxApprovalAmount !== null &&
+          currentLevel?.maxApprovalAmount !== undefined
+        ) {
+          const levelMax = toNumber(currentLevel.maxApprovalAmount);
+          if (approvedAmount > levelMax) {
+            throwHttpError({
+              status: 400,
+              message: `El monto aprobado ($${approvedAmount.toLocaleString()}) excede el tope del nivel "${currentLevel.name}" ($${levelMax.toLocaleString()}). Se requiere un nivel superior.`,
+              code: 'BAD_REQUEST',
+            });
+          }
+        }
+
         const [application] = await tx
           .update(loanApplications)
           .set({

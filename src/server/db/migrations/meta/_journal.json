@@ -260,6 +260,13 @@
       "when": 1773186828908,
       "tag": "0036_sparkling_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1773360000000,
+      "tag": "0037_payment_allocation_policy_restrict",
+      "breakpoints": true
     }
   ]
 }

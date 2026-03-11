@@ -917,7 +917,7 @@ export const creditProducts = pgTable(
       .notNull(),
     paymentAllocationPolicyId: integer('payment_allocation_policy_id')
       .notNull()
-      .references(() => paymentAllocationPolicies.id, { onDelete: 'cascade' }),
+      .references(() => paymentAllocationPolicies.id, { onDelete: 'restrict' }),
     xmlModelId: integer('xml_model_id'),
     // Concr07.tipfin
     financingType: financingTypeEnum('financing_type').notNull(),

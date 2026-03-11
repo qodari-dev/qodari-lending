@@ -167,6 +167,7 @@ export function CreditProductForm({
 
   const { data: paymentAllocationPoliciesData } = usePaymentAllocationPolicies({
     limit: 1000,
+    where: { and: [{ isActive: true }] },
     sort: [{ field: 'name', order: 'asc' }],
   });
   const paymentAllocationPolicies = useMemo(

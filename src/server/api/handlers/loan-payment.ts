@@ -1,5 +1,6 @@
 import {
   accountingEntries,
+  agreementBillingEmailDispatches,
   agreements,
   db,
   loanPayments,
@@ -376,6 +377,30 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         }
       }
 
+      // Validar instrucción de cobro si se proporcionó
+      if (body.billingDispatchId) {
+        const dispatch = await db.query.agreementBillingEmailDispatches.findFirst({
+          where: eq(agreementBillingEmailDispatches.id, body.billingDispatchId),
+          columns: { id: true, agreementId: true },
+        });
+
+        if (!dispatch) {
+          throwHttpError({
+            status: 404,
+            message: `Instrucción de cobro con ID ${body.billingDispatchId} no encontrada`,
+            code: 'NOT_FOUND',
+          });
+        }
+
+        if (body.agreementId && dispatch.agreementId !== body.agreementId) {
+          throwHttpError({
+            status: 400,
+            message: 'La instrucción de cobro no corresponde al convenio seleccionado',
+            code: 'BAD_REQUEST',
+          });
+        }
+      }
+
       const normalizedCompanyDocument = body.companyDocumentNumber?.trim()
         ? normalizeDocumentNumber(body.companyDocumentNumber)
         : '';
@@ -468,6 +493,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
             note: `Lote libranza referencia ${body.referenceNumber}`.slice(0, 1000),
             payrollReferenceNumber: body.referenceNumber,
             payrollPayerDocumentNumber: body.companyDocumentNumber?.trim() || null,
+            billingDispatchId: body.billingDispatchId ?? null,
             loanPaymentMethodAllocations: [
               {
                 collectionMethodId: body.collectionMethodId,

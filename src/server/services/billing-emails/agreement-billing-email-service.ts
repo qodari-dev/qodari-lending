@@ -1,5 +1,6 @@
 import { sendResendGenericEmail } from '@/server/clients/resend';
 import {
+  agreementBillingEmailDispatchItems,
   agreementBillingEmailDispatches,
   billingCycleProfileCycles,
   billingCycleProfiles,
@@ -10,12 +11,12 @@ import {
 import { enqueueAgreementBillingEmailJob } from '@/server/queues/agreement-billing-email';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary } from '@/server/utils/loan-statement';
-import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
 import type { BillingEmailTemplateVariable } from '@/utils/billing-email-template-variables';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { replaceVariablesInTemplate } from '@/utils/replace-vaiables-in-template';
 import { addDays, getDaysInMonth, isSaturday, isSunday, startOfDay, subDays } from 'date-fns';
-import { and, asc, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import { Workbook } from 'exceljs';
 
 type TriggerSource = 'CRON' | 'MANUAL' | 'RETRY';
@@ -25,6 +26,17 @@ type EnqueueAgreementBillingEmailsInput = {
   triggerSource: TriggerSource;
   forceResend?: boolean;
   runDate?: Date;
+};
+
+type DispatchItemRow = {
+  loanId: number;
+  creditNumber: string;
+  borrowerName: string;
+  borrowerDocument: string;
+  currentBalance: number;
+  installmentValue: number;
+  overdueAmount: number;
+  daysPastDue: number;
 };
 
 function normalizeToDateOnly(value: Date) {
@@ -112,7 +124,16 @@ async function getInstallmentValue(loanId: number, runDate: string) {
   );
 }
 
-async function buildLoansAttachment(agreementId: number, runDate: string) {
+function computeOverdueInfo(balanceSummary: { overdueBalance: string | number | null }) {
+  const overdueAmount = roundMoney(toNumber(balanceSummary.overdueBalance));
+  if (overdueAmount <= 0) return { overdueAmount: 0, daysPastDue: 0 };
+
+  // daysPastDue: el cálculo exacto requeriría la fecha de la cuota más antigua vencida.
+  // Por ahora se deja en 0; se puede enriquecer con balanceSummary.oldestOverdueDate.
+  return { overdueAmount, daysPastDue: 0 };
+}
+
+async function buildLoansData(agreementId: number, runDate: string): Promise<DispatchItemRow[]> {
   const agreementLoans = await db.query.loans.findMany({
     where: and(eq(loans.agreementId, agreementId), inArray(loans.status, ['ACTIVE', 'ACCOUNTED'])),
     columns: {
@@ -135,44 +156,109 @@ async function buildLoansAttachment(agreementId: number, runDate: string) {
     orderBy: [asc(loans.creditNumber)],
   });
 
-  const rows = await Promise.all(
+  return Promise.all(
     agreementLoans.map(async (loan) => {
       const [balanceSummary, installmentValue] = await Promise.all([
         getLoanBalanceSummary(loan.id),
         getInstallmentValue(loan.id, runDate),
       ]);
 
+      const { overdueAmount, daysPastDue } = computeOverdueInfo(balanceSummary);
+
       return {
+        loanId: loan.id,
         creditNumber: loan.creditNumber,
-        thirdParty: getThirdPartyLabel(loan.borrower),
-        balance: roundMoney(toNumber(balanceSummary.currentBalance)),
+        borrowerName: getThirdPartyLabel(loan.borrower),
+        borrowerDocument: loan.borrower.documentNumber,
+        currentBalance: roundMoney(toNumber(balanceSummary.currentBalance)),
         installmentValue,
+        overdueAmount,
+        daysPastDue,
       };
     })
   );
+}
 
+function buildExcelAttachment(params: {
+  rows: DispatchItemRow[];
+  dispatchNumber: number;
+  period: string;
+  agreementCode: string;
+}) {
   const workbook = new Workbook();
   const worksheet = workbook.addWorksheet('Creditos');
 
+  // Encabezado de instrucción
+  worksheet.mergeCells('A1:F1');
+  const titleCell = worksheet.getCell('A1');
+  titleCell.value = `Instrucción #${params.dispatchNumber} | Convenio: ${params.agreementCode} | Período: ${params.period}`;
+  titleCell.font = { bold: true, size: 12 };
+  titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.getRow(1).height = 24;
+
+  // Fila vacía de separación
+  worksheet.addRow([]);
+
+  // Definir columnas (a partir de fila 3)
   worksheet.columns = [
     { header: 'Numero credito', key: 'creditNumber', width: 22 },
-    { header: 'Tercero', key: 'thirdParty', width: 38 },
-    { header: 'Saldo', key: 'balance', width: 18, style: { numFmt: '#,##0.00' } },
+    { header: 'Documento', key: 'borrowerDocument', width: 18 },
+    { header: 'Tercero', key: 'borrowerName', width: 38 },
+    { header: 'Saldo', key: 'currentBalance', width: 18, style: { numFmt: '#,##0.00' } },
     { header: 'Valor cuota', key: 'installmentValue', width: 18, style: { numFmt: '#,##0.00' } },
+    { header: 'Mora', key: 'overdueAmount', width: 18, style: { numFmt: '#,##0.00' } },
   ];
 
-  rows.forEach((row) => worksheet.addRow(row));
-
-  const headerRow = worksheet.getRow(1);
+  // Encabezados de tabla en fila 3
+  const headerRowNum = 3;
+  const headers = ['Numero credito', 'Documento', 'Tercero', 'Saldo', 'Valor cuota', 'Mora'];
+  const headerRow = worksheet.getRow(headerRowNum);
+  headers.forEach((h, i) => {
+    headerRow.getCell(i + 1).value = h;
+  });
   headerRow.font = { bold: true };
   headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
-  const content = await workbook.xlsx.writeBuffer();
-  const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
-  return {
-    contentBase64: buffer.toString('base64'),
-    rowsCount: rows.length,
-  };
+  // Datos
+  let totalBalance = 0;
+  let totalInstallment = 0;
+  let totalOverdue = 0;
+
+  for (const row of params.rows) {
+    worksheet.addRow({
+      creditNumber: row.creditNumber,
+      borrowerDocument: row.borrowerDocument,
+      borrowerName: row.borrowerName,
+      currentBalance: row.currentBalance,
+      installmentValue: row.installmentValue,
+      overdueAmount: row.overdueAmount,
+    });
+    totalBalance = roundMoney(totalBalance + row.currentBalance);
+    totalInstallment = roundMoney(totalInstallment + row.installmentValue);
+    totalOverdue = roundMoney(totalOverdue + row.overdueAmount);
+  }
+
+  // Fila de totales
+  const totalsRow = worksheet.addRow({
+    creditNumber: '',
+    borrowerDocument: '',
+    borrowerName: 'TOTALES',
+    currentBalance: totalBalance,
+    installmentValue: totalInstallment,
+    overdueAmount: totalOverdue,
+  });
+  totalsRow.font = { bold: true };
+
+  return { workbook, totalInstallment };
+}
+
+async function getNextDispatchNumber(agreementId: number): Promise<number> {
+  const [result] = await db
+    .select({ maxNumber: sql<number>`COALESCE(MAX(${agreementBillingEmailDispatches.dispatchNumber}), 0)` })
+    .from(agreementBillingEmailDispatches)
+    .where(eq(agreementBillingEmailDispatches.agreementId, agreementId));
+
+  return (result?.maxNumber ?? 0) + 1;
 }
 
 async function enqueueDispatch(params: {
@@ -224,6 +310,9 @@ async function enqueueDispatch(params: {
     return { queued: true as const };
   }
 
+  // Nuevo dispatch: asignar consecutivo
+  const dispatchNumber = await getNextDispatchNumber(params.agreementId);
+
   const [created] = await db
     .insert(agreementBillingEmailDispatches)
     .values({
@@ -235,6 +324,7 @@ async function enqueueDispatch(params: {
       triggerSource: params.triggerSource,
       status: 'QUEUED',
       queuedAt: new Date(),
+      dispatchNumber,
     })
     .returning();
 
@@ -242,7 +332,32 @@ async function enqueueDispatch(params: {
   return { queued: true as const };
 }
 
+/**
+ * Recupera dispatches que quedaron en RUNNING por más de 10 minutos
+ * (posiblemente por un crash del worker). Los marca como FAILED.
+ */
+async function recoverStuckDispatches() {
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+
+  await db
+    .update(agreementBillingEmailDispatches)
+    .set({
+      status: 'FAILED',
+      failedAt: new Date(),
+      lastError: 'Timeout: dispatch en RUNNING por más de 10 minutos',
+    })
+    .where(
+      and(
+        eq(agreementBillingEmailDispatches.status, 'RUNNING'),
+        lt(agreementBillingEmailDispatches.startedAt, tenMinutesAgo)
+      )
+    );
+}
+
 export async function enqueueAgreementBillingEmails(input: EnqueueAgreementBillingEmailsInput) {
+  // Recuperar dispatches stuck antes de procesar
+  await recoverStuckDispatches();
+
   const runDate = normalizeToDateOnly(input.runDate ?? new Date());
   const runDateOnly = formatDateOnly(runDate);
   const period = buildPeriod(runDate);
@@ -272,6 +387,12 @@ export async function enqueueAgreementBillingEmails(input: EnqueueAgreementBilli
 
   for (const profile of profiles) {
     if (!profile.agreement || !profile.agreement.isActive) {
+      skippedCount += 1;
+      continue;
+    }
+
+    // Validar vigencia del convenio
+    if (profile.agreement.endDate && profile.agreement.endDate < runDateOnly) {
       skippedCount += 1;
       continue;
     }
@@ -342,6 +463,7 @@ export async function listAgreementBillingEmailDispatches(agreementId: number, l
       scheduledDate: true,
       status: true,
       triggerSource: true,
+      dispatchNumber: true,
       attempts: true,
       queuedAt: true,
       startedAt: true,
@@ -349,6 +471,8 @@ export async function listAgreementBillingEmailDispatches(agreementId: number, l
       failedAt: true,
       resendMessageId: true,
       lastError: true,
+      totalBilledAmount: true,
+      totalCredits: true,
       createdAt: true,
     },
     orderBy: [
@@ -485,27 +609,41 @@ export async function processAgreementBillingEmailDispatch(dispatchId: number) {
         : '',
       periodo: dispatch.period,
       fecha_envio: formatDateOnly(new Date()),
+      numero_instruccion: String(runningDispatch.dispatchNumber),
     };
 
     const subject = replaceVariablesInTemplate(template.subject, variables, { strict: true });
     const html = replaceVariablesInTemplate(template.htmlContent, variables, { strict: true });
-    // const text = renderTemplate(stripHtmlToText(template.htmlContent), variables);
 
-    const attachment = await buildLoansAttachment(agreement.id, dispatch.scheduledDate);
-    // const resendResponse = await sendResendEmail({
-    //   from: template.fromEmail,
-    //   to: [agreement.billingEmailTo],
-    //   cc: agreement.billingEmailCc ? [agreement.billingEmailCc] : undefined,
-    //   subject,
-    //   html,
-    //   text,
-    //   attachments: [
-    //     {
-    //       filename: `cartera-${agreement.agreementCode.toLowerCase()}-${dispatch.period}.xlsx`,
-    //       content: attachment.contentBase64,
-    //     },
-    //   ],
-    // });
+    // Construir datos de créditos y Excel
+    const rows = await buildLoansData(agreement.id, dispatch.scheduledDate);
+    const { workbook, totalInstallment } = buildExcelAttachment({
+      rows,
+      dispatchNumber: runningDispatch.dispatchNumber,
+      period: dispatch.period,
+      agreementCode: agreement.agreementCode,
+    });
+
+    const content = await workbook.xlsx.writeBuffer();
+    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+    const contentBase64 = buffer.toString('base64');
+
+    // Guardar items del despacho (snapshot de lo cobrado)
+    if (rows.length > 0) {
+      await db.insert(agreementBillingEmailDispatchItems).values(
+        rows.map((row) => ({
+          dispatchId: runningDispatch.id,
+          loanId: row.loanId,
+          creditNumber: row.creditNumber,
+          borrowerName: row.borrowerName,
+          borrowerDocument: row.borrowerDocument,
+          currentBalance: toDecimalString(row.currentBalance),
+          installmentAmount: toDecimalString(row.installmentValue),
+          overdueAmount: toDecimalString(row.overdueAmount),
+          daysPastDue: row.daysPastDue,
+        }))
+      );
+    }
 
     const resendResponse = await sendResendGenericEmail({
       from: template.fromEmail,
@@ -519,7 +657,7 @@ export async function processAgreementBillingEmailDispatch(dispatchId: number) {
       attachments: [
         {
           filename: `cartera-${agreement.agreementCode.toLowerCase()}-${dispatch.period}.xlsx`,
-          content: attachment.contentBase64,
+          content: contentBase64,
         },
       ],
     });
@@ -532,9 +670,11 @@ export async function processAgreementBillingEmailDispatch(dispatchId: number) {
         failedAt: null,
         lastError: null,
         resendMessageId: resendResponse.id,
+        totalBilledAmount: toDecimalString(totalInstallment),
+        totalCredits: rows.length,
         metadata: {
           agreement: buildAgreementLabel(agreement),
-          loansCount: attachment.rowsCount,
+          loansCount: rows.length,
         },
       })
       .where(eq(agreementBillingEmailDispatches.id, runningDispatch.id));

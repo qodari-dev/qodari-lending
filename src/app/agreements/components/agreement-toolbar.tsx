@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useHasPermission } from '@/stores/auth-store-provider';
-import { Mail, Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import * as React from 'react';
 
 interface ToolbarProps {
@@ -11,10 +11,8 @@ interface ToolbarProps {
   onSearchChange: (value: string) => void;
   onRefresh?: () => void;
   onCreate?: () => void;
-  onRunBillingEmails?: () => void;
   exportActions?: React.ReactNode;
   isRefreshing?: boolean;
-  isRunningBillingEmails?: boolean;
 }
 
 export function AgreementsToolbar({
@@ -22,13 +20,10 @@ export function AgreementsToolbar({
   onSearchChange,
   onRefresh,
   onCreate,
-  onRunBillingEmails,
   exportActions,
   isRefreshing = false,
-  isRunningBillingEmails = false,
 }: ToolbarProps) {
   const canCreate = useHasPermission('agreements:create');
-  const canRun = useHasPermission('agreements:run');
 
   return (
     <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -61,20 +56,6 @@ export function AgreementsToolbar({
           <Button type="button" size="sm" onClick={onCreate} className="h-9">
             <Plus className="mr-2 h-4 w-4" />
             Nuevo
-          </Button>
-        )}
-
-        {onRunBillingEmails && canRun && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={onRunBillingEmails}
-            disabled={isRunningBillingEmails}
-            className="h-9"
-          >
-            <Mail className={`mr-2 h-4 w-4 ${isRunningBillingEmails ? 'animate-pulse' : ''}`} />
-            Encolar correos
           </Button>
         )}
       </div>

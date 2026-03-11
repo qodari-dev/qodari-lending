@@ -66,6 +66,7 @@ import type {
   billingCycleProfiles,
   billingCycleProfileCycles,
   agreementBillingEmailDispatches,
+  agreementBillingEmailDispatchItems,
   loanApplicationRiskAssessments,
   channels,
   loanApplicationStatusHistory,
@@ -750,8 +751,16 @@ export type AgreementBillingEmailDispatches = typeof agreementBillingEmailDispat
   agreement?: Agreements;
   billingCycleProfile?: BillingCycleProfiles;
   billingCycleProfileCycle?: BillingCycleProfileCycles;
+  items?: AgreementBillingEmailDispatchItems[];
 };
 export type NewAgreementBillingEmailDispatches = typeof agreementBillingEmailDispatches.$inferInsert;
+
+export type AgreementBillingEmailDispatchItems =
+  typeof agreementBillingEmailDispatchItems.$inferSelect & {
+    dispatch?: AgreementBillingEmailDispatches;
+  };
+export type NewAgreementBillingEmailDispatchItems =
+  typeof agreementBillingEmailDispatchItems.$inferInsert;
 
 // ---------------------------------------------------------------------
 // Historial de evaluaciones de riesgo por solicitud

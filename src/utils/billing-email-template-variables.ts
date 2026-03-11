@@ -10,6 +10,7 @@ export const BILLING_EMAIL_TEMPLATE_VARIABLES = [
   'dia_pago_esperado',
   'periodo',
   'fecha_envio',
+  'numero_instruccion',
 ] as const;
 
 export type BillingEmailTemplateVariable = (typeof BILLING_EMAIL_TEMPLATE_VARIABLES)[number];

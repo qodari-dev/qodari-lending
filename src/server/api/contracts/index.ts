@@ -10,6 +10,7 @@ import { bankFile } from './bank-file';
 import { bank } from './bank';
 import { billingConcept } from './billing-concept';
 import { billingCycleProfile } from './billing-cycle-profile';
+import { billingDispatch } from './billing-dispatch';
 import { billingEmailTemplate } from './billing-email-template';
 import { causation } from './causation';
 import { channel } from './channel';
@@ -65,6 +66,7 @@ export const contract = c.router(
     bank,
     billingConcept,
     billingCycleProfile,
+    billingDispatch,
     billingEmailTemplate,
     causation,
     channel,

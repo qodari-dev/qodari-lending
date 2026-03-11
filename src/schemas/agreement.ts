@@ -131,6 +131,7 @@ export const AgreementBillingEmailDispatchSchema = z.object({
   scheduledDate: z.string(),
   status: z.enum(AGREEMENT_BILLING_EMAIL_DISPATCH_STATUS_OPTIONS),
   triggerSource: z.enum(['CRON', 'MANUAL', 'RETRY']),
+  dispatchNumber: z.number().int().nonnegative(),
   attempts: z.number().int().nonnegative(),
   queuedAt: z.string().nullable(),
   startedAt: z.string().nullable(),
@@ -138,6 +139,8 @@ export const AgreementBillingEmailDispatchSchema = z.object({
   failedAt: z.string().nullable(),
   resendMessageId: z.string().nullable(),
   lastError: z.string().nullable(),
+  totalBilledAmount: z.string().nullable(),
+  totalCredits: z.number().int().nullable(),
   createdAt: z.string(),
 });
 

@@ -1,4 +1,9 @@
-import { db, billingCycleProfileCycles, billingCycleProfiles } from '@/server/db';
+import {
+  agreementBillingEmailDispatches,
+  billingCycleProfileCycles,
+  billingCycleProfiles,
+  db,
+} from '@/server/db';
 import { logAudit } from '@/server/utils/audit-logger';
 import { UnifiedAuthContext } from '@/server/utils/auth-context';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
@@ -361,6 +366,19 @@ export const billingCycleProfile = tsr.router(contract.billingCycleProfile, {
           status: 404,
           message: `Perfil de ciclo con ID ${id} no encontrado`,
           code: 'NOT_FOUND',
+        });
+      }
+
+      const hasDispatches = await db.query.agreementBillingEmailDispatches.findFirst({
+        where: eq(agreementBillingEmailDispatches.billingCycleProfileId, id),
+        columns: { id: true },
+      });
+
+      if (hasDispatches) {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede eliminar el perfil porque tiene historial de despachos de facturación',
+          code: 'BAD_REQUEST',
         });
       }
 

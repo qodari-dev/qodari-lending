@@ -1,7 +1,9 @@
 import {
+  agreementBillingEmailDispatches,
   agreements,
   billingCycleProfiles,
   db,
+  loans,
 } from '@/server/db';
 import {
   enqueueAgreementBillingEmails,
@@ -22,7 +24,7 @@ import {
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { formatDateOnly, toDbDate, toIsoString } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 type AgreementColumn = keyof typeof agreements.$inferSelect;
@@ -346,6 +348,35 @@ export const agreement = tsr.router(contract.agreement, {
         });
       }
 
+      const hasActiveLoans = await db.query.loans.findFirst({
+        where: and(
+          eq(loans.agreementId, id),
+          inArray(loans.status, ['ACTIVE', 'ACCOUNTED'])
+        ),
+        columns: { id: true },
+      });
+
+      if (hasActiveLoans) {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede eliminar el convenio porque tiene créditos activos asociados',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const hasDispatches = await db.query.agreementBillingEmailDispatches.findFirst({
+        where: eq(agreementBillingEmailDispatches.agreementId, id),
+        columns: { id: true },
+      });
+
+      if (hasDispatches) {
+        throwHttpError({
+          status: 400,
+          message: 'No se puede eliminar el convenio porque tiene historial de despachos de facturación',
+          code: 'BAD_REQUEST',
+        });
+      }
+
       const hasProfiles = await db.query.billingCycleProfiles.findFirst({
         where: eq(billingCycleProfiles.agreementId, id),
       });
@@ -452,6 +483,7 @@ export const agreement = tsr.router(contract.agreement, {
             scheduledDate: toIsoString(item.scheduledDate) ?? '',
             status: item.status,
             triggerSource: item.triggerSource,
+            dispatchNumber: item.dispatchNumber,
             attempts: item.attempts,
             queuedAt: toIsoString(item.queuedAt),
             startedAt: toIsoString(item.startedAt),
@@ -459,6 +491,8 @@ export const agreement = tsr.router(contract.agreement, {
             failedAt: toIsoString(item.failedAt),
             resendMessageId: item.resendMessageId,
             lastError: item.lastError,
+            totalBilledAmount: item.totalBilledAmount,
+            totalCredits: item.totalCredits,
             createdAt: toIsoString(item.createdAt) ?? '',
           })),
         },

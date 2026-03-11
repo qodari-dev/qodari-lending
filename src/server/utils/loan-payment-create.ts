@@ -41,6 +41,7 @@ export type CreateLoanPaymentTxInput = {
   note?: string | null;
   payrollReferenceNumber?: string | null;
   payrollPayerDocumentNumber?: string | null;
+  billingDispatchId?: number | null;
   loanPaymentMethodAllocations: LoanPaymentMethodAllocationInput[];
 };
 
@@ -482,6 +483,7 @@ export async function createLoanPaymentTx(
       payrollPayerDocumentNumber: input.payrollPayerDocumentNumber?.trim()
         ? input.payrollPayerDocumentNumber.trim().slice(0, 15)
         : null,
+      billingDispatchId: input.billingDispatchId ?? null,
     })
     .returning();
 

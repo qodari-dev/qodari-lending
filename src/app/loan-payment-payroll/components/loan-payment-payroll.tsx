@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useAgreements } from '@/hooks/queries/use-agreement-queries';
+import { useAgreements, useAgreementBillingEmailDispatches } from '@/hooks/queries/use-agreement-queries';
 import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
 import { useAvailableLoanPaymentReceiptTypes } from '@/hooks/queries/use-loan-payment-queries';
 import { useProcessLoanPaymentPayroll } from '@/hooks/queries/use-loan-payment-payroll-queries';
@@ -57,6 +57,7 @@ type ImportedFileInfo = {
 
 const FormSchema = z.object({
   agreementId: z.number().int().positive().nullable().optional(),
+  billingDispatchId: z.number().int().positive().nullable().optional(),
   companyDocumentNumber: z.string().trim().max(15).nullable().optional(),
   receiptTypeId: z.number().int().positive(),
   glAccountId: z.number().int().positive().optional(),
@@ -146,6 +147,7 @@ export function LoanPaymentPayroll() {
     resolver: zodResolver(FormSchema) as Resolver<FormValues>,
     defaultValues: {
       agreementId: undefined,
+      billingDispatchId: undefined,
       companyDocumentNumber: '',
       receiptTypeId: undefined,
       glAccountId: undefined,
@@ -160,6 +162,23 @@ export function LoanPaymentPayroll() {
     control: form.control,
     name: 'collectionAmount',
   });
+
+  const watchedAgreementId = useWatch({
+    control: form.control,
+    name: 'agreementId',
+  });
+
+  const { data: dispatchesData, isLoading: isLoadingDispatches } =
+    useAgreementBillingEmailDispatches(watchedAgreementId ?? 0, 50, !!watchedAgreementId);
+
+  const sentDispatches = React.useMemo(() => {
+    const items = dispatchesData?.body?.data ?? [];
+    return items.filter((d) => d.status === 'SENT');
+  }, [dispatchesData]);
+
+  React.useEffect(() => {
+    form.setValue('billingDispatchId', undefined);
+  }, [form, watchedAgreementId]);
 
   const { data: agreementsData, isLoading: isLoadingAgreements } = useAgreements({
     limit: 1000,
@@ -431,6 +450,7 @@ export function LoanPaymentPayroll() {
     const response = await processPayroll({
       body: {
         agreementId: values.agreementId ?? null,
+        billingDispatchId: values.billingDispatchId ?? null,
         companyDocumentNumber: values.companyDocumentNumber?.trim() || null,
         receiptTypeId: values.receiptTypeId,
         glAccountId: values.glAccountId,
@@ -459,6 +479,7 @@ export function LoanPaymentPayroll() {
 
       form.reset({
         agreementId: undefined,
+        billingDispatchId: undefined,
         companyDocumentNumber: '',
         receiptTypeId: currentReceiptTypeId,
         glAccountId: currentGlAccountId,
@@ -512,6 +533,44 @@ export function LoanPaymentPayroll() {
                   </Field>
                 )}
               />
+
+              {watchedAgreementId ? (
+                <Controller
+                  name="billingDispatchId"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel htmlFor="billingDispatchId">Instrucción de cobro (opcional)</FieldLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                        value={field.value ? String(field.value) : ''}
+                        disabled={isLoadingDispatches || !sentDispatches.length}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              isLoadingDispatches
+                                ? 'Cargando...'
+                                : sentDispatches.length
+                                  ? 'Seleccione...'
+                                  : 'Sin instrucciones enviadas'
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sentDispatches.map((d) => (
+                            <SelectItem key={d.id} value={String(d.id)}>
+                              #{d.dispatchNumber} — {d.period}
+                              {d.totalBilledAmount ? ` — ${formatCurrency(Number(d.totalBilledAmount))}` : ''}
+                              {d.totalCredits ? ` (${d.totalCredits} créditos)` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
+                />
+              ) : null}
 
               <Controller
                 name="companyDocumentNumber"

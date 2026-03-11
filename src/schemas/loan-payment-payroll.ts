@@ -12,6 +12,7 @@ export const LoanPaymentPayrollRowSchema = z.object({
 export const ProcessLoanPaymentPayrollBodySchema = z.object({
   agreementId: z.number().int().positive().nullable().optional(),
   companyDocumentNumber: z.string().trim().max(15).nullable().optional(),
+  billingDispatchId: z.number().int().positive().nullable().optional(),
   receiptTypeId: z.number().int().positive(),
   glAccountId: z.number().int().positive().optional(),
   collectionMethodId: z.number().int().positive(),

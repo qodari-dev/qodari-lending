@@ -2271,6 +2271,12 @@ export const loanPayments = pgTable(
     payrollReferenceNumber: varchar('payroll_reference_number', { length: 7 }),
     payrollPayerDocumentNumber: varchar('payroll_payer_document_number', { length: 15 }),
 
+    // Enlace opcional a la instrucción de cobro que originó este pago
+    billingDispatchId: integer('billing_dispatch_id').references(
+      () => agreementBillingEmailDispatches.id,
+      { onDelete: 'set null' }
+    ),
+
     // usuario (IAM externo)
     createdByUserId: uuid('created_by_user_id').notNull(),
     createdByUserName: varchar('created_by_user_name', { length: 255 }).notNull(),
@@ -2763,7 +2769,7 @@ export const agreements = pgTable(
     billingEmailTemplateId: integer('billing_email_template_id').references(
       () => billingEmailTemplates.id,
       {
-        onDelete: 'set null',
+        onDelete: 'restrict',
       }
     ),
     startDate: date('start_date').notNull(),
@@ -2814,7 +2820,7 @@ export const billingCycleProfiles = pgTable(
       .references(() => creditProducts.id, { onDelete: 'cascade' }),
     // Convenio/pagaduría. null => default del producto
     agreementId: integer('agreement_id').references(() => agreements.id, {
-      onDelete: 'set null',
+      onDelete: 'restrict',
     }),
     // # de ciclos dentro del mes (1,2,3...)
     cyclesPerMonth: integer('cycles_per_month').notNull().default(1),
@@ -2886,19 +2892,21 @@ export const agreementBillingEmailDispatches = pgTable(
     id: serial('id').primaryKey(),
     agreementId: integer('agreement_id')
       .notNull()
-      .references(() => agreements.id, { onDelete: 'cascade' }),
+      .references(() => agreements.id, { onDelete: 'restrict' }),
     billingCycleProfileId: integer('billing_cycle_profile_id')
       .notNull()
-      .references(() => billingCycleProfiles.id, { onDelete: 'cascade' }),
+      .references(() => billingCycleProfiles.id, { onDelete: 'restrict' }),
     billingCycleProfileCycleId: integer('billing_cycle_profile_cycle_id')
       .notNull()
-      .references(() => billingCycleProfileCycles.id, { onDelete: 'cascade' }),
+      .references(() => billingCycleProfileCycles.id, { onDelete: 'restrict' }),
     period: varchar('period', { length: 7 }).notNull(),
     scheduledDate: date('scheduled_date').notNull(),
     status: billingEmailDispatchStatusEnum('status').notNull().default('QUEUED'),
     triggerSource: billingEmailDispatchTriggerSourceEnum('trigger_source')
       .notNull()
       .default('MANUAL'),
+    // Consecutivo por convenio (1, 2, 3...)
+    dispatchNumber: integer('dispatch_number').notNull().default(0),
     attempts: integer('attempts').notNull().default(0),
     queuedAt: timestamp('queued_at', { withTimezone: true }),
     startedAt: timestamp('started_at', { withTimezone: true }),
@@ -2906,6 +2914,9 @@ export const agreementBillingEmailDispatches = pgTable(
     failedAt: timestamp('failed_at', { withTimezone: true }),
     resendMessageId: varchar('resend_message_id', { length: 255 }),
     lastError: text('last_error'),
+    // Resumen del cobro (se llena al procesar)
+    totalBilledAmount: decimal('total_billed_amount', { precision: 14, scale: 2 }),
+    totalCredits: integer('total_credits'),
     metadata: jsonb('metadata'),
     ...timestamps,
   },
@@ -2926,6 +2937,41 @@ export const agreementBillingEmailDispatches = pgTable(
       sql`${t.period} ~ '^[0-9]{4}-[0-9]{2}$'`
     ),
     check('chk_agreement_billing_email_dispatch_attempts_min', sql`${t.attempts} >= 0`),
+    check('chk_agreement_billing_email_dispatch_number_min', sql`${t.dispatchNumber} >= 0`),
+  ]
+);
+
+// ---------------------------------------------------------------------
+// Líneas de detalle de cada despacho de facturación (snapshot de lo cobrado)
+// Nota:
+// Cada fila representa un crédito incluido en la instrucción de cobro.
+// Son un snapshot: guardan nombre, cédula, saldo y cuota al momento del corte.
+// Permiten conciliación futura: comparar lo cobrado vs lo pagado por nómina.
+// ---------------------------------------------------------------------
+export const agreementBillingEmailDispatchItems = pgTable(
+  'agreement_billing_email_dispatch_items',
+  {
+    id: serial('id').primaryKey(),
+    dispatchId: integer('dispatch_id')
+      .notNull()
+      .references(() => agreementBillingEmailDispatches.id, { onDelete: 'restrict' }),
+    loanId: integer('loan_id')
+      .notNull()
+      .references(() => loans.id, { onDelete: 'restrict' }),
+    creditNumber: varchar('credit_number', { length: 50 }).notNull(),
+    borrowerName: varchar('borrower_name', { length: 255 }).notNull(),
+    borrowerDocument: varchar('borrower_document', { length: 17 }).notNull(),
+    currentBalance: decimal('current_balance', { precision: 14, scale: 2 }).notNull(),
+    installmentAmount: decimal('installment_amount', { precision: 14, scale: 2 }).notNull(),
+    overdueAmount: decimal('overdue_amount', { precision: 14, scale: 2 })
+      .notNull()
+      .default('0'),
+    daysPastDue: integer('days_past_due').notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_dispatch_items_dispatch').on(t.dispatchId),
+    index('idx_dispatch_items_loan').on(t.loanId),
   ]
 );
 

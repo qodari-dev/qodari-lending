@@ -11,6 +11,7 @@ import {
   HandCoins,
   HandHeart,
   LayoutDashboard,
+  Mail,
   Receipt,
   Settings,
   ShieldAlert,
@@ -188,6 +189,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Abono Individual', url: `/loan-payments` },
                   { title: 'Abono por libranza', url: `/loan-payment-payroll` },
                   { title: 'Abono por archivo', url: `/loan-payment-file` },
+                ],
+              },
+              {
+                title: 'Facturación',
+                icon: Mail,
+                items: [
+                  { title: 'Instrucciones de cobro', url: `/billing-dispatches` },
                 ],
               },
             ],

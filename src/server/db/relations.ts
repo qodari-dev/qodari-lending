@@ -63,6 +63,7 @@ import {
   billingCycleProfiles,
   billingCycleProfileCycles,
   agreementBillingEmailDispatches,
+  agreementBillingEmailDispatchItems,
   loanApplicationRiskAssessments,
   loanApprovalLevels,
   loanApprovalLevelUsers,
@@ -891,6 +892,10 @@ export const loanPaymentsRelations = relations(loanPayments, ({ one, many }) => 
     fields: [loanPayments.glAccountId],
     references: [glAccounts.id],
   }),
+  billingDispatch: one(agreementBillingEmailDispatches, {
+    fields: [loanPayments.billingDispatchId],
+    references: [agreementBillingEmailDispatches.id],
+  }),
   loanPaymentMethodAllocations: many(loanPaymentMethodAllocations),
 }));
 
@@ -1083,7 +1088,7 @@ export const billingCycleProfileCyclesRelations = relations(
 
 export const agreementBillingEmailDispatchesRelations = relations(
   agreementBillingEmailDispatches,
-  ({ one }) => ({
+  ({ one, many }) => ({
     agreement: one(agreements, {
       fields: [agreementBillingEmailDispatches.agreementId],
       references: [agreements.id],
@@ -1095,6 +1100,24 @@ export const agreementBillingEmailDispatchesRelations = relations(
     billingCycleProfileCycle: one(billingCycleProfileCycles, {
       fields: [agreementBillingEmailDispatches.billingCycleProfileCycleId],
       references: [billingCycleProfileCycles.id],
+    }),
+    items: many(agreementBillingEmailDispatchItems),
+  })
+);
+
+// ---------------------------------------------------------------------
+// Líneas de detalle de despacho de facturación
+// ---------------------------------------------------------------------
+export const agreementBillingEmailDispatchItemsRelations = relations(
+  agreementBillingEmailDispatchItems,
+  ({ one }) => ({
+    dispatch: one(agreementBillingEmailDispatches, {
+      fields: [agreementBillingEmailDispatchItems.dispatchId],
+      references: [agreementBillingEmailDispatches.id],
+    }),
+    loan: one(loans, {
+      fields: [agreementBillingEmailDispatchItems.loanId],
+      references: [loans.id],
     }),
   })
 );

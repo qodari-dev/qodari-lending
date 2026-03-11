@@ -8,6 +8,8 @@ import {
   sexLabels,
   taxpayerTypeLabels,
 } from '@/schemas/third-party';
+import { loanApplicationStatusLabels, type LoanApplicationStatus } from '@/schemas/loan-application';
+import { loanStatusLabels, type LoanStatus } from '@/schemas/loan';
 import { formatDate, formatCurrency } from '@/utils/formatters';
 import {
   Table,
@@ -17,6 +19,30 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+
+const loanApplicationStatusVariant: Record<
+  LoanApplicationStatus,
+  'default' | 'secondary' | 'destructive' | 'outline'
+> = {
+  PENDING: 'outline',
+  APPROVED: 'default',
+  REJECTED: 'destructive',
+  CANCELED: 'secondary',
+};
+
+const loanStatusVariant: Record<
+  LoanStatus,
+  'default' | 'secondary' | 'destructive' | 'outline'
+> = {
+  ACTIVE: 'default',
+  GENERATED: 'outline',
+  INACTIVE: 'secondary',
+  ACCOUNTED: 'outline',
+  VOID: 'destructive',
+  RELIQUIDATED: 'secondary',
+  FINISHED: 'secondary',
+  PAID: 'default',
+};
 
 export function ThirdPartyInfo({
   thirdParty,
@@ -144,6 +170,13 @@ export function ThirdPartyInfo({
 
   const loanApplications = thirdParty.loanApplications ?? [];
   const loans = thirdParty.loans ?? [];
+
+  // Solicitudes donde este tercero es codeudor
+  const coDebtorApplications = (thirdParty.loanApplicationCoDebtors ?? [])
+    .map((item) => item.loanApplication)
+    .filter((app): app is NonNullable<typeof app> => !!app);
+
+  // Créditos donde este tercero es codeudor (a través de solicitudes aprobadas)
   const coDebtorLoans = Array.from(
     new Map(
       (thirdParty.loanApplicationCoDebtors ?? [])
@@ -164,7 +197,7 @@ export function ThirdPartyInfo({
         <div className="px-4">
           <DescriptionList sections={sections} columns={2} />
 
-          {/* Solicitudes de credito */}
+          {/* Solicitudes de credito como titular */}
           <div className="mt-6">
             <h3 className="mb-4 text-lg font-semibold">Solicitudes de Credito</h3>
             {loanApplications.length > 0 ? (
@@ -172,7 +205,6 @@ export function ThirdPartyInfo({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>ID</TableHead>
                       <TableHead>Codigo</TableHead>
                       <TableHead>Producto</TableHead>
                       <TableHead>Monto</TableHead>
@@ -183,14 +215,15 @@ export function ThirdPartyInfo({
                   <TableBody>
                     {loanApplications.map((app) => (
                       <TableRow key={app.id}>
-                        <TableCell className="font-medium">{app.id}</TableCell>
-                        <TableCell>{app.creditNumber ?? '-'}</TableCell>
+                        <TableCell className="font-medium">{app.creditNumber ?? '-'}</TableCell>
                         <TableCell>{app.creditProduct?.name ?? '-'}</TableCell>
                         <TableCell>
                           {app.requestedAmount ? formatCurrency(Number(app.requestedAmount)) : '-'}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{app.status ?? '-'}</Badge>
+                          <Badge variant={loanApplicationStatusVariant[app.status] ?? 'outline'}>
+                            {loanApplicationStatusLabels[app.status] ?? app.status}
+                          </Badge>
                         </TableCell>
                         <TableCell>{app.createdAt ? formatDate(app.createdAt) : '-'}</TableCell>
                       </TableRow>
@@ -205,15 +238,14 @@ export function ThirdPartyInfo({
             )}
           </div>
 
-          {/* Creditos */}
+          {/* Creditos como titular */}
           <div className="mt-6">
-            <h3 className="mb-4 text-lg font-semibold">Creditos Actuales</h3>
+            <h3 className="mb-4 text-lg font-semibold">Creditos como Titular</h3>
             {loans.length > 0 ? (
               <div className="rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>ID</TableHead>
                       <TableHead>Codigo</TableHead>
                       <TableHead>Fondo</TableHead>
                       <TableHead>Monto Capital</TableHead>
@@ -224,8 +256,7 @@ export function ThirdPartyInfo({
                   <TableBody>
                     {loans.map((loan) => (
                       <TableRow key={loan.id}>
-                        <TableCell className="font-medium">{loan.id}</TableCell>
-                        <TableCell>{loan.creditNumber ?? '-'}</TableCell>
+                        <TableCell className="font-medium">{loan.creditNumber ?? '-'}</TableCell>
                         <TableCell>{loan.creditFund?.name ?? '-'}</TableCell>
                         <TableCell>
                           {loan.principalAmount
@@ -233,7 +264,9 @@ export function ThirdPartyInfo({
                             : '-'}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{loan.status ?? '-'}</Badge>
+                          <Badge variant={loanStatusVariant[loan.status] ?? 'outline'}>
+                            {loanStatusLabels[loan.status] ?? loan.status}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           {loan.creditStartDate ? formatDate(loan.creditStartDate) : '-'}
@@ -245,20 +278,60 @@ export function ThirdPartyInfo({
               </div>
             ) : (
               <div className="text-muted-foreground rounded-lg border py-8 text-center">
-                No hay creditos activos para este tercero.
+                No hay creditos como titular para este tercero.
+              </div>
+            )}
+          </div>
+
+          {/* Solicitudes como codeudor */}
+          <div className="mt-6">
+            <h3 className="mb-4 text-lg font-semibold">Solicitudes como Codeudor</h3>
+            {coDebtorApplications.length > 0 ? (
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Codigo</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Monto</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Fecha</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {coDebtorApplications.map((app) => (
+                      <TableRow key={app.id}>
+                        <TableCell className="font-medium">{app.creditNumber ?? '-'}</TableCell>
+                        <TableCell>{app.creditProduct?.name ?? '-'}</TableCell>
+                        <TableCell>
+                          {app.requestedAmount ? formatCurrency(Number(app.requestedAmount)) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={loanApplicationStatusVariant[app.status] ?? 'outline'}>
+                            {loanApplicationStatusLabels[app.status] ?? app.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{app.createdAt ? formatDate(app.createdAt) : '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-muted-foreground rounded-lg border py-8 text-center">
+                No hay solicitudes donde este tercero figure como codeudor.
               </div>
             )}
           </div>
 
           {/* Creditos como codeudor */}
           <div className="mt-6">
-            <h3 className="mb-4 text-lg font-semibold">Creditos Como Codeudor</h3>
+            <h3 className="mb-4 text-lg font-semibold">Creditos como Codeudor</h3>
             {coDebtorLoans.length > 0 ? (
               <div className="rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>ID</TableHead>
                       <TableHead>Codigo</TableHead>
                       <TableHead>Fondo</TableHead>
                       <TableHead>Monto Capital</TableHead>
@@ -269,14 +342,15 @@ export function ThirdPartyInfo({
                   <TableBody>
                     {coDebtorLoans.map((loan) => (
                       <TableRow key={loan.id}>
-                        <TableCell className="font-medium">{loan.id}</TableCell>
-                        <TableCell>{loan.creditNumber ?? '-'}</TableCell>
+                        <TableCell className="font-medium">{loan.creditNumber ?? '-'}</TableCell>
                         <TableCell>{loan.creditFund?.name ?? '-'}</TableCell>
                         <TableCell>
                           {loan.principalAmount ? formatCurrency(Number(loan.principalAmount)) : '-'}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{loan.status ?? '-'}</Badge>
+                          <Badge variant={loanStatusVariant[loan.status] ?? 'outline'}>
+                            {loanStatusLabels[loan.status] ?? loan.status}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           {loan.creditStartDate ? formatDate(loan.creditStartDate) : '-'}

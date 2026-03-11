@@ -1,4 +1,6 @@
 {
+  "id": "4a995477-d269-445b-a636-adbba5a667b3",
+  "prevId": "af3218cf-cfa0-4884-b171-2841897d375e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5848,7 +5850,7 @@
         },
         "uploaded_by_user_name": {
           "name": "uploaded_by_user_name",
-          "type": "uuid",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -6277,6 +6279,12 @@
         },
         "executed_by_user_id": {
           "name": "executed_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "executed_by_user_name": {
+          "name": "executed_by_user_name",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
@@ -10224,6 +10232,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "created_by_user_name": {
+          "name": "created_by_user_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -13721,10 +13735,8 @@
   "policies": {},
   "views": {},
   "_meta": {
+    "columns": {},
     "schemas": {},
-    "tables": {},
-    "columns": {}
-  },
-  "id": "af3218cf-cfa0-4884-b171-2841897d375e",
-  "prevId": "14160f9e-a210-4028-8dac-325e6c55fd77"
+    "tables": {}
+  }
 }

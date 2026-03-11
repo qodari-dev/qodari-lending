@@ -1407,7 +1407,7 @@ export const loanApplicationDocuments = pgTable(
     isDelivered: boolean('is_delivered').notNull().default(false),
     fileKey: varchar('file_key', { length: 512 }),
     uploadedByUserId: uuid('uploaded_by_user_id'),
-    uploadedByUserName: uuid('uploaded_by_user_name'),
+    uploadedByUserName: varchar('uploaded_by_user_name', { length: 255 }),
     ...timestamps,
   },
   (t) => [uniqueIndex('uniq_application_document_type').on(t.loanApplicationId, t.documentTypeId)]
@@ -2198,6 +2198,7 @@ export const payrollExcessPayments = pgTable(
 
     // Concr64.usuario (viene de IAM/otro DB)
     createdByUserId: uuid('created_by_user_id').notNull(),
+    createdByUserName: varchar('created_by_user_name', { length: 255 }).notNull(),
 
     ...timestamps,
   },
@@ -2991,7 +2992,7 @@ export const loanApplicationRiskAssessments = pgTable(
 
     // trazabilidad
     executedByUserId: uuid('executed_by_user_id').notNull(),
-    executedByUserName: varchar('executed_by_user_id', { length: 255 }).notNull(),
+    executedByUserName: varchar('executed_by_user_name', { length: 255 }).notNull(),
     executedAt: timestamp('executed_at', { withTimezone: true }).notNull().defaultNow(),
 
     // resultado normalizado

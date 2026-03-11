@@ -83,6 +83,7 @@ const THIRD_PARTY_INCLUDES = createIncludeMap<typeof db.query.thirdParties>()({
       with: {
         loanApplication: {
           with: {
+            creditProduct: true,
             loans: {
               with: {
                 creditFund: true,

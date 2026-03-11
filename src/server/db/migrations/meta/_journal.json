@@ -274,6 +274,13 @@
       "when": 1773560000000,
       "tag": "0039_signature_system_improvements",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1773271499872,
+      "tag": "0039_colorful_dragon_man",
+      "breakpoints": true
     }
   ]
 }

@@ -13,7 +13,7 @@ import {
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { toDecimalString, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { asc, eq, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
 type LoanApprovalLevelColumn = keyof typeof loanApprovalLevels.$inferSelect;
@@ -407,6 +407,67 @@ export const loanApprovalLevel = tsr.router(contract.loanApprovalLevel, {
           message: 'Debe definir al menos un usuario activo por nivel activo',
           code: 'BAD_REQUEST',
         });
+      }
+
+      if (existing.isActive && !nextState.isActive) {
+        const linkedPendingApplication = await db.query.loanApplications.findFirst({
+          where: and(
+            eq(loanApplications.status, 'PENDING'),
+            or(
+              eq(loanApplications.currentApprovalLevelId, id),
+              eq(loanApplications.targetApprovalLevelId, id)
+            )
+          ),
+          columns: {
+            creditNumber: true,
+          },
+        });
+
+        if (linkedPendingApplication) {
+          throwHttpError({
+            status: 409,
+            message: `No puede inactivar el nivel porque la solicitud ${linkedPendingApplication.creditNumber} aun depende de este nivel. Reasigne o resuelva primero las solicitudes pendientes.`,
+            code: 'CONFLICT',
+          });
+        }
+      }
+
+      if (payload.users !== undefined) {
+        const nextActiveUserIds = new Set(
+          nextUsers.filter((user) => user.isActive).map((user) => user.userId)
+        );
+        const affectedUsers = existing.users.filter(
+          (user) => user.isActive && !nextActiveUserIds.has(user.userId)
+        );
+
+        if (affectedUsers.length) {
+          const blockedAssignment = await db.query.loanApplications.findFirst({
+            where: and(
+              eq(loanApplications.status, 'PENDING'),
+              eq(loanApplications.currentApprovalLevelId, id),
+              inArray(
+                loanApplications.assignedApprovalUserId,
+                affectedUsers.map((user) => user.userId)
+              )
+            ),
+            columns: {
+              creditNumber: true,
+              assignedApprovalUserId: true,
+            },
+          });
+
+          if (blockedAssignment) {
+            const blockedUser = affectedUsers.find(
+              (user) => user.userId === blockedAssignment.assignedApprovalUserId
+            );
+
+            throwHttpError({
+              status: 409,
+              message: `No puede quitar o inactivar al usuario ${blockedUser?.userName ?? blockedAssignment.assignedApprovalUserId} porque tiene la solicitud ${blockedAssignment.creditNumber} pendiente asignada. Reasigne primero sus solicitudes.`,
+              code: 'CONFLICT',
+            });
+          }
+        }
       }
 
       const [updated] = await db.transaction(async (tx) => {

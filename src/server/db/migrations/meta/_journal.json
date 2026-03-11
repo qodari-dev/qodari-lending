@@ -246,6 +246,20 @@
       "when": 1773158803033,
       "tag": "0034_silly_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1773169800000,
+      "tag": "0035_tan_hobgoblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1773186828908,
+      "tag": "0036_sparkling_eternity",
+      "breakpoints": true
     }
   ]
 }

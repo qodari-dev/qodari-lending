@@ -1149,7 +1149,7 @@ export const loanApprovalLevelUsers = pgTable(
       .references(() => loanApprovalLevels.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').notNull(),
     userName: varchar('user_name', { length: 255 }).notNull(),
-    sortOrder: integer('sort_order').notNull().default(0),
+    sortOrder: integer('sort_order').notNull().default(1),
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
@@ -1157,7 +1157,7 @@ export const loanApprovalLevelUsers = pgTable(
     uniqueIndex('uniq_loan_approval_level_user').on(t.loanApprovalLevelId, t.userId),
     index('idx_loan_approval_level_users_level').on(t.loanApprovalLevelId),
     index('idx_loan_approval_level_users_level_active').on(t.loanApprovalLevelId, t.isActive),
-    check('chk_loan_approval_level_users_sort_order_min', sql`${t.sortOrder} >= 0`),
+    check('chk_loan_approval_level_users_sort_order_min', sql`${t.sortOrder} >= 1`),
   ]
 );
 
@@ -1286,6 +1286,7 @@ export const loanApplications = pgTable(
         onDelete: 'set null',
       }
     ),
+    approvalAssignedAt: timestamp('approval_assigned_at', { withTimezone: true }),
 
     // IAM externo
     statusChangedByUserId: uuid('status_changed_by_user_id'),
@@ -3003,6 +3004,7 @@ export const loanApplicationApprovalHistory = pgTable(
     actorUserName: varchar('actor_user_name', { length: 255 }),
     assignedToUserId: uuid('assigned_to_user_id'),
     assignedToUserName: varchar('assigned_to_user_name', { length: 255 }),
+    approvalAssignedAt: timestamp('approval_assigned_at', { withTimezone: true }),
     note: varchar('note', { length: 255 }),
     metadata: jsonb('metadata'),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),

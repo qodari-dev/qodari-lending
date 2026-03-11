@@ -125,7 +125,9 @@ export const LoanApplicationApprovalLoadItemSchema = z.object({
   requestedAmount: z.number().nonnegative(),
   applicationDate: z.string().min(1),
   assignedAt: z.string().min(1).nullable(),
+  createdAt: z.string().min(1),
   pendingDays: z.number().int().nonnegative(),
+  createdDays: z.number().int().nonnegative(),
 });
 
 export const LoanApplicationApprovalLoadUserSchema = z.object({
@@ -134,6 +136,8 @@ export const LoanApplicationApprovalLoadUserSchema = z.object({
   pendingCount: z.number().int().nonnegative(),
   oldestAssignedAt: z.string().min(1).nullable(),
   oldestPendingDays: z.number().int().nonnegative(),
+  oldestCreatedAt: z.string().min(1).nullable(),
+  oldestCreatedDays: z.number().int().nonnegative(),
   applications: z.array(LoanApplicationApprovalLoadItemSchema),
 });
 

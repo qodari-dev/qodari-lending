@@ -68,9 +68,7 @@ import { tsr } from '@ts-rest/serverless/next';
 import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 import { env } from '@/env';
-import {
-  pickApplicableBillingRule,
-} from '@/server/utils/billing-concept-resolver';
+import { pickApplicableBillingRule } from '@/server/utils/billing-concept-resolver';
 import { calculateOneTimeConceptAmount } from '@/server/utils/accounting-utils';
 import { roundMoney } from '@/server/utils/value-utils';
 import {
@@ -80,7 +78,6 @@ import {
   reassignApplicationApproval,
   recordFinalApproval,
   recordRejectedOrCanceled,
-  resolveTargetApprovalLevel,
   assignInitialApproval,
 } from '@/server/services/loan-applications/loan-application-approval-service';
 
@@ -683,10 +680,15 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             applicationDate: true,
             assignedApprovalUserId: true,
             assignedApprovalUserName: true,
+            approvalAssignedAt: true,
             updatedAt: true,
             createdAt: true,
           },
-          orderBy: [asc(loanApplications.updatedAt), asc(loanApplications.id)],
+          orderBy: [
+            asc(loanApplications.approvalAssignedAt),
+            asc(loanApplications.createdAt),
+            asc(loanApplications.id),
+          ],
         }),
       ]);
 
@@ -696,13 +698,17 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         pendingCount: number;
         oldestAssignedAt: string | null;
         oldestPendingDays: number;
+        oldestCreatedAt: string | null;
+        oldestCreatedDays: number;
         applications: Array<{
           loanApplicationId: number;
           creditNumber: string;
           requestedAmount: number;
           applicationDate: string;
           assignedAt: string | null;
+          createdAt: string;
           pendingDays: number;
+          createdDays: number;
         }>;
       };
 
@@ -717,6 +723,8 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           pendingCount: 0,
           oldestAssignedAt: null,
           oldestPendingDays: 0,
+          oldestCreatedAt: null,
+          oldestCreatedDays: 0,
           applications: [],
         });
       }
@@ -725,10 +733,15 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         const assignedUserId = app.assignedApprovalUserId;
         if (!assignedUserId) continue;
 
-        const assignedAt = app.updatedAt ?? app.createdAt;
-        const assignedAtIso = assignedAt instanceof Date ? assignedAt.toISOString() : String(assignedAt);
+        const assignedAt = app.approvalAssignedAt ?? app.createdAt;
+        const assignedAtIso =
+          assignedAt instanceof Date ? assignedAt.toISOString() : String(assignedAt);
         const assignedDateMs = new Date(formatDateOnly(assignedAt) + 'T00:00:00').getTime();
         const pendingDays = Math.max(0, Math.round((todayMs - assignedDateMs) / 86_400_000));
+        const createdAtIso =
+          app.createdAt instanceof Date ? app.createdAt.toISOString() : String(app.createdAt);
+        const createdDateMs = new Date(formatDateOnly(app.createdAt) + 'T00:00:00').getTime();
+        const createdDays = Math.max(0, Math.round((todayMs - createdDateMs) / 86_400_000));
 
         const entry: ApprovalLoadUserEntry = usersMap.get(assignedUserId) ?? {
           userId: assignedUserId,
@@ -736,6 +749,8 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           pendingCount: 0,
           oldestAssignedAt: null,
           oldestPendingDays: 0,
+          oldestCreatedAt: null,
+          oldestCreatedDays: 0,
           applications: [],
         };
 
@@ -743,11 +758,14 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           loanApplicationId: app.id,
           creditNumber: app.creditNumber,
           requestedAmount: toNumber(app.requestedAmount),
-          applicationDate: typeof app.applicationDate === 'string'
-            ? app.applicationDate
-            : formatDateOnly(app.applicationDate),
+          applicationDate:
+            typeof app.applicationDate === 'string'
+              ? app.applicationDate
+              : formatDateOnly(app.applicationDate),
           assignedAt: assignedAtIso,
+          createdAt: createdAtIso,
           pendingDays,
+          createdDays,
         });
 
         usersMap.set(assignedUserId, entry);
@@ -756,11 +774,18 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const users = Array.from(usersMap.values())
         .map((user) => {
           const oldestItem = user.applications[0] ?? null;
+          const oldestCreatedItem =
+            user.applications.reduce<(typeof user.applications)[number] | null>((oldest, item) => {
+              if (!oldest || item.createdDays > oldest.createdDays) return item;
+              return oldest;
+            }, null) ?? null;
           return {
             ...user,
             pendingCount: user.applications.length,
             oldestAssignedAt: oldestItem?.assignedAt ?? null,
             oldestPendingDays: oldestItem?.pendingDays ?? 0,
+            oldestCreatedAt: oldestCreatedItem?.createdAt ?? null,
+            oldestCreatedDays: oldestCreatedItem?.createdDays ?? 0,
           };
         })
         .sort((a, b) => {
@@ -1248,36 +1273,16 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           }
         }
 
-        const approvalState = await ensurePendingAssignment(
-          tx,
-          {
-            id: updatedApplication.id,
-            status: updatedApplication.status,
-            requestedAmount: updatedApplication.requestedAmount,
-            currentApprovalLevelId: updatedApplication.currentApprovalLevelId,
-            targetApprovalLevelId: updatedApplication.targetApprovalLevelId,
-            assignedApprovalUserId: updatedApplication.assignedApprovalUserId,
-            assignedApprovalUserName: updatedApplication.assignedApprovalUserName,
-          },
-          {
+        await assignInitialApproval(tx, {
+          loanApplicationId: updatedApplication.id,
+          requestedAmount: updatedApplication.requestedAmount,
+          actor: {
             userId,
             userName: userName || userId,
-          }
-        );
-
-        const { targetLevelId } = await resolveTargetApprovalLevel(
-          tx,
-          approvalState.requestedAmount
-        );
-
-        if (approvalState.targetApprovalLevelId !== targetLevelId) {
-          await tx
-            .update(loanApplications)
-            .set({
-              targetApprovalLevelId: targetLevelId,
-            })
-            .where(eq(loanApplications.id, id));
-        }
+          },
+          action: 'REASSIGNED',
+          note: 'Reinicio de flujo por edicion de solicitud',
+        });
 
         const refreshed = await tx.query.loanApplications.findFirst({
           where: eq(loanApplications.id, id),
@@ -1393,6 +1398,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             assignedApprovalUserName: null,
             currentApprovalLevelId: null,
             targetApprovalLevelId: null,
+            approvalAssignedAt: null,
           })
           .where(eq(loanApplications.id, id))
           .returning();
@@ -1530,6 +1536,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             assignedApprovalUserName: null,
             currentApprovalLevelId: null,
             targetApprovalLevelId: null,
+            approvalAssignedAt: null,
           })
           .where(eq(loanApplications.id, id))
           .returning();
@@ -1662,6 +1669,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
               targetApprovalLevelId: true,
               assignedApprovalUserId: true,
               assignedApprovalUserName: true,
+              approvalAssignedAt: true,
             },
           });
 
@@ -2047,10 +2055,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       // -----------------------------------------------------------------------
       let totalFinancedAmount = 0;
       for (const snapshot of loanBillingConceptSnapshots) {
-        if (
-          snapshot.financingMode === 'FINANCED_IN_LOAN' &&
-          snapshot.frequency === 'ONE_TIME'
-        ) {
+        if (snapshot.financingMode === 'FINANCED_IN_LOAN' && snapshot.frequency === 'ONE_TIME') {
           const conceptAmount = calculateOneTimeConceptAmount({
             concept: {
               calcMethod: snapshot.calcMethod,
@@ -2150,6 +2155,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             targetApprovalLevelId: true,
             assignedApprovalUserId: true,
             assignedApprovalUserName: true,
+            approvalAssignedAt: true,
           },
         });
 
@@ -2213,6 +2219,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             assignedApprovalUserName: null,
             currentApprovalLevelId: null,
             targetApprovalLevelId: null,
+            approvalAssignedAt: null,
           })
           .where(eq(loanApplications.id, id))
           .returning();
@@ -2432,11 +2439,15 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             targetApprovalLevelId: true,
             assignedApprovalUserId: true,
             assignedApprovalUserName: true,
+            approvalAssignedAt: true,
           },
           orderBy: [asc(loanApplications.createdAt), asc(loanApplications.id)],
         });
 
-        let reassignedCount = 0;
+        const ensuredApplications: Array<{
+          id: number;
+          currentApprovalLevelId: number;
+        }> = [];
         for (const application of assignedApplications) {
           const ensured = await ensurePendingAssignment(tx, application, {
             userId,
@@ -2455,6 +2466,61 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             });
           }
 
+          ensuredApplications.push({
+            id: ensured.id,
+            currentApprovalLevelId: ensured.currentApprovalLevelId,
+          });
+        }
+
+        if (body.strategy === 'TO_USER' && ensuredApplications.length) {
+          const sourceLevelIds = Array.from(
+            new Set(ensuredApplications.map((application) => application.currentApprovalLevelId))
+          );
+
+          if (sourceLevelIds.length !== 1 || !sourceLevelIds[0]) {
+            throwHttpError({
+              status: 409,
+              message:
+                'El usuario origen tiene solicitudes pendientes en varios niveles. Use round robin o reasigne por nivel.',
+              code: 'CONFLICT',
+            });
+          }
+
+          const targetLevelMemberships = await tx.query.loanApprovalLevelUsers.findMany({
+            where: and(
+              eq(loanApprovalLevelUsers.userId, body.toAssignedUserId!),
+              eq(loanApprovalLevelUsers.isActive, true)
+            ),
+            columns: {
+              loanApprovalLevelId: true,
+            },
+          });
+
+          const targetLevelIds = Array.from(
+            new Set(targetLevelMemberships.map((item) => item.loanApprovalLevelId))
+          );
+
+          if (targetLevelIds.length !== 1) {
+            throwHttpError({
+              status: 409,
+              message:
+                'El usuario destino debe estar configurado en un unico nivel activo para la reasignacion masiva.',
+              code: 'CONFLICT',
+            });
+          }
+
+          if (targetLevelIds[0] !== sourceLevelIds[0]) {
+            throwHttpError({
+              status: 409,
+              message:
+                'El usuario destino debe pertenecer al mismo nivel activo del usuario origen.',
+              code: 'CONFLICT',
+            });
+          }
+        }
+
+        let reassignedCount = 0;
+        for (const ensured of ensuredApplications) {
           await reassignApplicationApproval(tx, {
             loanApplicationId: ensured.id,
             currentLevelId: ensured.currentApprovalLevelId,
@@ -2575,6 +2641,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             targetApprovalLevelId: existing.targetApprovalLevelId,
             assignedApprovalUserId: existing.assignedApprovalUserId,
             assignedApprovalUserName: existing.assignedApprovalUserName,
+            approvalAssignedAt: existing.approvalAssignedAt,
           },
           {
             userId,

@@ -21,6 +21,7 @@ type LoanApplicationApprovalState = Pick<
   | 'targetApprovalLevelId'
   | 'assignedApprovalUserId'
   | 'assignedApprovalUserName'
+  | 'approvalAssignedAt'
 >;
 
 type UserContext = {
@@ -232,6 +233,7 @@ async function writeApprovalHistory(
     actorUserName?: string;
     assignedToUserId?: string | null;
     assignedToUserName?: string | null;
+    approvalAssignedAt?: Date | null;
     note?: string | null;
     metadata?: Record<string, unknown>;
   }
@@ -244,6 +246,7 @@ async function writeApprovalHistory(
     actorUserName: args.actorUserName ?? null,
     assignedToUserId: args.assignedToUserId ?? null,
     assignedToUserName: args.assignedToUserName ?? null,
+    approvalAssignedAt: args.approvalAssignedAt ?? null,
     note: args.note ? args.note.slice(0, 255) : null,
     metadata: args.metadata ?? null,
   });
@@ -261,6 +264,7 @@ export async function assignInitialApproval(
 ) {
   const { targetLevelId, levels } = await resolveTargetApprovalLevel(tx, args.requestedAmount);
   const firstLevel = levels[0];
+  const approvalAssignedAt = new Date();
 
   if (!firstLevel) {
     throwHttpError({
@@ -279,6 +283,7 @@ export async function assignInitialApproval(
       targetApprovalLevelId: targetLevelId,
       assignedApprovalUserId: assignee.userId,
       assignedApprovalUserName: assignee.userName,
+      approvalAssignedAt,
     })
     .where(eq(loanApplications.id, args.loanApplicationId));
 
@@ -290,6 +295,7 @@ export async function assignInitialApproval(
     actorUserName: args.actor?.userName,
     assignedToUserId: assignee.userId,
     assignedToUserName: assignee.userName,
+    approvalAssignedAt,
     note: args.note,
     metadata: {
       targetLevelId,
@@ -302,6 +308,7 @@ export async function assignInitialApproval(
     targetApprovalLevelId: targetLevelId,
     assignedApprovalUserId: assignee.userId,
     assignedApprovalUserName: assignee.userName,
+    approvalAssignedAt,
   };
 }
 
@@ -369,6 +376,7 @@ export async function approveIntermediateLevel(
   }
 
   const nextLevel = levels[currentIndex + 1];
+  const approvalAssignedAt = new Date();
   if (!nextLevel) {
     throwHttpError({
       status: 409,
@@ -402,6 +410,7 @@ export async function approveIntermediateLevel(
       currentApprovalLevelId: nextLevel.id,
       assignedApprovalUserId: assignee.userId,
       assignedApprovalUserName: assignee.userName,
+      approvalAssignedAt,
     })
     .where(eq(loanApplications.id, args.loanApplicationId));
 
@@ -413,6 +422,7 @@ export async function approveIntermediateLevel(
     actorUserName: args.actor.userName,
     assignedToUserId: assignee.userId,
     assignedToUserName: assignee.userName,
+    approvalAssignedAt,
     note: args.note,
     metadata: {
       fromLevelId: args.currentLevelId,
@@ -425,6 +435,7 @@ export async function approveIntermediateLevel(
     currentApprovalLevelId: nextLevel.id,
     assignedApprovalUserId: assignee.userId,
     assignedApprovalUserName: assignee.userName,
+    approvalAssignedAt,
   };
 }
 
@@ -440,6 +451,7 @@ export async function reassignApplicationApproval(
     note?: string;
   }
 ) {
+  const approvalAssignedAt = new Date();
   const assignee =
     args.strategy === 'TO_USER'
       ? await pickAssigneeForLevel(tx, args.currentLevelId, {
@@ -454,6 +466,7 @@ export async function reassignApplicationApproval(
     .set({
       assignedApprovalUserId: assignee.userId,
       assignedApprovalUserName: assignee.userName,
+      approvalAssignedAt,
     })
     .where(eq(loanApplications.id, args.loanApplicationId));
 
@@ -465,6 +478,7 @@ export async function reassignApplicationApproval(
     actorUserName: args.actor.userName,
     assignedToUserId: assignee.userId,
     assignedToUserName: assignee.userName,
+    approvalAssignedAt,
     note: args.note,
     metadata: {
       strategy: args.strategy,

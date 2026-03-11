@@ -113,6 +113,11 @@ export function LoanApplicationApprovalLoadSheet({
     [load]
   );
 
+  const maxCreatedDays = React.useMemo(
+    () => load?.users.reduce((max, user) => Math.max(max, user.oldestCreatedDays), 0) ?? 0,
+    [load]
+  );
+
   return (
     <Sheet open={opened} onOpenChange={onOpened}>
       <SheetContent className="overflow-y-auto sm:max-w-6xl">
@@ -197,7 +202,7 @@ export function LoanApplicationApprovalLoadSheet({
                 <Badge variant="secondary">{load.levelName}</Badge>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-2xl">
@@ -236,7 +241,16 @@ export function LoanApplicationApprovalLoadSheet({
                     <CardTitle className="text-2xl">{formatNumber(maxPendingDays, 0)}</CardTitle>
                   </CardHeader>
                   <CardContent className="text-muted-foreground text-xs">
-                    Mayor espera del nivel en dias
+                    Mayor tiempo en cola del nivel
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-2xl">{formatNumber(maxCreatedDays, 0)}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-muted-foreground text-xs">
+                    Mayor antiguedad total del nivel
                   </CardContent>
                 </Card>
               </div>
@@ -251,8 +265,9 @@ export function LoanApplicationApprovalLoadSheet({
                       <TableRow>
                         <TableHead>Usuario</TableHead>
                         <TableHead className="text-right">Pendientes</TableHead>
-                        <TableHead>Mas antigua</TableHead>
-                        <TableHead className="text-right">Mayor espera</TableHead>
+                        <TableHead>Asignacion mas antigua</TableHead>
+                        <TableHead className="text-right">Mayor cola</TableHead>
+                        <TableHead className="text-right">Mayor antiguedad</TableHead>
                         <TableHead className="text-right">Detalle</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -281,6 +296,9 @@ export function LoanApplicationApprovalLoadSheet({
                                 {user.pendingCount ? `${user.oldestPendingDays} dias` : '-'}
                               </TableCell>
                               <TableCell className="text-right">
+                                {user.pendingCount ? `${user.oldestCreatedDays} dias` : '-'}
+                              </TableCell>
+                              <TableCell className="text-right">
                                 <Button
                                   type="button"
                                   variant={isSelected ? 'secondary' : 'outline'}
@@ -299,7 +317,7 @@ export function LoanApplicationApprovalLoadSheet({
                         })
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-muted-foreground text-center">
+                          <TableCell colSpan={6} className="text-muted-foreground text-center">
                             No hay usuarios configurados para este nivel
                           </TableCell>
                         </TableRow>
@@ -323,6 +341,7 @@ export function LoanApplicationApprovalLoadSheet({
                           <TableHead>Fecha solicitud</TableHead>
                           <TableHead>Fecha asignado</TableHead>
                           <TableHead className="text-right">Dias en cola</TableHead>
+                          <TableHead className="text-right">Dias desde creacion</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -338,11 +357,12 @@ export function LoanApplicationApprovalLoadSheet({
                                 {item.assignedAt ? formatDateTime(item.assignedAt) : '-'}
                               </TableCell>
                               <TableCell className="text-right">{item.pendingDays} dias</TableCell>
+                              <TableCell className="text-right">{item.createdDays} dias</TableCell>
                             </TableRow>
                           ))
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-muted-foreground text-center">
+                            <TableCell colSpan={6} className="text-muted-foreground text-center">
                               Este usuario no tiene pendientes en este nivel
                             </TableCell>
                           </TableRow>

@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { useCreditsSettings } from '@/hooks/queries/use-credits-settings-queries';
 import {
   useApproveLoanApplication,
@@ -83,6 +84,7 @@ export function LoanApplicationApproveDialog({
       mode: 'FINAL',
       repaymentMethodId: undefined,
       paymentGuaranteeTypeId: undefined,
+      isInsuranceApproved: false,
       approvedInstallments: 1,
       approvedAmount: '0',
       actNumber: '',
@@ -172,6 +174,7 @@ export function LoanApplicationApproveDialog({
       mode: 'FINAL',
       repaymentMethodId: loanApplication.repaymentMethodId ?? undefined,
       paymentGuaranteeTypeId: loanApplication.paymentGuaranteeTypeId ?? undefined,
+      isInsuranceApproved: loanApplication.creditProduct?.paysInsurance ?? false,
       approvedInstallments: loanApplication.installments ?? 1,
       approvedAmount: String(loanApplication.requestedAmount ?? '0'),
       actNumber: '',
@@ -321,6 +324,28 @@ export function LoanApplicationApproveDialog({
                 </div>
               )}
             />
+
+            {loanApplication?.creditProduct?.paysInsurance ? (
+              <Controller
+                name="isInsuranceApproved"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="col-span-2 flex items-center justify-between rounded-md border px-3 py-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="approveInsuranceApproved">Seguro aprobado</Label>
+                      <p className="text-muted-foreground text-xs">
+                        Si no se aprueba, el crédito se genera sin cobro de seguro.
+                      </p>
+                    </div>
+                    <Switch
+                      id="approveInsuranceApproved"
+                      checked={Boolean(field.value)}
+                      onCheckedChange={field.onChange}
+                    />
+                  </div>
+                )}
+              />
+            ) : null}
 
             <Controller
               name="approvedInstallments"

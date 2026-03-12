@@ -26,6 +26,7 @@ type LoanCandidate = {
   costCenterId: number | null;
   insuranceCompanyId: number | null;
   insuranceValue: string | null;
+  isInsuranceApproved: boolean;
   creditProductId: number;
 };
 
@@ -66,6 +67,7 @@ async function getLoanCandidates(run: typeof processRuns.$inferSelect): Promise<
       costCenterId: loans.costCenterId,
       insuranceCompanyId: loans.insuranceCompanyId,
       insuranceValue: loans.insuranceValue,
+      isInsuranceApproved: loanApplications.isInsuranceApproved,
       creditProductId: loanApplications.creditProductId,
     })
     .from(loans)
@@ -188,7 +190,7 @@ export async function executeCurrentInsuranceProcessRun(
     summary.reviewedCredits += 1;
 
     try {
-      if (!loan.insuranceCompanyId) {
+      if (!loan.isInsuranceApproved || !loan.insuranceCompanyId) {
         continue;
       }
 

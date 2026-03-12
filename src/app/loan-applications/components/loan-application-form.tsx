@@ -153,8 +153,6 @@ export function LoanApplicationForm({
       investmentTypeId: undefined,
       agreementId: null,
       note: '',
-      isInsuranceApproved: false,
-      creditStudyFee: '0',
       loanApplicationCoDebtors: [],
       loanApplicationDocuments: [],
       loanApplicationPledges: [],
@@ -563,8 +561,6 @@ export function LoanApplicationForm({
       investmentTypeId: loanApplication?.investmentTypeId ?? undefined,
       agreementId: loanApplication?.agreementId ?? null,
       note: loanApplication?.note ?? '',
-      isInsuranceApproved: loanApplication?.isInsuranceApproved ?? false,
-      creditStudyFee: String(loanApplication?.creditStudyFee ?? '0'),
       loanApplicationCoDebtors:
         loanApplication?.loanApplicationCoDebtors
           ?.map((item) => ({
@@ -1421,18 +1417,6 @@ export function LoanApplicationForm({
                               </ComboboxList>
                             </ComboboxContent>
                           </Combobox>
-                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                      )}
-                    />
-
-                    <Controller
-                      name="creditStudyFee"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor="creditStudyFee">Estudio credito</FieldLabel>
-                          <Input id="creditStudyFee" {...field} value={field.value ?? ''} />
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>
                       )}

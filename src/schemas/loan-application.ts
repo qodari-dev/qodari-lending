@@ -216,8 +216,6 @@ const LoanApplicationBaseSchema = z.object({
     .positive('Tipo de inversion es requerido'),
   agreementId: z.number().int().positive().nullable().optional(),
   note: z.string().nullable().optional(),
-  isInsuranceApproved: z.boolean().optional(),
-  creditStudyFee: decimalStringField('Estudio de credito invalido').nullable().optional(),
   loanApplicationCoDebtors: LoanApplicationCoDebtorInputSchema.array().optional(),
   loanApplicationDocuments: LoanApplicationDocumentInputSchema.array().optional(),
   loanApplicationPledges: LoanApplicationPledgeInputSchema.array().optional(),
@@ -324,6 +322,7 @@ export const FinalApproveLoanApplicationBodySchema = z.object({
   mode: z.literal('FINAL'),
   repaymentMethodId: z.number().int().positive(),
   paymentGuaranteeTypeId: z.number().int().positive(),
+  isInsuranceApproved: z.boolean().optional(),
   approvedInstallments: z.number().int().positive(),
   approvedAmount: decimalStringField('Valor aprobado es requerido').refine(
     (value) => Number(value) > 0,

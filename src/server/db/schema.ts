@@ -1303,9 +1303,6 @@ export const loanApplications = pgTable(
     statusNote: text('status_note'),
     // aprseg enum('N','S') -> boolean
     isInsuranceApproved: boolean('is_insurance_approved').notNull().default(false),
-
-    // estcre int -> mejor decimal (dinero)
-    creditStudyFee: decimal('credit_study_fee', { precision: 14, scale: 2 }).notNull().default('0'),
     ...timestamps,
     riskStatus: riskStatusEnum('risk_status').notNull().default('NOT_REQUIRED'),
     riskScore: decimal('risk_score', { precision: 12, scale: 5 }),
@@ -1518,8 +1515,6 @@ export const loans = pgTable(
       onDelete: 'restrict',
     }),
     insuranceValue: decimal('insurance_value', { precision: 14, scale: 2 }),
-
-    discountStudyCredit: boolean('discount_study_credit').notNull().default(false),
 
     costCenterId: integer('cost_center_id').references(() => costCenters.id, {
       onDelete: 'set null',

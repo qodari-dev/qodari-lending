@@ -521,10 +521,6 @@ export function LoanInfo({
               label: 'Documento castigo interes',
               value: detail.interestWriteOffDocument ?? '-',
             },
-            {
-              label: 'Descuenta estudio',
-              value: detail.discountStudyCredit ? 'Si' : 'No',
-            },
             { label: 'Documento garantia', value: detail.guaranteeDocument ?? '-' },
           ],
         },

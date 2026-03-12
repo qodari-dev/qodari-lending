@@ -48,7 +48,6 @@ export const aceptacionTemplate: PdfTemplateBuilder<LoanDocumentData> = (data, r
           { label: 'Plazo', value: `${loan.installments} meses` },
           { label: 'Cuota Mensual', value: formatCurrency(cuotaMensual) },
           { label: 'Valor del Seguro', value: formatCurrency(loan.insuranceValue ?? '0') },
-          { label: 'Valor Estudio del Credito', value: loan.discountStudyCredit ? 'Si' : '$0' },
         ]),
       ),
 

@@ -219,6 +219,7 @@ export function LoanApplicationDetails({
         { label: 'Cuotas', value: loanApplication.installments },
         { label: 'Tasa financiacion', value: formatPercent(loanApplication.financingFactor, 4) },
         { label: 'Tasa seguro', value: formatPercent(loanApplication.insuranceFactor, 4) },
+        { label: 'Seguro aprobado', value: loanApplication.isInsuranceApproved ? 'Si' : 'No' },
         { label: 'Valor solicitado', value: formatCurrency(loanApplication.requestedAmount) },
         { label: 'Valor aprobado', value: formatCurrency(loanApplication.approvedAmount ?? '-') },
       ],

@@ -1028,8 +1028,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             statusDate,
             note: body.note ?? null,
             statusNote: null,
-            isInsuranceApproved: body.isInsuranceApproved ?? false,
-            creditStudyFee: toDecimalString(body.creditStudyFee ?? '0'),
+            isInsuranceApproved: false,
           })
           .returning();
 
@@ -1311,8 +1310,6 @@ export const loanApplication = tsr.router(contract.loanApplication, {
                 ? body.investmentTypeId
                 : existing.investmentTypeId,
             note: body.note !== undefined ? body.note : existing.note,
-            isInsuranceApproved: body.isInsuranceApproved ?? existing.isInsuranceApproved,
-            creditStudyFee: toDecimalString(body.creditStudyFee ?? existing.creditStudyFee),
           })
           .where(eq(loanApplications.id, id))
           .returning();
@@ -2183,13 +2180,24 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       // -----------------------------------------------------------------------
       // Insurance + Simulation (principal includes financed concept amounts)
       // -----------------------------------------------------------------------
-      const insuranceCalculation = await resolveInsuranceFactor({
-        creditProductId: existing.creditProductId,
-        insuranceCompanyId: existing.insuranceCompanyId,
-        installments: approvedInstallments,
-        requestedAmount: approvedAmount,
-        product,
-      });
+      const isInsuranceApproved = product.paysInsurance && Boolean(finalBody.isInsuranceApproved);
+      const insuranceCalculation = isInsuranceApproved
+        ? await resolveInsuranceFactor({
+            creditProductId: existing.creditProductId,
+            insuranceCompanyId: existing.insuranceCompanyId,
+            installments: approvedInstallments,
+            requestedAmount: approvedAmount,
+            product,
+          })
+        : {
+            product,
+            insuranceFactor: 0,
+            insuranceCompanyId: null,
+            insuranceRateType: null,
+            insuranceRatePercent: 0,
+            insuranceFixedAmount: 0,
+            insuranceMinimumAmount: 0,
+          };
 
       const schedule = calculateCreditSimulation({
         financingType: product.financingType,
@@ -2331,6 +2339,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           .set({
             repaymentMethodId: finalBody.repaymentMethodId,
             paymentGuaranteeTypeId: finalBody.paymentGuaranteeTypeId,
+            isInsuranceApproved,
             approvedAmount: toDecimalString(approvedAmount),
             actNumber: finalBody.actNumber,
             status: 'APPROVED',
@@ -2368,9 +2377,8 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             firstCollectionDate,
             principalAmount: toDecimalString(effectivePrincipal),
             initialTotalAmount: toDecimalString(schedule.summary.totalPayment),
-            insuranceCompanyId: existing.insuranceCompanyId,
+            insuranceCompanyId: isInsuranceApproved ? existing.insuranceCompanyId : null,
             insuranceValue: toDecimalString(schedule.summary.totalInsurance),
-            discountStudyCredit: toNumber(existing.creditStudyFee) > 0,
             costCenterId: affiliationOffice.costCenterId ?? null,
             repaymentMethodId: finalBody.repaymentMethodId,
             paymentGuaranteeTypeId: finalBody.paymentGuaranteeTypeId,

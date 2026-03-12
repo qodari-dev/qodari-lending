@@ -32,7 +32,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { useAgreements } from '@/hooks/queries/use-agreement-queries';
 import { useCreditsSettings } from '@/hooks/queries/use-credits-settings-queries';
 import {
   useApproveLoanApplication,
@@ -84,7 +83,6 @@ export function LoanApplicationApproveDialog({
       mode: 'FINAL',
       repaymentMethodId: undefined,
       paymentGuaranteeTypeId: undefined,
-      agreementId: null,
       approvedInstallments: 1,
       approvedAmount: '0',
       actNumber: '',
@@ -118,13 +116,6 @@ export function LoanApplicationApproveDialog({
     () => paymentGuaranteeTypesData?.body?.data ?? [],
     [paymentGuaranteeTypesData]
   );
-
-  const { data: agreementsData } = useAgreements({
-    limit: 1000,
-    where: { and: [{ isActive: true }] },
-    sort: [{ field: 'businessName', order: 'asc' }],
-  });
-  const agreements = React.useMemo(() => agreementsData?.body?.data ?? [], [agreementsData]);
 
   const { data: thirdPartiesData } = useThirdParties({
     limit: 20,
@@ -181,7 +172,6 @@ export function LoanApplicationApproveDialog({
       mode: 'FINAL',
       repaymentMethodId: loanApplication.repaymentMethodId ?? undefined,
       paymentGuaranteeTypeId: loanApplication.paymentGuaranteeTypeId ?? undefined,
-      agreementId: null,
       approvedInstallments: loanApplication.installments ?? 1,
       approvedAmount: String(loanApplication.requestedAmount ?? '0'),
       actNumber: '',
@@ -215,7 +205,6 @@ export function LoanApplicationApproveDialog({
       body: {
         ...values,
         mode: 'FINAL',
-        agreementId: values.agreementId ?? null,
         approvedAmount: values.approvedAmount.trim(),
         actNumber: values.actNumber.trim(),
       },
@@ -236,6 +225,13 @@ export function LoanApplicationApproveDialog({
             Complete los datos de aprobacion para generar el credito y su tabla de amortizacion.
           </DialogDescription>
         </DialogHeader>
+
+        {loanApplication?.agreement ? (
+          <div className="rounded-md border px-3 py-2 text-sm">
+            <span className="font-medium">Convenio:</span>{' '}
+            {loanApplication.agreement.agreementCode} - {loanApplication.agreement.businessName}
+          </div>
+        ) : null}
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -291,34 +287,6 @@ export function LoanApplicationApproveDialog({
                   {fieldState.error ? (
                     <p className="text-destructive text-xs">{fieldState.error.message}</p>
                   ) : null}
-                </div>
-              )}
-            />
-
-            <Controller
-              name="agreementId"
-              control={form.control}
-              render={({ field }) => (
-                <div className="space-y-2">
-                  <Label htmlFor="approveAgreementId">Convenio</Label>
-                  <Select
-                    value={field.value ? String(field.value) : '__none__'}
-                    onValueChange={(value) =>
-                      field.onChange(value === '__none__' ? null : Number(value))
-                    }
-                  >
-                    <SelectTrigger id="approveAgreementId">
-                      <SelectValue placeholder="Sin convenio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Sin convenio</SelectItem>
-                      {agreements.map((item) => (
-                        <SelectItem key={item.id} value={String(item.id)}>
-                          {item.agreementCode} - {item.businessName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               )}
             />

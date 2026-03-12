@@ -48,6 +48,7 @@ import { useMyAffiliationOffices } from '@/hooks/queries/use-affiliation-office-
 import { useBanks } from '@/hooks/queries/use-bank-queries';
 import { useChannels } from '@/hooks/queries/use-channel-queries';
 import { useCreditProducts } from '@/hooks/queries/use-credit-product-queries';
+import { useAgreements } from '@/hooks/queries/use-agreement-queries';
 import { useInsuranceCompanies } from '@/hooks/queries/use-insurance-company-queries';
 import { useInvestmentTypes } from '@/hooks/queries/use-investment-type-queries';
 import {
@@ -150,6 +151,7 @@ export function LoanApplicationForm({
       insuranceCompanyId: null,
       requestedAmount: '0',
       investmentTypeId: undefined,
+      agreementId: null,
       note: '',
       isInsuranceApproved: false,
       creditStudyFee: '0',
@@ -262,6 +264,13 @@ export function LoanApplicationForm({
     () => investmentTypesData?.body?.data ?? [],
     [investmentTypesData]
   );
+
+  const { data: agreementsData } = useAgreements({
+    limit: 1000,
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'businessName', order: 'asc' }],
+  });
+  const agreements = useMemo(() => agreementsData?.body?.data ?? [], [agreementsData]);
 
   const selectedThirdPartyId = useWatch({
     control: form.control,
@@ -552,6 +561,7 @@ export function LoanApplicationForm({
       insuranceCompanyId: loanApplication?.insuranceCompanyId ?? null,
       requestedAmount: String(loanApplication?.requestedAmount ?? '0'),
       investmentTypeId: loanApplication?.investmentTypeId ?? undefined,
+      agreementId: loanApplication?.agreementId ?? null,
       note: loanApplication?.note ?? '',
       isInsuranceApproved: loanApplication?.isInsuranceApproved ?? false,
       creditStudyFee: String(loanApplication?.creditStudyFee ?? '0'),
@@ -972,6 +982,70 @@ export function LoanApplicationForm({
                             <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-700">
                               El solicitante requiere actualizacion hoy.
                             </div>
+                          ) : null}
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    <Controller
+                      name="agreementId"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid} className="col-span-2">
+                          <FieldLabel htmlFor="agreementId">Convenio</FieldLabel>
+                          <Combobox
+                            items={agreements}
+                            value={agreements.find((item) => item.id === field.value) ?? null}
+                            onValueChange={(value) => field.onChange(value?.id ?? null)}
+                            itemToStringValue={(item) => String(item.id)}
+                            itemToStringLabel={(item) =>
+                              `${item.agreementCode} - ${item.businessName}`
+                            }
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  <ComboboxValue placeholder="Sin convenio" />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent portalContainer={sheetContentRef}>
+                              <ComboboxInput
+                                placeholder="Buscar convenio..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron convenios</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.agreementCode} - {item.businessName}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                          <p className="text-muted-foreground text-xs">
+                            Si aplica libranza, el convenio se define desde la solicitud. Se
+                            validara contra la empresa empleadora del solicitante.
+                          </p>
+                          {selectedThirdParty?.employerBusinessName ||
+                          selectedThirdParty?.employerDocumentNumber ? (
+                            <p className="text-muted-foreground text-xs">
+                              Empresa actual del solicitante:{' '}
+                              {selectedThirdParty?.employerBusinessName ?? 'Sin nombre'}{' '}
+                              {selectedThirdParty?.employerDocumentNumber
+                                ? `(${selectedThirdParty.employerDocumentNumber})`
+                                : ''}
+                            </p>
                           ) : null}
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>

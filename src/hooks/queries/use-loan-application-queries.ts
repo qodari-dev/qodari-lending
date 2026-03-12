@@ -40,6 +40,7 @@ function defaultQuery(filters?: Partial<ListLoanApplicationsQuery>) {
     limit: filters?.limit ?? 20,
     include: filters?.include ?? [
       'thirdParty',
+      'agreement',
       'creditProduct',
       'creditFund',
       'paymentFrequency',

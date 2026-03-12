@@ -59,6 +59,7 @@ import {
   toNumber,
   toRateString,
 } from '@/server/utils/value-utils';
+import { normalizeDocumentNumber } from '@/server/utils/string-utils';
 import { calculateLoanApplicationPaymentCapacity } from '@/utils/payment-capacity';
 import {
   resolvePaymentFrequencyIntervalDays,
@@ -89,6 +90,7 @@ const LOAN_APPLICATION_FIELDS: FieldMap = {
   status: loanApplications.status,
   applicationDate: loanApplications.applicationDate,
   thirdPartyId: loanApplications.thirdPartyId,
+  agreementId: loanApplications.agreementId,
   creditProductId: loanApplications.creditProductId,
   requestedAmount: loanApplications.requestedAmount,
   assignedApprovalUserId: loanApplications.assignedApprovalUserId,
@@ -123,6 +125,10 @@ const LOAN_APPLICATION_INCLUDES = createIncludeMap<typeof db.query.loanApplicati
         workCity: true,
       },
     },
+  },
+  agreement: {
+    relation: 'agreement',
+    config: true,
   },
   repaymentMethod: {
     relation: 'repaymentMethod',
@@ -415,6 +421,88 @@ async function ensureThirdPartiesAreUpToDate(args: { thirdPartyIds: number[] }) 
       code: 'BAD_REQUEST',
     });
   }
+}
+
+async function validateLoanApplicationAgreement(args: {
+  agreementId: number;
+  thirdPartyId: number;
+  referenceDate: string;
+}) {
+  const [agreement, applicant] = await Promise.all([
+    db.query.agreements.findFirst({
+      where: and(eq(agreements.id, args.agreementId), eq(agreements.isActive, true)),
+      columns: {
+        id: true,
+        agreementCode: true,
+        businessName: true,
+        documentNumber: true,
+        startDate: true,
+        endDate: true,
+      },
+    }),
+    db.query.thirdParties.findFirst({
+      where: eq(thirdParties.id, args.thirdPartyId),
+      columns: {
+        id: true,
+        employerDocumentNumber: true,
+        employerBusinessName: true,
+      },
+    }),
+  ]);
+
+  if (!agreement) {
+    throwHttpError({
+      status: 404,
+      message: 'Convenio no encontrado o inactivo',
+      code: 'NOT_FOUND',
+    });
+  }
+
+  if (agreement.startDate && agreement.startDate > args.referenceDate) {
+    throwHttpError({
+      status: 400,
+      message: 'El convenio seleccionado aun no esta vigente para la fecha de la solicitud',
+      code: 'BAD_REQUEST',
+    });
+  }
+
+  if (agreement.endDate && agreement.endDate < args.referenceDate) {
+    throwHttpError({
+      status: 400,
+      message: 'El convenio seleccionado ya no esta vigente para la fecha de la solicitud',
+      code: 'BAD_REQUEST',
+    });
+  }
+
+  if (!applicant) {
+    throwHttpError({
+      status: 404,
+      message: 'Solicitante no encontrado',
+      code: 'NOT_FOUND',
+    });
+  }
+
+  const employerDocument = normalizeDocumentNumber(applicant.employerDocumentNumber ?? '');
+  const agreementDocument = normalizeDocumentNumber(agreement.documentNumber ?? '');
+
+  if (!employerDocument) {
+    throwHttpError({
+      status: 400,
+      message:
+        'El solicitante no tiene empresa empleadora configurada. Actualice el tercero antes de asignar convenio',
+      code: 'BAD_REQUEST',
+    });
+  }
+
+  if (!agreementDocument || employerDocument !== agreementDocument) {
+    throwHttpError({
+      status: 400,
+      message: `El solicitante no pertenece a la empresa del convenio ${agreement.agreementCode} - ${agreement.businessName}`,
+      code: 'BAD_REQUEST',
+    });
+  }
+
+  return agreement;
 }
 
 function generateCreditNumber(prefix: string): string {
@@ -833,6 +921,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const { userId, userName } = getRequiredUserContext(session);
 
       const requestedAmount = toNumber(body.requestedAmount);
+      const applicationDate = formatDateOnly(body.applicationDate);
       const paymentCapacity = calculateLoanApplicationPaymentCapacity({
         salary: body.salary,
         otherIncome: body.otherIncome,
@@ -844,6 +933,14 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       await ensureThirdPartiesAreUpToDate({
         thirdPartyIds: [body.thirdPartyId, ...coDebtorThirdPartyIds],
       });
+
+      if (body.agreementId) {
+        await validateLoanApplicationAgreement({
+          agreementId: body.agreementId,
+          thirdPartyId: body.thirdPartyId,
+          referenceDate: applicationDate,
+        });
+      }
 
       const { financingFactor } = await resolveCategoryAndFinancingFactor({
         creditProductId: body.creditProductId,
@@ -901,11 +998,12 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             creditNumber,
             creditFundId: product.creditFundId,
             channelId: body.channelId,
-            applicationDate: formatDateOnly(body.applicationDate),
+            applicationDate,
             affiliationOfficeId: body.affiliationOfficeId,
             createdByUserId: userId,
             createdByUserName: userName || userId,
             thirdPartyId: body.thirdPartyId,
+            agreementId: body.agreementId ?? null,
             categoryCode: body.categoryCode,
             repaymentMethodId: body.repaymentMethodId ?? null,
             paymentGuaranteeTypeId: body.paymentGuaranteeTypeId ?? null,
@@ -1097,7 +1195,12 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const targetCreditProductId = body.creditProductId ?? existing.creditProductId;
       const targetCategoryCode = body.categoryCode ?? existing.categoryCode;
       const targetInstallments = body.installments ?? existing.installments;
+      const targetApplicationDate = body.applicationDate
+        ? formatDateOnly(body.applicationDate)
+        : existing.applicationDate;
       const targetRequestedAmount = toNumber(body.requestedAmount ?? existing.requestedAmount);
+      const targetAgreementId =
+        body.agreementId !== undefined ? body.agreementId : existing.agreementId;
       const targetInsuranceCompanyId =
         body.insuranceCompanyId !== undefined
           ? body.insuranceCompanyId
@@ -1136,6 +1239,14 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         thirdPartyIds: [targetThirdPartyId, ...targetCoDebtorIds],
       });
 
+      if (targetAgreementId) {
+        await validateLoanApplicationAgreement({
+          agreementId: targetAgreementId,
+          thirdPartyId: targetThirdPartyId,
+          referenceDate: targetApplicationDate,
+        });
+      }
+
       const { financingFactor } = await resolveCategoryAndFinancingFactor({
         creditProductId: targetCreditProductId,
         categoryCode: targetCategoryCode,
@@ -1164,11 +1275,10 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           .set({
             creditFundId: product.creditFundId,
             channelId: body.channelId ?? existing.channelId,
-            applicationDate: body.applicationDate
-              ? formatDateOnly(body.applicationDate)
-              : existing.applicationDate,
+            applicationDate: targetApplicationDate,
             affiliationOfficeId: body.affiliationOfficeId ?? existing.affiliationOfficeId,
             thirdPartyId: body.thirdPartyId ?? existing.thirdPartyId,
+            agreementId: targetAgreementId ?? null,
             categoryCode: targetCategoryCode,
             repaymentMethodId:
               body.repaymentMethodId !== undefined
@@ -1789,7 +1899,6 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         affiliationOffice,
         repaymentMethod,
         paymentGuaranteeType,
-        agreement,
         payeeThirdParty,
         product,
         paymentFrequency,
@@ -1811,12 +1920,6 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             eq(paymentGuaranteeTypes.isActive, true)
           ),
         }),
-        finalBody.agreementId
-          ? db.query.agreements.findFirst({
-              where: and(eq(agreements.id, finalBody.agreementId), eq(agreements.isActive, true)),
-              columns: { id: true },
-            })
-          : Promise.resolve(null),
         db.query.thirdParties.findFirst({
           where: eq(thirdParties.id, finalBody.payeeThirdPartyId),
           columns: { id: true },
@@ -1865,14 +1968,6 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         throwHttpError({
           status: 404,
           message: 'Tipo de garantia no encontrado',
-          code: 'NOT_FOUND',
-        });
-      }
-
-      if (finalBody.agreementId && !agreement) {
-        throwHttpError({
-          status: 404,
-          message: 'Convenio no encontrado',
           code: 'NOT_FOUND',
         });
       }
@@ -1955,6 +2050,14 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const statusDate = today;
       const firstCollectionDate = formatDateOnly(finalBody.firstCollectionDate);
       const approvedDate = statusDate;
+      const agreement =
+        existing.agreementId != null
+          ? await validateLoanApplicationAgreement({
+              agreementId: existing.agreementId,
+              thirdPartyId: existing.thirdPartyId,
+              referenceDate: approvedDate,
+            })
+          : null;
 
       // -----------------------------------------------------------------------
       // Billing concept resolution (BEFORE simulation so FINANCED_IN_LOAN can
@@ -2253,7 +2356,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             createdByUserName: userName || userId,
             recordDate: statusDate,
             loanApplicationId: existing.id,
-            agreementId: finalBody.agreementId ?? null,
+            agreementId: existing.agreementId ?? null,
             bankId: existing.bankId,
             bankAccountType: existing.bankAccountType,
             bankAccountNumber: existing.bankAccountNumber,
@@ -2283,14 +2386,14 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           })
           .returning();
 
-        if (finalBody.agreementId) {
+        if (agreement) {
           await tx.insert(loanAgreementHistory).values({
             loanId: loan.id,
-            agreementId: finalBody.agreementId,
+            agreementId: agreement.id,
             effectiveDate: statusDate,
             changedByUserId: userId,
             changedByUserName: userName || userId,
-            note: 'Convenio asignado al aprobar solicitud',
+            note: 'Convenio tomado desde la solicitud',
             metadata: {
               sourceLoanApplicationId: id,
               actNumber: finalBody.actNumber,
@@ -2344,7 +2447,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             loanId: loan.id,
             approvedAmount: toDecimalString(approvedAmount),
             actNumber: finalBody.actNumber,
-            agreementId: finalBody.agreementId ?? null,
+            agreementId: existing.agreementId ?? null,
             payeeThirdPartyId: finalBody.payeeThirdPartyId,
             approvedInstallments,
             firstCollectionDate,
@@ -2364,6 +2467,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             approvedAmount: toDecimalString(approvedAmount),
             approvedInstallments,
             actNumber: finalBody.actNumber,
+            agreementId: existing.agreementId ?? null,
           },
         });
 

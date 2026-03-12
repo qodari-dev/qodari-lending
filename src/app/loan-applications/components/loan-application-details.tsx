@@ -182,6 +182,12 @@ export function LoanApplicationDetails({
           value: loanApplication.affiliationOffice?.name ?? loanApplication.affiliationOfficeId,
         },
         { label: 'Canal', value: loanApplication.channel?.name ?? loanApplication.channelId },
+        {
+          label: 'Convenio',
+          value: loanApplication.agreement
+            ? `${loanApplication.agreement.agreementCode} - ${loanApplication.agreement.businessName}`
+            : '-',
+        },
         { label: 'Acta', value: loanApplication.actNumber ?? '-' },
         { label: 'Motivo rechazo', value: loanApplication.rejectionReason?.name ?? '-' },
         {

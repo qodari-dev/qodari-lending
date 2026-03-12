@@ -1270,6 +1270,9 @@ export const loanApplications = pgTable(
       .references(() => investmentTypes.id, {
         onDelete: 'restrict',
       }),
+    agreementId: integer('agreement_id').references(() => agreements.id, {
+      onDelete: 'restrict',
+    }),
 
     status: loanApplicationStatusEnum('status').notNull().default('PENDING'),
     assignedApprovalUserId: uuid('assigned_approval_user_id'),
@@ -1318,6 +1321,7 @@ export const loanApplications = pgTable(
     index('idx_loan_applications_target_level').on(t.targetApprovalLevelId),
     index('idx_loan_applications_third_party').on(t.thirdPartyId),
     index('idx_loan_applications_product').on(t.creditProductId),
+    index('idx_loan_applications_agreement').on(t.agreementId),
   ]
 );
 

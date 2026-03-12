@@ -555,6 +555,10 @@ export const loanApplicationsRelations = relations(loanApplications, ({ one, man
     fields: [loanApplications.investmentTypeId],
     references: [investmentTypes.id],
   }),
+  agreement: one(agreements, {
+    fields: [loanApplications.agreementId],
+    references: [agreements.id],
+  }),
   channel: one(channels, {
     fields: [loanApplications.channelId],
     references: [channels.id],
@@ -1039,6 +1043,7 @@ export const creditProductLateInterestRulesRelations = relations(
 // ---------------------------------------------------------------------
 export const agreementsRelations = relations(agreements, ({ many, one }) => ({
   loans: many(loans),
+  loanApplications: many(loanApplications),
   loanAgreementHistory: many(loanAgreementHistory),
   billingCycleProfiles: many(billingCycleProfiles),
   agreementBillingEmailDispatches: many(agreementBillingEmailDispatches),

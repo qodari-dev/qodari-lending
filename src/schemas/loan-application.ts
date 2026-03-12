@@ -45,6 +45,7 @@ const LoanApplicationWhereFieldsSchema = z
     applicationDate: z.union([z.coerce.date(), DateOperatorsSchema]).optional(),
     affiliationOfficeId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     thirdPartyId: z.union([z.number(), NumberOperatorsSchema]).optional(),
+    agreementId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     categoryCode: z.union([CategoryCodeSchema, StringOperatorsSchema]).optional(),
     creditProductId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     installments: z.union([z.number(), NumberOperatorsSchema]).optional(),
@@ -75,6 +76,7 @@ const LOAN_APPLICATION_INCLUDE_OPTIONS = [
   'affiliationOffice',
   'creditFund',
   'thirdParty',
+  'agreement',
   'repaymentMethod',
   'bank',
   'creditProduct',
@@ -212,6 +214,7 @@ const LoanApplicationBaseSchema = z.object({
     .number({ message: 'Tipo de inversion es requerido' })
     .int()
     .positive('Tipo de inversion es requerido'),
+  agreementId: z.number().int().positive().nullable().optional(),
   note: z.string().nullable().optional(),
   isInsuranceApproved: z.boolean().optional(),
   creditStudyFee: decimalStringField('Estudio de credito invalido').nullable().optional(),
@@ -321,7 +324,6 @@ export const FinalApproveLoanApplicationBodySchema = z.object({
   mode: z.literal('FINAL'),
   repaymentMethodId: z.number().int().positive(),
   paymentGuaranteeTypeId: z.number().int().positive(),
-  agreementId: z.number().int().positive().nullable().optional(),
   approvedInstallments: z.number().int().positive(),
   approvedAmount: decimalStringField('Valor aprobado es requerido').refine(
     (value) => Number(value) > 0,

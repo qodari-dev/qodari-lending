@@ -431,6 +431,7 @@ export type LoanApplications = typeof loanApplications.$inferSelect & {
   affiliationOffice?: AffiliationOffices;
   creditFund?: CreditFunds | null;
   thirdParty?: ThirdParties;
+  agreement?: Agreements | null;
   repaymentMethod?: RepaymentMethods;
   bank?: Banks;
   creditProduct?: CreditProducts;
@@ -718,6 +719,7 @@ export type NewBillingEmailTemplates = typeof billingEmailTemplates.$inferInsert
 // Concr59 - Convenios / Pagadurías
 // ---------------------------------------------------------------------
 export type Agreements = typeof agreements.$inferSelect & {
+  loanApplications?: LoanApplications[];
   loans?: Loans[];
   loanAgreementHistory?: LoanAgreementHistory[];
   billingCycleProfiles?: BillingCycleProfiles[];

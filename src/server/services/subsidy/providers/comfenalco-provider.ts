@@ -32,6 +32,10 @@ function mapWorker(record: ComfenalcoWorkerRecord): SubsidyWorker {
 
   return {
     fullName: buildFullName([record.nombre1, record.nombre2, record.apellido1, record.apellido2]),
+    firstName: record.nombre1?.trim() || null,
+    secondName: record.nombre2?.trim() || null,
+    firstLastName: record.apellido1?.trim() || null,
+    secondLastName: record.apellido2?.trim() || null,
     documentNumber: normalizeDigitsOnly(record.ndAfiliado) ?? record.ndAfiliado,
     identificationTypeCode: record.tdAfiliado?.trim() || null,
     currentSalary: toNumber(record.salarioTrab),

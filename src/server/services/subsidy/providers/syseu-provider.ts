@@ -63,9 +63,10 @@ function mapEmployment(
   total: number
 ) {
   const companyDocumentNumber = normalizeAlphanumericDocument(item.nit_empresa);
-  const companyName =
+  const fallbackCompanyName =
     (companyDocumentNumber ? companyNames.get(companyDocumentNumber) : null) ??
     (companyDocumentNumber ? `Empresa ${companyDocumentNumber}` : `Empresa ${index + 1}`);
+  const companyName = item.razon_social?.trim() || fallbackCompanyName;
   const leftCompanyAt = parseDateToISO(item.fecha_retiro);
 
   return {
@@ -103,6 +104,10 @@ function mapWorker(params: {
       params.worker.primer_apellido,
       params.worker.segundo_apellido,
     ]),
+    firstName: params.worker.primer_nombre?.trim() || null,
+    secondName: params.worker.segundo_nombre?.trim() || null,
+    firstLastName: params.worker.primer_apellido?.trim() || null,
+    secondLastName: params.worker.segundo_apellido?.trim() || null,
     documentNumber:
       normalizeAlphanumericDocument(params.worker.numero_identificacion) ??
       params.worker.numero_identificacion ??
@@ -111,10 +116,10 @@ function mapWorker(params: {
     currentSalary,
     categoryCode: params.worker.categoria?.trim() || null,
     sex: null,
-    address: null,
-    phone: null,
-    email: null,
-    companyName: primaryEmployment?.companyName ?? null,
+    address: params.worker.direccion?.trim() || null,
+    phone: params.worker.telefono?.trim() || null,
+    email: params.worker.email?.trim() || null,
+    companyName: params.worker.razon_social?.trim() || primaryEmployment?.companyName || null,
     joinedCompanyAt: primaryEmployment?.joinedCompanyAt ?? null,
     leftCompanyAt: primaryEmployment?.leftCompanyAt ?? null,
     joinedSubsidyAt: primaryEmployment?.joinedSubsidyAt ?? null,

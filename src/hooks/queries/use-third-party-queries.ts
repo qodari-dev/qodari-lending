@@ -77,6 +77,14 @@ export function useUpdateThirdParty() {
   });
 }
 
+export function useLookupThirdPartySubsidy() {
+  return api.thirdParty.lookupSubsidy.useMutation({
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
 export function useDeleteThirdParty() {
   const queryClient = api.useQueryClient();
 

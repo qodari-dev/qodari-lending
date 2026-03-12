@@ -12,6 +12,10 @@ export type SubsidyEmploymentRecord = {
 
 export type SubsidyWorker = {
   fullName: string;
+  firstName: string | null;
+  secondName: string | null;
+  firstLastName: string | null;
+  secondLastName: string | null;
   documentNumber: string;
   identificationTypeCode: string | null;
   currentSalary: number;

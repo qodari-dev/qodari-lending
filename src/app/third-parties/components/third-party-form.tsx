@@ -35,7 +35,11 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useCities } from '@/hooks/queries/use-city-queries';
 import { useIdentificationTypes } from '@/hooks/queries/use-identification-type-queries';
-import { useCreateThirdParty, useUpdateThirdParty } from '@/hooks/queries/use-third-party-queries';
+import {
+  useCreateThirdParty,
+  useLookupThirdPartySubsidy,
+  useUpdateThirdParty,
+} from '@/hooks/queries/use-third-party-queries';
 import { useThirdPartyTypes } from '@/hooks/queries/use-third-party-type-queries';
 import { City } from '@/schemas/city';
 import { categoryCodeSelectOptions } from '@/schemas/category';
@@ -55,6 +59,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { Controller, FormProvider, useForm, useWatch } from 'react-hook-form';
+import { toast } from 'sonner';
 import { z } from 'zod';
 
 type FormValues = z.infer<typeof CreateThirdPartyBodySchema>;
@@ -106,6 +111,8 @@ export function ThirdPartyForm({
   });
 
   const personType = useWatch({ control: form.control, name: 'personType' });
+  const identificationTypeId = useWatch({ control: form.control, name: 'identificationTypeId' });
+  const documentNumber = useWatch({ control: form.control, name: 'documentNumber' });
 
   // Fetch identification types
   const { data: identificationTypesData } = useIdentificationTypes({
@@ -177,8 +184,104 @@ export function ThirdPartyForm({
 
   const { mutateAsync: create, isPending: isCreating } = useCreateThirdParty();
   const { mutateAsync: update, isPending: isUpdating } = useUpdateThirdParty();
+  const { mutateAsync: lookupSubsidy, isPending: isLookingUpSubsidy } =
+    useLookupThirdPartySubsidy();
 
   const isLoading = isCreating || isUpdating;
+  const canLookupSubsidy = Boolean(identificationTypeId && documentNumber?.trim());
+  const validCategoryCodes = useMemo(
+    () => new Set<string>(categoryCodeSelectOptions.map((option) => option.value)),
+    []
+  );
+
+  const applySubsidyWorkerToForm = useCallback(
+    (
+      worker: {
+        firstName: string | null;
+        secondName: string | null;
+        firstLastName: string | null;
+        secondLastName: string | null;
+        categoryCode: string | null;
+        sex: string | null;
+        address: string | null;
+        phone: string | null;
+        email: string | null;
+      },
+      mode: 'FULL' | 'CATEGORY'
+    ) => {
+      const subsidyCategory =
+        worker.categoryCode && validCategoryCodes.has(worker.categoryCode)
+          ? worker.categoryCode
+          : null;
+
+      if (mode === 'FULL') {
+        if (personType === 'NATURAL') {
+          form.setValue('firstName', worker.firstName ?? '', { shouldDirty: true });
+          form.setValue('secondName', worker.secondName ?? '', { shouldDirty: true });
+          form.setValue('firstLastName', worker.firstLastName ?? '', { shouldDirty: true });
+          form.setValue('secondLastName', worker.secondLastName ?? '', { shouldDirty: true });
+
+          if (worker.sex === 'M' || worker.sex === 'F') {
+            form.setValue('sex', worker.sex, { shouldDirty: true });
+          }
+        }
+
+        if (worker.address) {
+          form.setValue('homeAddress', worker.address, { shouldDirty: true });
+        }
+
+        if (worker.phone) {
+          form.setValue('homePhone', worker.phone, { shouldDirty: true });
+        }
+
+        if (worker.email) {
+          form.setValue('email', worker.email, { shouldDirty: true });
+        }
+
+        if (!thirdParty && subsidyCategory) {
+          form.setValue('categoryCode', subsidyCategory as FormValues['categoryCode'], {
+            shouldDirty: true,
+          });
+        }
+
+        toast.success('Información de subsidio aplicada al formulario');
+        return;
+      }
+
+      if (!subsidyCategory) {
+        toast.warning('Subsidio no devolvió una categoría válida para actualizar');
+        return;
+      }
+
+      form.setValue('categoryCode', subsidyCategory as FormValues['categoryCode'], {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      toast.success('Categoría actualizada desde subsidio');
+    },
+    [form, personType, thirdParty, validCategoryCodes]
+  );
+
+  const handleLookupSubsidy = useCallback(
+    async (mode: 'FULL' | 'CATEGORY') => {
+      const currentIdentificationTypeId = form.getValues('identificationTypeId');
+      const currentDocumentNumber = form.getValues('documentNumber')?.trim();
+
+      if (!currentIdentificationTypeId || !currentDocumentNumber) {
+        return;
+      }
+
+      const response = await lookupSubsidy({
+        body: {
+          identificationTypeId: currentIdentificationTypeId,
+          documentNumber: currentDocumentNumber,
+        },
+      });
+
+      applySubsidyWorkerToForm(response.body.worker, mode);
+    },
+    [applySubsidyWorkerToForm, form, lookupSubsidy]
+  );
 
   const onSubmit = useCallback(
     async (values: FormValues) => {
@@ -310,6 +413,29 @@ export function ThirdPartyForm({
                   )}
                 />
               </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!canLookupSubsidy || isLookingUpSubsidy || isLoading}
+                  onClick={() => handleLookupSubsidy('FULL')}
+                >
+                  {isLookingUpSubsidy ? <Spinner className="mr-2 size-4" /> : null}
+                  Traer información de subsidio
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!canLookupSubsidy || isLookingUpSubsidy || isLoading}
+                  onClick={() => handleLookupSubsidy('CATEGORY')}
+                >
+                  {isLookingUpSubsidy ? <Spinner className="mr-2 size-4" /> : null}
+                  Actualizar categoría
+                </Button>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Habilite estos botones después de ingresar tipo y número de documento.
+              </p>
             </FieldGroup>
 
             {/* Datos Persona Natural */}

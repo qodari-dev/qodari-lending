@@ -1,7 +1,8 @@
-import { db, thirdParties } from '@/server/db';
+import { db, identificationTypes, thirdParties } from '@/server/db';
+import { getSubsidyWorkerBasicData } from '@/server/services/subsidy/subsidy-service';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { toNullableString } from '@/server/utils/string-utils';
+import { normalizeDocumentNumber, toNullableString } from '@/server/utils/string-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { eq, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
@@ -383,6 +384,62 @@ export const thirdParty = tsr.router(contract.thirdParty, {
         userAgent,
       });
       return error;
+    }
+  },
+
+  lookupSubsidy: async ({ body }, { request, appRoute }) => {
+    try {
+      await getAuthContextAndValidatePermission(request, appRoute.metadata);
+
+      const identificationType = await db.query.identificationTypes.findFirst({
+        where: eq(identificationTypes.id, body.identificationTypeId),
+      });
+
+      if (!identificationType) {
+        throwHttpError({
+          status: 404,
+          message: 'Tipo de documento no encontrado',
+          code: 'NOT_FOUND',
+        });
+      }
+
+      const result = await getSubsidyWorkerBasicData({
+        identificationTypeCode: identificationType.code,
+        documentNumber: normalizeDocumentNumber(body.documentNumber),
+      });
+
+      if (!result) {
+        throwHttpError({
+          status: 404,
+          message: 'No se encontro informacion de subsidio para ese documento',
+          code: 'NOT_FOUND',
+        });
+      }
+
+      return {
+        status: 200 as const,
+        body: {
+          source: result.source,
+          worker: {
+            fullName: result.worker.fullName,
+            firstName: result.worker.firstName,
+            secondName: result.worker.secondName,
+            firstLastName: result.worker.firstLastName,
+            secondLastName: result.worker.secondLastName,
+            documentNumber: result.worker.documentNumber,
+            identificationTypeCode: result.worker.identificationTypeCode,
+            categoryCode: result.worker.categoryCode,
+            sex: result.worker.sex,
+            address: result.worker.address,
+            phone: result.worker.phone,
+            email: result.worker.email,
+          },
+        },
+      };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: 'Error al consultar informacion de subsidio del tercero',
+      });
     }
   },
 

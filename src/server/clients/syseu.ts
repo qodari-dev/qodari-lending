@@ -15,17 +15,26 @@ type SyseuEnvelope<T> = {
 export type SyseuFamilyMemberRecord = {
   tipo_identificacion?: string;
   numero_identificacion?: string;
+  conyuge_relacionada?: string;
   primer_apellido?: string;
   segundo_apellido?: string;
   primer_nombre?: string;
   segundo_nombre?: string;
   fecha_nacimiento?: string;
   parentesco?: string;
+  companera_permanente?: string;
+  compañera_permanente?: string;
   estado?: string;
 };
 
 export type SyseuWorkerRecord = SyseuFamilyMemberRecord & {
+  nit_empresa?: string;
+  razon_social?: string;
   categoria?: string;
+  ciudad?: string;
+  direccion?: string;
+  telefono?: string;
+  email?: string;
 };
 
 export type SyseuFamilyGroupRecord = {
@@ -41,6 +50,7 @@ export type SyseuSalaryHistoryRecord = {
 
 export type SyseuAffiliationHistoryRecord = {
   nit_empresa?: string;
+  razon_social?: string;
   codigo_sucursal?: string;
   codigo_lista?: string;
   fecha_afiliacion?: string;
@@ -207,7 +217,10 @@ export type SyseuContributionRecord = {
 };
 
 function normalizeDocumentNumber(value: string): string {
-  return value.trim().replace(/[^\dA-Za-z]/g, '').toUpperCase();
+  return value
+    .trim()
+    .replace(/[^\dA-Za-z]/g, '')
+    .toUpperCase();
 }
 
 class SyseuClient {

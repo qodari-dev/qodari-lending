@@ -1,6 +1,8 @@
 import {
   CreateThirdPartyBodySchema,
   GetThirdPartyQuerySchema,
+  LookupThirdPartySubsidyBodySchema,
+  LookupThirdPartySubsidyResponseSchema,
   ListThirdPartiesQuerySchema,
   UpdateThirdPartyBodySchema,
 } from '@/schemas/third-party';
@@ -91,6 +93,26 @@ export const thirdParty = c.router(
       } satisfies TsRestMetaData,
       responses: {
         200: c.type<ThirdParties>(),
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    lookupSubsidy: {
+      method: 'POST',
+      path: '/lookup-subsidy',
+      body: LookupThirdPartySubsidyBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'read',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: LookupThirdPartySubsidyResponseSchema,
         400: TsRestErrorSchema,
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,

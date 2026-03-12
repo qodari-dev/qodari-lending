@@ -170,6 +170,29 @@ export const CreateThirdPartyBodySchema = z.object({
 
 export const UpdateThirdPartyBodySchema = CreateThirdPartyBodySchema.partial();
 
+export const LookupThirdPartySubsidyBodySchema = z.object({
+  identificationTypeId: z.number().int().positive(),
+  documentNumber: z.string().trim().min(1).max(17),
+});
+
+export const LookupThirdPartySubsidyResponseSchema = z.object({
+  source: z.enum(['COMFENALCO', 'SYSEU']),
+  worker: z.object({
+    fullName: z.string(),
+    firstName: z.string().nullable(),
+    secondName: z.string().nullable(),
+    firstLastName: z.string().nullable(),
+    secondLastName: z.string().nullable(),
+    documentNumber: z.string(),
+    identificationTypeCode: z.string().nullable(),
+    categoryCode: z.string().nullable(),
+    sex: z.string().nullable(),
+    address: z.string().nullable(),
+    phone: z.string().nullable(),
+    email: z.string().nullable(),
+  }),
+});
+
 // ============================================
 // TYPES
 // ============================================
@@ -177,6 +200,10 @@ export const UpdateThirdPartyBodySchema = CreateThirdPartyBodySchema.partial();
 export type ThirdPartyPaginated = ClientInferResponseBody<Contract['thirdParty']['list'], 200>;
 
 export type ThirdParty = ThirdPartyPaginated['data'][number];
+export type ThirdPartySubsidyLookup = ClientInferResponseBody<
+  Contract['thirdParty']['lookupSubsidy'],
+  200
+>;
 
 export type ThirdPartySortField = (typeof THIRD_PARTY_SORT_FIELDS)[number];
 export type ThirdPartyInclude = (typeof THIRD_PARTY_INCLUDE_OPTIONS)[number];

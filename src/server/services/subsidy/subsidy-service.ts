@@ -140,3 +140,32 @@ export async function getSubsidyWorkerStudy(
     return null;
   }
 }
+
+export async function getSubsidyWorkerBasicData(
+  input: GetSubsidyWorkerStudyInput
+): Promise<Pick<SubsidyWorkerStudyData, 'source' | 'worker'> | null> {
+  const provider = getSubsidyProvider();
+
+  if (!provider) {
+    return null;
+  }
+
+  try {
+    const worker = await provider.getWorker({
+      identificationTypeCode: input.identificationTypeCode,
+      documentNumber: input.documentNumber,
+    });
+
+    if (!worker) {
+      return null;
+    }
+
+    return {
+      source: provider.key,
+      worker,
+    };
+  } catch (error) {
+    console.error('[subsidy-service] provider error', error);
+    return null;
+  }
+}

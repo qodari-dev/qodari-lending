@@ -2,6 +2,7 @@ import type {
   SyseuAffiliationHistoryRecord,
   SyseuContributionRecord,
   SyseuFamilyMemberRecord,
+  SyseuPledgeRecord,
   SyseuSalaryHistoryRecord,
   SyseuSubsidyPaymentRecord,
 } from '@/server/clients/syseu';
@@ -16,8 +17,12 @@ import { toNumber } from '@/server/utils/value-utils';
 import type { SubsidyProvider, SubsidyLookupInput } from '../subsidy-provider';
 import type {
   SubsidyBeneficiary,
+  SubsidyCurrentPeriod,
   SubsidyContribution,
   SubsidyPayment,
+  SubsidyPledge,
+  SubsidySalaryHistory,
+  SubsidySpouse,
   SubsidyWorker,
 } from '../subsidy.types';
 
@@ -140,12 +145,37 @@ function mapBeneficiary(record: SyseuFamilyMemberRecord): SubsidyBeneficiary {
     documentNumber: normalizeAlphanumericDocument(record.numero_identificacion),
     identificationTypeCode: record.tipo_identificacion?.trim() || null,
     relationship: record.parentesco?.trim() || null,
+    relatedSpouseDocumentNumber: normalizeAlphanumericDocument(record.conyuge_relacionada),
     birthDate,
     age: calculateAge(birthDate),
     isDeceased: String(record.estado ?? '')
       .trim()
       .toUpperCase()
       .includes('FALLE'),
+  };
+}
+
+function mapSpouse(record: SyseuFamilyMemberRecord): SubsidySpouse {
+  const birthDate = parseDateToISO(record.fecha_nacimiento);
+  const permanentPartnerFlag = String(
+    record.companera_permanente ?? record['compañera_permanente'] ?? ''
+  )
+    .trim()
+    .toUpperCase();
+
+  return {
+    fullName: buildFullName([
+      record.primer_nombre,
+      record.segundo_nombre,
+      record.primer_apellido,
+      record.segundo_apellido,
+    ]),
+    documentNumber: normalizeAlphanumericDocument(record.numero_identificacion),
+    identificationTypeCode: record.tipo_identificacion?.trim() || null,
+    relationship: record.parentesco?.trim() || null,
+    birthDate,
+    isPermanentPartner:
+      permanentPartnerFlag === 'SI' || permanentPartnerFlag === 'S' || permanentPartnerFlag === '1',
   };
 }
 
@@ -186,6 +216,43 @@ function mapSubsidyPayment(record: SyseuSubsidyPaymentRecord): SubsidyPayment {
   };
 }
 
+function mapSalaryHistory(record: SyseuSalaryHistoryRecord): SubsidySalaryHistory | null {
+  const effectiveDate = parseDateToISO(record.fecha_salario);
+  const salary = toNumber(record.salario);
+
+  if (!effectiveDate || !Number.isFinite(salary) || salary < 0) {
+    return null;
+  }
+
+  return {
+    effectiveDate,
+    salary,
+  };
+}
+
+function mapPledge(record: SyseuPledgeRecord): SubsidyPledge {
+  const isIndexed = String(record.indice ?? '')
+    .trim()
+    .toUpperCase();
+
+  return {
+    mark: record.marca?.trim() || null,
+    documentNumber: normalizeAlphanumericDocument(record.documento),
+    workerDocumentNumber: normalizeAlphanumericDocument(record.cedula_trabajador),
+    spouseDocumentNumber: normalizeAlphanumericDocument(record.cedula_conyuge),
+    requestedValue: toNumber(record.valor_solicitado),
+    creditValue: toNumber(record.valor_credito),
+    paymentValue: toNumber(record.valor_abono),
+    discountValue: toNumber(record.valor_descuento),
+    accountingCode: record.codigo_contable?.trim() || null,
+    crossDocumentNumber: normalizeAlphanumericDocument(record.documento_cruce),
+    effectiveDate: parseDateToISO(record.fecha),
+    status: record.estado?.trim() || null,
+    statusDate: parseDateToISO(record.fecha_estado),
+    isIndexed: isIndexed === 'SI' || isIndexed === 'S' || isIndexed === '1',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
@@ -216,6 +283,19 @@ class SyseuSubsidyProvider implements SubsidyProvider {
     return records.map(mapBeneficiary);
   }
 
+  async getSpouses(input: SubsidyLookupInput): Promise<SubsidySpouse[]> {
+    const records = await syseuClient.getSpousesByDocument(input.documentNumber);
+    return records.map(mapSpouse);
+  }
+
+  async getSalaryHistory(input: SubsidyLookupInput): Promise<SubsidySalaryHistory[]> {
+    const records = await syseuClient.getSalaryHistoryByDocument(input.documentNumber);
+    return records
+      .map(mapSalaryHistory)
+      .filter((item): item is SubsidySalaryHistory => item !== null)
+      .sort((left, right) => right.effectiveDate.localeCompare(left.effectiveDate));
+  }
+
   async getContributions(input: SubsidyLookupInput): Promise<SubsidyContribution[]> {
     const contributions = await syseuClient.getContributionsByDocument(input.documentNumber);
     const companyNames = buildCompanyNameMap(contributions);
@@ -225,6 +305,24 @@ class SyseuSubsidyProvider implements SubsidyProvider {
   async getSubsidyPayments(input: SubsidyLookupInput): Promise<SubsidyPayment[]> {
     const payments = await syseuClient.getSubsidyPaymentsByDocument(input.documentNumber);
     return payments.map(mapSubsidyPayment);
+  }
+
+  async getPledges(input: SubsidyLookupInput): Promise<SubsidyPledge[]> {
+    const records = await syseuClient.getPledgesByDocument(input.documentNumber);
+    return records.map(mapPledge);
+  }
+
+  async getCurrentPeriod(): Promise<SubsidyCurrentPeriod | null> {
+    const currentPeriod = await syseuClient.getCurrentPeriod();
+
+    if (!currentPeriod?.periodo?.trim()) {
+      return null;
+    }
+
+    return {
+      period: currentPeriod.periodo.trim(),
+      subsidyValue: toNumber(currentPeriod.valor_subsidio),
+    };
   }
 }
 

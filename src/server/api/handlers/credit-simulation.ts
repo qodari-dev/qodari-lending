@@ -512,6 +512,7 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
           },
           subsidySource: subsidyData?.source ?? null,
           companyHistory: subsidyData?.companyHistory ?? [],
+          salaryHistory: subsidyData?.salaryHistory ?? [],
           contributions: subsidyData?.contributions ?? [],
           spouses: subsidyData?.spouses ?? [],
           beneficiaries: subsidyData?.beneficiaries ?? [],

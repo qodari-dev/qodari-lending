@@ -296,9 +296,19 @@ export function WorkerStudy() {
                   <div className="grid gap-3 md:grid-cols-3">
                     {result.spouses.map((spouse, index) => (
                       <div key={index} className="rounded-lg border p-3">
-                        <p className="font-medium">{spouse.fullName}</p>
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-medium">{spouse.fullName}</p>
+                          {spouse.isPermanentPartner ? (
+                            <Badge variant="outline">Permanente</Badge>
+                          ) : null}
+                        </div>
                         {spouse.documentNumber ? (
                           <p className="text-muted-foreground text-xs">Doc: {spouse.documentNumber}</p>
+                        ) : null}
+                        {spouse.relationship ? (
+                          <p className="text-muted-foreground text-xs">
+                            Parentesco: {spouse.relationship}
+                          </p>
                         ) : null}
                         {spouse.birthDate ? (
                           <p className="text-muted-foreground text-xs">
@@ -319,39 +329,75 @@ export function WorkerStudy() {
                   <CardTitle>Beneficiarios</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Documento</TableHead>
-                        <TableHead>Parentesco</TableHead>
-                        <TableHead>Edad</TableHead>
-                        <TableHead>Fecha nacimiento</TableHead>
-                        <TableHead>Estado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {result.beneficiaries.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{item.fullName}</TableCell>
-                          <TableCell>{item.documentNumber ?? '-'}</TableCell>
-                          <TableCell>{item.relationship ?? '-'}</TableCell>
-                          <TableCell>{item.age != null ? item.age : '-'}</TableCell>
-                          <TableCell>{item.birthDate ? formatDate(item.birthDate) : '-'}</TableCell>
-                          <TableCell>
-                            {item.isDeceased ? (
-                              <Badge variant="destructive">Fallecido</Badge>
-                            ) : (
-                              <Badge variant="outline">Activo</Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {result.beneficiaries.map((item, index) => (
+                      <div key={index} className="rounded-lg border p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-medium">{item.fullName}</p>
+                          {item.isDeceased ? (
+                            <Badge variant="destructive">Fallecido</Badge>
+                          ) : (
+                            <Badge variant="outline">Activo</Badge>
+                          )}
+                        </div>
+                        {item.relationship ? (
+                          <p className="text-muted-foreground text-xs">
+                            Parentesco: {item.relationship}
+                          </p>
+                        ) : null}
+                        {item.documentNumber ? (
+                          <p className="text-muted-foreground text-xs">Doc: {item.documentNumber}</p>
+                        ) : null}
+                        {item.relatedSpouseDocumentNumber ? (
+                          <p className="text-muted-foreground text-xs">
+                            Cónyuge relacionada: {item.relatedSpouseDocumentNumber}
+                          </p>
+                        ) : null}
+                        {item.birthDate ? (
+                          <p className="text-muted-foreground text-xs">
+                            Fecha nacimiento: {formatDate(item.birthDate)}
+                          </p>
+                        ) : null}
+                        {item.age != null ? (
+                          <p className="text-muted-foreground text-xs">Edad: {item.age}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             ) : null}
+
+            {/* Trayectoria salarial */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Trayectoria salarial</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha salario</TableHead>
+                      <TableHead>Salario</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {result.salaryHistory.length ? (
+                      result.salaryHistory.map((item, index) => (
+                        <TableRow key={`${item.effectiveDate}-${index}`}>
+                          <TableCell>{formatDate(item.effectiveDate)}</TableCell>
+                          <TableCell>{formatCurrency(item.salary)}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={2}>Sin informacion</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
 
             {/* Historial de aportes */}
             <Card>

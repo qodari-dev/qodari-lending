@@ -88,6 +88,11 @@ export const WorkerStudyContributionSchema = z.object({
   contributionValue: z.number(),
 });
 
+export const WorkerStudySalaryHistorySchema = z.object({
+  effectiveDate: z.string(),
+  salary: z.number(),
+});
+
 export const WorkerStudyCompanyHistorySchema = z.object({
   companyName: z.string(),
   companyDocumentNumber: z.string().nullable(),
@@ -100,6 +105,7 @@ export const WorkerStudyBeneficiarySchema = z.object({
   fullName: z.string(),
   documentNumber: z.string().nullable(),
   relationship: z.string().nullable(),
+  relatedSpouseDocumentNumber: z.string().nullable(),
   birthDate: z.string().nullable(),
   age: z.number().nullable(),
   isDeceased: z.boolean(),
@@ -186,12 +192,15 @@ export const WorkerStudyResponseSchema = z.object({
   }),
   subsidySource: z.string().nullable(),
   companyHistory: z.array(WorkerStudyCompanyHistorySchema),
+  salaryHistory: z.array(WorkerStudySalaryHistorySchema),
   contributions: z.array(WorkerStudyContributionSchema),
   spouses: z.array(
     z.object({
       fullName: z.string(),
       documentNumber: z.string().nullable(),
       birthDate: z.string().nullable(),
+      relationship: z.string().nullable(),
+      isPermanentPartner: z.boolean(),
     })
   ),
   beneficiaries: z.array(WorkerStudyBeneficiarySchema),

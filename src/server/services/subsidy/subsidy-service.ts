@@ -3,9 +3,13 @@ import { roundMoney } from '@/server/utils/value-utils';
 import { getSubsidyProvider } from './subsidy-provider-factory';
 import type {
   SubsidyBeneficiary,
+  SubsidyCurrentPeriod,
   SubsidyCompanyHistory,
   SubsidyContribution,
   SubsidyPayment,
+  SubsidyPledge,
+  SubsidySalaryHistory,
+  SubsidySpouse,
   SubsidyWorker,
   SubsidyWorkerStudyData,
 } from './subsidy.types';
@@ -64,22 +68,16 @@ function buildCompanyHistory(worker: SubsidyWorker): SubsidyCompanyHistory[] {
 function buildStudyFromProvider(params: {
   source: SubsidyWorkerStudyData['source'];
   worker: SubsidyWorker;
+  spouses: SubsidySpouse[];
   beneficiaries: SubsidyBeneficiary[];
+  salaryHistory: SubsidySalaryHistory[];
   contributions: SubsidyContribution[];
   subsidyPayments: SubsidyPayment[];
 }): SubsidyWorkerStudyData {
-  const { worker, beneficiaries, contributions, subsidyPayments } = params;
+  const { worker, spouses, beneficiaries, salaryHistory, contributions, subsidyPayments } = params;
 
   const companyHistory = buildCompanyHistory(worker);
-
-  // Cónyuges (puede haber varios históricos)
-  const spouses = beneficiaries
-    .filter((item) => isSpouseRelationship(item.relationship))
-    .map((item) => ({
-      fullName: item.fullName,
-      documentNumber: item.documentNumber,
-      birthDate: item.birthDate,
-    }));
+  const nonSpouseBeneficiaries = beneficiaries.filter((item) => !isSpouseRelationship(item.relationship));
 
   const currentSalary = toSafeMoney(worker.currentSalary);
 
@@ -88,13 +86,20 @@ function buildStudyFromProvider(params: {
     worker,
     currentSalary,
     companyHistory,
+    salaryHistory,
     contributions,
-    spouses,
-    beneficiaries,
+    spouses: spouses.map((item) => ({
+      fullName: item.fullName,
+      documentNumber: item.documentNumber,
+      birthDate: item.birthDate,
+      relationship: item.relationship,
+      isPermanentPartner: item.isPermanentPartner,
+    })),
+    beneficiaries: nonSpouseBeneficiaries,
     subsidyPayments,
     notes: [
       `Fuente subsidio: ${params.source}.`,
-      `Beneficiarios encontrados: ${beneficiaries.length}.`,
+      `Beneficiarios encontrados: ${nonSpouseBeneficiaries.length}.`,
       ...(spouses.length > 0
         ? [`Conyuge(s) identificado(s): ${spouses.map((s) => s.fullName).join(', ')}.`]
         : []),
@@ -117,9 +122,10 @@ export async function getSubsidyWorkerStudy(
       documentNumber: input.documentNumber,
     };
 
-    const [worker, beneficiaries, contributions, subsidyPayments] = await Promise.all([
+    const [worker, beneficiaries, salaryHistory, contributions, subsidyPayments] = await Promise.all([
       provider.getWorker(lookup),
       provider.getBeneficiaries(lookup),
+      provider.getSalaryHistory(lookup),
       provider.getContributions(lookup),
       provider.getSubsidyPayments(lookup),
     ]);
@@ -128,10 +134,25 @@ export async function getSubsidyWorkerStudy(
       return null;
     }
 
+    const spouses = provider.getSpouses
+      ? await provider.getSpouses(lookup)
+      : beneficiaries
+          .filter((item) => isSpouseRelationship(item.relationship))
+          .map((item) => ({
+            fullName: item.fullName,
+            documentNumber: item.documentNumber,
+            identificationTypeCode: item.identificationTypeCode,
+            relationship: item.relationship,
+            birthDate: item.birthDate,
+            isPermanentPartner: false,
+          }));
+
     return buildStudyFromProvider({
       source: provider.key,
       worker,
+      spouses,
       beneficiaries,
+      salaryHistory,
       contributions,
       subsidyPayments,
     });
@@ -163,6 +184,59 @@ export async function getSubsidyWorkerBasicData(
     return {
       source: provider.key,
       worker,
+    };
+  } catch (error) {
+    console.error('[subsidy-service] provider error', error);
+    return null;
+  }
+}
+
+export async function getSubsidyCurrentPeriod(): Promise<{
+  source: SubsidyWorkerStudyData['source'];
+  period: SubsidyCurrentPeriod;
+} | null> {
+  const provider = getSubsidyProvider();
+
+  if (!provider) {
+    return null;
+  }
+
+  try {
+    const period = await provider.getCurrentPeriod();
+
+    if (!period) {
+      return null;
+    }
+
+    return {
+      source: provider.key,
+      period,
+    };
+  } catch (error) {
+    console.error('[subsidy-service] provider error', error);
+    return null;
+  }
+}
+
+export async function getSubsidyPledges(input: GetSubsidyWorkerStudyInput): Promise<{
+  source: SubsidyWorkerStudyData['source'];
+  pledges: SubsidyPledge[];
+} | null> {
+  const provider = getSubsidyProvider();
+
+  if (!provider) {
+    return null;
+  }
+
+  try {
+    const pledges = await provider.getPledges({
+      identificationTypeCode: input.identificationTypeCode,
+      documentNumber: input.documentNumber,
+    });
+
+    return {
+      source: provider.key,
+      pledges,
     };
   } catch (error) {
     console.error('[subsidy-service] provider error', error);

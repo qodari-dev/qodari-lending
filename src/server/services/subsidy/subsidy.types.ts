@@ -36,9 +36,19 @@ export type SubsidyBeneficiary = {
   documentNumber: string | null;
   identificationTypeCode: string | null;
   relationship: string | null;
+  relatedSpouseDocumentNumber: string | null;
   birthDate: string | null;
   age: number | null;
   isDeceased: boolean;
+};
+
+export type SubsidySpouse = {
+  fullName: string;
+  documentNumber: string | null;
+  identificationTypeCode: string | null;
+  relationship: string | null;
+  birthDate: string | null;
+  isPermanentPartner: boolean;
 };
 
 export type SubsidyContribution = {
@@ -48,6 +58,11 @@ export type SubsidyContribution = {
   workerDocumentNumber: string | null;
   baseSalary: number;
   contributionValue: number;
+};
+
+export type SubsidySalaryHistory = {
+  effectiveDate: string;
+  salary: number;
 };
 
 export type SubsidyCompanyHistory = {
@@ -68,16 +83,41 @@ export type SubsidyPayment = {
   isVoided: boolean;
 };
 
+export type SubsidyCurrentPeriod = {
+  period: string;
+  subsidyValue: number;
+};
+
+export type SubsidyPledge = {
+  mark: string | null;
+  documentNumber: string | null;
+  workerDocumentNumber: string | null;
+  spouseDocumentNumber: string | null;
+  requestedValue: number;
+  creditValue: number;
+  paymentValue: number;
+  discountValue: number;
+  accountingCode: string | null;
+  crossDocumentNumber: string | null;
+  effectiveDate: string | null;
+  status: string | null;
+  statusDate: string | null;
+  isIndexed: boolean;
+};
+
 export type SubsidyWorkerStudyData = {
   source: SubsidySource;
   worker: SubsidyWorker;
   currentSalary: number;
   companyHistory: SubsidyCompanyHistory[];
+  salaryHistory: SubsidySalaryHistory[];
   contributions: SubsidyContribution[];
   spouses: Array<{
     fullName: string;
     documentNumber: string | null;
     birthDate: string | null;
+    relationship: string | null;
+    isPermanentPartner: boolean;
   }>;
   beneficiaries: SubsidyBeneficiary[];
   subsidyPayments: SubsidyPayment[];

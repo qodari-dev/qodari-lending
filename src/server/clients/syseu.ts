@@ -12,6 +12,11 @@ type SyseuEnvelope<T> = {
   data: T;
 };
 
+type SyseuRequestOptions<T> = {
+  allowNoData?: boolean;
+  emptyValue?: T;
+};
+
 export type SyseuFamilyMemberRecord = {
   tipo_identificacion?: string;
   numero_identificacion?: string;
@@ -216,6 +221,28 @@ export type SyseuContributionRecord = {
   subsi65?: SyseuContributionDetailRecord[] | null;
 };
 
+export type SyseuCurrentPeriodRecord = {
+  periodo?: string;
+  valor_subsidio?: string | number;
+};
+
+export type SyseuPledgeRecord = {
+  marca?: string;
+  documento?: string;
+  cedula_trabajador?: string;
+  cedula_conyuge?: string;
+  valor_solicitado?: string | number;
+  valor_credito?: string | number;
+  valor_abono?: string | number;
+  valor_descuento?: string | number;
+  codigo_contable?: string;
+  documento_cruce?: string;
+  fecha?: string;
+  estado?: string;
+  fecha_estado?: string;
+  indice?: string;
+};
+
 function normalizeDocumentNumber(value: string): string {
   return value
     .trim()
@@ -223,12 +250,33 @@ function normalizeDocumentNumber(value: string): string {
     .toUpperCase();
 }
 
+function normalizeSyseuMessage(value: string | undefined) {
+  return (value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function isSyseuNoDataMessage(value: string | undefined) {
+  const normalized = normalizeSyseuMessage(value);
+  return (
+    normalized.includes('no existe informacion') ||
+    normalized.includes('no se encontro informacion') ||
+    normalized.includes('sin informacion')
+  );
+}
+
 class SyseuClient {
   private get baseUrl(): string {
     return env.SYSEU_URL ?? '';
   }
 
-  private async request<T>(path: string, body: Record<string, string>): Promise<T> {
+  private async request<T>(
+    path: string,
+    body: Record<string, string>,
+    options?: SyseuRequestOptions<T>
+  ): Promise<T> {
     assertSyseuConfig();
 
     const response = await fetch(`${this.baseUrl}${path}`, {
@@ -243,8 +291,21 @@ class SyseuClient {
 
     const payload = (await response.json().catch(() => null)) as SyseuEnvelope<T> | null;
 
-    if (!response.ok || !payload?.flag) {
+    if (!response.ok) {
       const detail = payload?.msg || `HTTP ${response.status}`;
+      throw new Error(`Error en Syseu (${path}): ${detail}`);
+    }
+
+    if (!payload) {
+      throw new Error(`Error en Syseu (${path}): Respuesta inválida`);
+    }
+
+    if (!payload.flag) {
+      if (options?.allowNoData && isSyseuNoDataMessage(payload.msg)) {
+        return options.emptyValue as T;
+      }
+
+      const detail = payload.msg || 'Respuesta inválida';
       throw new Error(`Error en Syseu (${path}): ${detail}`);
     }
 
@@ -253,8 +314,11 @@ class SyseuClient {
 
   async getFamilyGroupByDocument(documentNumber: string): Promise<SyseuFamilyGroupRecord | null> {
     const cleanDocumentNumber = normalizeDocumentNumber(documentNumber);
-    const data = await this.request<SyseuFamilyGroupRecord>('/nucleoFamiliar', {
+    const data = await this.request<SyseuFamilyGroupRecord | null>('/nucleoFamiliar', {
       cedtra: cleanDocumentNumber,
+    }, {
+      allowNoData: true,
+      emptyValue: null,
     });
 
     return data ?? null;
@@ -266,6 +330,10 @@ class SyseuClient {
       '/trayectoriaSalarios',
       {
         cedtra: cleanDocumentNumber,
+      },
+      {
+        allowNoData: true,
+        emptyValue: { trasal: [] },
       }
     );
 
@@ -280,6 +348,10 @@ class SyseuClient {
       '/trayectoriaAfiliacion',
       {
         cedtra: cleanDocumentNumber,
+      },
+      {
+        allowNoData: true,
+        emptyValue: { traafi: [] },
       }
     );
 
@@ -290,6 +362,9 @@ class SyseuClient {
     const cleanDocumentNumber = normalizeDocumentNumber(documentNumber);
     const data = await this.request<SyseuSubsidyPaymentRecord[]>('/giroSubsidio', {
       cedtra: cleanDocumentNumber,
+    }, {
+      allowNoData: true,
+      emptyValue: [],
     });
 
     return data ?? [];
@@ -308,9 +383,36 @@ class SyseuClient {
     const cleanDocumentNumber = normalizeDocumentNumber(documentNumber);
     const data = await this.request<SyseuContributionRecord[]>('/getAportes', {
       cedtra: cleanDocumentNumber,
+    }, {
+      allowNoData: true,
+      emptyValue: [],
     });
 
     return data ?? [];
+  }
+
+  async getCurrentPeriod(): Promise<SyseuCurrentPeriodRecord | null> {
+    const data = await this.request<{ periodo?: SyseuCurrentPeriodRecord | null }>(
+      '/traerPeriodo',
+      {}
+    );
+    return data?.periodo ?? null;
+  }
+
+  async getPledgesByDocument(documentNumber: string): Promise<SyseuPledgeRecord[]> {
+    const cleanDocumentNumber = normalizeDocumentNumber(documentNumber);
+    const data = await this.request<{ subsi43?: SyseuPledgeRecord[] | null }>(
+      '/traerSubsi43',
+      {
+        cedtra: cleanDocumentNumber,
+      },
+      {
+        allowNoData: true,
+        emptyValue: { subsi43: [] },
+      }
+    );
+
+    return data?.subsi43 ?? [];
   }
 
   async getWorkerByDocument(documentNumber: string) {
@@ -320,14 +422,16 @@ class SyseuClient {
 
   async getBeneficiariesByDocument(documentNumber: string) {
     const familyGroup = await this.getFamilyGroupByDocument(documentNumber);
-    const spouse = Array.isArray(familyGroup?.conyuges)
+    return familyGroup?.beneficiarios ?? [];
+  }
+
+  async getSpousesByDocument(documentNumber: string) {
+    const familyGroup = await this.getFamilyGroupByDocument(documentNumber);
+    return Array.isArray(familyGroup?.conyuges)
       ? familyGroup.conyuges
       : familyGroup?.conyuges
         ? [familyGroup.conyuges]
         : [];
-    const beneficiaries = familyGroup?.beneficiarios ?? [];
-
-    return [...spouse, ...beneficiaries];
   }
 
   async getTransfersByDocument(documentNumber: string) {

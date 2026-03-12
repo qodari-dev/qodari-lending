@@ -1,7 +1,7 @@
 import React from 'react';
 import type { PdfTemplateBuilder } from '../types';
 import { createBaseStyles } from '../theme';
-import { formatCurrency, formatDate, formatNumber } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatDateTime, formatNumber } from '@/utils/formatters';
 import { PageShell, MetaLines, SummaryGrid, PdfTable, type TableColumn } from '../components';
 import { WorkerStudyResponseSchema } from '@/schemas/credit-simulation';
 import {
@@ -23,6 +23,7 @@ export type WorkerStudyPdfData = z.infer<typeof WorkerStudyResponseSchema> & {
 };
 
 type Contribution = WorkerStudyPdfData['contributions'][number];
+type SalaryHistory = WorkerStudyPdfData['salaryHistory'][number];
 type CompanyHistory = WorkerStudyPdfData['companyHistory'][number];
 type LoanApplication = WorkerStudyPdfData['loanApplications'][number];
 type Credit = WorkerStudyPdfData['credits'][number];
@@ -53,6 +54,16 @@ const contributionColumns: TableColumn<Contribution>[] = [
     width: '23%',
     textAlign: 'right',
     getValue: (r) => formatCurrency(r.contributionValue),
+  },
+];
+
+const salaryHistoryColumns: TableColumn<SalaryHistory>[] = [
+  { header: 'Fecha salario', width: '40%', getValue: (r) => formatDate(r.effectiveDate) },
+  {
+    header: 'Salario',
+    width: '60%',
+    textAlign: 'right',
+    getValue: (r) => formatCurrency(r.salary),
   },
 ];
 
@@ -97,10 +108,11 @@ const loanApplicationColumns: TableColumn<LoanApplication>[] = [
 ];
 
 const beneficiaryColumns: TableColumn<Beneficiary>[] = [
-  { header: 'Nombre', width: '30%', getValue: (r) => r.fullName },
-  { header: 'Documento', width: '18%', getValue: (r) => r.documentNumber ?? '-' },
-  { header: 'Parentesco', width: '17%', getValue: (r) => r.relationship ?? '-' },
-  { header: 'Nacimiento', width: '15%', getValue: (r) => r.birthDate ? formatDate(r.birthDate) : '-' },
+  { header: 'Nombre', width: '25%', getValue: (r) => r.fullName },
+  { header: 'Documento', width: '14%', getValue: (r) => r.documentNumber ?? '-' },
+  { header: 'Parentesco', width: '14%', getValue: (r) => r.relationship ?? '-' },
+  { header: 'Conyuge rel.', width: '14%', getValue: (r) => r.relatedSpouseDocumentNumber ?? '-' },
+  { header: 'Nacimiento', width: '13%', getValue: (r) => r.birthDate ? formatDate(r.birthDate) : '-' },
   {
     header: 'Edad',
     width: '10%',
@@ -193,6 +205,7 @@ export const workerStudyReportTemplate: PdfTemplateBuilder<WorkerStudyPdfData> =
           label: 'Documento',
           value: `${data.worker.identificationTypeCode} ${data.worker.documentNumber}`,
         },
+        { label: 'Generado', value: formatDateTime(data.generatedAt) },
       ]),
 
       // -- Worker details --
@@ -220,11 +233,23 @@ export const workerStudyReportTemplate: PdfTemplateBuilder<WorkerStudyPdfData> =
               SummaryGrid(rpdf, styles, [
                 { label: 'Nombre', value: spouse.fullName },
                 { label: 'Documento', value: spouse.documentNumber ?? '-' },
+                { label: 'Parentesco', value: spouse.relationship ?? '-' },
+                { label: 'Permanente', value: spouse.isPermanentPartner ? 'Si' : 'No' },
                 { label: 'Nacimiento', value: spouse.birthDate ? formatDate(spouse.birthDate) : '-' },
               ])
             ),
           ]
         : []),
+
+      // -- Salary history --
+      h(Text, { style: styles.sectionTitle, key: 'sec-salary-history' }, 'Trayectoria salarial'),
+      PdfTable(rpdf, styles, {
+        columns: salaryHistoryColumns,
+        rows: data.salaryHistory,
+        emptyMessage: 'Sin trayectoria salarial.',
+        keyExtractor: (r) => `salary-${r.effectiveDate}-${r.salary}`,
+        tableKey: 'salary-history',
+      }),
 
       // -- Contributions --
       h(Text, { style: styles.sectionTitle, key: 'sec-contributions' }, 'Historial de aportes'),

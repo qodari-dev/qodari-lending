@@ -9,8 +9,12 @@ import { toNumber } from '@/server/utils/value-utils';
 import type { SubsidyProvider, SubsidyLookupInput } from '../subsidy-provider';
 import type {
   SubsidyBeneficiary,
+  SubsidyCurrentPeriod,
   SubsidyContribution,
   SubsidyPayment,
+  SubsidyPledge,
+  SubsidySalaryHistory,
+  SubsidySpouse,
   SubsidyWorker,
 } from '../subsidy.types';
 
@@ -62,9 +66,21 @@ function mapBeneficiary(record: ComfenalcoBeneficiaryRecord): SubsidyBeneficiary
     documentNumber: normalizeDigitsOnly(record.ndAfiliado),
     identificationTypeCode: record.tdAfiliado?.trim() || null,
     relationship: record.parentesco?.trim() || null,
+    relatedSpouseDocumentNumber: null,
     birthDate: null, // Comfenalco no devuelve fecha de nacimiento
     age: Number.isFinite(Number(record.edad)) ? Number(record.edad) : null,
     isDeceased: fallecimiento === 'X' || fallecimiento === '1' || fallecimiento === 'SI',
+  };
+}
+
+function mapSpouse(record: ComfenalcoBeneficiaryRecord): SubsidySpouse {
+  return {
+    fullName: buildFullName([record.nombre1, record.nombre2, record.apellido1, record.apellido2]),
+    documentNumber: normalizeDigitsOnly(record.ndAfiliado),
+    identificationTypeCode: record.tdAfiliado?.trim() || null,
+    relationship: record.parentesco?.trim() || null,
+    birthDate: null,
+    isPermanentPartner: false,
   };
 }
 
@@ -85,6 +101,37 @@ class ComfenalcoSubsidyProvider implements SubsidyProvider {
     return (worker?.beneficiarios ?? []).map(mapBeneficiary);
   }
 
+  async getSpouses(input: SubsidyLookupInput): Promise<SubsidySpouse[]> {
+    const beneficiaries = await this.getBeneficiaries(input);
+    return beneficiaries
+      .filter((item) => {
+        const normalized = String(item.relationship ?? '').trim().toUpperCase();
+        return (
+          normalized.includes('CONYUGE') ||
+          normalized.includes('COMPANER') ||
+          normalized.includes('ESPOS') ||
+          normalized.includes('PAREJA')
+        );
+      })
+      .map((item) =>
+        mapSpouse({
+          parentesco: item.relationship ?? '',
+          tdAfiliado: item.identificationTypeCode ?? '',
+          ndAfiliado: item.documentNumber ?? '',
+          nombre1: item.fullName,
+          nombre2: '',
+          apellido1: '',
+          apellido2: '',
+          edad: item.age != null ? String(item.age) : '',
+          fallecimiento: item.isDeceased ? 'SI' : 'NO',
+        })
+      );
+  }
+
+  async getSalaryHistory(_input: SubsidyLookupInput): Promise<SubsidySalaryHistory[]> {
+    return [];
+  }
+
   async getContributions(_input: SubsidyLookupInput): Promise<SubsidyContribution[]> {
     // Comfenalco no devuelve historial de aportes todavía
     return [];
@@ -93,6 +140,15 @@ class ComfenalcoSubsidyProvider implements SubsidyProvider {
   async getSubsidyPayments(_input: SubsidyLookupInput): Promise<SubsidyPayment[]> {
     // Comfenalco no devuelve historial de giro de subsidio todavía
     return [];
+  }
+
+  async getPledges(_input: SubsidyLookupInput): Promise<SubsidyPledge[]> {
+    // Comfenalco no devuelve pignoraciones todavía
+    return [];
+  }
+
+  async getCurrentPeriod(): Promise<SubsidyCurrentPeriod | null> {
+    return null;
   }
 }
 

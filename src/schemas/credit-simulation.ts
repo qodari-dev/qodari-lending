@@ -82,15 +82,37 @@ export const CalculateCreditSimulationResponseSchema = z.object({
 export const WorkerStudyContributionSchema = z.object({
   period: z.string(),
   companyName: z.string(),
-  contributionBaseSalary: z.number(),
+  companyDocumentNumber: z.string().nullable(),
+  workerDocumentNumber: z.string().nullable(),
+  baseSalary: z.number(),
   contributionValue: z.number(),
 });
 
 export const WorkerStudyCompanyHistorySchema = z.object({
   companyName: z.string(),
+  companyDocumentNumber: z.string().nullable(),
   fromDate: z.string(),
   toDate: z.string().nullable(),
   contributionMonths: z.number().int().nonnegative(),
+});
+
+export const WorkerStudyBeneficiarySchema = z.object({
+  fullName: z.string(),
+  documentNumber: z.string().nullable(),
+  relationship: z.string().nullable(),
+  birthDate: z.string().nullable(),
+  age: z.number().nullable(),
+  isDeceased: z.boolean(),
+});
+
+export const WorkerStudySubsidyPaymentSchema = z.object({
+  period: z.string(),
+  beneficiaryRelationship: z.string().nullable(),
+  paymentType: z.string().nullable(),
+  installmentNumber: z.string().nullable(),
+  installmentValue: z.number(),
+  transferPeriod: z.string().nullable(),
+  isVoided: z.boolean(),
 });
 
 export const WORKER_STUDY_LOAN_APPLICATION_STATUS_OPTIONS = [
@@ -155,30 +177,25 @@ export const WorkerStudyResponseSchema = z.object({
     identificationTypeCode: z.string(),
     identificationTypeName: z.string(),
     documentNumber: z.string(),
+    currentSalary: z.number().nonnegative().nullable(),
+    categoryCode: z.string().nullable(),
+    sex: z.string().nullable(),
+    address: z.string().nullable(),
+    phone: z.string().nullable(),
+    email: z.string().nullable(),
   }),
   subsidySource: z.string().nullable(),
-  salary: z
-    .object({
-      currentSalary: z.number().nonnegative(),
-      averageSalaryLastSixMonths: z.number().nonnegative(),
-      highestSalaryLastSixMonths: z.number().nonnegative(),
-    })
-    .nullable(),
-  trajectory: z
-    .object({
-      totalContributionMonths: z.number().int().nonnegative(),
-      currentCompanyName: z.string().nullable(),
-      previousCompanyName: z.string().nullable(),
-    })
-    .nullable(),
-  contributions: z.array(WorkerStudyContributionSchema),
   companyHistory: z.array(WorkerStudyCompanyHistorySchema),
-  spouse: z
-    .object({
+  contributions: z.array(WorkerStudyContributionSchema),
+  spouses: z.array(
+    z.object({
       fullName: z.string(),
       documentNumber: z.string().nullable(),
+      birthDate: z.string().nullable(),
     })
-    .nullable(),
+  ),
+  beneficiaries: z.array(WorkerStudyBeneficiarySchema),
+  subsidyPayments: z.array(WorkerStudySubsidyPaymentSchema),
   loanApplications: z.array(WorkerStudyLoanApplicationSchema),
   credits: z.array(WorkerStudyCreditSchema),
   notes: z.string().nullable(),

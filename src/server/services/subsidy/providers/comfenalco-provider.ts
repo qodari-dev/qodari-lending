@@ -4,53 +4,24 @@ import type {
   ComfenalcoWorkerRecord,
 } from '@/server/clients/comfenalco';
 import { comfenalcoClient } from '@/server/clients/comfenalco';
+import { buildFullName, normalizeDigitsOnly, parseDateToISO } from '@/server/utils/string-utils';
 import { toNumber } from '@/server/utils/value-utils';
 import type { SubsidyProvider, SubsidyLookupInput } from '../subsidy-provider';
-import type { SubsidyBeneficiary, SubsidyWorker } from '../subsidy.types';
-
-function normalizeDocument(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const normalized = value.trim().replace(/\D/g, '');
-  return normalized.length ? normalized : null;
-}
-
-function parseDate(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-
-  if (/^\d{8}$/.test(trimmed)) {
-    const yyyy = trimmed.slice(0, 4);
-    const mm = trimmed.slice(4, 6);
-    const dd = trimmed.slice(6, 8);
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  const parsed = new Date(trimmed);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString().slice(0, 10);
-}
-
-function buildFullName(parts: Array<string | null | undefined>) {
-  const value = parts
-    .map((part) => (part ?? '').trim())
-    .filter(Boolean)
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return value || 'Afiliado';
-}
+import type {
+  SubsidyBeneficiary,
+  SubsidyContribution,
+  SubsidyPayment,
+  SubsidyWorker,
+} from '../subsidy.types';
 
 function mapEmploymentFromEmployer(item: ComfenalcoEmployerRecord) {
   return {
     companyName: item.razonSocialEmp?.trim() || 'Empresa sin nombre',
-    companyDocumentNumber: normalizeDocument(item.nroNitEmp),
+    companyDocumentNumber: normalizeDigitsOnly(item.nroNitEmp),
     currentSalary: toNumber(item.salarioTrab),
-    joinedCompanyAt: parseDate(item.fecIngEmpr),
-    leftCompanyAt: parseDate(item.fechaHasta),
-    joinedSubsidyAt: parseDate(item.fecIngCaja),
+    joinedCompanyAt: parseDateToISO(item.fecIngEmpr),
+    leftCompanyAt: parseDateToISO(item.fechaHasta),
+    joinedSubsidyAt: parseDateToISO(item.fecIngCaja),
     isPrimary: String(item.empPrincipal).trim().toUpperCase() === 'X',
   };
 }
@@ -61,13 +32,18 @@ function mapWorker(record: ComfenalcoWorkerRecord): SubsidyWorker {
 
   return {
     fullName: buildFullName([record.nombre1, record.nombre2, record.apellido1, record.apellido2]),
-    documentNumber: normalizeDocument(record.ndAfiliado) ?? record.ndAfiliado,
+    documentNumber: normalizeDigitsOnly(record.ndAfiliado) ?? record.ndAfiliado,
     identificationTypeCode: record.tdAfiliado?.trim() || null,
     currentSalary: toNumber(record.salarioTrab),
+    categoryCode: null, // Comfenalco no devuelve categoría
+    sex: null, // Comfenalco no devuelve sexo
+    address: null, // Comfenalco no devuelve dirección
+    phone: null, // Comfenalco no devuelve teléfono
+    email: null, // Comfenalco no devuelve email
     companyName: primaryEmployment?.companyName ?? (record.razonSocial?.trim() || null),
-    joinedCompanyAt: primaryEmployment?.joinedCompanyAt ?? parseDate(record.fecIngEmpr),
-    leftCompanyAt: primaryEmployment?.leftCompanyAt ?? parseDate(record.fechaHasta),
-    joinedSubsidyAt: primaryEmployment?.joinedSubsidyAt ?? parseDate(record.fecIngCaja),
+    joinedCompanyAt: primaryEmployment?.joinedCompanyAt ?? parseDateToISO(record.fecIngEmpr),
+    leftCompanyAt: primaryEmployment?.leftCompanyAt ?? parseDateToISO(record.fechaHasta),
+    joinedSubsidyAt: primaryEmployment?.joinedSubsidyAt ?? parseDateToISO(record.fecIngCaja),
     employments,
   };
 }
@@ -79,9 +55,10 @@ function mapBeneficiary(record: ComfenalcoBeneficiaryRecord): SubsidyBeneficiary
 
   return {
     fullName: buildFullName([record.nombre1, record.nombre2, record.apellido1, record.apellido2]),
-    documentNumber: normalizeDocument(record.ndAfiliado),
+    documentNumber: normalizeDigitsOnly(record.ndAfiliado),
     identificationTypeCode: record.tdAfiliado?.trim() || null,
     relationship: record.parentesco?.trim() || null,
+    birthDate: null, // Comfenalco no devuelve fecha de nacimiento
     age: Number.isFinite(Number(record.edad)) ? Number(record.edad) : null,
     isDeceased: fallecimiento === 'X' || fallecimiento === '1' || fallecimiento === 'SI',
   };
@@ -102,6 +79,16 @@ class ComfenalcoSubsidyProvider implements SubsidyProvider {
 
     const worker = await comfenalcoClient.getWorkerByDocument(input.documentNumber);
     return (worker?.beneficiarios ?? []).map(mapBeneficiary);
+  }
+
+  async getContributions(_input: SubsidyLookupInput): Promise<SubsidyContribution[]> {
+    // Comfenalco no devuelve historial de aportes todavía
+    return [];
+  }
+
+  async getSubsidyPayments(_input: SubsidyLookupInput): Promise<SubsidyPayment[]> {
+    // Comfenalco no devuelve historial de giro de subsidio todavía
+    return [];
   }
 }
 

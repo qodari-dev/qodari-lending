@@ -15,6 +15,11 @@ export type SubsidyWorker = {
   documentNumber: string;
   identificationTypeCode: string | null;
   currentSalary: number;
+  categoryCode: string | null;
+  sex: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
   companyName: string | null;
   joinedCompanyAt: string | null;
   leftCompanyAt: string | null;
@@ -27,39 +32,50 @@ export type SubsidyBeneficiary = {
   documentNumber: string | null;
   identificationTypeCode: string | null;
   relationship: string | null;
+  birthDate: string | null;
   age: number | null;
   isDeceased: boolean;
 };
 
+export type SubsidyContribution = {
+  period: string;
+  companyName: string;
+  companyDocumentNumber: string | null;
+  workerDocumentNumber: string | null;
+  baseSalary: number;
+  contributionValue: number;
+};
+
+export type SubsidyCompanyHistory = {
+  companyName: string;
+  companyDocumentNumber: string | null;
+  fromDate: string;
+  toDate: string | null;
+  contributionMonths: number;
+};
+
+export type SubsidyPayment = {
+  period: string;
+  beneficiaryRelationship: string | null;
+  paymentType: string | null;
+  installmentNumber: string | null;
+  installmentValue: number;
+  transferPeriod: string | null;
+  isVoided: boolean;
+};
+
 export type SubsidyWorkerStudyData = {
   source: SubsidySource;
-  workerName: string;
-  workerDocumentNumber: string;
-  salary: {
-    currentSalary: number;
-    averageSalaryLastSixMonths: number;
-    highestSalaryLastSixMonths: number;
-  };
-  trajectory: {
-    totalContributionMonths: number;
-    currentCompanyName: string | null;
-    previousCompanyName: string | null;
-  };
-  contributions: Array<{
-    period: string;
-    companyName: string;
-    contributionBaseSalary: number;
-    contributionValue: number;
-  }>;
-  companyHistory: Array<{
-    companyName: string;
-    fromDate: string;
-    toDate: string | null;
-    contributionMonths: number;
-  }>;
-  spouse: {
+  worker: SubsidyWorker;
+  currentSalary: number;
+  companyHistory: SubsidyCompanyHistory[];
+  contributions: SubsidyContribution[];
+  spouses: Array<{
     fullName: string;
     documentNumber: string | null;
-  } | null;
+    birthDate: string | null;
+  }>;
+  beneficiaries: SubsidyBeneficiary[];
+  subsidyPayments: SubsidyPayment[];
   notes: string[];
 };

@@ -31,42 +31,6 @@ import { tsr } from '@ts-rest/serverless/next';
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 
-// ---------------------------------------------------------------------------
-// Worker Study – query row types
-// ---------------------------------------------------------------------------
-
-type WorkerStudyLoanApplicationRow = {
-  id: number;
-  creditNumber: string;
-  applicationDate: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
-  requestedAmount: string;
-  approvedAmount: string | null;
-  creditProduct: { name: string } | null;
-};
-
-type WorkerStudyCreditRow = {
-  id: number;
-  creditNumber: string;
-  loanApplicationId: number;
-  recordDate: string;
-  creditStartDate: string;
-  status:
-    | 'ACTIVE'
-    | 'GENERATED'
-    | 'INACTIVE'
-    | 'ACCOUNTED'
-    | 'VOID'
-    | 'RELIQUIDATED'
-    | 'FINISHED'
-    | 'PAID';
-  disbursementStatus: 'LIQUIDATED' | 'SENT_TO_ACCOUNTING' | 'SENT_TO_BANK' | 'DISBURSED';
-  principalAmount: string;
-  loanApplication: {
-    creditProduct: { name: string } | null;
-  } | null;
-};
-
 export const creditSimulation = tsr.router(contract.creditSimulation, {
   calculate: async ({ body }, { request, appRoute }) => {
     try {
@@ -74,7 +38,10 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
 
       const [product, paymentFrequency] = await Promise.all([
         db.query.creditProducts.findFirst({
-          where: and(eq(creditProducts.id, body.creditProductId), eq(creditProducts.isActive, true)),
+          where: and(
+            eq(creditProducts.id, body.creditProductId),
+            eq(creditProducts.isActive, true)
+          ),
         }),
         db.query.paymentFrequencies.findFirst({
           where: and(
@@ -175,7 +142,9 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         }
 
         const metricValue =
-          product.insuranceRangeMetric === 'INSTALLMENT_COUNT' ? body.installments : body.creditAmount;
+          product.insuranceRangeMetric === 'INSTALLMENT_COUNT'
+            ? body.installments
+            : body.creditAmount;
 
         const insuranceRange = findInsuranceRateRange({
           ranges: insurer.insuranceRateRanges,
@@ -222,7 +191,8 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
 
       const financedConceptRows = productBillingConceptRows.filter((item) => {
         if (!item.billingConcept?.isActive) return false;
-        const effectiveMode = item.overrideFinancingMode ?? item.billingConcept.defaultFinancingMode;
+        const effectiveMode =
+          item.overrideFinancingMode ?? item.billingConcept.defaultFinancingMode;
         const effectiveFreq = item.overrideFrequency ?? item.billingConcept.defaultFrequency;
         return effectiveMode === 'FINANCED_IN_LOAN' && effectiveFreq === 'ONE_TIME';
       });
@@ -388,8 +358,30 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         });
       }
 
-      let loanApplicationRows: WorkerStudyLoanApplicationRow[] = [];
-      let creditRows: WorkerStudyCreditRow[] = [];
+      type LoanAppRow = {
+        id: number;
+        creditNumber: string;
+        applicationDate: string;
+        status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
+        requestedAmount: string;
+        approvedAmount: string | null;
+        creditProduct: { name: string } | null;
+      };
+
+      type CreditRow = {
+        id: number;
+        creditNumber: string;
+        loanApplicationId: number;
+        recordDate: string;
+        creditStartDate: string;
+        status: 'ACTIVE' | 'GENERATED' | 'INACTIVE' | 'ACCOUNTED' | 'VOID' | 'RELIQUIDATED' | 'FINISHED' | 'PAID';
+        disbursementStatus: 'LIQUIDATED' | 'SENT_TO_ACCOUNTING' | 'SENT_TO_BANK' | 'DISBURSED';
+        principalAmount: string;
+        loanApplication: { creditProduct: { name: string } | null } | null;
+      };
+
+      let loanApplicationRows: LoanAppRow[] = [];
+      let creditRows: CreditRow[] = [];
 
       if (workerThirdParty) {
         [loanApplicationRows, creditRows] = await Promise.all([
@@ -405,9 +397,7 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
             },
             with: {
               creditProduct: {
-                columns: {
-                  name: true,
-                },
+                columns: { name: true },
               },
             },
             orderBy: [desc(loanApplications.applicationDate), desc(loanApplications.id)],
@@ -428,9 +418,7 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
               loanApplication: {
                 with: {
                   creditProduct: {
-                    columns: {
-                      name: true,
-                    },
+                    columns: { name: true },
                   },
                 },
               },
@@ -495,7 +483,7 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
 
       const localLoanNotes = workerThirdParty
         ? `Solicitudes encontradas: ${studiedLoanApplications.length}. Creditos encontrados: ${studiedCredits.length}.`
-        : 'No se encontro un tercero registrado para este documento.';
+        : 'No se encontro un tercero registrado para este documento en creditos.';
 
       const subsidyNotes = subsidyData?.notes ?? [];
       if (!subsidyData) {
@@ -510,18 +498,24 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         status: 200 as const,
         body: {
           worker: {
-            fullName: subsidyData?.workerName || workerFullName,
+            fullName: subsidyData?.worker.fullName || workerFullName,
             identificationTypeId: identificationType.id,
             identificationTypeCode: identificationType.code,
             identificationTypeName: identificationType.name,
-            documentNumber: subsidyData?.workerDocumentNumber || workerDocumentNumber,
+            documentNumber: subsidyData?.worker.documentNumber || workerDocumentNumber,
+            currentSalary: subsidyData?.currentSalary ?? null,
+            categoryCode: subsidyData?.worker.categoryCode ?? null,
+            sex: subsidyData?.worker.sex ?? null,
+            address: subsidyData?.worker.address ?? null,
+            phone: subsidyData?.worker.phone ?? null,
+            email: subsidyData?.worker.email ?? null,
           },
           subsidySource: subsidyData?.source ?? null,
-          salary: subsidyData?.salary ?? null,
-          trajectory: subsidyData?.trajectory ?? null,
-          contributions: subsidyData?.contributions ?? [],
           companyHistory: subsidyData?.companyHistory ?? [],
-          spouse: subsidyData?.spouse ?? null,
+          contributions: subsidyData?.contributions ?? [],
+          spouses: subsidyData?.spouses ?? [],
+          beneficiaries: subsidyData?.beneficiaries ?? [],
+          subsidyPayments: subsidyData?.subsidyPayments ?? [],
           loanApplications: studiedLoanApplications,
           credits: studiedCredits,
           notes: notes.length ? notes.join(' ') : null,

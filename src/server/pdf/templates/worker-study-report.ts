@@ -26,6 +26,8 @@ type Contribution = WorkerStudyPdfData['contributions'][number];
 type CompanyHistory = WorkerStudyPdfData['companyHistory'][number];
 type LoanApplication = WorkerStudyPdfData['loanApplications'][number];
 type Credit = WorkerStudyPdfData['credits'][number];
+type Beneficiary = WorkerStudyPdfData['beneficiaries'][number];
+type SubsidyPayment = WorkerStudyPdfData['subsidyPayments'][number];
 
 const paymentBehaviorLabels: Record<Credit['paymentBehavior'], string> = {
   PAID: 'Pagado',
@@ -44,7 +46,7 @@ const contributionColumns: TableColumn<Contribution>[] = [
     header: 'IBC',
     width: '22%',
     textAlign: 'right',
-    getValue: (r) => formatCurrency(r.contributionBaseSalary),
+    getValue: (r) => formatCurrency(r.baseSalary),
   },
   {
     header: 'Valor aporte',
@@ -92,6 +94,35 @@ const loanApplicationColumns: TableColumn<LoanApplication>[] = [
     textAlign: 'right',
     getValue: (r) => (r.approvedAmount !== null ? formatCurrency(r.approvedAmount) : '-'),
   },
+];
+
+const beneficiaryColumns: TableColumn<Beneficiary>[] = [
+  { header: 'Nombre', width: '30%', getValue: (r) => r.fullName },
+  { header: 'Documento', width: '18%', getValue: (r) => r.documentNumber ?? '-' },
+  { header: 'Parentesco', width: '17%', getValue: (r) => r.relationship ?? '-' },
+  { header: 'Nacimiento', width: '15%', getValue: (r) => r.birthDate ? formatDate(r.birthDate) : '-' },
+  {
+    header: 'Edad',
+    width: '10%',
+    textAlign: 'right',
+    getValue: (r) => r.age !== null ? String(r.age) : '-',
+  },
+  { header: 'Estado', width: '10%', getValue: (r) => r.isDeceased ? 'Fallecido' : 'Activo' },
+];
+
+const subsidyPaymentColumns: TableColumn<SubsidyPayment>[] = [
+  { header: 'Periodo', width: '14%', getValue: (r) => r.period },
+  { header: 'Parentesco', width: '16%', getValue: (r) => r.beneficiaryRelationship ?? '-' },
+  { header: 'Tipo pago', width: '16%', getValue: (r) => r.paymentType ?? '-' },
+  { header: 'Cuota #', width: '10%', getValue: (r) => r.installmentNumber ?? '-' },
+  {
+    header: 'Valor',
+    width: '16%',
+    textAlign: 'right',
+    getValue: (r) => formatCurrency(r.installmentValue),
+  },
+  { header: 'Per. giro', width: '14%', getValue: (r) => r.transferPeriod ?? '-' },
+  { header: 'Anulado', width: '14%', getValue: (r) => r.isVoided ? 'Si' : 'No' },
 ];
 
 const creditColumns: TableColumn<Credit>[] = [
@@ -164,35 +195,34 @@ export const workerStudyReportTemplate: PdfTemplateBuilder<WorkerStudyPdfData> =
         },
       ]),
 
-      // -- Salary & trajectory --
-      ...(data.salary || data.trajectory
+      // -- Worker details --
+      h(Text, { style: styles.sectionTitle, key: 'sec-worker-details' }, 'Datos del trabajador'),
+      SummaryGrid(rpdf, styles, [
+        {
+          label: 'Salario actual',
+          value: data.worker.currentSalary != null
+            ? formatCurrency(data.worker.currentSalary)
+            : '-',
+        },
+        { label: 'Categoria', value: data.worker.categoryCode ?? '-' },
+        { label: 'Sexo', value: data.worker.sex ?? '-' },
+        { label: 'Direccion', value: data.worker.address ?? '-' },
+        { label: 'Telefono', value: data.worker.phone ?? '-' },
+        { label: 'Email', value: data.worker.email ?? '-' },
+        { label: 'Fuente subsidio', value: data.subsidySource ?? '-' },
+      ]),
+
+      // -- Spouses --
+      ...(data.spouses.length > 0
         ? [
-            h(Text, { style: styles.sectionTitle, key: 'sec-salary' }, 'Salario y trayectoria'),
-            SummaryGrid(rpdf, styles, [
-              ...(data.salary
-                ? [
-                    { label: 'Salario actual', value: formatCurrency(data.salary.currentSalary) },
-                    {
-                      label: 'Promedio 6 meses',
-                      value: formatCurrency(data.salary.averageSalaryLastSixMonths),
-                    },
-                    {
-                      label: 'Mas alto 6 meses',
-                      value: formatCurrency(data.salary.highestSalaryLastSixMonths),
-                    },
-                  ]
-                : []),
-              ...(data.trajectory
-                ? [
-                    {
-                      label: 'Meses de aportes',
-                      value: formatNumber(data.trajectory.totalContributionMonths),
-                    },
-                    { label: 'Empresa actual', value: data.trajectory.currentCompanyName ?? '-' },
-                    { label: 'Empresa anterior', value: data.trajectory.previousCompanyName ?? '-' },
-                  ]
-                : []),
-            ]),
+            h(Text, { style: styles.sectionTitle, key: 'sec-spouses' }, 'Conyuges'),
+            ...data.spouses.map((spouse) =>
+              SummaryGrid(rpdf, styles, [
+                { label: 'Nombre', value: spouse.fullName },
+                { label: 'Documento', value: spouse.documentNumber ?? '-' },
+                { label: 'Nacimiento', value: spouse.birthDate ? formatDate(spouse.birthDate) : '-' },
+              ])
+            ),
           ]
         : []),
 
@@ -238,6 +268,30 @@ export const workerStudyReportTemplate: PdfTemplateBuilder<WorkerStudyPdfData> =
         emptyMessage: 'Sin creditos registrados.',
         keyExtractor: (r) => `credit-${r.id}`,
         tableKey: 'credits',
+      }),
+
+      // -- Beneficiaries --
+      h(Text, { style: styles.sectionTitle, key: 'sec-beneficiaries' }, 'Beneficiarios'),
+      PdfTable(rpdf, styles, {
+        columns: beneficiaryColumns,
+        rows: data.beneficiaries,
+        emptyMessage: 'Sin beneficiarios registrados.',
+        keyExtractor: (r) => `ben-${r.documentNumber ?? r.fullName}`,
+        tableKey: 'beneficiaries',
+      }),
+
+      // -- Subsidy payments --
+      h(
+        Text,
+        { style: styles.sectionTitle, key: 'sec-subsidy-payments' },
+        'Historial de giro de subsidio',
+      ),
+      PdfTable(rpdf, styles, {
+        columns: subsidyPaymentColumns,
+        rows: data.subsidyPayments,
+        emptyMessage: 'Sin historial de giros.',
+        keyExtractor: (r) => `sp-${r.period}-${r.installmentNumber ?? ''}-${r.beneficiaryRelationship ?? ''}`,
+        tableKey: 'subsidy-payments',
       }),
 
       // -- Notes --

@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { useWorkerStudy } from '@/hooks/queries/use-credit-simulation-queries';
 import { useIdentificationTypes } from '@/hooks/queries/use-identification-type-queries';
 import { WorkerStudyBodySchema, WorkerStudyResult } from '@/schemas/credit-simulation';
@@ -223,9 +224,13 @@ export function WorkerStudy() {
 
         {result ? (
           <div className="space-y-4">
+            {/* Datos del trabajador */}
             <Card>
               <CardHeader>
                 <CardTitle>Datos del trabajador</CardTitle>
+                {result.subsidySource ? (
+                  <CardDescription>Fuente: {result.subsidySource}</CardDescription>
+                ) : null}
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-3">
                 <div>
@@ -238,6 +243,42 @@ export function WorkerStudy() {
                     {result.worker.identificationTypeCode} {result.worker.documentNumber}
                   </p>
                 </div>
+                {result.worker.currentSalary != null ? (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Salario actual</p>
+                    <p className="font-medium">{formatCurrency(result.worker.currentSalary)}</p>
+                  </div>
+                ) : null}
+                {result.worker.categoryCode ? (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Categoria</p>
+                    <p className="font-medium">{result.worker.categoryCode}</p>
+                  </div>
+                ) : null}
+                {result.worker.address ? (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Direccion</p>
+                    <p className="font-medium">{result.worker.address}</p>
+                  </div>
+                ) : null}
+                {result.worker.phone ? (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Telefono</p>
+                    <p className="font-medium">{result.worker.phone}</p>
+                  </div>
+                ) : null}
+                {result.worker.email ? (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Email</p>
+                    <p className="font-medium">{result.worker.email}</p>
+                  </div>
+                ) : null}
+                {result.worker.sex ? (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Sexo</p>
+                    <p className="font-medium">{result.worker.sex}</p>
+                  </div>
+                ) : null}
                 <div>
                   <p className="text-muted-foreground text-xs">Generado</p>
                   <p className="font-medium">{formatDateTime(result.generatedAt)}</p>
@@ -245,56 +286,74 @@ export function WorkerStudy() {
               </CardContent>
             </Card>
 
-            {result.salary ? (
+            {/* Cónyuges */}
+            {result.spouses.length > 0 ? (
               <Card>
                 <CardHeader>
-                  <CardTitle>Salario</CardTitle>
+                  <CardTitle>Conyuge(s)</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-3 md:grid-cols-3">
-                  <div>
-                    <p className="text-muted-foreground text-xs">Salario actual</p>
-                    <p className="font-medium">{formatCurrency(result.salary.currentSalary)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Promedio ultimos 6 meses</p>
-                    <p className="font-medium">
-                      {formatCurrency(result.salary.averageSalaryLastSixMonths)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Salario mas alto (6 meses)</p>
-                    <p className="font-medium">
-                      {formatCurrency(result.salary.highestSalaryLastSixMonths)}
-                    </p>
+                <CardContent>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {result.spouses.map((spouse, index) => (
+                      <div key={index} className="rounded-lg border p-3">
+                        <p className="font-medium">{spouse.fullName}</p>
+                        {spouse.documentNumber ? (
+                          <p className="text-muted-foreground text-xs">Doc: {spouse.documentNumber}</p>
+                        ) : null}
+                        {spouse.birthDate ? (
+                          <p className="text-muted-foreground text-xs">
+                            Fecha nacimiento: {formatDate(spouse.birthDate)}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
             ) : null}
 
-            {result.trajectory ? (
+            {/* Beneficiarios */}
+            {result.beneficiaries.length > 0 ? (
               <Card>
                 <CardHeader>
-                  <CardTitle>Trayectoria</CardTitle>
+                  <CardTitle>Beneficiarios</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-3 md:grid-cols-3">
-                  <div>
-                    <p className="text-muted-foreground text-xs">Meses de aportes</p>
-                    <p className="font-medium">
-                      {formatNumber(result.trajectory.totalContributionMonths)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Empresa actual</p>
-                    <p className="font-medium">{result.trajectory.currentCompanyName ?? '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Empresa anterior</p>
-                    <p className="font-medium">{result.trajectory.previousCompanyName ?? '-'}</p>
-                  </div>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Documento</TableHead>
+                        <TableHead>Parentesco</TableHead>
+                        <TableHead>Edad</TableHead>
+                        <TableHead>Fecha nacimiento</TableHead>
+                        <TableHead>Estado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.beneficiaries.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{item.fullName}</TableCell>
+                          <TableCell>{item.documentNumber ?? '-'}</TableCell>
+                          <TableCell>{item.relationship ?? '-'}</TableCell>
+                          <TableCell>{item.age != null ? item.age : '-'}</TableCell>
+                          <TableCell>{item.birthDate ? formatDate(item.birthDate) : '-'}</TableCell>
+                          <TableCell>
+                            {item.isDeceased ? (
+                              <Badge variant="destructive">Fallecido</Badge>
+                            ) : (
+                              <Badge variant="outline">Activo</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             ) : null}
 
+            {/* Historial de aportes */}
             <Card>
               <CardHeader>
                 <CardTitle>Historial de aportes</CardTitle>
@@ -311,11 +370,11 @@ export function WorkerStudy() {
                   </TableHeader>
                   <TableBody>
                     {result.contributions.length ? (
-                      result.contributions.map((item) => (
-                        <TableRow key={`${item.period}-${item.companyName}`}>
+                      result.contributions.map((item, index) => (
+                        <TableRow key={`${item.period}-${index}`}>
                           <TableCell>{item.period}</TableCell>
                           <TableCell>{item.companyName}</TableCell>
-                          <TableCell>{formatCurrency(item.contributionBaseSalary)}</TableCell>
+                          <TableCell>{formatCurrency(item.baseSalary)}</TableCell>
                           <TableCell>{formatCurrency(item.contributionValue)}</TableCell>
                         </TableRow>
                       ))
@@ -329,6 +388,7 @@ export function WorkerStudy() {
               </CardContent>
             </Card>
 
+            {/* Historial de empresas */}
             <Card>
               <CardHeader>
                 <CardTitle>Historial de empresas</CardTitle>
@@ -345,8 +405,8 @@ export function WorkerStudy() {
                   </TableHeader>
                   <TableBody>
                     {result.companyHistory.length ? (
-                      result.companyHistory.map((item) => (
-                        <TableRow key={`${item.companyName}-${item.fromDate}`}>
+                      result.companyHistory.map((item, index) => (
+                        <TableRow key={`${item.companyName}-${index}`}>
                           <TableCell>{item.companyName}</TableCell>
                           <TableCell>{formatDate(item.fromDate)}</TableCell>
                           <TableCell>{item.toDate ? formatDate(item.toDate) : 'Actual'}</TableCell>
@@ -363,6 +423,50 @@ export function WorkerStudy() {
               </CardContent>
             </Card>
 
+            {/* Historial de giro de subsidio */}
+            {result.subsidyPayments.length > 0 ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Historial de giro de subsidio</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Periodo</TableHead>
+                        <TableHead>Parentesco</TableHead>
+                        <TableHead>Tipo pago</TableHead>
+                        <TableHead>Cuota</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Periodo giro</TableHead>
+                        <TableHead>Estado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.subsidyPayments.map((item, index) => (
+                        <TableRow key={`${item.period}-${index}`}>
+                          <TableCell>{item.period}</TableCell>
+                          <TableCell>{item.beneficiaryRelationship ?? '-'}</TableCell>
+                          <TableCell>{item.paymentType ?? '-'}</TableCell>
+                          <TableCell>{item.installmentNumber ?? '-'}</TableCell>
+                          <TableCell>{formatCurrency(item.installmentValue)}</TableCell>
+                          <TableCell>{item.transferPeriod ?? '-'}</TableCell>
+                          <TableCell>
+                            {item.isVoided ? (
+                              <Badge variant="destructive">Anulado</Badge>
+                            ) : (
+                              <Badge variant="outline">Vigente</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {/* Solicitudes de credito */}
             <Card>
               <CardHeader>
                 <CardTitle>Solicitudes de credito</CardTitle>
@@ -403,6 +507,7 @@ export function WorkerStudy() {
               </CardContent>
             </Card>
 
+            {/* Creditos y cartera */}
             <Card>
               <CardHeader>
                 <CardTitle>Creditos y cartera</CardTitle>
@@ -453,6 +558,7 @@ export function WorkerStudy() {
               </CardContent>
             </Card>
 
+            {/* Observaciones */}
             {result.notes ? (
               <Card>
                 <CardHeader>

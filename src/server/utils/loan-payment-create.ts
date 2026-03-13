@@ -107,10 +107,10 @@ export async function createLoanPaymentTx(
     });
   }
 
-  if (!['ACTIVE', 'ACCOUNTED'].includes(existingLoan.status)) {
+  if (existingLoan.status !== 'ACCOUNTED') {
     throwHttpError({
       status: 400,
-      message: 'El credito debe estar activo para recibir abonos',
+      message: 'El credito debe estar contabilizado para recibir abonos',
       code: 'BAD_REQUEST',
     });
   }
@@ -634,7 +634,7 @@ export async function createLoanPaymentTx(
     );
 
   const remainingBalance = roundMoney(toNumber(remaining[0]?.balance ?? '0'));
-  if (remainingBalance <= 0.01 && existingLoan.status !== 'PAID') {
+  if (remainingBalance <= 0.01) {
     await tx
       .update(loans)
       .set({

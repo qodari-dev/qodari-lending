@@ -6,10 +6,19 @@ import {
   ProcessAccountingInterfaceWriteOffBodySchema,
   ProcessAccountingInterfaceProvisionBodySchema,
 } from '@/schemas/accounting-interface';
+import {
+  accountingEntries,
+  db,
+  loanInstallments,
+  loans,
+  loanStatusHistory,
+} from '@/server/db';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
+import { getRequiredUserContext } from '@/server/utils/required-user-context';
 import { formatDateOnly } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
+import { and, between, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { contract } from '../contracts';
 
@@ -32,21 +41,111 @@ async function processCredits(body: ProcessCreditsBody, context: HandlerContext)
   const { request, appRoute } = context;
 
   try {
-    await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const { userId, userName } = getRequiredUserContext(session!);
 
-    // TODO(accounting-interface-credits): implementar interface contable de creditos
-    // - consultar creditos desembolsados/liquidados en el rango
-    // - construir comprobante segun reglas contables
-    // - integrar y registrar trazabilidad del lote
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
+    const transactionDate = formatDateOnly(body.transactionDate);
+
+    const draftCreditEntries = await db.query.accountingEntries.findMany({
+      where: and(
+        eq(accountingEntries.processType, 'CREDIT'),
+        eq(accountingEntries.status, 'DRAFT'),
+        between(accountingEntries.entryDate, startDate, endDate)
+      ),
+      columns: {
+        id: true,
+        loanId: true,
+      },
+    });
+
+    const loanIds = [...new Set(draftCreditEntries.map((item) => item.loanId).filter((value): value is number => !!value))];
+
+    if (loanIds.length) {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(accountingEntries)
+          .set({
+            status: 'POSTED',
+            statusDate: transactionDate,
+          })
+          .where(
+            and(
+              eq(accountingEntries.processType, 'CREDIT'),
+              eq(accountingEntries.status, 'DRAFT'),
+              between(accountingEntries.entryDate, startDate, endDate),
+              inArray(accountingEntries.loanId, loanIds)
+            )
+          );
+
+        await tx
+          .update(loanInstallments)
+          .set({ status: 'ACCOUNTED' })
+          .where(
+            and(
+              inArray(loanInstallments.loanId, loanIds),
+              eq(loanInstallments.status, 'GENERATED')
+            )
+          );
+
+        const loansToAccount = await tx.query.loans.findMany({
+          where: and(inArray(loans.id, loanIds), eq(loans.status, 'GENERATED')),
+          columns: {
+            id: true,
+            status: true,
+          },
+        });
+
+        if (loansToAccount.length) {
+          await tx
+            .update(loans)
+            .set({
+              status: 'ACCOUNTED',
+              statusDate: transactionDate,
+              disbursementStatus: 'SENT_TO_ACCOUNTING',
+              statusChangedByUserId: userId,
+              statusChangedByUserName: userName || userId,
+            })
+            .where(
+              and(
+                inArray(
+                  loans.id,
+                  loansToAccount.map((item) => item.id)
+                ),
+                eq(loans.status, 'GENERATED')
+              )
+            );
+
+          await tx.insert(loanStatusHistory).values(
+            loansToAccount.map((loan) => ({
+              loanId: loan.id,
+              fromStatus: loan.status,
+              toStatus: 'ACCOUNTED' as const,
+              changedByUserId: userId,
+              changedByUserName: userName || userId,
+              note: 'Credito enviado y contabilizado en interfaz contable',
+              metadata: {
+                interfaceType: 'CREDITS',
+                transactionDate,
+              },
+            }))
+          );
+        }
+      });
+    }
+
     return {
       status: 200 as const,
       body: {
         interfaceType: 'CREDITS' as const,
-        periodStartDate: formatDateOnly(body.startDate),
-        periodEndDate: formatDateOnly(body.endDate),
-        transactionDate: formatDateOnly(body.transactionDate),
-        processedRecords: 0,
-        message: 'Interfaz contable de Creditos recibida. Pendiente implementacion.',
+        periodStartDate: startDate,
+        periodEndDate: endDate,
+        transactionDate,
+        processedRecords: loanIds.length,
+        message: loanIds.length
+          ? `Interfaz contable de Creditos procesada. Se contabilizaron ${loanIds.length} creditos.`
+          : 'No se encontraron creditos pendientes por contabilizar en el rango seleccionado.',
       },
     };
   } catch (e) {

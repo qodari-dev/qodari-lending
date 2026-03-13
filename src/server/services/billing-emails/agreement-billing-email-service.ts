@@ -83,7 +83,7 @@ async function getInstallmentValue(loanId: number, runDate: string) {
   const nextInstallment = await db.query.loanInstallments.findFirst({
     where: and(
       eq(loanInstallments.loanId, loanId),
-      inArray(loanInstallments.status, ['GENERATED', 'ACCOUNTED']),
+      inArray(loanInstallments.status, ['ACCOUNTED', 'CAUSED']),
       gte(loanInstallments.dueDate, runDate)
     ),
     columns: {
@@ -105,7 +105,7 @@ async function getInstallmentValue(loanId: number, runDate: string) {
   const latestInstallment = await db.query.loanInstallments.findFirst({
     where: and(
       eq(loanInstallments.loanId, loanId),
-      inArray(loanInstallments.status, ['GENERATED', 'ACCOUNTED'])
+      inArray(loanInstallments.status, ['ACCOUNTED', 'CAUSED'])
     ),
     columns: {
       principalAmount: true,
@@ -135,7 +135,7 @@ function computeOverdueInfo(balanceSummary: { overdueBalance: string | number | 
 
 async function buildLoansData(agreementId: number, runDate: string): Promise<DispatchItemRow[]> {
   const agreementLoans = await db.query.loans.findMany({
-    where: and(eq(loans.agreementId, agreementId), inArray(loans.status, ['ACTIVE', 'ACCOUNTED'])),
+    where: and(eq(loans.agreementId, agreementId), eq(loans.status, 'ACCOUNTED')),
     columns: {
       id: true,
       creditNumber: true,

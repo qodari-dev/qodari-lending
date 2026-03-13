@@ -5,6 +5,7 @@ import {
   creditProducts,
   db,
   loanApplications,
+  loanInstallments,
   loanProcessStates,
   loans,
   portfolioEntries,
@@ -16,7 +17,7 @@ import {
 } from '@/server/utils/accounting-utils';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { applyPortfolioDeltas } from '@/server/utils/portfolio-utils';
-import { roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
 import { addDays, differenceInCalendarDays, startOfMonth } from 'date-fns';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { CurrentInterestRunSummary } from './types';
@@ -27,6 +28,7 @@ type LoanCandidate = {
   thirdPartyId: number;
   costCenterId: number | null;
   financingFactor: string;
+  maturityDate: string;
   creditProductId: number;
   interestAccrualMethod: 'DAILY' | 'MONTHLY';
   interestRateType:
@@ -45,6 +47,10 @@ function parseDateOnly(value: string): Date {
 
 function maxDate(a: Date, b: Date): Date {
   return a.getTime() >= b.getTime() ? a : b;
+}
+
+function minDate(a: Date, b: Date): Date {
+  return a.getTime() <= b.getTime() ? a : b;
 }
 
 function getYearBaseDays(convention: LoanCandidate['interestDayCountConvention']): number {
@@ -105,7 +111,7 @@ function toErrorMessage(error: unknown, fallback: string) {
 }
 
 async function getLoanCandidates(run: typeof processRuns.$inferSelect): Promise<LoanCandidate[]> {
-  const conditions = [inArray(loans.status, ['ACTIVE', 'ACCOUNTED'])];
+  const conditions = [eq(loans.status, 'ACCOUNTED')];
 
   if (run.scopeType === 'LOAN') {
     conditions.push(eq(loans.id, run.scopeId));
@@ -121,6 +127,7 @@ async function getLoanCandidates(run: typeof processRuns.$inferSelect): Promise<
       thirdPartyId: loans.thirdPartyId,
       costCenterId: loans.costCenterId,
       financingFactor: loanApplications.financingFactor,
+      maturityDate: loans.maturityDate,
       creditProductId: loanApplications.creditProductId,
       interestAccrualMethod: creditProducts.interestAccrualMethod,
       interestRateType: creditProducts.interestRateType,
@@ -216,9 +223,10 @@ export async function executeCurrentInterestProcessRun(processRunId: number): Pr
       const previousStateDate = previousState
         ? parseDateOnly(previousState.lastProcessedDate)
         : null;
+      const maturityDate = parseDateOnly(loan.maturityDate);
 
       let effectiveStartDate = processDate;
-      let effectiveEndDate = processDate;
+      let effectiveEndDate = minDate(processDate, maturityDate);
       if (loan.interestAccrualMethod === 'MONTHLY') {
         if (!isEndOfMonth(processDate)) {
           continue;
@@ -231,7 +239,7 @@ export async function executeCurrentInterestProcessRun(processRunId: number): Pr
         const monthStartDate = startOfMonth(processDate);
         const minStartDateByState = previousStateDate ? addDays(previousStateDate, 1) : monthStartDate;
         effectiveStartDate = maxDate(monthStartDate, minStartDateByState);
-        effectiveEndDate = processDate;
+        effectiveEndDate = minDate(processDate, maturityDate);
       } else {
         if (previousStateDate && previousStateDate >= processDate) {
           continue;
@@ -239,7 +247,7 @@ export async function executeCurrentInterestProcessRun(processRunId: number): Pr
 
         const minStartDateByState = previousStateDate ? addDays(previousStateDate, 1) : processDate;
         effectiveStartDate = minStartDateByState;
-        effectiveEndDate = processDate;
+        effectiveEndDate = minDate(processDate, maturityDate);
       }
 
       if (effectiveStartDate > effectiveEndDate) {
@@ -495,6 +503,17 @@ export async function executeCurrentInterestProcessRun(processRunId: number): Pr
               lastError: null,
             },
           });
+
+        await tx
+          .update(loanInstallments)
+          .set({ status: 'CAUSED' })
+          .where(
+            and(
+              eq(loanInstallments.loanId, loan.id),
+              eq(loanInstallments.status, 'ACCOUNTED'),
+              sql`${loanInstallments.dueDate} <= ${formatDateOnly(effectiveEndDate)}`
+            )
+          );
       });
 
       summary.accruedCredits += 1;

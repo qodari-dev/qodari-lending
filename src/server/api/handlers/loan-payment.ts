@@ -463,10 +463,10 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           }
         }
 
-        if (!['ACTIVE', 'ACCOUNTED'].includes(loanItem.status)) {
+        if (loanItem.status !== 'ACCOUNTED') {
           throwHttpError({
             status: 400,
-            message: `El credito ${row.creditNumber} no esta activo para registrar abonos`,
+            message: `El credito ${row.creditNumber} no esta contabilizado para registrar abonos`,
             code: 'BAD_REQUEST',
           });
         }
@@ -691,12 +691,12 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           return;
         }
 
-        if (!['ACTIVE', 'ACCOUNTED'].includes(loan.status)) {
+        if (loan.status !== 'ACCOUNTED') {
           validationErrors.push({
             rowNumber: row.rowNumber,
             creditNumber: row.creditNumber,
             documentNumber: row.documentNumber,
-            reason: 'El credito no esta activo para registrar abonos',
+            reason: 'El credito no esta contabilizado para registrar abonos',
           });
           return;
         }

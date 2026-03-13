@@ -1675,7 +1675,7 @@ export const installmentRecordStatusEnum = pgEnum('installment_record_status', [
   'ACCOUNTED', // C
   'VOID', // X
   'RELIQUIDATED', // R
-  'INACTIVE', // I
+  'CAUSED', // I legacy
 ]);
 
 // ---------------------------------------------------------------------

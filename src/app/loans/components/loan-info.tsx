@@ -588,7 +588,7 @@ export function LoanInfo({
                         <TableHead>Interes</TableHead>
                         <TableHead>Seguro</TableHead>
                         <TableHead>Cuota</TableHead>
-                        <TableHead>Saldo capital</TableHead>
+                        <TableHead>Saldo capital proyectado</TableHead>
                         <TableHead>Estado</TableHead>
                       </TableRow>
                     </TableHeader>

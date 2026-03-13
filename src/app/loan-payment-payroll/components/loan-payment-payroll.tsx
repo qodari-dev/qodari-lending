@@ -331,7 +331,7 @@ export function LoanPaymentPayroll() {
           where: {
             and: [
               ...(values.agreementId ? [{ agreementId: { eq: values.agreementId } }] : []),
-              { status: { in: ['ACTIVE', 'ACCOUNTED'] } },
+              { status: 'ACCOUNTED' },
             ],
           },
         },

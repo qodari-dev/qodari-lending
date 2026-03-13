@@ -36,7 +36,7 @@ export const INSTALLMENT_RECORD_STATUS_OPTIONS = [
   'ACCOUNTED',
   'VOID',
   'RELIQUIDATED',
-  'INACTIVE',
+  'CAUSED',
 ] as const;
 export type InstallmentRecordStatus = (typeof INSTALLMENT_RECORD_STATUS_OPTIONS)[number];
 
@@ -66,7 +66,7 @@ export const installmentRecordStatusLabels: Record<InstallmentRecordStatus, stri
   ACCOUNTED: 'Contabilizada',
   VOID: 'Anulada',
   RELIQUIDATED: 'Reliquidada',
-  INACTIVE: 'Inactiva',
+  CAUSED: 'Causada',
 };
 
 export const loanPaymentStatusLabels: Record<LoanPaymentStatus, string> = {

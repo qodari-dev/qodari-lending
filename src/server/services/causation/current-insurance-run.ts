@@ -50,7 +50,7 @@ function toErrorMessage(error: unknown, fallback: string) {
 }
 
 async function getLoanCandidates(run: typeof processRuns.$inferSelect): Promise<LoanCandidate[]> {
-  const conditions = [inArray(loans.status, ['ACTIVE', 'ACCOUNTED'])];
+  const conditions = [eq(loans.status, 'ACCOUNTED')];
 
   if (run.scopeType === 'LOAN') {
     conditions.push(eq(loans.id, run.scopeId));
@@ -83,7 +83,7 @@ async function getInstallmentCharges(args: {
 }) {
   const whereParts = [
     eq(loanInstallments.loanId, args.loanId),
-    inArray(loanInstallments.status, ['GENERATED', 'ACCOUNTED']),
+    inArray(loanInstallments.status, ['ACCOUNTED', 'CAUSED']),
     lte(loanInstallments.dueDate, args.processDate),
   ];
 

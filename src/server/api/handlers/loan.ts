@@ -1450,12 +1450,7 @@ export const loan = tsr.router(contract.loan, {
           .where(
             and(
               eq(loanInstallments.loanId, id),
-              inArray(loanInstallments.status, [
-                'GENERATED',
-                'ACCOUNTED',
-                'RELIQUIDATED',
-                'INACTIVE',
-              ])
+              inArray(loanInstallments.status, ['GENERATED', 'ACCOUNTED', 'RELIQUIDATED', 'CAUSED'])
             )
           );
 
@@ -2745,18 +2740,11 @@ export const loan = tsr.router(contract.loan, {
           })),
         });
 
-        await tx
-          .update(loanInstallments)
-          .set({ status: 'ACCOUNTED' })
-          .where(and(eq(loanInstallments.loanId, id), eq(loanInstallments.status, 'GENERATED')));
-
         const [loanUpdated] = await tx
           .update(loans)
           .set({
-            status: 'ACTIVE',
             disbursementStatus: 'LIQUIDATED',
             disbursementAmount: toDecimalString(disbursementAmount),
-            statusDate: entryDate,
             statusChangedByUserId: userId,
             statusChangedByUserName: userName || userId,
           })
@@ -2770,26 +2758,6 @@ export const loan = tsr.router(contract.loan, {
             code: 'CONFLICT',
           });
         }
-
-        await tx.insert(loanStatusHistory).values({
-          loanId: id,
-          fromStatus: existingLoan.status,
-          toStatus: 'ACTIVE',
-          changedByUserId: userId,
-          changedByUserName: userName || userId,
-          note: 'Credito liquidado y saldo inicial generado',
-          metadata: {
-            accountingDocumentCode: documentCode,
-            entriesGenerated: accountingEntriesPayload.length,
-            oneTimeBilledSeparatelyConceptsCount: oneTimeBilledSeparatelyConcepts.length,
-            oneTimeFinancedConceptsCount: oneTimeFinancedConcepts.length,
-            oneTimeDiscountConceptsCount: oneTimeDiscountConcepts.length,
-            oneTimeConceptsAmount: toDecimalString(oneTimeConceptAmountTotal),
-            disbursementAmount: toDecimalString(disbursementAmount),
-            totalFinancedAmount: toDecimalString(totalFinancedAmount),
-            totalDiscountAmount: toDecimalString(totalDiscountAmount),
-          },
-        });
 
         return [loanUpdated];
       });

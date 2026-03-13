@@ -68,7 +68,7 @@ export function CausationCurrentInsurance() {
     limit: 1000,
     include: ['borrower'],
     sort: [{ field: 'creditStartDate', order: 'desc' }],
-    where: { and: [{ status: { in: ['ACTIVE', 'ACCOUNTED'] } }] },
+    where: { and: [{ status: 'ACCOUNTED' }] },
   });
 
   const creditProductOptions = React.useMemo(

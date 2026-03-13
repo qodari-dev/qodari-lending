@@ -93,7 +93,7 @@ export function LoanPaymentForm({
     limit: 25,
     include: ['borrower', 'agreement', 'paymentFrequency', 'loanApplication'],
     where: {
-      and: [{ status: { in: ['ACTIVE', 'ACCOUNTED'] } }],
+      and: [{ status: 'ACCOUNTED' }],
     },
     search: debouncedLoanSearch || undefined,
     sort: [{ field: 'createdAt', order: 'desc' }],

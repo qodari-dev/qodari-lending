@@ -75,7 +75,7 @@ async function processCredits(body: ProcessCreditsBody, context: HandlerContext)
         await tx
           .update(accountingEntries)
           .set({
-            status: 'POSTED',
+            status: 'ACCOUNTED',
             statusDate: transactionDate,
           })
           .where(

@@ -959,7 +959,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
         where: and(
           eq(accountingEntries.sourceType, 'LOAN_PAYMENT'),
           eq(accountingEntries.sourceId, String(existing.id)),
-          inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
+          inArray(accountingEntries.status, ['DRAFT', 'ACCOUNTED'])
         ),
         orderBy: [asc(accountingEntries.sequence)],
       });

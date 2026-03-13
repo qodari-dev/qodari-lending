@@ -297,7 +297,7 @@ export type LoanStatementEntry = {
   runningBalance: string;
   installmentNumber: number | null;
   dueDate: string | null;
-  status: 'DRAFT' | 'POSTED' | 'VOIDED';
+  status: 'DRAFT' | 'ACCOUNTED' | 'VOIDED';
 };
 
 export type LoanStatement = {

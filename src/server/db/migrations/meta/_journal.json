@@ -351,6 +351,13 @@
       "when": 1773434341965,
       "tag": "0049_thick_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1773436777809,
+      "tag": "0050_furry_screwball",
+      "breakpoints": true
     }
   ]
 }

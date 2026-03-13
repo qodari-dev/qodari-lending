@@ -1428,7 +1428,7 @@ export const loan = tsr.router(contract.loan, {
           .where(
             and(
               eq(accountingEntries.loanId, id),
-              inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
+              inArray(accountingEntries.status, ['DRAFT', 'ACCOUNTED'])
             )
           );
 
@@ -2720,7 +2720,7 @@ export const loan = tsr.router(contract.loan, {
           where: and(
             eq(accountingEntries.processType, 'CREDIT'),
             eq(accountingEntries.loanId, existingLoan.id),
-            inArray(accountingEntries.status, ['DRAFT', 'POSTED'])
+            inArray(accountingEntries.status, ['DRAFT', 'ACCOUNTED'])
           ),
           columns: { id: true },
         });

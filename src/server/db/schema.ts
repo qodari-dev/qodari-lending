@@ -1887,7 +1887,7 @@ export const portfolioEntries = pgTable(
 
 export const accountingEntriesStatusEnum = pgEnum('accounting_entries_status', [
   'DRAFT',
-  'POSTED',
+  'ACCOUNTED',
   'VOIDED',
 ]);
 
@@ -1960,6 +1960,7 @@ export const accountingEntries = pgTable(
   (t) => [
     uniqueIndex('uniq_accounting_entry_legacy_key').on(t.processType, t.documentCode, t.sequence),
     index('idx_entries_process_run').on(t.processRunId),
+    index('idx_entries_process_status_date').on(t.processType, t.status, t.entryDate),
     // índices para cartera / consultas típicas
     index('idx_entries_loan_installment_due_status').on(
       t.loanId,
@@ -1975,6 +1976,20 @@ export const accountingEntries = pgTable(
     }),
     index('idx_accounting_entries_source').on(t.sourceType, t.sourceId),
     index('idx_accounting_entries_reversal').on(t.reversalOfEntryId),
+    check(
+      'chk_accounting_entries_process_run_source',
+      sql`
+        (
+          ${t.sourceType} = 'PROCESS_RUN'
+          AND ${t.processRunId} IS NOT NULL
+        )
+        OR
+        (
+          ${t.sourceType} <> 'PROCESS_RUN'
+          AND ${t.processRunId} IS NULL
+        )
+      `
+    ),
   ]
 );
 

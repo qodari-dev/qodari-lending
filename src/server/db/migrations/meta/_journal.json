@@ -316,6 +316,20 @@
       "when": 1773418138956,
       "tag": "0044_lyrical_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1773420360527,
+      "tag": "0045_true_nightshade",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1773421563139,
+      "tag": "0046_spicy_red_skull",
+      "breakpoints": true
     }
   ]
 }

@@ -50,7 +50,7 @@ function toErrorMessage(error: unknown, fallback: string) {
 }
 
 async function getLoanCandidates(run: typeof processRuns.$inferSelect): Promise<LoanCandidate[]> {
-  const conditions = [eq(loans.status, 'ACCOUNTED')];
+  const conditions = [eq(loans.status, 'ACCOUNTED'), eq(loans.disbursementStatus, 'DISBURSED')];
 
   if (run.scopeType === 'LOAN') {
     conditions.push(eq(loans.id, run.scopeId));

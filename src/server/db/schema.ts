@@ -1419,13 +1419,10 @@ export const loanApplicationDocuments = pgTable(
 // Enums Concr08
 // ------------------------------------------------------------
 export const loanStatusEnum = pgEnum('loan_status', [
-  'ACTIVE', // A
   'GENERATED', // G
-  'INACTIVE', // I
   'ACCOUNTED', // C (contabilizado)
   'VOID', // X (anulado)
   'RELIQUIDATED', // R
-  'FINISHED', // T (terminado)
   'PAID', // P
 ]);
 
@@ -1434,6 +1431,7 @@ export const loanDisbursementStatusEnum = pgEnum('loan_disbursement_status', [
   'SENT_TO_ACCOUNTING', // C
   'SENT_TO_BANK', // B
   'DISBURSED', // D
+  'REJECTED', // R
 ]);
 
 // ---------------------------------------------------------------------
@@ -1529,10 +1527,8 @@ export const loans = pgTable(
       .notNull()
       .references(() => paymentGuaranteeTypes.id, { onDelete: 'restrict' }),
 
-    guaranteeDocument: varchar('guarantee_document', { length: 50 }),
-
-    // estado (A/G/I/C/X/R/T/P)
-    status: loanStatusEnum('status').notNull().default('ACTIVE'),
+    // estado (G/C/X/R/P)
+    status: loanStatusEnum('status').notNull().default('GENERATED'),
     statusDate: date('status_date').notNull(),
 
     affiliationOfficeId: integer('affiliation_office_id')
@@ -1639,7 +1635,7 @@ export const loanAgreementHistory = pgTable(
 // ---------------------------------------------------------------------
 // Historial de estados del credito
 // Nota (ES):
-// Traza cambios de estado del credito (GENERATED, ACTIVE, PAID, etc).
+// Traza cambios de estado del credito (GENERATED, ACCOUNTED, PAID, etc).
 // El primer registro se crea al aprobar la solicitud.
 // ---------------------------------------------------------------------
 export const loanStatusHistory = pgTable(

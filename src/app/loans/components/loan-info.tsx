@@ -110,9 +110,8 @@ function extensionFromMimeType(mimeType: string): string {
 }
 
 function StatusBadge({ status }: { status: LoanStatus }) {
-  return (
-    <Badge variant={status === 'ACTIVE' ? 'default' : 'outline'}>{loanStatusLabels[status]}</Badge>
-  );
+  const isPrimaryStatus = status === 'ACCOUNTED' || status === 'PAID';
+  return <Badge variant={isPrimaryStatus ? 'default' : 'outline'}>{loanStatusLabels[status]}</Badge>;
 }
 
 function LoanDocumentsTab({ loanId, creditNumber }: { loanId: number; creditNumber: string }) {
@@ -521,7 +520,6 @@ export function LoanInfo({
               label: 'Documento castigo interes',
               value: detail.interestWriteOffDocument ?? '-',
             },
-            { label: 'Documento garantia', value: detail.guaranteeDocument ?? '-' },
           ],
         },
         {

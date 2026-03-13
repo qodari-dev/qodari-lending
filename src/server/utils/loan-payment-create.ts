@@ -96,6 +96,7 @@ export async function createLoanPaymentTx(
       thirdPartyId: true,
       costCenterId: true,
       status: true,
+      disbursementStatus: true,
     },
   });
 
@@ -107,10 +108,10 @@ export async function createLoanPaymentTx(
     });
   }
 
-  if (existingLoan.status !== 'ACCOUNTED') {
+  if (existingLoan.status !== 'ACCOUNTED' || existingLoan.disbursementStatus !== 'DISBURSED') {
     throwHttpError({
       status: 400,
-      message: 'El credito debe estar contabilizado para recibir abonos',
+      message: 'El credito debe estar contabilizado y desembolsado para recibir abonos',
       code: 'BAD_REQUEST',
     });
   }

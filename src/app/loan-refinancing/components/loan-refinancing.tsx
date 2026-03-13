@@ -222,7 +222,7 @@ export function LoanRefinancing() {
             where: {
               and: [
                 { thirdPartyId: { eq: originItem.thirdPartyId } },
-                { status: { in: ['ACTIVE', 'GENERATED', 'ACCOUNTED', 'RELIQUIDATED'] } },
+                { status: { in: ['GENERATED', 'ACCOUNTED', 'RELIQUIDATED'] } },
               ],
             },
           },

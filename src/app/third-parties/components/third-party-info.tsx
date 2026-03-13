@@ -34,13 +34,10 @@ const loanStatusVariant: Record<
   LoanStatus,
   'default' | 'secondary' | 'destructive' | 'outline'
 > = {
-  ACTIVE: 'default',
   GENERATED: 'outline',
-  INACTIVE: 'secondary',
-  ACCOUNTED: 'outline',
+  ACCOUNTED: 'default',
   VOID: 'destructive',
   RELIQUIDATED: 'secondary',
-  FINISHED: 'secondary',
   PAID: 'default',
 };
 

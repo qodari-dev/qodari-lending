@@ -135,7 +135,11 @@ function computeOverdueInfo(balanceSummary: { overdueBalance: string | number | 
 
 async function buildLoansData(agreementId: number, runDate: string): Promise<DispatchItemRow[]> {
   const agreementLoans = await db.query.loans.findMany({
-    where: and(eq(loans.agreementId, agreementId), eq(loans.status, 'ACCOUNTED')),
+    where: and(
+      eq(loans.agreementId, agreementId),
+      eq(loans.status, 'ACCOUNTED'),
+      eq(loans.disbursementStatus, 'DISBURSED')
+    ),
     columns: {
       id: true,
       creditNumber: true,

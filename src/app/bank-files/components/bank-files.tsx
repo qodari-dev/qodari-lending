@@ -68,14 +68,14 @@ export function BankFiles() {
     <>
       <PageHeader
         title="Archivos para bancos"
-        description="Seleccione banco y fecha de liquidacion para generar el archivo."
+        description="Genere el archivo para créditos contabilizados pendientes de envío o rechazados por el banco."
       />
       <PageContent>
         <Card>
           <CardHeader>
             <CardTitle>Parametros</CardTitle>
             <CardDescription>
-              Cada banco tiene estructura propia y se resuelve internamente al generar.
+              Se toman créditos contabilizados del banco seleccionado con estado de desembolso enviado a contabilidad o rechazado.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -139,7 +139,7 @@ export function BankFiles() {
         {result ? (
           <Card>
             <CardHeader>
-              <CardTitle>Resultado de generacion</CardTitle>
+              <CardTitle>Resultado de envío</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-5">
               <div>
@@ -179,4 +179,3 @@ export function BankFiles() {
     </>
   );
 }
-

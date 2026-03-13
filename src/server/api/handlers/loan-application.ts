@@ -2720,7 +2720,6 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             costCenterId: affiliationOffice.costCenterId ?? null,
             repaymentMethodId: finalBody.repaymentMethodId,
             paymentGuaranteeTypeId: finalBody.paymentGuaranteeTypeId,
-            guaranteeDocument: existing.creditNumber,
             status: 'GENERATED',
             statusDate,
             affiliationOfficeId: existing.affiliationOfficeId,

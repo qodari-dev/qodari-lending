@@ -351,7 +351,7 @@ export const agreement = tsr.router(contract.agreement, {
       const hasActiveLoans = await db.query.loans.findFirst({
         where: and(
           eq(loans.agreementId, id),
-          inArray(loans.status, ['ACTIVE', 'ACCOUNTED'])
+          inArray(loans.status, ['GENERATED', 'ACCOUNTED'])
         ),
         columns: { id: true },
       });

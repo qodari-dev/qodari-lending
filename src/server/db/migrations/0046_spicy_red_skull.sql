@@ -1,0 +1,1 @@
+ALTER TYPE "public"."loan_disbursement_status" ADD VALUE 'REJECTED';

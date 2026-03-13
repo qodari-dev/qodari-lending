@@ -12,13 +12,10 @@ import { ClientInferResponseBody } from '@ts-rest/core';
 import { z } from 'zod';
 
 export const LOAN_STATUS_OPTIONS = [
-  'ACTIVE',
   'GENERATED',
-  'INACTIVE',
   'ACCOUNTED',
   'VOID',
   'RELIQUIDATED',
-  'FINISHED',
   'PAID',
 ] as const;
 export type LoanStatus = (typeof LOAN_STATUS_OPTIONS)[number];
@@ -28,6 +25,7 @@ export const LOAN_DISBURSEMENT_STATUS_OPTIONS = [
   'SENT_TO_ACCOUNTING',
   'SENT_TO_BANK',
   'DISBURSED',
+  'REJECTED',
 ] as const;
 export type LoanDisbursementStatus = (typeof LOAN_DISBURSEMENT_STATUS_OPTIONS)[number];
 
@@ -44,13 +42,10 @@ export const LOAN_PAYMENT_STATUS_OPTIONS = ['PAID', 'VOID'] as const;
 export type LoanPaymentStatus = (typeof LOAN_PAYMENT_STATUS_OPTIONS)[number];
 
 export const loanStatusLabels: Record<LoanStatus, string> = {
-  ACTIVE: 'Activo',
   GENERATED: 'Generado',
-  INACTIVE: 'Inactivo',
   ACCOUNTED: 'Contabilizado',
   VOID: 'Anulado',
   RELIQUIDATED: 'Reliquidado',
-  FINISHED: 'Terminado',
   PAID: 'Pagado',
 };
 
@@ -59,6 +54,7 @@ export const loanDisbursementStatusLabels: Record<LoanDisbursementStatus, string
   SENT_TO_ACCOUNTING: 'Enviado a contabilidad',
   SENT_TO_BANK: 'Enviado al banco',
   DISBURSED: 'Desembolsado',
+  REJECTED: 'Rechazado por banco',
 };
 
 export const installmentRecordStatusLabels: Record<InstallmentRecordStatus, string> = {

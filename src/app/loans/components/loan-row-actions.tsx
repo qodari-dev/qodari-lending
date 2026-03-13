@@ -29,6 +29,8 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
   const canVoid = useHasPermission('loans:void');
 
   const isVoidOrPaid = loan.status === 'VOID' || loan.status === 'PAID';
+  const isOperationalLoan =
+    loan.status === 'ACCOUNTED' && loan.disbursementStatus === 'DISBURSED';
 
   const actions: (RowAction<Loan> | RowActionGroup<Loan>)[] = [
     {
@@ -58,13 +60,13 @@ export function LoanRowActions({ row, table }: LoanRowActionsProps) {
       label: 'Proceso juridico',
       icon: Scale,
       onClick: meta?.onRowLegalProcess,
-      hidden: !(canUpdate && loan.status === 'ACTIVE'),
+      hidden: !(canUpdate && isOperationalLoan),
     },
     {
       label: 'Acuerdo de pago',
       icon: Handshake,
       onClick: meta?.onRowPaymentAgreement,
-      hidden: !(canUpdate && loan.status === 'ACTIVE'),
+      hidden: !(canUpdate && isOperationalLoan),
     },
     {
       label: 'Cambiar convenio',

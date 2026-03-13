@@ -413,6 +413,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           creditNumber: true,
           agreementId: true,
           status: true,
+          disbursementStatus: true,
         },
         with: {
           borrower: {
@@ -463,10 +464,10 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           }
         }
 
-        if (loanItem.status !== 'ACCOUNTED') {
+        if (loanItem.status !== 'ACCOUNTED' || loanItem.disbursementStatus !== 'DISBURSED') {
           throwHttpError({
             status: 400,
-            message: `El credito ${row.creditNumber} no esta contabilizado para registrar abonos`,
+            message: `El credito ${row.creditNumber} no esta contabilizado y desembolsado para registrar abonos`,
             code: 'BAD_REQUEST',
           });
         }
@@ -625,6 +626,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
               id: true,
               creditNumber: true,
               status: true,
+              disbursementStatus: true,
             },
             with: {
               borrower: {
@@ -691,12 +693,12 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           return;
         }
 
-        if (loan.status !== 'ACCOUNTED') {
+        if (loan.status !== 'ACCOUNTED' || loan.disbursementStatus !== 'DISBURSED') {
           validationErrors.push({
             rowNumber: row.rowNumber,
             creditNumber: row.creditNumber,
             documentNumber: row.documentNumber,
-            reason: 'El credito no esta contabilizado para registrar abonos',
+            reason: 'El credito no esta contabilizado y desembolsado para registrar abonos',
           });
           return;
         }
@@ -1093,7 +1095,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           await tx
             .update(loans)
             .set({
-              status: 'ACTIVE',
+              status: 'ACCOUNTED',
               statusDate: nowDate,
               statusChangedByUserId: userId,
               statusChangedByUserName: userName || userId,
@@ -1103,7 +1105,7 @@ export const loanPayment = tsr.router(contract.loanPayment, {
           await tx.insert(loanStatusHistory).values({
             loanId: existingLoan.id,
             fromStatus: 'PAID',
-            toStatus: 'ACTIVE',
+            toStatus: 'ACCOUNTED',
             changedByUserId: userId,
             changedByUserName: userName || userId,
             note: `Reversa de abono ${existing.paymentNumber}`.slice(0, 255),

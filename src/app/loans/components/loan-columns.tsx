@@ -15,7 +15,7 @@ function getBorrowerLabel(loan: Loan): string {
 }
 
 function StatusBadge({ status }: { status: LoanStatus }) {
-  if (status === 'ACTIVE') {
+  if (status === 'ACCOUNTED' || status === 'PAID') {
     return (
       <Badge variant="default" className="gap-1 bg-green-600 hover:bg-green-700">
         <CheckCircle className="h-3 w-3" />

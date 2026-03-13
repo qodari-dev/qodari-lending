@@ -332,6 +332,7 @@ export function LoanPaymentPayroll() {
             and: [
               ...(values.agreementId ? [{ agreementId: { eq: values.agreementId } }] : []),
               { status: 'ACCOUNTED' },
+              { disbursementStatus: 'DISBURSED' },
             ],
           },
         },

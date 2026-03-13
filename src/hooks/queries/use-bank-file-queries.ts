@@ -10,3 +10,18 @@ export function useGenerateBankFile() {
   });
 }
 
+export function usePreviewBankNoveltyFile() {
+  return api.bankFile.previewNoveltyFile.useMutation({
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}
+
+export function useProcessBankNoveltyFile() {
+  return api.bankFile.processNoveltyFile.useMutation({
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}

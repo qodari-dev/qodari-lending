@@ -49,3 +49,11 @@ export function useProcessAccountingInterfaceProvision() {
     },
   });
 }
+
+export function useProcessAccountingInterfaceDisbursementAdjustments() {
+  return api.accountingInterface.processDisbursementAdjustments.useMutation({
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}

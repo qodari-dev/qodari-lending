@@ -68,12 +68,12 @@ export function BankFiles() {
     <>
       <PageHeader
         title="Archivos para bancos"
-        description="Genere el archivo para créditos contabilizados pendientes de envío o rechazados por el banco."
+        description="Genere el archivo plano para créditos contabilizados pendientes de envío al banco."
       />
       <PageContent>
         <Card>
           <CardHeader>
-            <CardTitle>Parametros</CardTitle>
+            <CardTitle>Parámetros</CardTitle>
             <CardDescription>
               Se toman créditos contabilizados del banco seleccionado con estado de desembolso enviado a contabilidad o rechazado.
             </CardDescription>
@@ -113,7 +113,7 @@ export function BankFiles() {
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="liquidationDate">Fecha de liquidacion de creditos</FieldLabel>
+                      <FieldLabel htmlFor="liquidationDate">Fecha de liquidación de créditos</FieldLabel>
                       <DatePicker
                         id="liquidationDate"
                         value={field.value ?? null}
@@ -147,15 +147,15 @@ export function BankFiles() {
                 <p className="font-medium">{result.bankName}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Codigo</p>
+                <p className="text-muted-foreground text-xs">Código</p>
                 <p className="font-medium">{result.bankCode ?? '-'}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Fecha liquidacion</p>
+                <p className="text-muted-foreground text-xs">Fecha liquidación</p>
                 <p className="font-medium">{formatDate(result.liquidationDate)}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Numero de creditos</p>
+                <p className="text-muted-foreground text-xs">Número de créditos</p>
                 <p className="font-medium">{result.reviewedCredits}</p>
               </div>
               <div>

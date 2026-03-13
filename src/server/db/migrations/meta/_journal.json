@@ -330,6 +330,27 @@
       "when": 1773421563139,
       "tag": "0046_spicy_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1773427539486,
+      "tag": "0047_adorable_hex",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1773430712733,
+      "tag": "0048_remarkable_gressill",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1773434341965,
+      "tag": "0049_thick_professor_monster",
+      "breakpoints": true
     }
   ]
 }

@@ -48,6 +48,7 @@ import {
   createSpacesPresignedGetUrl,
   createSpacesPresignedPutUrl,
 } from '@/server/utils/storage/spaces-presign';
+import { recordLoanDisbursementEvent } from '@/server/utils/loan-disbursement-events';
 import {
   calculateCreditSimulation,
   findInsuranceRateRange,
@@ -2753,6 +2754,22 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           changedByUserId: userId,
           changedByUserName: userName || userId,
           note: 'Credito generado desde aprobacion de solicitud',
+          metadata: {
+            sourceLoanApplicationId: id,
+            actNumber: finalBody.actNumber,
+            approvedInstallments,
+          },
+        });
+
+        await recordLoanDisbursementEvent(tx, {
+          loanId: loan.id,
+          eventType: 'CREATED',
+          eventDate: statusDate,
+          newFirstCollectionDate: firstCollectionDate,
+          newMaturityDate: lastInstallment.dueDate,
+          changedByUserId: userId,
+          changedByUserName: userName || userId,
+          note: 'Crédito generado desde aprobación de solicitud',
           metadata: {
             sourceLoanApplicationId: id,
             actNumber: finalBody.actNumber,

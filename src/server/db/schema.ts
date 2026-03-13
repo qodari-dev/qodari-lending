@@ -1434,6 +1434,17 @@ export const loanDisbursementStatusEnum = pgEnum('loan_disbursement_status', [
   'REJECTED', // R
 ]);
 
+export const loanDisbursementEventTypeEnum = pgEnum('loan_disbursement_event_type', [
+  'CREATED',
+  'LIQUIDATED',
+  'SENT_TO_ACCOUNTING',
+  'SENT_TO_BANK',
+  'DISBURSED',
+  'REJECTED',
+  'DATES_UPDATED',
+  'ADJUSTMENT_SENT_TO_ACCOUNTING',
+]);
+
 // ---------------------------------------------------------------------
 // Concr08 - Créditos aprobados / liquidados
 // Nota:
@@ -1561,6 +1572,9 @@ export const loans = pgTable(
     disbursementStatus: loanDisbursementStatusEnum('disbursement_status')
       .notNull()
       .default('LIQUIDATED'),
+    hasPendingDisbursementAdjustment: boolean('has_pending_disbursement_adjustment')
+      .notNull()
+      .default(false),
 
     lastPaymentDate: date('last_payment_date'),
 
@@ -1663,6 +1677,49 @@ export const loanStatusHistory = pgTable(
   (t) => [
     index('idx_loan_status_history_loan').on(t.loanId),
     index('idx_loan_status_history_changed_at').on(t.changedAt),
+  ]
+);
+
+// ---------------------------------------------------------------------
+// Historial del flujo de desembolso del credito
+// Nota (ES):
+// Traza los eventos operativos del desembolso del crédito, incluyendo cambios
+// de estado y ajustes relevantes de fechas del plan.
+// ---------------------------------------------------------------------
+export const loanDisbursementEvents = pgTable(
+  'loan_disbursement_events',
+  {
+    id: serial('id').primaryKey(),
+
+    loanId: integer('loan_id')
+      .notNull()
+      .references(() => loans.id, { onDelete: 'cascade' }),
+
+    eventType: loanDisbursementEventTypeEnum('event_type').notNull(),
+    fromDisbursementStatus: loanDisbursementStatusEnum('from_disbursement_status'),
+    toDisbursementStatus: loanDisbursementStatusEnum('to_disbursement_status'),
+
+    eventDate: date('event_date').notNull(),
+    previousDisbursementDate: date('previous_disbursement_date'),
+    newDisbursementDate: date('new_disbursement_date'),
+    previousFirstCollectionDate: date('previous_first_collection_date'),
+    newFirstCollectionDate: date('new_first_collection_date'),
+    previousMaturityDate: date('previous_maturity_date'),
+    newMaturityDate: date('new_maturity_date'),
+
+    changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+    changedByUserId: uuid('changed_by_user_id'),
+    changedByUserName: varchar('changed_by_user_name', { length: 255 }),
+
+    note: varchar('note', { length: 255 }),
+    metadata: jsonb('metadata'),
+
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_loan_disbursement_events_loan').on(t.loanId),
+    index('idx_loan_disbursement_events_changed_at').on(t.changedAt),
+    index('idx_loan_disbursement_events_type').on(t.eventType),
   ]
 );
 

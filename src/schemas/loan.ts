@@ -29,6 +29,18 @@ export const LOAN_DISBURSEMENT_STATUS_OPTIONS = [
 ] as const;
 export type LoanDisbursementStatus = (typeof LOAN_DISBURSEMENT_STATUS_OPTIONS)[number];
 
+export const LOAN_DISBURSEMENT_EVENT_TYPE_OPTIONS = [
+  'CREATED',
+  'LIQUIDATED',
+  'SENT_TO_ACCOUNTING',
+  'SENT_TO_BANK',
+  'DISBURSED',
+  'REJECTED',
+  'DATES_UPDATED',
+  'ADJUSTMENT_SENT_TO_ACCOUNTING',
+] as const;
+export type LoanDisbursementEventType = (typeof LOAN_DISBURSEMENT_EVENT_TYPE_OPTIONS)[number];
+
 export const INSTALLMENT_RECORD_STATUS_OPTIONS = [
   'GENERATED',
   'ACCOUNTED',
@@ -55,6 +67,17 @@ export const loanDisbursementStatusLabels: Record<LoanDisbursementStatus, string
   SENT_TO_BANK: 'Enviado al banco',
   DISBURSED: 'Desembolsado',
   REJECTED: 'Rechazado por banco',
+};
+
+export const loanDisbursementEventTypeLabels: Record<LoanDisbursementEventType, string> = {
+  CREATED: 'Crédito generado',
+  LIQUIDATED: 'Liquidación',
+  SENT_TO_ACCOUNTING: 'Enviado a contabilidad',
+  SENT_TO_BANK: 'Enviado al banco',
+  DISBURSED: 'Desembolso confirmado',
+  REJECTED: 'Rechazo banco',
+  DATES_UPDATED: 'Fechas ajustadas',
+  ADJUSTMENT_SENT_TO_ACCOUNTING: 'Novedad enviada a contabilidad',
 };
 
 export const installmentRecordStatusLabels: Record<InstallmentRecordStatus, string> = {
@@ -135,6 +158,7 @@ const LOAN_INCLUDE_OPTIONS = [
   'portfolioEntries',
   'accountingEntries',
   'loanAgreementHistory',
+  'loanDisbursementEvents',
   'loanStatusHistory',
   'loanBillingConcepts',
   'loanDocumentInstances',

@@ -1,0 +1,1 @@
+ALTER TABLE "loans" ADD COLUMN "has_pending_disbursement_adjustment" boolean DEFAULT false NOT NULL;

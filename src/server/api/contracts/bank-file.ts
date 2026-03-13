@@ -1,4 +1,11 @@
-import { GenerateBankFileBodySchema, GenerateBankFileResponseSchema } from '@/schemas/bank-file';
+import {
+  GenerateBankFileBodySchema,
+  GenerateBankFileResponseSchema,
+  PreviewBankNoveltyBodySchema,
+  PreviewBankNoveltyResponseSchema,
+  ProcessBankNoveltyBodySchema,
+  ProcessBankNoveltyResponseSchema,
+} from '@/schemas/bank-file';
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
 import { initContract } from '@ts-rest/core';
 
@@ -27,7 +34,45 @@ export const bankFile = c.router(
         500: TsRestErrorSchema,
       },
     },
+    previewNoveltyFile: {
+      method: 'POST',
+      path: '/preview-novelty-file',
+      body: PreviewBankNoveltyBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'read',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: PreviewBankNoveltyResponseSchema,
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    processNoveltyFile: {
+      method: 'POST',
+      path: '/process-novelty-file',
+      body: ProcessBankNoveltyBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'update',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: ProcessBankNoveltyResponseSchema,
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        409: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
   },
   { pathPrefix: '/bank-files' }
 );
-

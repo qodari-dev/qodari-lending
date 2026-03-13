@@ -45,6 +45,7 @@ import {
 } from '@/schemas/billing-concept';
 import {
   installmentRecordStatusLabels,
+  loanDisbursementEventTypeLabels,
   loanDisbursementStatusLabels,
   LoanInclude,
   loanPaymentStatusLabels,
@@ -227,6 +228,7 @@ const LOAN_DETAIL_INCLUDES: LoanInclude[] = [
   'portfolioEntries',
   'accountingEntries',
   'loanAgreementHistory',
+  'loanDisbursementEvents',
   'loanStatusHistory',
   'loanBillingConcepts',
   'loanDocumentInstances',
@@ -270,6 +272,8 @@ export function LoanInfo({
   const extractReport = extractReportData?.body;
   const loanProcessStatesRaw = (detail as { loanProcessStates?: unknown } | undefined)
     ?.loanProcessStates;
+  const loanDisbursementEventsRaw = (detail as { loanDisbursementEvents?: unknown } | undefined)
+    ?.loanDisbursementEvents;
   const loanProcessStatesRows = (
     Array.isArray(loanProcessStatesRaw)
       ? loanProcessStatesRaw
@@ -287,6 +291,23 @@ export function LoanInfo({
       status: string;
       triggerSource: string;
     } | null;
+  }>;
+  const loanDisbursementEventRows = (Array.isArray(loanDisbursementEventsRaw)
+    ? loanDisbursementEventsRaw
+    : []) as Array<{
+    id: number;
+    eventType: string;
+    eventDate: string;
+    fromDisbursementStatus?: string | null;
+    toDisbursementStatus?: string | null;
+    previousFirstCollectionDate?: string | null;
+    newFirstCollectionDate?: string | null;
+    previousMaturityDate?: string | null;
+    newMaturityDate?: string | null;
+    changedAt: string | Date;
+    changedByUserId?: string | null;
+    changedByUserName?: string | null;
+    note?: string | null;
   }>;
   const signatureDocuments = [...(detail?.loanDocumentInstances ?? [])].sort(
     (a, b) => toTimestamp(b.generatedAt) - toTimestamp(a.generatedAt)
@@ -337,6 +358,10 @@ export function LoanInfo({
     (sum, envelope) => sum + (envelope.signatureSigners?.length ?? 0),
     0
   );
+  const getDisbursementEventTypeLabel = (eventType?: string | null) =>
+    eventType ? (loanDisbursementEventTypeLabels as Record<string, string>)[eventType] ?? eventType : '-';
+  const getDisbursementStatusLabel = (status?: string | null) =>
+    status ? (loanDisbursementStatusLabels as Record<string, string>)[status] ?? status : '-';
   const handleDownloadSignatureFile = useCallback(
     async (fileKey: string, fileName: string) => {
       if (!effectiveLoanId) return;
@@ -897,6 +922,62 @@ export function LoanInfo({
                         {loanStatusLabels[detail.status as LoanStatus] ?? detail.status} (
                         {formatDate(detail.statusDate)})
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Historial de desembolso</h3>
+                  {loanDisbursementEventRows.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha registro</TableHead>
+                          <TableHead>Evento</TableHead>
+                          <TableHead>Fecha evento</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>1er recaudo</TableHead>
+                          <TableHead>Vencimiento</TableHead>
+                          <TableHead>Usuario</TableHead>
+                          <TableHead>Nota</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {loanDisbursementEventRows.map((item) => {
+                          const statusTransition = item.toDisbursementStatus
+                            ? `${getDisbursementStatusLabel(item.fromDisbursementStatus)} -> ${getDisbursementStatusLabel(item.toDisbursementStatus)}`
+                            : '-';
+                          const firstCollectionTransition =
+                            item.previousFirstCollectionDate || item.newFirstCollectionDate
+                              ? `${formatDate(item.previousFirstCollectionDate)} -> ${formatDate(item.newFirstCollectionDate)}`
+                              : '-';
+                          const maturityTransition =
+                            item.previousMaturityDate || item.newMaturityDate
+                              ? `${formatDate(item.previousMaturityDate)} -> ${formatDate(item.newMaturityDate)}`
+                              : '-';
+
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell>{formatDateTime(item.changedAt)}</TableCell>
+                              <TableCell>
+                                {getDisbursementEventTypeLabel(item.eventType)}
+                              </TableCell>
+                              <TableCell>{formatDate(item.eventDate)}</TableCell>
+                              <TableCell>{statusTransition}</TableCell>
+                              <TableCell>{firstCollectionTransition}</TableCell>
+                              <TableCell>{maturityTransition}</TableCell>
+                              <TableCell>
+                                {item.changedByUserName ?? item.changedByUserId ?? '-'}
+                              </TableCell>
+                              <TableCell>{item.note ?? '-'}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                      No hay eventos de desembolso registrados.
                     </div>
                   )}
                 </div>

@@ -9,6 +9,7 @@ import {
   loanApplicationRiskAssessments,
   loanApplicationStatusHistory,
   loanAgreementHistory,
+  loanDisbursementEvents,
   loanBillingConcepts,
   loanDocumentInstances,
   loanInstallments,
@@ -49,6 +50,7 @@ import {
   getLoanStatement,
 } from '@/server/utils/loan-statement';
 import { applyPortfolioDeltas } from '@/server/utils/portfolio-utils';
+import { recordLoanDisbursementEvent } from '@/server/utils/loan-disbursement-events';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { getRequiredUserContext } from '@/server/utils/required-user-context';
 import { buildTypedIncludes, createIncludeMap } from '@/server/utils/query/include-builder';
@@ -253,6 +255,12 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
         agreement: true,
       },
       orderBy: [desc(loanAgreementHistory.changedAt)],
+    },
+  },
+  loanDisbursementEvents: {
+    relation: 'loanDisbursementEvents',
+    config: {
+      orderBy: [desc(loanDisbursementEvents.changedAt)],
     },
   },
   loanStatusHistory: {
@@ -2758,6 +2766,25 @@ export const loan = tsr.router(contract.loan, {
             code: 'CONFLICT',
           });
         }
+
+        await recordLoanDisbursementEvent(tx, {
+          loanId: existingLoan.id,
+          eventType: 'LIQUIDATED',
+          eventDate: entryDate,
+          fromDisbursementStatus: existingLoan.disbursementStatus,
+          toDisbursementStatus: 'LIQUIDATED',
+          previousFirstCollectionDate: existingLoan.firstCollectionDate,
+          newFirstCollectionDate: loanUpdated.firstCollectionDate,
+          previousMaturityDate: existingLoan.maturityDate,
+          newMaturityDate: loanUpdated.maturityDate,
+          changedByUserId: userId,
+          changedByUserName: userName || userId,
+          note: 'Crédito liquidado y movimientos generados',
+          metadata: {
+            documentCode,
+            disbursementAmount: toDecimalString(disbursementAmount),
+          },
+        });
 
         return [loanUpdated];
       });

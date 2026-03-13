@@ -1,6 +1,7 @@
 import {
   ProcessAccountingInterfaceCreditsBodySchema,
   ProcessAccountingInterfaceCurrentInterestBodySchema,
+  ProcessAccountingInterfaceDisbursementAdjustmentsBodySchema,
   ProcessAccountingInterfaceLateInterestBodySchema,
   ProcessAccountingInterfacePaymentsBodySchema,
   ProcessAccountingInterfaceWriteOffBodySchema,
@@ -10,10 +11,12 @@ import {
   accountingEntries,
   db,
   loanInstallments,
+  loanDisbursementEvents,
   loans,
   loanStatusHistory,
 } from '@/server/db';
 import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
+import { recordLoanDisbursementEvent } from '@/server/utils/loan-disbursement-events';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { getRequiredUserContext } from '@/server/utils/required-user-context';
 import { formatDateOnly } from '@/server/utils/value-utils';
@@ -24,6 +27,9 @@ import { contract } from '../contracts';
 
 type ProcessCreditsBody = z.infer<typeof ProcessAccountingInterfaceCreditsBodySchema>;
 type ProcessCurrentInterestBody = z.infer<typeof ProcessAccountingInterfaceCurrentInterestBodySchema>;
+type ProcessDisbursementAdjustmentsBody = z.infer<
+  typeof ProcessAccountingInterfaceDisbursementAdjustmentsBodySchema
+>;
 type ProcessLateInterestBody = z.infer<typeof ProcessAccountingInterfaceLateInterestBodySchema>;
 type ProcessPaymentsBody = z.infer<typeof ProcessAccountingInterfacePaymentsBodySchema>;
 type ProcessWriteOffBody = z.infer<typeof ProcessAccountingInterfaceWriteOffBodySchema>;
@@ -62,6 +68,8 @@ async function processCredits(body: ProcessCreditsBody, context: HandlerContext)
 
     const loanIds = [...new Set(draftCreditEntries.map((item) => item.loanId).filter((value): value is number => !!value))];
 
+    let processedRecords = 0;
+
     if (loanIds.length) {
       await db.transaction(async (tx) => {
         await tx
@@ -94,6 +102,9 @@ async function processCredits(body: ProcessCreditsBody, context: HandlerContext)
           columns: {
             id: true,
             status: true,
+            disbursementStatus: true,
+            firstCollectionDate: true,
+            maturityDate: true,
           },
         });
 
@@ -131,6 +142,29 @@ async function processCredits(body: ProcessCreditsBody, context: HandlerContext)
               },
             }))
           );
+
+          await Promise.all(
+            loansToAccount.map((loan) =>
+              recordLoanDisbursementEvent(tx, {
+                loanId: loan.id,
+                eventType: 'SENT_TO_ACCOUNTING',
+                eventDate: transactionDate,
+                fromDisbursementStatus: loan.disbursementStatus,
+                toDisbursementStatus: 'SENT_TO_ACCOUNTING',
+                previousFirstCollectionDate: loan.firstCollectionDate,
+                newFirstCollectionDate: loan.firstCollectionDate,
+                previousMaturityDate: loan.maturityDate,
+                newMaturityDate: loan.maturityDate,
+                changedByUserId: userId,
+                changedByUserName: userName || userId,
+                note: 'Crédito contabilizado y enviado a contabilidad',
+                metadata: {
+                  interfaceType: 'CREDITS',
+                  transactionDate,
+                },
+              })
+            )
+          );
         }
       });
     }
@@ -151,6 +185,117 @@ async function processCredits(body: ProcessCreditsBody, context: HandlerContext)
   } catch (e) {
     return genericTsRestErrorResponse(e, {
       genericMsg: 'Error al procesar interfaz contable de Creditos',
+    });
+  }
+}
+
+async function processDisbursementAdjustments(
+  body: ProcessDisbursementAdjustmentsBody,
+  context: HandlerContext
+) {
+  const { request, appRoute } = context;
+
+  try {
+    const session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const { userId, userName } = getRequiredUserContext(session!);
+
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
+    const transactionDate = formatDateOnly(body.transactionDate);
+
+    const adjustmentEvents = await db.query.loanDisbursementEvents.findMany({
+      where: and(
+        eq(loanDisbursementEvents.eventType, 'DATES_UPDATED'),
+        between(loanDisbursementEvents.eventDate, startDate, endDate)
+      ),
+      columns: {
+        loanId: true,
+      },
+    });
+
+    const loanIds = [...new Set(adjustmentEvents.map((item) => item.loanId))];
+    let processedRecords = 0;
+
+    if (loanIds.length) {
+      await db.transaction(async (tx) => {
+        const loansToProcess = await tx.query.loans.findMany({
+          where: and(
+            inArray(loans.id, loanIds),
+            eq(loans.status, 'ACCOUNTED'),
+            eq(loans.disbursementStatus, 'DISBURSED'),
+            eq(loans.hasPendingDisbursementAdjustment, true)
+          ),
+          columns: {
+            id: true,
+            disbursementStatus: true,
+            firstCollectionDate: true,
+            maturityDate: true,
+          },
+        });
+
+        if (!loansToProcess.length) {
+          return;
+        }
+
+        processedRecords = loansToProcess.length;
+
+        await tx
+          .update(loans)
+          .set({
+            hasPendingDisbursementAdjustment: false,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              inArray(
+                loans.id,
+                loansToProcess.map((item) => item.id)
+              ),
+              eq(loans.hasPendingDisbursementAdjustment, true)
+            )
+          );
+
+        await Promise.all(
+          loansToProcess.map((loan) =>
+            recordLoanDisbursementEvent(tx, {
+              loanId: loan.id,
+              eventType: 'ADJUSTMENT_SENT_TO_ACCOUNTING',
+              eventDate: transactionDate,
+              fromDisbursementStatus: loan.disbursementStatus,
+              toDisbursementStatus: loan.disbursementStatus,
+              previousFirstCollectionDate: loan.firstCollectionDate,
+              newFirstCollectionDate: loan.firstCollectionDate,
+              previousMaturityDate: loan.maturityDate,
+              newMaturityDate: loan.maturityDate,
+              changedByUserId: userId,
+              changedByUserName: userName || userId,
+              note: 'Novedad de desembolso enviada a contabilidad',
+              metadata: {
+                interfaceType: 'DISBURSEMENT_ADJUSTMENTS',
+                transactionDate,
+              },
+            })
+          )
+        );
+      });
+    }
+
+    return {
+      status: 200 as const,
+      body: {
+        interfaceType: 'DISBURSEMENT_ADJUSTMENTS' as const,
+        periodStartDate: startDate,
+        periodEndDate: endDate,
+        transactionDate,
+        processedRecords,
+        message: processedRecords
+          ? `Interfaz contable de novedades de desembolso procesada. Se enviaron ${processedRecords} crédito(s) a contabilidad y se desmarcaron.`
+          : 'No se encontraron novedades de desembolso pendientes en el rango seleccionado.',
+      },
+    };
+  } catch (e) {
+    return genericTsRestErrorResponse(e, {
+      genericMsg: 'Error al procesar interfaz contable de novedades de desembolso',
     });
   }
 }
@@ -297,6 +442,8 @@ async function processProvision(body: ProcessProvisionBody, context: HandlerCont
 
 export const accountingInterface = tsr.router(contract.accountingInterface, {
   processCredits: ({ body }, context) => processCredits(body, context),
+  processDisbursementAdjustments: ({ body }, context) =>
+    processDisbursementAdjustments(body, context),
   processCurrentInterest: ({ body }, context) => processCurrentInterest(body, context),
   processLateInterest: ({ body }, context) => processLateInterest(body, context),
   processPayments: ({ body }, context) => processPayments(body, context),

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."loan_disbursement_event_type" ADD VALUE 'ADJUSTMENT_SENT_TO_ACCOUNTING';

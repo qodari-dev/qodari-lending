@@ -187,3 +187,34 @@ export type ProcessAccountingInterfaceProvisionResult = ClientInferResponseBody<
   Contract['accountingInterface']['processProvision'],
   200
 >;
+
+// DISBURSEMENT ADJUSTMENTS
+export const ProcessAccountingInterfaceDisbursementAdjustmentsBodySchema = z
+  .object({
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date(),
+    transactionDate: z.coerce.date(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.endDate < value.startDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['endDate'],
+        message: 'La fecha final debe ser mayor o igual a la fecha inicial',
+      });
+    }
+  });
+
+export const ProcessAccountingInterfaceDisbursementAdjustmentsResponseSchema = z.object({
+  interfaceType: z.literal('DISBURSEMENT_ADJUSTMENTS'),
+  periodStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  periodEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  processedRecords: z.number().int().nonnegative(),
+  message: z.string(),
+});
+
+export type ProcessAccountingInterfaceDisbursementAdjustmentsResult = ClientInferResponseBody<
+  Contract['accountingInterface']['processDisbursementAdjustments'],
+  200
+>;

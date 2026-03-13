@@ -7,6 +7,8 @@ import {
   ProcessAccountingInterfaceLateInterestResponseSchema,
   ProcessAccountingInterfacePaymentsBodySchema,
   ProcessAccountingInterfacePaymentsResponseSchema,
+  ProcessAccountingInterfaceDisbursementAdjustmentsBodySchema,
+  ProcessAccountingInterfaceDisbursementAdjustmentsResponseSchema,
   ProcessAccountingInterfaceWriteOffBodySchema,
   ProcessAccountingInterfaceWriteOffResponseSchema,
   ProcessAccountingInterfaceProvisionBodySchema,
@@ -93,6 +95,16 @@ export const accountingInterface = c.router(
       metadata,
       responses: {
         200: ProcessAccountingInterfaceProvisionResponseSchema,
+        ...errorResponses,
+      },
+    },
+    processDisbursementAdjustments: {
+      method: 'POST',
+      path: '/disbursement-adjustments/process',
+      body: ProcessAccountingInterfaceDisbursementAdjustmentsBodySchema,
+      metadata,
+      responses: {
+        200: ProcessAccountingInterfaceDisbursementAdjustmentsResponseSchema,
         ...errorResponses,
       },
     },

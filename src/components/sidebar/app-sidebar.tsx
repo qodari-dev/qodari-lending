@@ -234,6 +234,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 items: [
                   { title: 'Creditos', url: `/interface-accounting` },
                   {
+                    title: 'Novedades desembolso',
+                    url: `/interface-accounting/disbursement-adjustments`,
+                  },
+                  {
                     title: 'Interes Corriente',
                     url: `/interface-accounting/current-interest`,
                   },
@@ -264,7 +268,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {
                 title: 'Archivos para bancos',
                 icon: FileUp,
-                items: [{ title: 'Generar archivo para banco', url: `/bank-files` }],
+                items: [
+                  { title: 'Generar archivo para banco', url: `/bank-files` },
+                  { title: 'Cargar respuesta banco', url: `/bank-file-responses` },
+                ],
               },
             ],
             pathname

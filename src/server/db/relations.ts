@@ -40,6 +40,7 @@ import {
   loanApplicationDocuments,
   loans,
   loanAgreementHistory,
+  loanDisbursementEvents,
   loanStatusHistory,
   loanInstallments,
   loanApplicationActNumbers,
@@ -698,6 +699,7 @@ export const loansRelations = relations(loans, ({ one, many }) => ({
   loanPayments: many(loanPayments),
   loanAgreementHistory: many(loanAgreementHistory),
   loanStatusHistory: many(loanStatusHistory),
+  loanDisbursementEvents: many(loanDisbursementEvents),
   loanBillingConcepts: many(loanBillingConcepts),
   loanDocumentInstances: many(loanDocumentInstances),
   signatureEnvelopes: many(signatureEnvelopes),
@@ -723,6 +725,13 @@ export const loanAgreementHistoryRelations = relations(loanAgreementHistory, ({ 
 export const loanStatusHistoryRelations = relations(loanStatusHistory, ({ one }) => ({
   loan: one(loans, {
     fields: [loanStatusHistory.loanId],
+    references: [loans.id],
+  }),
+}));
+
+export const loanDisbursementEventsRelations = relations(loanDisbursementEvents, ({ one }) => ({
+  loan: one(loans, {
+    fields: [loanDisbursementEvents.loanId],
     references: [loans.id],
   }),
 }));

@@ -1,8 +1,10 @@
 import {
+  accountingDistributionLines,
   accountingEntries,
   banks,
   db,
   loanInstallments,
+  loanPayments,
   loans,
   paymentFrequencies,
   portfolioEntries,
@@ -11,20 +13,30 @@ import { UnifiedAuthContext } from '@/server/utils/auth-context';
 import { logAudit } from '@/server/utils/audit-logger';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getClientIp } from '@/server/utils/get-client-ip';
+import {
+  buildDisbursementAdjustmentDocumentCode,
+} from '@/server/utils/accounting-utils';
 import { recordLoanDisbursementEvent } from '@/server/utils/loan-disbursement-events';
+import { buildLoanLiquidationArtifacts } from '@/server/utils/loan-liquidation-artifacts';
+import { applyPortfolioDeltas } from '@/server/utils/portfolio-utils';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { getRequiredUserContext } from '@/server/utils/required-user-context';
-import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
 import {
   PreviewBankNoveltyBodySchema,
   ProcessBankNoveltyBodySchema,
 } from '@/schemas/bank-file';
 import type { PaymentScheduleMode } from '@/schemas/payment-frequency';
-import { buildDueDates } from '@/utils/credit-simulation';
+import {
+  buildDueDates,
+  calculateCreditSimulation,
+  findInsuranceRateRange,
+  resolveInsuranceFactorFromRange,
+} from '@/utils/credit-simulation';
 import { resolvePaymentFrequencyIntervalDays } from '@/utils/payment-frequency';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { contract } from '../contracts';
 import { z } from 'zod';
 
@@ -97,6 +109,20 @@ type BankNoveltyPreviewRow = {
   canProcess: boolean;
   requiresDateAdjustment: boolean;
   validationMessage: string | null;
+};
+
+type AdjustmentEntryLike = {
+  id: number;
+  glAccountId: number;
+  costCenterId: number | null;
+  thirdPartyId: number | null;
+  description: string;
+  nature: 'DEBIT' | 'CREDIT';
+  amount: string;
+  loanId: number | null;
+  installmentNumber: number | null;
+  dueDate: string | null;
+  status: 'DRAFT' | 'ACCOUNTED' | 'VOIDED';
 };
 
 function getNormalizedCreditNumber(value: string) {
@@ -216,6 +242,30 @@ function resolveNewDueDates(loan: BankNoveltyLoanRow, newFirstCollectionDate: st
   return dueDates.map((item) => formatDateOnly(item));
 }
 
+function buildEntryValueSignature(entries: Array<AdjustmentEntryLike | typeof accountingEntries.$inferInsert>) {
+  return entries
+    .map((entry) =>
+      [
+        entry.glAccountId,
+        entry.nature,
+        entry.installmentNumber ?? 'null',
+        roundMoney(toNumber(entry.amount)),
+      ].join(':')
+    )
+    .sort();
+}
+
+function areEntryValuesEquivalent(
+  currentEntries: AdjustmentEntryLike[],
+  nextEntries: Array<typeof accountingEntries.$inferInsert>
+) {
+  const currentSignature = buildEntryValueSignature(currentEntries);
+  const nextSignature = buildEntryValueSignature(nextEntries);
+
+  if (currentSignature.length !== nextSignature.length) return false;
+  return currentSignature.every((value, index) => value === nextSignature[index]);
+}
+
 async function loadNoveltyLoans(creditNumbers: string[]) {
   const normalizedCreditNumbers = Array.from(new Set(creditNumbers.map(getNormalizedCreditNumber)));
 
@@ -266,6 +316,184 @@ async function loadNoveltyLoans(creditNumbers: string[]) {
   return new Map(
     foundLoans.map((loan) => [getNormalizedCreditNumber(loan.creditNumber), loan as BankNoveltyLoanRow])
   );
+}
+
+async function buildRecalculatedSchedule(args: {
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
+  loanId: number;
+  newFirstCollectionDate: string;
+}) {
+  const fullLoan = await args.tx.query.loans.findFirst({
+    where: eq(loans.id, args.loanId),
+    columns: {
+      id: true,
+      creditNumber: true,
+      principalAmount: true,
+      installments: true,
+      creditStartDate: true,
+      costCenterId: true,
+      thirdPartyId: true,
+      firstCollectionDate: true,
+      maturityDate: true,
+      initialTotalAmount: true,
+      insuranceValue: true,
+    },
+    with: {
+      paymentFrequency: {
+        columns: {
+          id: true,
+          scheduleMode: true,
+          intervalDays: true,
+          dayOfMonth: true,
+          semiMonthDay1: true,
+          semiMonthDay2: true,
+          useEndOfMonthFallback: true,
+        },
+      },
+      loanApplication: {
+        columns: {
+          financingFactor: true,
+          approvedAmount: true,
+          insuranceCompanyId: true,
+          isInsuranceApproved: true,
+        },
+        with: {
+          creditProduct: {
+            columns: {
+              financingType: true,
+              interestRateType: true,
+              interestDayCountConvention: true,
+              insuranceAccrualMethod: true,
+              paysInsurance: true,
+              insuranceRangeMetric: true,
+              capitalDistributionId: true,
+            },
+          },
+          insuranceCompany: {
+            columns: {
+              minimumValue: true,
+            },
+            with: {
+              insuranceRateRanges: true,
+            },
+          },
+        },
+      },
+      loanBillingConcepts: {
+        with: {
+          glAccount: true,
+          billingConcept: true,
+        },
+      },
+    },
+  });
+
+  if (!fullLoan || !fullLoan.paymentFrequency || !fullLoan.loanApplication?.creditProduct) {
+    throwHttpError({
+      status: 400,
+      code: 'BAD_REQUEST',
+      message: 'No fue posible cargar la configuración completa del crédito para recalcular el desembolso.',
+    });
+  }
+
+  const paymentFrequencyIntervalDays = resolvePaymentFrequencyIntervalDays({
+    scheduleMode: fullLoan.paymentFrequency.scheduleMode,
+    intervalDays: fullLoan.paymentFrequency.intervalDays,
+    dayOfMonth: fullLoan.paymentFrequency.dayOfMonth,
+    semiMonthDay1: fullLoan.paymentFrequency.semiMonthDay1,
+    semiMonthDay2: fullLoan.paymentFrequency.semiMonthDay2,
+  });
+
+  if (paymentFrequencyIntervalDays <= 0) {
+    throwHttpError({
+      status: 400,
+      code: 'BAD_REQUEST',
+      message: `La periodicidad del crédito ${fullLoan.creditNumber} no es válida.`,
+    });
+  }
+
+  let insuranceRatePercent = 0;
+  let insuranceFixedAmount = 0;
+  let insuranceMinimumAmount = 0;
+
+  const product = fullLoan.loanApplication.creditProduct;
+  if (
+    product.paysInsurance &&
+    fullLoan.loanApplication.isInsuranceApproved &&
+    fullLoan.loanApplication.insuranceCompany &&
+    fullLoan.loanApplication.insuranceCompanyId
+  ) {
+    const metricValue =
+      product.insuranceRangeMetric === 'INSTALLMENT_COUNT'
+        ? fullLoan.installments
+        : toNumber(fullLoan.loanApplication.approvedAmount ?? '0');
+
+    const insuranceRange = findInsuranceRateRange({
+      ranges: fullLoan.loanApplication.insuranceCompany.insuranceRateRanges,
+      rangeMetric: product.insuranceRangeMetric,
+      metricValue,
+    });
+
+    if (!insuranceRange) {
+      throwHttpError({
+        status: 400,
+        code: 'BAD_REQUEST',
+        message: `La aseguradora configurada para el crédito ${fullLoan.creditNumber} no tiene rango válido para recalcular el seguro.`,
+      });
+    }
+
+    const resolvedInsurance = resolveInsuranceFactorFromRange({
+      range: insuranceRange,
+      minimumValue: fullLoan.loanApplication.insuranceCompany.minimumValue,
+    });
+
+    insuranceRatePercent = resolvedInsurance.insuranceRatePercent;
+    insuranceFixedAmount = resolvedInsurance.insuranceFixedAmount;
+    insuranceMinimumAmount = resolvedInsurance.insuranceMinimumAmount;
+  }
+
+  const schedule = calculateCreditSimulation({
+    financingType: product.financingType,
+    principal: roundMoney(toNumber(fullLoan.principalAmount)),
+    annualRatePercent: toNumber(fullLoan.loanApplication.financingFactor),
+    installments: fullLoan.installments,
+    firstPaymentDate: new Date(`${args.newFirstCollectionDate}T00:00:00`),
+    disbursementDate: new Date(`${fullLoan.creditStartDate}T00:00:00`),
+    daysInterval: paymentFrequencyIntervalDays,
+    paymentScheduleMode: fullLoan.paymentFrequency.scheduleMode,
+    dayOfMonth: fullLoan.paymentFrequency.dayOfMonth,
+    semiMonthDay1: fullLoan.paymentFrequency.semiMonthDay1,
+    semiMonthDay2: fullLoan.paymentFrequency.semiMonthDay2,
+    useEndOfMonthFallback: fullLoan.paymentFrequency.useEndOfMonthFallback ?? true,
+    interestRateType: product.interestRateType,
+    interestDayCountConvention: product.interestDayCountConvention,
+    insuranceAccrualMethod: product.insuranceAccrualMethod,
+    insuranceRatePercent,
+    insuranceFixedAmount,
+    insuranceMinimumAmount,
+  });
+
+  const distributionLines = await args.tx.query.accountingDistributionLines.findMany({
+    where: eq(accountingDistributionLines.accountingDistributionId, product.capitalDistributionId),
+    with: {
+      glAccount: true,
+    },
+    orderBy: [asc(accountingDistributionLines.id)],
+  });
+
+  if (!distributionLines.length) {
+    throwHttpError({
+      status: 400,
+      code: 'BAD_REQUEST',
+      message: `El crédito ${fullLoan.creditNumber} no tiene líneas de distribución contable configuradas para reliquidar.`,
+    });
+  }
+
+  return {
+    fullLoan,
+    schedule,
+    distributionLines,
+  };
 }
 
 function getThirdPartyName(party: BankFileLoanRow['disbursementParty']): string {
@@ -640,6 +868,8 @@ export const bankFile = tsr.router(contract.bankFile, {
         body.records.map((record) => [getNormalizedCreditNumber(record.creditNumber), record])
       );
 
+      let valueChangedAdjustments = 0;
+
       const processedRows = await db.transaction(async (tx) => {
         const results: Array<
           BankNoveltyPreviewRow & {
@@ -722,56 +952,250 @@ export const bankFile = tsr.router(contract.bankFile, {
 
           let nextFirstCollectionDate = loan.firstCollectionDate;
           let nextMaturityDate = loan.maturityDate;
+          let valueChangedAdjustment = false;
 
           if (wantsDateChange && record.newFirstCollectionDate) {
-            const dueDates = resolveNewDueDates(loan, record.newFirstCollectionDate);
+            const activePayments = await tx.query.loanPayments.findFirst({
+              where: and(eq(loanPayments.loanId, loan.id), ne(loanPayments.status, 'VOID')),
+              columns: { id: true },
+            });
+
+            if (activePayments) {
+              throwHttpError({
+                status: 400,
+                code: 'BAD_REQUEST',
+                message: `El crédito ${loan.creditNumber} ya tiene pagos registrados y no permite cambiar la primera fecha de recaudo desde la respuesta del banco.`,
+              });
+            }
+
+            const { fullLoan, schedule, distributionLines } = await buildRecalculatedSchedule({
+              tx,
+              loanId: loan.id,
+              newFirstCollectionDate: record.newFirstCollectionDate,
+            });
+
+            const nextInstallments = schedule.installments.map((installment) => ({
+              installmentNumber: installment.installmentNumber,
+              dueDate: installment.dueDate,
+              principalAmount: toDecimalString(installment.principal),
+              interestAmount: toDecimalString(installment.interest),
+              insuranceAmount: toDecimalString(installment.insurance),
+              remainingPrincipal: toDecimalString(installment.closingBalance),
+            }));
+
             nextFirstCollectionDate = record.newFirstCollectionDate;
-            nextMaturityDate = dueDates[dueDates.length - 1] ?? loan.maturityDate;
+            nextMaturityDate =
+              nextInstallments[nextInstallments.length - 1]?.dueDate ?? loan.maturityDate;
 
-            for (let index = 0; index < dueDates.length; index++) {
-              const installmentNumber = index + 1;
-              const nextDueDate = dueDates[index]!;
+            const adjustmentDocumentCode = buildDisbursementAdjustmentDocumentCode(loan.id);
+            const existingAdjustmentEntries = await tx.query.accountingEntries.findMany({
+              where: and(
+                eq(accountingEntries.processType, 'CREDIT'),
+                eq(accountingEntries.documentCode, adjustmentDocumentCode)
+              ),
+              columns: {
+                sequence: true,
+              },
+            });
 
-              await tx
-                .update(loanInstallments)
-                .set({
-                  dueDate: nextDueDate,
-                  updatedAt: new Date(),
-                })
-                .where(
-                  and(
-                    eq(loanInstallments.loanId, loan.id),
-                    eq(loanInstallments.installmentNumber, installmentNumber),
-                    inArray(loanInstallments.status, ['ACCOUNTED', 'GENERATED', 'CAUSED'])
-                  )
-                );
+            const currentActiveCreditEntries = await tx.query.accountingEntries.findMany({
+              where: and(
+                eq(accountingEntries.loanId, loan.id),
+                eq(accountingEntries.processType, 'CREDIT'),
+                inArray(accountingEntries.status, ['DRAFT', 'ACCOUNTED'])
+              ),
+              columns: {
+                id: true,
+                glAccountId: true,
+                costCenterId: true,
+                thirdPartyId: true,
+                description: true,
+                nature: true,
+                amount: true,
+                loanId: true,
+                installmentNumber: true,
+                dueDate: true,
+                status: true,
+              },
+              orderBy: [asc(accountingEntries.sequence)],
+            });
 
-              await tx
-                .update(portfolioEntries)
-                .set({
-                  dueDate: nextDueDate,
-                  updatedAt: new Date(),
-                })
-                .where(
-                  and(
-                    eq(portfolioEntries.loanId, loan.id),
-                    eq(portfolioEntries.installmentNumber, installmentNumber)
-                  )
-                );
+            const rebuiltArtifacts = buildLoanLiquidationArtifacts({
+              loan: {
+                id: fullLoan.id,
+                creditNumber: fullLoan.creditNumber,
+                costCenterId: fullLoan.costCenterId ?? null,
+                thirdPartyId: fullLoan.thirdPartyId,
+                creditStartDate: fullLoan.creditStartDate,
+                principalAmount: fullLoan.principalAmount,
+              },
+              installments: nextInstallments.map((item) => ({
+                installmentNumber: item.installmentNumber,
+                dueDate: item.dueDate,
+                principalAmount: item.principalAmount,
+                interestAmount: item.interestAmount,
+                insuranceAmount: item.insuranceAmount,
+              })),
+              distributionLines,
+              loanConceptSnapshots: fullLoan.loanBillingConcepts,
+              documentCode: adjustmentDocumentCode,
+              entryDate: record.responseDate,
+              sourceType: 'MANUAL_ADJUSTMENT',
+              sourceId: String(loan.id),
+              startingSequence:
+                Math.max(0, ...existingAdjustmentEntries.map((item) => item.sequence)) +
+                1 +
+                currentActiveCreditEntries.length,
+              freezeComputedOneTimeAmounts: true,
+            });
+
+            valueChangedAdjustment = !areEntryValuesEquivalent(
+              currentActiveCreditEntries,
+              rebuiltArtifacts.accountingEntriesPayload
+            );
+
+            if (!valueChangedAdjustment) {
+              const dueDates = nextInstallments.map((item) => item.dueDate);
+
+              for (let index = 0; index < dueDates.length; index++) {
+                const installmentNumber = index + 1;
+                const nextDueDate = dueDates[index]!;
+
+                await tx
+                  .update(loanInstallments)
+                  .set({
+                    dueDate: nextDueDate,
+                    updatedAt: new Date(),
+                  })
+                  .where(
+                    and(
+                      eq(loanInstallments.loanId, loan.id),
+                      eq(loanInstallments.installmentNumber, installmentNumber),
+                      inArray(loanInstallments.status, ['ACCOUNTED', 'GENERATED', 'CAUSED'])
+                    )
+                  );
+
+                await tx
+                  .update(portfolioEntries)
+                  .set({
+                    dueDate: nextDueDate,
+                    updatedAt: new Date(),
+                  })
+                  .where(
+                    and(
+                      eq(portfolioEntries.loanId, loan.id),
+                      eq(portfolioEntries.installmentNumber, installmentNumber)
+                    )
+                  );
+
+                await tx
+                  .update(accountingEntries)
+                  .set({
+                    dueDate: nextDueDate,
+                    updatedAt: new Date(),
+                  })
+                  .where(
+                    and(
+                      eq(accountingEntries.loanId, loan.id),
+                      eq(accountingEntries.installmentNumber, installmentNumber),
+                      eq(accountingEntries.processType, 'CREDIT'),
+                      inArray(accountingEntries.status, ['DRAFT', 'ACCOUNTED'])
+                    )
+                  );
+              }
+            } else {
+              valueChangedAdjustments += 1;
+
+              const reversalEntries: Array<typeof accountingEntries.$inferInsert> =
+                currentActiveCreditEntries.map((entry, index) => ({
+                  processType: 'CREDIT',
+                  documentCode: adjustmentDocumentCode,
+                  sequence:
+                    Math.max(0, ...existingAdjustmentEntries.map((item) => item.sequence)) + index + 1,
+                  entryDate: record.responseDate,
+                  glAccountId: entry.glAccountId,
+                  costCenterId: entry.costCenterId,
+                  thirdPartyId: entry.thirdPartyId ?? fullLoan.thirdPartyId,
+                  description: `Reversa novedad desembolso ${fullLoan.creditNumber}`.slice(0, 255),
+                  nature: entry.nature === 'DEBIT' ? 'CREDIT' : 'DEBIT',
+                  amount: entry.amount,
+                  loanId: entry.loanId,
+                  installmentNumber: entry.installmentNumber,
+                  dueDate: entry.dueDate,
+                  status: 'DRAFT',
+                  statusDate: record.responseDate,
+                  sourceType: 'MANUAL_ADJUSTMENT',
+                  sourceId: String(loan.id),
+                  reversalOfEntryId: entry.id,
+                  processRunId: null,
+                }));
+
+              const existingPortfolio = await tx.query.portfolioEntries.findMany({
+                where: eq(portfolioEntries.loanId, loan.id),
+              });
+
+              await tx.insert(accountingEntries).values([
+                ...reversalEntries,
+                ...rebuiltArtifacts.accountingEntriesPayload,
+              ]);
 
               await tx
                 .update(accountingEntries)
                 .set({
-                  dueDate: nextDueDate,
-                  updatedAt: new Date(),
+                  status: 'VOIDED',
+                  statusDate: record.responseDate,
                 })
                 .where(
-                  and(
-                    eq(accountingEntries.loanId, loan.id),
-                    eq(accountingEntries.installmentNumber, installmentNumber),
-                    eq(accountingEntries.processType, 'CREDIT')
+                  inArray(
+                    accountingEntries.id,
+                    currentActiveCreditEntries.map((item) => item.id)
                   )
                 );
+
+              await applyPortfolioDeltas(tx, {
+                movementDate: record.responseDate,
+                deltas: [
+                  ...existingPortfolio.map((entry) => ({
+                    glAccountId: entry.glAccountId,
+                    thirdPartyId: entry.thirdPartyId,
+                    loanId: entry.loanId,
+                    installmentNumber: entry.installmentNumber,
+                    dueDate: entry.dueDate,
+                    chargeDelta: -toNumber(entry.chargeAmount),
+                    paymentDelta: -toNumber(entry.paymentAmount),
+                  })),
+                  ...rebuiltArtifacts.portfolioDeltas,
+                ],
+              });
+
+              for (const installment of nextInstallments) {
+                await tx
+                  .update(loanInstallments)
+                  .set({
+                    dueDate: installment.dueDate,
+                    principalAmount: installment.principalAmount,
+                    interestAmount: installment.interestAmount,
+                    insuranceAmount: installment.insuranceAmount,
+                    remainingPrincipal: installment.remainingPrincipal,
+                    status: 'GENERATED',
+                    updatedAt: new Date(),
+                  })
+                  .where(
+                    and(
+                      eq(loanInstallments.loanId, loan.id),
+                      eq(loanInstallments.installmentNumber, installment.installmentNumber)
+                    )
+                  );
+              }
+
+              await tx
+                .update(loans)
+                .set({
+                  initialTotalAmount: toDecimalString(schedule.summary.totalPayment),
+                  insuranceValue: toDecimalString(schedule.summary.totalInsurance),
+                  updatedAt: new Date(),
+                })
+                .where(eq(loans.id, loan.id));
             }
           }
 
@@ -805,6 +1229,11 @@ export const bankFile = tsr.router(contract.bankFile, {
               rowNumber: record.rowNumber,
               amount: previewRow.amount,
               changeFirstCollectionDate: wantsDateChange,
+              adjustmentMode: wantsDateChange
+                ? valueChangedAdjustment
+                  ? 'VALUE_CHANGE'
+                  : 'DATES_ONLY'
+                : 'NONE',
             },
           });
 
@@ -828,6 +1257,10 @@ export const bankFile = tsr.router(contract.bankFile, {
                 rowNumber: record.rowNumber,
                 previousFirstCollectionDate: loan.firstCollectionDate,
                 newFirstCollectionDate: nextFirstCollectionDate,
+                adjustmentMode: valueChangedAdjustment ? 'VALUE_CHANGE' : 'DATES_ONLY',
+                previousInitialTotalAmount: valueChangedAdjustment
+                  ? null
+                  : undefined,
               },
             });
           }
@@ -884,7 +1317,7 @@ export const bankFile = tsr.router(contract.bankFile, {
           summary,
           rows: processedRows,
           message: summary.dateAdjustmentRecords
-            ? `Se procesaron ${summary.processedRecords} registros. ${summary.dateAdjustmentRecords} crédito(s) quedaron marcados como novedad de desembolso para ajuste contable.`
+            ? `Se procesaron ${summary.processedRecords} registros. ${summary.dateAdjustmentRecords} crédito(s) quedaron marcados como novedad de desembolso para ajuste contable${valueChangedAdjustments ? `, ${valueChangedAdjustments} con reliquidación de valores` : ''}.`
             : `Se procesaron ${summary.processedRecords} registros de novedades del banco.`,
         },
       };

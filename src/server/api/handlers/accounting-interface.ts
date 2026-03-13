@@ -240,6 +240,39 @@ async function processDisbursementAdjustments(
         processedRecords = loansToProcess.length;
 
         await tx
+          .update(accountingEntries)
+          .set({
+            status: 'ACCOUNTED',
+            statusDate: transactionDate,
+          })
+          .where(
+            and(
+              inArray(
+                accountingEntries.loanId,
+                loansToProcess.map((item) => item.id)
+              ),
+              eq(accountingEntries.processType, 'CREDIT'),
+              eq(accountingEntries.sourceType, 'MANUAL_ADJUSTMENT'),
+              eq(accountingEntries.status, 'DRAFT')
+            )
+          );
+
+        await tx
+          .update(loanInstallments)
+          .set({
+            status: 'ACCOUNTED',
+          })
+          .where(
+            and(
+              inArray(
+                loanInstallments.loanId,
+                loansToProcess.map((item) => item.id)
+              ),
+              eq(loanInstallments.status, 'GENERATED')
+            )
+          );
+
+        await tx
           .update(loans)
           .set({
             hasPendingDisbursementAdjustment: false,
@@ -273,6 +306,7 @@ async function processDisbursementAdjustments(
               metadata: {
                 interfaceType: 'DISBURSEMENT_ADJUSTMENTS',
                 transactionDate,
+                accountedDraftAdjustments: true,
               },
             })
           )

@@ -24,6 +24,10 @@ export function buildLiquidationDocumentCode(loanId: number): string {
   return buildNumericDocumentCode('L', loanId);
 }
 
+export function buildDisbursementAdjustmentDocumentCode(loanId: number): string {
+  return buildNumericDocumentCode('A', loanId);
+}
+
 export function buildPaymentDocumentCode(loanPaymentId: number): string {
   return buildNumericDocumentCode('R', loanPaymentId);
 }

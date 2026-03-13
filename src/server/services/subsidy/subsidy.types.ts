@@ -32,6 +32,7 @@ export type SubsidyWorker = {
 };
 
 export type SubsidyBeneficiary = {
+  beneficiaryCode: string | null;
   fullName: string;
   documentNumber: string | null;
   identificationTypeCode: string | null;

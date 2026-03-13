@@ -126,6 +126,7 @@ export function LoanApplicationForm({
   const [showAmortizationPreview, setShowAmortizationPreview] = useState(false);
   const [thirdPartySearch, setThirdPartySearch] = useState('');
   const [debouncedThirdPartySearch] = useDebounce(thirdPartySearch.trim(), 350);
+  const lastPledgeThirdPartyIdRef = useRef<number | undefined>(undefined);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(CreateLoanApplicationBodySchema) as Resolver<FormValues>,
@@ -138,6 +139,7 @@ export function LoanApplicationForm({
       repaymentMethodId: null,
       paymentGuaranteeTypeId: null,
       pledgesSubsidy: false,
+      pledgesEffectiveDate: null,
       salary: '0',
       otherIncome: '0',
       otherCredits: '0',
@@ -146,7 +148,7 @@ export function LoanApplicationForm({
       bankAccountType: 'SAVINGS',
       bankId: undefined,
       creditProductId: undefined,
-      paymentFrequencyId: null,
+      paymentFrequencyId: undefined,
       installments: 12,
       insuranceCompanyId: null,
       requestedAmount: '0',
@@ -554,12 +556,15 @@ export function LoanApplicationForm({
       bankAccountType: loanApplication?.bankAccountType ?? 'SAVINGS',
       bankId: loanApplication?.bankId ?? undefined,
       creditProductId: loanApplication?.creditProductId ?? undefined,
-      paymentFrequencyId: loanApplication?.paymentFrequencyId ?? null,
+      paymentFrequencyId: loanApplication?.paymentFrequencyId ?? undefined,
       installments: loanApplication?.installments ?? 12,
       insuranceCompanyId: loanApplication?.insuranceCompanyId ?? null,
       requestedAmount: String(loanApplication?.requestedAmount ?? '0'),
       investmentTypeId: loanApplication?.investmentTypeId ?? undefined,
       agreementId: loanApplication?.agreementId ?? null,
+      pledgesEffectiveDate: loanApplication?.loanApplicationPledges?.[0]?.effectiveDate
+        ? new Date(`${loanApplication.loanApplicationPledges[0].effectiveDate}T00:00:00`)
+        : null,
       note: loanApplication?.note ?? '',
       loanApplicationCoDebtors:
         loanApplication?.loanApplicationCoDebtors
@@ -575,13 +580,12 @@ export function LoanApplicationForm({
         })) ?? [],
       loanApplicationPledges:
         loanApplication?.loanApplicationPledges?.map((item) => ({
-          pledgeCode: item.pledgeCode,
-          documentNumber: item.documentNumber ?? '',
+          documentNumber: item.documentNumber ?? null,
           beneficiaryCode: item.beneficiaryCode,
           pledgedAmount: String(item.pledgedAmount),
-          effectiveDate: new Date(`${item.effectiveDate}T00:00:00`),
         })) ?? [],
     });
+    lastPledgeThirdPartyIdRef.current = loanApplication?.thirdPartyId ?? undefined;
   }, [opened, loanApplication, form]);
 
   useEffect(() => {
@@ -600,6 +604,42 @@ export function LoanApplicationForm({
     if (selectedCreditProduct?.paysInsurance) return;
     form.setValue('insuranceCompanyId', null);
   }, [form, selectedCreditProduct?.paysInsurance]);
+
+  useEffect(() => {
+    if (!opened) return;
+
+    if (!pledgesSubsidy) {
+      if ((form.getValues('loanApplicationPledges') ?? []).length > 0) {
+        form.setValue('loanApplicationPledges', [], { shouldDirty: true, shouldValidate: true });
+      }
+      if (form.getValues('pledgesEffectiveDate')) {
+        form.setValue('pledgesEffectiveDate', null, { shouldDirty: true, shouldValidate: true });
+      }
+      if (activeTab === 'pledges') {
+        setActiveTab('application');
+      }
+    }
+  }, [activeTab, form, opened, pledgesSubsidy]);
+
+  useEffect(() => {
+    if (!opened) return;
+
+    const previousThirdPartyId = lastPledgeThirdPartyIdRef.current;
+    if (previousThirdPartyId === undefined) {
+      lastPledgeThirdPartyIdRef.current = selectedThirdPartyId;
+      return;
+    }
+
+    if (previousThirdPartyId !== selectedThirdPartyId) {
+      form.setValue('loanApplicationPledges', [], { shouldDirty: true, shouldValidate: true });
+      form.setValue('pledgesEffectiveDate', null, { shouldDirty: true, shouldValidate: true });
+      if (activeTab === 'pledges') {
+        setActiveTab('application');
+      }
+    }
+
+    lastPledgeThirdPartyIdRef.current = selectedThirdPartyId;
+  }, [activeTab, form, opened, selectedThirdPartyId]);
 
   useEffect(() => {
     form.setValue('paymentCapacity', calculatedPaymentCapacity.toFixed(2), {
@@ -687,7 +727,14 @@ export function LoanApplicationForm({
         values.pledgesSubsidy &&
         (!values.loanApplicationPledges || values.loanApplicationPledges.length === 0)
       ) {
+        setActiveTab('pledges');
         toast.error('Debe agregar al menos una pignoracion');
+        return;
+      }
+
+      if (values.pledgesSubsidy && !values.pledgesEffectiveDate) {
+        setActiveTab('pledges');
+        toast.error('Debe indicar la fecha para empezar a pignorar');
         return;
       }
 

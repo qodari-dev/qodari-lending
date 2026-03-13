@@ -134,15 +134,22 @@ function mapWorker(params: {
 
 function mapBeneficiary(record: SyseuFamilyMemberRecord): SubsidyBeneficiary {
   const birthDate = parseDateToISO(record.fecha_nacimiento);
+  const documentNumber = normalizeAlphanumericDocument(record.numero_identificacion);
+  const beneficiaryCode =
+    record.codigo_beneficiario?.trim() ||
+    record.beneficiary_code?.trim() ||
+    record.beneficiaryCode?.trim() ||
+    documentNumber;
 
   return {
+    beneficiaryCode: beneficiaryCode || null,
     fullName: buildFullName([
       record.primer_nombre,
       record.segundo_nombre,
       record.primer_apellido,
       record.segundo_apellido,
     ]),
-    documentNumber: normalizeAlphanumericDocument(record.numero_identificacion),
+    documentNumber,
     identificationTypeCode: record.tipo_identificacion?.trim() || null,
     relationship: record.parentesco?.trim() || null,
     relatedSpouseDocumentNumber: normalizeAlphanumericDocument(record.conyuge_relacionada),

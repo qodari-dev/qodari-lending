@@ -45,10 +45,11 @@ import { cn } from '@/lib/utils';
 import {
   FinalApproveLoanApplicationBodySchema,
   LoanApplication,
+  StepApproveLoanApplicationBodySchema,
 } from '@/schemas/loan-application';
 import { ThirdParty } from '@/schemas/third-party';
 import { useHasPermission } from '@/stores/auth-store-provider';
-import { formatDate } from '@/utils/formatters';
+import { formatDate, formatDateTime } from '@/utils/formatters';
 import { resolveSuggestedFirstCollectionDate } from '@/utils/payment-frequency';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -57,15 +58,120 @@ import React from 'react';
 import { Controller, type Resolver, useForm } from 'react-hook-form';
 import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
+import { Textarea } from '@/components/ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-type ApproveFormValues = z.infer<typeof FinalApproveLoanApplicationBodySchema>;
+type ApproveFormValues = {
+  mode: 'FINAL' | 'STEP';
+  repaymentMethodId?: number;
+  paymentGuaranteeTypeId?: number;
+  isInsuranceApproved?: boolean;
+  approvedInstallments?: number;
+  approvedAmount: string;
+  actNumber: string;
+  payeeThirdPartyId?: number;
+  firstCollectionDate: Date;
+  approvalNote?: string;
+};
+
+const approvalActionLabels: Record<string, string> = {
+  ASSIGNED: 'Asignada',
+  REASSIGNED: 'Reasignada',
+  APPROVED_FORWARD: 'Aprobada y enviada',
+  APPROVED_FINAL: 'Aprobada final',
+  REJECTED: 'Rechazada',
+  CANCELED: 'Cancelada',
+};
+
+function readMetadataValue(
+  metadata: Record<string, unknown> | null | undefined,
+  key: string
+): string | null {
+  const value = metadata?.[key];
+  if (value === null || value === undefined || value === '') return null;
+  return String(value);
+}
+
+function renderApprovalMetadata(item: NonNullable<LoanApplication['loanApplicationApprovalHistory']>[number]) {
+  const metadata = (item.metadata ?? null) as Record<string, unknown> | null;
+  if (!metadata) return null;
+
+  const lines: string[] = [];
+
+  if (item.action === 'REASSIGNED') {
+    const strategy = readMetadataValue(metadata, 'strategy');
+    if (strategy === 'TO_USER') {
+      lines.push('Estrategia: Reasignacion manual');
+    } else if (strategy === 'ROUND_ROBIN') {
+      lines.push('Estrategia: Round robin');
+    }
+    if (item.assignedToUserName || item.assignedToUserId) {
+      lines.push(`Asignado a: ${item.assignedToUserName ?? item.assignedToUserId}`);
+    }
+  }
+
+  if (item.action === 'ASSIGNED' || item.action === 'APPROVED_FORWARD') {
+    if (item.assignedToUserName || item.assignedToUserId) {
+      lines.push(`Asignado a: ${item.assignedToUserName ?? item.assignedToUserId}`);
+    }
+  }
+
+  const repaymentMethodName = readMetadataValue(metadata, 'repaymentMethodName');
+  if (repaymentMethodName) {
+    lines.push(`Forma de pago: ${repaymentMethodName}`);
+  }
+
+  const paymentGuaranteeTypeName = readMetadataValue(metadata, 'paymentGuaranteeTypeName');
+  if (paymentGuaranteeTypeName) {
+    lines.push(`Garantia de pago: ${paymentGuaranteeTypeName}`);
+  }
+
+  const approvedAmount = readMetadataValue(metadata, 'approvedAmount');
+  if (approvedAmount) {
+    lines.push(`Valor aprobado: ${approvedAmount}`);
+  }
+
+  const approvedInstallments = readMetadataValue(metadata, 'approvedInstallments');
+  if (approvedInstallments) {
+    lines.push(`Cuotas aprobadas: ${approvedInstallments}`);
+  }
+
+  const actNumber = readMetadataValue(metadata, 'actNumber');
+  if (actNumber) {
+    lines.push(`Acta: ${actNumber}`);
+  }
+
+  const isInsuranceApproved = metadata?.isInsuranceApproved;
+  if (typeof isInsuranceApproved === 'boolean') {
+    lines.push(`Seguro aprobado: ${isInsuranceApproved ? 'Si' : 'No'}`);
+  }
+
+  const loanId = readMetadataValue(metadata, 'loanId');
+  if (loanId && item.action === 'APPROVED_FINAL') {
+    lines.push(`Credito generado: ${loanId}`);
+  }
+
+  if (!lines.length) return null;
+
+  return (
+    <div className="space-y-1">
+      {lines.map((line) => (
+        <p key={line} className="text-muted-foreground text-xs">
+          {line}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 export function LoanApplicationApproveDialog({
+  mode,
   loanApplication,
   opened,
   onOpened,
   onApproved,
 }: {
+  mode: 'FINAL' | 'STEP';
   loanApplication: LoanApplication | undefined;
   opened: boolean;
   onOpened(opened: boolean): void;
@@ -76,12 +182,17 @@ export function LoanApplicationApproveDialog({
   const [thirdPartySearch, setThirdPartySearch] = React.useState('');
   const [debouncedThirdPartySearch] = useDebounce(thirdPartySearch.trim(), 350);
   const [pinnedThirdParty, setPinnedThirdParty] = React.useState<ThirdParty | null>(null);
+  const [openedHistoryDialog, setOpenedHistoryDialog] = React.useState(false);
+  const validationSchema = React.useMemo(
+    () => (mode === 'FINAL' ? FinalApproveLoanApplicationBodySchema : StepApproveLoanApplicationBodySchema),
+    [mode]
+  );
 
   const form = useForm<ApproveFormValues>({
-    resolver: zodResolver(FinalApproveLoanApplicationBodySchema) as Resolver<ApproveFormValues>,
+    resolver: zodResolver(validationSchema) as Resolver<ApproveFormValues>,
     mode: 'onChange',
     defaultValues: {
-      mode: 'FINAL',
+      mode,
       repaymentMethodId: undefined,
       paymentGuaranteeTypeId: undefined,
       isInsuranceApproved: false,
@@ -90,6 +201,7 @@ export function LoanApplicationApproveDialog({
       actNumber: '',
       payeeThirdPartyId: undefined,
       firstCollectionDate: new Date(),
+      approvalNote: '',
     },
   });
 
@@ -171,17 +283,18 @@ export function LoanApplicationApproveDialog({
     }
 
     form.reset({
-      mode: 'FINAL',
+      mode,
       repaymentMethodId: loanApplication.repaymentMethodId ?? undefined,
       paymentGuaranteeTypeId: loanApplication.paymentGuaranteeTypeId ?? undefined,
-      isInsuranceApproved: loanApplication.creditProduct?.paysInsurance ?? false,
-      approvedInstallments: loanApplication.installments ?? 1,
-      approvedAmount: String(loanApplication.requestedAmount ?? '0'),
-      actNumber: '',
+      isInsuranceApproved: loanApplication.isInsuranceApproved ?? loanApplication.creditProduct?.paysInsurance ?? false,
+      approvedInstallments: loanApplication.approvedInstallments ?? loanApplication.installments ?? 1,
+      approvedAmount: String(loanApplication.approvedAmount ?? loanApplication.requestedAmount ?? '0'),
+      actNumber: loanApplication.actNumber ?? '',
       payeeThirdPartyId: loanApplication.thirdPartyId ?? undefined,
       firstCollectionDate: suggestedFirstCollectionDate,
+      approvalNote: '',
     });
-  }, [form, loanApplication, opened, suggestedFirstCollectionDate]);
+  }, [form, loanApplication, mode, opened, suggestedFirstCollectionDate]);
 
   React.useEffect(() => {
     if (!opened || !loanApplication) return;
@@ -203,13 +316,38 @@ export function LoanApplicationApproveDialog({
   async function onSubmit(values: ApproveFormValues) {
     if (!loanApplication?.id) return;
 
+    if (mode === 'STEP') {
+      await approveLoanApplication({
+        params: { id: loanApplication.id },
+        body: {
+          mode: 'STEP',
+          repaymentMethodId: values.repaymentMethodId!,
+          paymentGuaranteeTypeId: values.paymentGuaranteeTypeId!,
+          isInsuranceApproved: values.isInsuranceApproved,
+          approvedInstallments: values.approvedInstallments!,
+          approvedAmount: values.approvedAmount.trim(),
+          actNumber: values.actNumber.trim(),
+          approvalNote: values.approvalNote?.trim() ?? '',
+        },
+      });
+
+      onOpened(false);
+      onApproved?.();
+      return;
+    }
+
     await approveLoanApplication({
       params: { id: loanApplication.id },
       body: {
-        ...values,
         mode: 'FINAL',
+        repaymentMethodId: values.repaymentMethodId!,
+        paymentGuaranteeTypeId: values.paymentGuaranteeTypeId!,
+        isInsuranceApproved: values.isInsuranceApproved,
+        approvedInstallments: values.approvedInstallments!,
         approvedAmount: values.approvedAmount.trim(),
         actNumber: values.actNumber.trim(),
+        payeeThirdPartyId: values.payeeThirdPartyId!,
+        firstCollectionDate: values.firstCollectionDate,
       },
     });
 
@@ -220,12 +358,17 @@ export function LoanApplicationApproveDialog({
   const open = opened && !!loanApplication;
 
   return (
-    <Dialog open={open} onOpenChange={onOpened}>
-      <DialogContent ref={dialogContentRef} className="sm:max-w-xl">
+    <>
+      <Dialog open={open} onOpenChange={onOpened}>
+        <DialogContent ref={dialogContentRef} className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Aprobar solicitud</DialogTitle>
+          <DialogTitle>
+            {mode === 'FINAL' ? 'Aprobacion final de solicitud' : 'Aprobar y enviar al siguiente nivel'}
+          </DialogTitle>
           <DialogDescription>
-            Complete los datos de aprobacion para generar el credito y su tabla de amortizacion.
+            {mode === 'FINAL'
+              ? 'Complete los datos de aprobacion para generar el credito y su tabla de amortizacion.'
+              : 'Guarde la propuesta de aprobacion y envie la solicitud al siguiente nivel.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -242,7 +385,7 @@ export function LoanApplicationApproveDialog({
               name="repaymentMethodId"
               control={form.control}
               render={({ field, fieldState }) => (
-                <div className="space-y-2">
+                <div className="col-span-2 space-y-2">
                   <Label htmlFor="approveRepaymentMethodId">Forma de pago</Label>
                   <Select
                     value={field.value ? String(field.value) : ''}
@@ -270,7 +413,7 @@ export function LoanApplicationApproveDialog({
               name="paymentGuaranteeTypeId"
               control={form.control}
               render={({ field, fieldState }) => (
-                <div className="space-y-2">
+                <div className="col-span-2 space-y-2">
                   <Label htmlFor="approvePaymentGuaranteeTypeId">Garantia de pago</Label>
                   <Select
                     value={field.value ? String(field.value) : ''}
@@ -298,7 +441,7 @@ export function LoanApplicationApproveDialog({
               name="actNumber"
               control={form.control}
               render={({ field, fieldState }) => (
-                <div className="space-y-2">
+                <div className="col-span-2 space-y-2">
                   <Label htmlFor="approveActNumber">Acta</Label>
                   <Select
                     value={field.value}
@@ -324,6 +467,27 @@ export function LoanApplicationApproveDialog({
                 </div>
               )}
             />
+
+            {mode === 'STEP' ? (
+              <Controller
+                name="approvalNote"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="approveStepNote">Nota de aprobacion</Label>
+                    <Textarea
+                      id="approveStepNote"
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      placeholder="Ingrese observaciones para el siguiente nivel..."
+                    />
+                    {fieldState.error ? (
+                      <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                    ) : null}
+                  </div>
+                )}
+              />
+            ) : null}
 
             {loanApplication?.creditProduct?.paysInsurance ? (
               <Controller
@@ -393,114 +557,129 @@ export function LoanApplicationApproveDialog({
               )}
             />
 
-            <Controller
-              name="payeeThirdPartyId"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <div className="col-span-2 space-y-2">
-                  <Label>Tercero desembolso</Label>
-                  <Combobox
-                    items={thirdParties}
-                    value={thirdParties.find((item) => item.id === field.value) ?? null}
-                    filter={null}
-                    onOpenChange={(isOpen) => {
-                      if (!isOpen) setThirdPartySearch('');
-                    }}
-                    onInputValueChange={(value, details) => {
-                      if (
-                        details.reason === 'input-change' ||
-                        details.reason === 'input-clear'
-                      ) {
-                        setThirdPartySearch(value);
-                      }
-                    }}
-                    onValueChange={(value: ThirdParty | null) => {
-                      field.onChange(value?.id ?? undefined);
-                      if (value) setPinnedThirdParty(value);
-                    }}
-                    itemToStringValue={(item: ThirdParty) => String(item.id)}
-                    itemToStringLabel={(item: ThirdParty) =>
-                      `${getThirdPartyLabel(item)} (${item.documentNumber})`
-                    }
-                  >
-                    <ComboboxTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full justify-between font-normal"
-                        >
-                          <ComboboxValue placeholder="Seleccione..." />
-                          <ChevronDownIcon className="text-muted-foreground size-4" />
-                        </Button>
-                      }
-                    />
-                    <ComboboxContent portalContainer={dialogContentRef}>
-                      <ComboboxInput
-                        placeholder="Buscar tercero..."
-                        showClear
-                        showTrigger={false}
-                      />
-                      <ComboboxList>
-                        <ComboboxEmpty>No se encontraron terceros</ComboboxEmpty>
-                        <ComboboxCollection>
-                          {(item: ThirdParty) => (
-                            <ComboboxItem key={item.id} value={item}>
-                              {getThirdPartyLabel(item)} ({item.documentNumber})
-                            </ComboboxItem>
-                          )}
-                        </ComboboxCollection>
-                      </ComboboxList>
-                    </ComboboxContent>
-                  </Combobox>
-                  {fieldState.error ? (
-                    <p className="text-destructive text-xs">{fieldState.error.message}</p>
-                  ) : null}
-                </div>
-              )}
-            />
-
-            <Controller
-              name="firstCollectionDate"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <div className="space-y-2">
-                  <Label htmlFor="approveFirstCollectionDate">Fecha primer recaudo</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="approveFirstCollectionDate"
-                        type="button"
-                        variant="outline"
-                        className={cn(
-                          'w-full justify-start text-left font-normal',
-                          !field.value && 'text-muted-foreground'
-                        )}
+            {mode === 'FINAL' ? (
+              <>
+                <Controller
+                  name="payeeThirdPartyId"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <div className="col-span-2 space-y-2">
+                      <Label>Tercero desembolso</Label>
+                      <Combobox
+                        items={thirdParties}
+                        value={thirdParties.find((item) => item.id === field.value) ?? null}
+                        filter={null}
+                        onOpenChange={(isOpen) => {
+                          if (!isOpen) setThirdPartySearch('');
+                        }}
+                        onInputValueChange={(value, details) => {
+                          if (
+                            details.reason === 'input-change' ||
+                            details.reason === 'input-clear'
+                          ) {
+                            setThirdPartySearch(value);
+                          }
+                        }}
+                        onValueChange={(value: ThirdParty | null) => {
+                          field.onChange(value?.id ?? undefined);
+                          if (value) setPinnedThirdParty(value);
+                        }}
+                        itemToStringValue={(item: ThirdParty) => String(item.id)}
+                        itemToStringLabel={(item: ThirdParty) =>
+                          `${getThirdPartyLabel(item)} (${item.documentNumber})`
+                        }
                       >
-                        <CalendarIcon className="mr-2 size-4" />
-                        {field.value ? formatDate(field.value) : 'Seleccione fecha'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={(value) => field.onChange(value)}
-                        disabled={(date) => date < suggestedFirstCollectionDate}
-                        captionLayout="dropdown"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <p className="text-muted-foreground text-xs">
-                    Sugerida desde {formatDate(suggestedFirstCollectionDate)} (mínimo{' '}
-                    {minimumDaysBeforeFirstCollection} días).
-                  </p>
-                  {fieldState.error ? (
-                    <p className="text-destructive text-xs">{fieldState.error.message}</p>
-                  ) : null}
-                </div>
-              )}
-            />
+                        <ComboboxTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full justify-between font-normal"
+                            >
+                              <ComboboxValue placeholder="Seleccione..." />
+                              <ChevronDownIcon className="text-muted-foreground size-4" />
+                            </Button>
+                          }
+                        />
+                        <ComboboxContent portalContainer={dialogContentRef}>
+                          <ComboboxInput
+                            placeholder="Buscar tercero..."
+                            showClear
+                            showTrigger={false}
+                          />
+                          <ComboboxList>
+                            <ComboboxEmpty>No se encontraron terceros</ComboboxEmpty>
+                            <ComboboxCollection>
+                              {(item: ThirdParty) => (
+                                <ComboboxItem key={item.id} value={item}>
+                                  {getThirdPartyLabel(item)} ({item.documentNumber})
+                                </ComboboxItem>
+                              )}
+                            </ComboboxCollection>
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
+                      {fieldState.error ? (
+                        <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                      ) : null}
+                    </div>
+                  )}
+                />
+
+                <Controller
+                  name="firstCollectionDate"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="approveFirstCollectionDate">Fecha primer recaudo</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            id="approveFirstCollectionDate"
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              'w-full justify-start text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 size-4" />
+                            {field.value ? formatDate(field.value) : 'Seleccione fecha'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={(value) => field.onChange(value)}
+                            disabled={(date) => date < suggestedFirstCollectionDate}
+                            captionLayout="dropdown"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <p className="text-muted-foreground text-xs">
+                        Sugerida desde {formatDate(suggestedFirstCollectionDate)} (mínimo{' '}
+                        {minimumDaysBeforeFirstCollection} días).
+                      </p>
+                      {fieldState.error ? (
+                        <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                      ) : null}
+                    </div>
+                  )}
+                />
+              </>
+            ) : null}
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenedHistoryDialog(true)}
+            >
+              Ver historial completo
+            </Button>
           </div>
 
           <DialogFooter>
@@ -509,11 +688,62 @@ export function LoanApplicationApproveDialog({
             </Button>
             <Button type="submit" disabled={isApproving || !form.formState.isValid}>
               {isApproving && <Spinner />}
-              Aprobar solicitud
+              {mode === 'FINAL' ? 'Aprobar solicitud' : 'Aprobar y continuar'}
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+
+        </DialogContent>
+      </Dialog>
+      {openedHistoryDialog ? (
+        <Dialog open={openedHistoryDialog} onOpenChange={setOpenedHistoryDialog}>
+          <DialogContent className="sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Historial completo de aprobacion</DialogTitle>
+            <DialogDescription>
+              Revise notas, usuarios y metadata registrada por cada nivel.
+            </DialogDescription>
+          </DialogHeader>
+
+          {loanApplication?.loanApplicationApprovalHistory?.length ? (
+            <div className="max-h-[70vh] overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Accion</TableHead>
+                    <TableHead>Nivel</TableHead>
+                    <TableHead>Usuario</TableHead>
+                    <TableHead>Nota</TableHead>
+                    <TableHead>Metadata</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loanApplication.loanApplicationApprovalHistory.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{formatDateTime(item.occurredAt)}</TableCell>
+                      <TableCell>{approvalActionLabels[item.action] ?? item.action}</TableCell>
+                      <TableCell>{item.level?.name ?? '-'}</TableCell>
+                      <TableCell>{item.actorUserName ?? item.actorUserId ?? '-'}</TableCell>
+                      <TableCell className="max-w-80 whitespace-pre-wrap break-words">
+                        {item.note ?? '-'}
+                      </TableCell>
+                      <TableCell className="max-w-96 align-top">
+                        {renderApprovalMetadata(item) ?? '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+              No hay historial de aprobacion registrado.
+            </div>
+          )}
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </>
   );
 }

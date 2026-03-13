@@ -60,10 +60,12 @@ function mapBeneficiary(record: ComfenalcoBeneficiaryRecord): SubsidyBeneficiary
   const fallecimiento = String(record.fallecimiento ?? '')
     .trim()
     .toUpperCase();
+  const documentNumber = normalizeDigitsOnly(record.ndAfiliado);
 
   return {
+    beneficiaryCode: documentNumber,
     fullName: buildFullName([record.nombre1, record.nombre2, record.apellido1, record.apellido2]),
-    documentNumber: normalizeDigitsOnly(record.ndAfiliado),
+    documentNumber,
     identificationTypeCode: record.tdAfiliado?.trim() || null,
     relationship: record.parentesco?.trim() || null,
     relatedSpouseDocumentNumber: null,

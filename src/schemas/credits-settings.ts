@@ -54,6 +54,7 @@ export const UpdateCreditsSettingsBodySchema = z.object({
   companyName: z.string().max(255).nullable().optional(),
   companyAddress: z.string().max(255).nullable().optional(),
   companyPhone: z.string().max(20).nullable().optional(),
+  pledgeSubsidyCode: z.string().max(20).nullable().optional(),
 
   // GL Accounts
   cashGlAccountId: z.number().nullable().optional(),

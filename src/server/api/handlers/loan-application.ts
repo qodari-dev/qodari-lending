@@ -81,6 +81,10 @@ import {
   recordRejectedOrCanceled,
   assignInitialApproval,
 } from '@/server/services/loan-applications/loan-application-approval-service';
+import {
+  getSubsidyCurrentPeriod,
+  getSubsidyWorkerStudy,
+} from '@/server/services/subsidy/subsidy-service';
 
 type LoanApplicationColumn = keyof typeof loanApplications.$inferSelect;
 
@@ -93,6 +97,7 @@ const LOAN_APPLICATION_FIELDS: FieldMap = {
   agreementId: loanApplications.agreementId,
   creditProductId: loanApplications.creditProductId,
   requestedAmount: loanApplications.requestedAmount,
+  approvedInstallments: loanApplications.approvedInstallments,
   assignedApprovalUserId: loanApplications.assignedApprovalUserId,
   createdAt: loanApplications.createdAt,
   updatedAt: loanApplications.updatedAt,
@@ -505,6 +510,40 @@ async function validateLoanApplicationAgreement(args: {
   return agreement;
 }
 
+async function getPledgeSubsidyCodeSetting() {
+  const settings = await db.query.creditsSettings.findFirst({
+    where: eq(creditsSettings.appSlug, env.IAM_APP_SLUG),
+    columns: {
+      pledgeSubsidyCode: true,
+    },
+  });
+
+  const pledgeCode = settings?.pledgeSubsidyCode?.trim() || null;
+  if (!pledgeCode) {
+    throwHttpError({
+      status: 400,
+      message:
+        'No existe codigo de pignoracion configurado en créditos. Actualice credit settings antes de guardar',
+      code: 'BAD_REQUEST',
+    });
+  }
+
+  return pledgeCode;
+}
+
+function buildFallbackBeneficiaryCode(params: {
+  documentNumber: string | null;
+  spouseDocumentNumber: string | null;
+  fullName: string;
+  index: number;
+}) {
+  if (params.documentNumber) return params.documentNumber;
+  return `BEN-${params.spouseDocumentNumber ?? 'SINCONYUGE'}-${params.index + 1}-${params.fullName
+    .trim()
+    .replace(/\s+/g, '-')
+    .toUpperCase()}`;
+}
+
 function generateCreditNumber(prefix: string): string {
   const now = new Date();
   const yy = String(now.getFullYear()).slice(-2);
@@ -903,6 +942,152 @@ export const loanApplication = tsr.router(contract.loanApplication, {
     }
   },
 
+  subsidyPledgeLookup: async ({ params: { thirdPartyId } }, { request, appRoute }) => {
+    try {
+      await getAuthContextAndValidatePermission(request, appRoute.metadata);
+
+      const thirdParty = await db.query.thirdParties.findFirst({
+        where: eq(thirdParties.id, thirdPartyId),
+        columns: {
+          id: true,
+          documentNumber: true,
+        },
+        with: {
+          identificationType: {
+            columns: {
+              code: true,
+            },
+          },
+        },
+      });
+
+      if (!thirdParty) {
+        throwHttpError({
+          status: 404,
+          message: 'Solicitante no encontrado',
+          code: 'NOT_FOUND',
+        });
+      }
+
+      if (!thirdParty.identificationType?.code?.trim()) {
+        throwHttpError({
+          status: 400,
+          message: 'El solicitante no tiene tipo de documento valido para consultar subsidio',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const [study, currentPeriod, pledgeCode] = await Promise.all([
+        getSubsidyWorkerStudy({
+          identificationTypeCode: thirdParty.identificationType.code,
+          documentNumber: normalizeDocumentNumber(thirdParty.documentNumber),
+        }),
+        getSubsidyCurrentPeriod(),
+        getPledgeSubsidyCodeSetting(),
+      ]);
+
+      if (!study) {
+        throwHttpError({
+          status: 404,
+          message: 'No se encontro informacion de subsidio para el solicitante',
+          code: 'NOT_FOUND',
+        });
+      }
+
+      const subsidyValue = currentPeriod?.period.subsidyValue ?? 0;
+      const spouseByDocument = new Map(
+        study.spouses
+          .filter((item) => item.documentNumber)
+          .map((item) => [item.documentNumber as string, item])
+      );
+
+      const groupsMap = new Map<
+        string,
+        {
+          groupKey: string;
+          groupLabel: string;
+          spouseDocumentNumber: string | null;
+          spouseName: string | null;
+          spouseRelationship: string | null;
+          isPermanentPartner: boolean;
+          beneficiaries: Array<{
+            beneficiaryCode: string;
+            documentNumber: string | null;
+            fullName: string;
+            relationship: string | null;
+            relatedSpouseDocumentNumber: string | null;
+            birthDate: string | null;
+            age: number | null;
+            maxSubsidyValue: number;
+          }>;
+        }
+      >();
+
+      study.beneficiaries.forEach((beneficiary, index) => {
+        const spouseDocumentNumber = beneficiary.relatedSpouseDocumentNumber ?? null;
+        const spouse = spouseDocumentNumber ? spouseByDocument.get(spouseDocumentNumber) : null;
+        const groupKey = spouseDocumentNumber ?? 'NO_SPOUSE';
+        const group =
+          groupsMap.get(groupKey) ??
+          (() => {
+            const label = spouse
+              ? `${spouse.fullName}${spouse.isPermanentPartner ? ' (Companera permanente)' : ''}`
+              : 'Relacion sin conyuge';
+            const nextGroup = {
+              groupKey,
+              groupLabel: label,
+              spouseDocumentNumber: spouseDocumentNumber,
+              spouseName: spouse?.fullName ?? null,
+              spouseRelationship: spouse?.relationship ?? null,
+              isPermanentPartner: spouse?.isPermanentPartner ?? false,
+              beneficiaries: [],
+            };
+            groupsMap.set(groupKey, nextGroup);
+            return nextGroup;
+          })();
+
+        group.beneficiaries.push({
+          beneficiaryCode: beneficiary.beneficiaryCode
+            ? beneficiary.beneficiaryCode
+            : buildFallbackBeneficiaryCode({
+                documentNumber: beneficiary.documentNumber,
+                spouseDocumentNumber,
+                fullName: beneficiary.fullName,
+                index,
+              }),
+          documentNumber: beneficiary.documentNumber,
+          fullName: beneficiary.fullName,
+          relationship: beneficiary.relationship,
+          relatedSpouseDocumentNumber: spouseDocumentNumber,
+          birthDate: beneficiary.birthDate,
+          age: beneficiary.age,
+          maxSubsidyValue: subsidyValue,
+        });
+      });
+
+      const groups = Array.from(groupsMap.values()).sort((left, right) =>
+        left.groupLabel.localeCompare(right.groupLabel, 'es')
+      );
+      groups.forEach((group) => {
+        group.beneficiaries.sort((left, right) => left.fullName.localeCompare(right.fullName, 'es'));
+      });
+
+      return {
+        status: 200 as const,
+        body: {
+          source: study.source,
+          pledgeCode,
+          currentPeriod: currentPeriod?.period ?? null,
+          groups,
+        },
+      };
+    } catch (e) {
+      return genericTsRestErrorResponse(e, {
+        genericMsg: 'Error al consultar beneficiarios para pignoracion',
+      });
+    }
+  },
+
   create: async ({ body }, { request, appRoute, nextRequest }) => {
     let session: UnifiedAuthContext | undefined;
     const ipAddress = getClientIp(nextRequest);
@@ -962,6 +1147,17 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       });
 
       const pledgesData = body.pledgesSubsidy ? (body.loanApplicationPledges ?? []) : [];
+      const pledgesEffectiveDate = body.pledgesSubsidy ? body.pledgesEffectiveDate : null;
+
+      if (body.pledgesSubsidy && !pledgesEffectiveDate) {
+        throwHttpError({
+          status: 400,
+          message: 'Debe indicar la fecha para empezar a pignorar',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      const pledgeCode = pledgesData.length ? await getPledgeSubsidyCodeSetting() : null;
 
       const office = await db.query.affiliationOffices.findFirst({
         where: eq(affiliationOffices.id, body.affiliationOfficeId),
@@ -1054,15 +1250,15 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           );
         }
 
-        if (pledgesData.length) {
+        if (pledgesData.length && pledgeCode && pledgesEffectiveDate) {
           await tx.insert(loanApplicationPledges).values(
             pledgesData.map((pledge) => ({
               loanApplicationId: application.id,
-              pledgeCode: pledge.pledgeCode,
+              pledgeCode,
               documentNumber: pledge.documentNumber ?? null,
               beneficiaryCode: pledge.beneficiaryCode,
               pledgedAmount: toDecimalString(pledge.pledgedAmount),
-              effectiveDate: formatDateOnly(pledge.effectiveDate),
+              effectiveDate: formatDateOnly(pledgesEffectiveDate),
             }))
           );
         }
@@ -1190,6 +1386,17 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           code: 'BAD_REQUEST',
         });
       }
+
+      const existingPledges = await db.query.loanApplicationPledges.findMany({
+        where: eq(loanApplicationPledges.loanApplicationId, id),
+        columns: {
+          documentNumber: true,
+          beneficiaryCode: true,
+          pledgedAmount: true,
+          effectiveDate: true,
+        },
+        orderBy: [asc(loanApplicationPledges.id)],
+      });
 
       const targetCreditProductId = body.creditProductId ?? existing.creditProductId;
       const targetCategoryCode = body.categoryCode ?? existing.categoryCode;
@@ -1349,14 +1556,30 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         }
 
         const shouldUpdatePledges =
-          body.loanApplicationPledges !== undefined || body.pledgesSubsidy === false;
+          body.loanApplicationPledges !== undefined ||
+          body.pledgesSubsidy !== undefined ||
+          body.pledgesEffectiveDate !== undefined;
         if (shouldUpdatePledges) {
           await tx
             .delete(loanApplicationPledges)
             .where(eq(loanApplicationPledges.loanApplicationId, id));
 
           const pledgesSubsidy = body.pledgesSubsidy ?? existing.pledgesSubsidy;
-          const pledgesData = pledgesSubsidy ? (body.loanApplicationPledges ?? []) : [];
+          const pledgesData = pledgesSubsidy
+            ? (body.loanApplicationPledges ??
+              existingPledges.map((pledge) => ({
+                documentNumber: pledge.documentNumber ?? null,
+                beneficiaryCode: pledge.beneficiaryCode,
+                pledgedAmount: String(pledge.pledgedAmount),
+              })))
+            : [];
+          const pledgesEffectiveDate = pledgesSubsidy
+            ? body.pledgesEffectiveDate
+              ? formatDateOnly(body.pledgesEffectiveDate)
+              : existingPledges[0]?.effectiveDate
+                ? existingPledges[0].effectiveDate
+                : null
+            : null;
 
           if (pledgesSubsidy && pledgesData.length === 0) {
             throwHttpError({
@@ -1366,15 +1589,25 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             });
           }
 
-          if (pledgesData.length) {
+          if (pledgesSubsidy && !pledgesEffectiveDate) {
+            throwHttpError({
+              status: 400,
+              message: 'Debe indicar la fecha para empezar a pignorar',
+              code: 'BAD_REQUEST',
+            });
+          }
+
+          const pledgeCode = pledgesData.length ? await getPledgeSubsidyCodeSetting() : null;
+
+          if (pledgesData.length && pledgeCode && pledgesEffectiveDate) {
             await tx.insert(loanApplicationPledges).values(
               pledgesData.map((pledge) => ({
                 loanApplicationId: id,
-                pledgeCode: pledge.pledgeCode,
+                pledgeCode,
                 documentNumber: pledge.documentNumber ?? null,
                 beneficiaryCode: pledge.beneficiaryCode,
                 pledgedAmount: toDecimalString(pledge.pledgedAmount),
-                effectiveDate: formatDateOnly(pledge.effectiveDate),
+                effectiveDate: pledgesEffectiveDate,
               }))
             );
           }
@@ -1765,6 +1998,88 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const { userId, userName } = getRequiredUserContext(session);
 
       if (body.mode === 'STEP') {
+        const approvedAmount = toNumber(body.approvedAmount);
+        if (!Number.isFinite(approvedAmount) || approvedAmount <= 0) {
+          throwHttpError({
+            status: 400,
+            message: 'Valor aprobado invalido',
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        const [repaymentMethod, paymentGuaranteeType, actNumber, product] = await Promise.all([
+          db.query.repaymentMethods.findFirst({
+            where: and(
+              eq(repaymentMethods.id, body.repaymentMethodId),
+              eq(repaymentMethods.isActive, true)
+            ),
+          }),
+          db.query.paymentGuaranteeTypes.findFirst({
+            where: and(
+              eq(paymentGuaranteeTypes.id, body.paymentGuaranteeTypeId),
+              eq(paymentGuaranteeTypes.isActive, true)
+            ),
+          }),
+          db.query.loanApplicationActNumbers.findFirst({
+            where: and(
+              eq(loanApplicationActNumbers.affiliationOfficeId, existing.affiliationOfficeId),
+              eq(loanApplicationActNumbers.actNumber, body.actNumber)
+            ),
+          }),
+          db.query.creditProducts.findFirst({
+            where: eq(creditProducts.id, existing.creditProductId),
+            columns: {
+              id: true,
+              name: true,
+              maxInstallments: true,
+              paysInsurance: true,
+            },
+          }),
+        ]);
+
+        if (!repaymentMethod) {
+          throwHttpError({
+            status: 404,
+            message: 'Forma de pago no encontrada',
+            code: 'NOT_FOUND',
+          });
+        }
+
+        if (!paymentGuaranteeType) {
+          throwHttpError({
+            status: 404,
+            message: 'Tipo de garantia no encontrado',
+            code: 'NOT_FOUND',
+          });
+        }
+
+        if (!actNumber) {
+          throwHttpError({
+            status: 404,
+            message: 'Acta no encontrada para la oficina de la solicitud',
+            code: 'NOT_FOUND',
+          });
+        }
+
+        if (!product) {
+          throwHttpError({
+            status: 404,
+            message: 'Linea de credito no encontrada',
+            code: 'NOT_FOUND',
+          });
+        }
+
+        if (product.maxInstallments && body.approvedInstallments > product.maxInstallments) {
+          throwHttpError({
+            status: 400,
+            message: `El numero de cuotas supera el maximo permitido (${product.maxInstallments})`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        const stepIsInsuranceApproved =
+          product.paysInsurance && Boolean(body.isInsuranceApproved);
+
         const [updated] = await db.transaction(async (tx) => {
           const current = await tx.query.loanApplications.findFirst({
             where: eq(loanApplications.id, id),
@@ -1824,6 +2139,18 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             });
           }
 
+          await tx
+            .update(loanApplications)
+            .set({
+              repaymentMethodId: body.repaymentMethodId,
+              paymentGuaranteeTypeId: body.paymentGuaranteeTypeId,
+              isInsuranceApproved: stepIsInsuranceApproved,
+              approvedInstallments: body.approvedInstallments,
+              approvedAmount: toDecimalString(body.approvedAmount),
+              actNumber: body.actNumber,
+            })
+            .where(eq(loanApplications.id, id));
+
           await approveIntermediateLevel(tx, {
             loanApplicationId: id,
             currentLevelId: pendingApplication.currentApprovalLevelId,
@@ -1833,6 +2160,16 @@ export const loanApplication = tsr.router(contract.loanApplication, {
               userName: userName || userId,
             },
             note: body.approvalNote,
+            metadata: {
+              repaymentMethodId: body.repaymentMethodId,
+              repaymentMethodName: repaymentMethod.name,
+              paymentGuaranteeTypeId: body.paymentGuaranteeTypeId,
+              paymentGuaranteeTypeName: paymentGuaranteeType.name,
+              isInsuranceApproved: stepIsInsuranceApproved,
+              approvedInstallments: body.approvedInstallments,
+              approvedAmount: toDecimalString(body.approvedAmount),
+              actNumber: body.actNumber,
+            },
           });
 
           const refreshed = await tx.query.loanApplications.findFirst({
@@ -2340,6 +2677,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             repaymentMethodId: finalBody.repaymentMethodId,
             paymentGuaranteeTypeId: finalBody.paymentGuaranteeTypeId,
             isInsuranceApproved,
+            approvedInstallments,
             approvedAmount: toDecimalString(approvedAmount),
             actNumber: finalBody.actNumber,
             status: 'APPROVED',
@@ -2472,6 +2810,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           note: `Aprobacion final. Acta ${finalBody.actNumber}`,
           metadata: {
             loanId: loan.id,
+            repaymentMethodName: repaymentMethod.name,
+            paymentGuaranteeTypeName: paymentGuaranteeType.name,
+            isInsuranceApproved,
             approvedAmount: toDecimalString(approvedAmount),
             approvedInstallments,
             actNumber: finalBody.actNumber,

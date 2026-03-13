@@ -18,6 +18,9 @@ type SyseuRequestOptions<T> = {
 };
 
 export type SyseuFamilyMemberRecord = {
+  codigo_beneficiario?: string;
+  beneficiary_code?: string;
+  beneficiaryCode?: string;
   tipo_identificacion?: string;
   numero_identificacion?: string;
   conyuge_relacionada?: string;

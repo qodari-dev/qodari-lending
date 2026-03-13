@@ -64,7 +64,22 @@ export function LoanApplicationDocumentsForm({
         )
     );
 
-    replace([...requiredRows, ...optionalRows]);
+    const nextRows = [...requiredRows, ...optionalRows];
+    const isSameShape =
+      current.length === nextRows.length &&
+      current.every((item, index) => {
+        const nextItem = nextRows[index];
+        return (
+          nextItem &&
+          item.documentTypeId === nextItem.documentTypeId &&
+          item.isDelivered === nextItem.isDelivered &&
+          (item.fileKey ?? null) === (nextItem.fileKey ?? null)
+        );
+      });
+
+    if (!isSameShape) {
+      replace(nextRows);
+    }
   }, [form, replace, requiredDocuments]);
 
   const requiredByType = useMemo(() => {

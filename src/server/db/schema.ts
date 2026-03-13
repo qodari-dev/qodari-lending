@@ -1263,6 +1263,7 @@ export const loanApplications = pgTable(
       precision: 14,
       scale: 2,
     }).notNull(),
+    approvedInstallments: integer('approved_installments'),
     approvedAmount: decimal('approved_amount', { precision: 14, scale: 2 }),
 
     investmentTypeId: integer('investment_type_id')
@@ -1330,7 +1331,7 @@ export const loanApplications = pgTable(
 // Campos clave:
 // - loanApplicationId: solicitud asociada.
 // - agreementCode: convenio/contrato (integración externa).
-// - beneficiaryCode: beneficiario al que se le descuenta.
+// - beneficiaryCode: código/identificador del beneficiario en subsidio.
 // - pledgedAmount: valor a descontar/pignorar.
 // ---------------------------------------------------------------------
 export const loanApplicationPledges = pgTable(
@@ -1342,7 +1343,7 @@ export const loanApplicationPledges = pgTable(
       .references(() => loanApplications.id, { onDelete: 'cascade' }),
     pledgeCode: varchar('pledge_code', { length: 20 }).notNull(),
     documentNumber: varchar('document_number', { length: 20 }),
-    beneficiaryCode: integer('beneficiary_code').notNull(),
+    beneficiaryCode: varchar('beneficiary_code', { length: 30 }).notNull(),
     pledgedAmount: decimal('pledged_amount', {
       precision: 14,
       scale: 2,
@@ -2377,6 +2378,7 @@ export const creditsSettings = pgTable('credits_settings', {
   companyName: varchar('company_name', { length: 255 }),
   companyAddress: varchar('company_address', { length: 255 }),
   companyPhone: varchar('company_phone', { length: 20 }),
+  pledgeSubsidyCode: varchar('pledge_subsidy_code', { length: 20 }),
 
   // Auxiliares (glAccounts)
   cashGlAccountId: integer('cash_gl_account_id').references(() => glAccounts.id, {

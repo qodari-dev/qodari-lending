@@ -88,6 +88,7 @@ export function CreditsSettingsPage() {
         companyName: settings.companyName ?? '',
         companyAddress: settings.companyAddress ?? '',
         companyPhone: settings.companyPhone ?? '',
+        pledgeSubsidyCode: settings.pledgeSubsidyCode ?? '',
         cashGlAccountId: settings.cashGlAccountId ?? undefined,
         majorGlAccountId: settings.majorGlAccountId ?? undefined,
         minimumMajorPaidAmount: settings.minimumMajorPaidAmount ?? null,
@@ -220,6 +221,17 @@ export function CreditsSettingsPage() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel>Telefono</FieldLabel>
+                          <Input {...field} value={field.value ?? ''} disabled={!canUpdate} />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="pledgeSubsidyCode"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Codigo de Pignoracion Subsidio</FieldLabel>
                           <Input {...field} value={field.value ?? ''} disabled={!canUpdate} />
                           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                         </Field>

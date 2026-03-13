@@ -1,0 +1,1 @@
+ALTER TABLE "loan_applications" ADD COLUMN "approved_installments" integer;

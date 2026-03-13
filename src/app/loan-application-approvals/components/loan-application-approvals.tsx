@@ -3,14 +3,7 @@
 import { DataTable, useDataTable } from '@/components/data-table';
 import { PageContent, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -22,7 +15,6 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  useApproveLoanApplication,
   useCancelLoanApplication,
   useLoanApplicationInbox,
   useRejectLoanApplication,
@@ -91,8 +83,6 @@ export function LoanApplicationApprovals() {
   });
 
   const { data, isLoading, isFetching, refetch } = useLoanApplicationInbox(queryParams);
-  const { mutateAsync: approveLoanApplication, isPending: isApprovingStep } =
-    useApproveLoanApplication();
   const { mutateAsync: cancelLoanApplication, isPending: isCanceling } = useCancelLoanApplication();
   const { mutateAsync: rejectLoanApplication, isPending: isRejecting } = useRejectLoanApplication();
 
@@ -109,7 +99,6 @@ export function LoanApplicationApprovals() {
   const [openedCancelDialog, setOpenedCancelDialog] = React.useState(false);
   const [openedRejectDialog, setOpenedRejectDialog] = React.useState(false);
 
-  const [stepApproveNote, setStepApproveNote] = React.useState('');
   const [cancelNote, setCancelNote] = React.useState('');
   const [rejectNote, setRejectNote] = React.useState('');
   const [rejectReasonId, setRejectReasonId] = React.useState<number | undefined>();
@@ -137,7 +126,6 @@ export function LoanApplicationApprovals() {
       return;
     }
 
-    setStepApproveNote('');
     setOpenedStepApproveDialog(true);
   }, []);
 
@@ -153,21 +141,6 @@ export function LoanApplicationApprovals() {
     setRejectReasonId(undefined);
     setOpenedRejectDialog(true);
   }, []);
-
-  const submitStepApprove = React.useCallback(async () => {
-    if (!loanApplication?.id || !stepApproveNote.trim()) return;
-
-    await approveLoanApplication({
-      params: { id: loanApplication.id },
-      body: {
-        mode: 'STEP',
-        approvalNote: stepApproveNote.trim(),
-      },
-    });
-
-    setOpenedStepApproveDialog(false);
-    setLoanApplication(undefined);
-  }, [approveLoanApplication, loanApplication, stepApproveNote]);
 
   const submitCancel = React.useCallback(async () => {
     if (!loanApplication?.id || !cancelNote.trim()) return;
@@ -248,6 +221,7 @@ export function LoanApplicationApprovals() {
       />
 
       <LoanApplicationApproveDialog
+        mode="FINAL"
         loanApplication={loanApplication}
         opened={openedFinalApproveDialog}
         onOpened={setOpenedFinalApproveDialog}
@@ -257,37 +231,16 @@ export function LoanApplicationApprovals() {
         }}
       />
 
-      <Dialog open={openedStepApproveDialog} onOpenChange={setOpenedStepApproveDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Aprobar y enviar al siguiente nivel</DialogTitle>
-            <DialogDescription>
-              Esta accion mantiene la solicitud pendiente y la reasigna al siguiente nivel de
-              aprobacion.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-2">
-            <Label htmlFor="stepApproveNote">Nota de aprobacion</Label>
-            <Textarea
-              id="stepApproveNote"
-              value={stepApproveNote}
-              onChange={(event) => setStepApproveNote(event.target.value)}
-              placeholder="Ingrese observaciones de aprobacion..."
-            />
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenedStepApproveDialog(false)}>
-              Cerrar
-            </Button>
-            <Button onClick={submitStepApprove} disabled={isApprovingStep || !stepApproveNote.trim()}>
-              {isApprovingStep ? <Spinner /> : null}
-              Aprobar y continuar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LoanApplicationApproveDialog
+        mode="STEP"
+        loanApplication={loanApplication}
+        opened={openedStepApproveDialog}
+        onOpened={setOpenedStepApproveDialog}
+        onApproved={() => {
+          setOpenedStepApproveDialog(false);
+          setLoanApplication(undefined);
+        }}
+      />
 
       <Dialog open={openedCancelDialog} onOpenChange={setOpenedCancelDialog}>
         <DialogContent>

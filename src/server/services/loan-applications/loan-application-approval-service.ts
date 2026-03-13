@@ -362,6 +362,7 @@ export async function approveIntermediateLevel(
     targetLevelId: number;
     actor: UserContext;
     note: string;
+    metadata?: Record<string, unknown>;
   }
 ) {
   const levels = await listActiveLevels(tx);
@@ -428,6 +429,7 @@ export async function approveIntermediateLevel(
       fromLevelId: args.currentLevelId,
       toLevelId: nextLevel.id,
       targetLevelId: args.targetLevelId,
+      ...(args.metadata ?? {}),
     },
   });
 

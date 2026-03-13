@@ -32,6 +32,10 @@ export const loanApplicationsKeys = {
   actNumbers: () => [...loanApplicationsKeys.all, 'act-numbers'] as const,
   actNumbersList: (query: ListLoanApplicationActNumbersQuery) =>
     [...loanApplicationsKeys.actNumbers(), query] as const,
+
+  subsidyPledgeLookup: () => [...loanApplicationsKeys.all, 'subsidy-pledge-lookup'] as const,
+  subsidyPledgeLookupDetail: (thirdPartyId: number) =>
+    [...loanApplicationsKeys.subsidyPledgeLookup(), thirdPartyId] as const,
 };
 
 function defaultQuery(filters?: Partial<ListLoanApplicationsQuery>) {
@@ -238,6 +242,21 @@ export function useLoanApplicationActNumbers(query: ListLoanApplicationActNumber
     queryKey: loanApplicationsKeys.actNumbersList(query),
     queryData: { query },
     enabled: !!query.affiliationOfficeId,
+  });
+}
+
+export function useLoanApplicationSubsidyPledgeLookup(
+  thirdPartyId?: number,
+  options?: { enabled?: boolean }
+) {
+  return api.loanApplication.subsidyPledgeLookup.useQuery({
+    queryKey: loanApplicationsKeys.subsidyPledgeLookupDetail(thirdPartyId ?? 0),
+    queryData: {
+      params: {
+        thirdPartyId: thirdPartyId ?? 0,
+      },
+    },
+    enabled: (options?.enabled ?? true) && typeof thirdPartyId === 'number' && thirdPartyId > 0,
   });
 }
 

@@ -50,6 +50,7 @@ const LoanApplicationWhereFieldsSchema = z
     creditProductId: z.union([z.number(), NumberOperatorsSchema]).optional(),
     installments: z.union([z.number(), NumberOperatorsSchema]).optional(),
     requestedAmount: z.union([z.string(), StringOperatorsSchema]).optional(),
+    approvedInstallments: z.union([z.number(), NumberOperatorsSchema]).optional(),
     assignedApprovalUserId: z.union([z.string(), StringOperatorsSchema]).optional(),
     status: z.union([z.enum(LOAN_APPLICATION_STATUS_OPTIONS), StringOperatorsSchema]).optional(),
     pledgesSubsidy: z.union([z.boolean(), BooleanOperatorsSchema]).optional(),
@@ -67,6 +68,7 @@ const LOAN_APPLICATION_SORT_FIELDS = [
   'thirdPartyId',
   'creditProductId',
   'requestedAmount',
+  'approvedInstallments',
   'assignedApprovalUserId',
   'createdAt',
   'updatedAt',
@@ -151,6 +153,43 @@ export const LoanApplicationApprovalLoadResponseSchema = z.object({
   users: z.array(LoanApplicationApprovalLoadUserSchema),
 });
 
+export const GetLoanApplicationSubsidyPledgeLookupParamsSchema = z.object({
+  thirdPartyId: z.coerce.number().int().positive(),
+});
+
+export const LoanApplicationSubsidyPledgeBeneficiarySchema = z.object({
+  beneficiaryCode: z.string().min(1),
+  documentNumber: z.string().nullable(),
+  fullName: z.string().min(1),
+  relationship: z.string().nullable(),
+  relatedSpouseDocumentNumber: z.string().nullable(),
+  birthDate: z.string().nullable(),
+  age: z.number().int().nullable(),
+  maxSubsidyValue: z.number().nonnegative(),
+});
+
+export const LoanApplicationSubsidyPledgeGroupSchema = z.object({
+  groupKey: z.string().min(1),
+  groupLabel: z.string().min(1),
+  spouseDocumentNumber: z.string().nullable(),
+  spouseName: z.string().nullable(),
+  spouseRelationship: z.string().nullable(),
+  isPermanentPartner: z.boolean(),
+  beneficiaries: z.array(LoanApplicationSubsidyPledgeBeneficiarySchema),
+});
+
+export const LoanApplicationSubsidyPledgeLookupResponseSchema = z.object({
+  source: z.enum(['COMFENALCO', 'SYSEU']),
+  pledgeCode: z.string().nullable(),
+  currentPeriod: z
+    .object({
+      period: z.string().min(1),
+      subsidyValue: z.number().nonnegative(),
+    })
+    .nullable(),
+  groups: z.array(LoanApplicationSubsidyPledgeGroupSchema),
+});
+
 function isValidDecimal(value: string | null | undefined): boolean {
   if (value === null || value === undefined) return false;
   if (value.trim() === '') return false;
@@ -180,11 +219,12 @@ export const LoanApplicationDocumentInputSchema = z.object({
 export type LoanApplicationDocumentInput = z.infer<typeof LoanApplicationDocumentInputSchema>;
 
 export const LoanApplicationPledgeInputSchema = z.object({
-  pledgeCode: z.string().min(1).max(20),
   documentNumber: z.string().max(20).nullable().optional(),
-  beneficiaryCode: z.number().int().positive(),
-  pledgedAmount: decimalStringField('Valor pignorado es requerido'),
-  effectiveDate: z.coerce.date(),
+  beneficiaryCode: z.string().trim().min(1).max(30),
+  pledgedAmount: decimalStringField('Valor pignorado es requerido').refine(
+    (value) => Number(value) > 0,
+    { message: 'Valor pignorado debe ser mayor a cero' }
+  ),
 });
 
 export type LoanApplicationPledgeInput = z.infer<typeof LoanApplicationPledgeInputSchema>;
@@ -206,15 +246,22 @@ const LoanApplicationBaseSchema = z.object({
   bankAccountType: z.enum(BANK_ACCOUNT_TYPE_OPTIONS),
   bankId: z.number().int().positive(),
   creditProductId: z.number().int().positive(),
-  paymentFrequencyId: z.number().int().positive().nullable().optional(),
+  paymentFrequencyId: z
+    .number({ message: 'Periodicidad de pago es requerida' })
+    .int()
+    .positive('Periodicidad de pago es requerida'),
   installments: z.number().int().positive(),
   insuranceCompanyId: z.number().int().positive().nullable().optional(),
-  requestedAmount: decimalStringField('Valor solicitado es requerido'),
+  requestedAmount: decimalStringField('Valor solicitado es requerido').refine(
+    (value) => Number(value) > 0,
+    { message: 'Valor solicitado debe ser mayor a cero' }
+  ),
   investmentTypeId: z
     .number({ message: 'Tipo de inversion es requerido' })
     .int()
     .positive('Tipo de inversion es requerido'),
   agreementId: z.number().int().positive().nullable().optional(),
+  pledgesEffectiveDate: z.coerce.date().nullable().optional(),
   note: z.string().nullable().optional(),
   loanApplicationCoDebtors: LoanApplicationCoDebtorInputSchema.array().optional(),
   loanApplicationDocuments: LoanApplicationDocumentInputSchema.array().optional(),
@@ -225,9 +272,9 @@ const addLoanApplicationValidation = <T extends z.ZodTypeAny>(schema: T) =>
   schema.superRefine((value, ctx) => {
     const data = value as {
       pledgesSubsidy?: boolean;
+      pledgesEffectiveDate?: Date | null;
       loanApplicationPledges?: {
-        pledgeCode: string;
-        beneficiaryCode: number;
+        beneficiaryCode: string;
       }[];
       loanApplicationCoDebtors?: {
         thirdPartyId: number;
@@ -247,6 +294,14 @@ const addLoanApplicationValidation = <T extends z.ZodTypeAny>(schema: T) =>
         code: 'custom',
         message: 'Debe registrar al menos una pignoracion cuando aplica subsidio',
         path: ['loanApplicationPledges'],
+      });
+    }
+
+    if (data.pledgesSubsidy && !data.pledgesEffectiveDate) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Debe indicar la fecha para empezar a pignorar',
+        path: ['pledgesEffectiveDate'],
       });
     }
 
@@ -289,7 +344,7 @@ const addLoanApplicationValidation = <T extends z.ZodTypeAny>(schema: T) =>
     const pledges = data.loanApplicationPledges ?? [];
     const pledgeKeys = new Set<string>();
     for (const pledge of pledges) {
-      const key = `${pledge.pledgeCode}-${pledge.beneficiaryCode}`;
+      const key = pledge.beneficiaryCode;
       if (pledgeKeys.has(key)) {
         ctx.addIssue({
           code: 'custom',
@@ -318,8 +373,7 @@ export const RejectLoanApplicationBodySchema = z.object({
   rejectionReasonId: z.number().int().positive(),
 });
 
-export const FinalApproveLoanApplicationBodySchema = z.object({
-  mode: z.literal('FINAL'),
+const ApprovalDraftFieldsSchema = z.object({
   repaymentMethodId: z.number().int().positive(),
   paymentGuaranteeTypeId: z.number().int().positive(),
   isInsuranceApproved: z.boolean().optional(),
@@ -329,11 +383,15 @@ export const FinalApproveLoanApplicationBodySchema = z.object({
     { message: 'Valor aprobado debe ser mayor a cero' }
   ),
   actNumber: z.string().min(1).max(20),
+});
+
+export const FinalApproveLoanApplicationBodySchema = ApprovalDraftFieldsSchema.extend({
+  mode: z.literal('FINAL'),
   payeeThirdPartyId: z.number().int().positive(),
   firstCollectionDate: z.coerce.date(),
 });
 
-export const StepApproveLoanApplicationBodySchema = z.object({
+export const StepApproveLoanApplicationBodySchema = ApprovalDraftFieldsSchema.extend({
   mode: z.literal('STEP'),
   approvalNote: z.string().min(1).max(1000),
 });
@@ -411,5 +469,9 @@ export type LoanApplicationActNumbersList = ClientInferResponseBody<
 >;
 export type LoanApplicationApprovalLoad = ClientInferResponseBody<
   Contract['loanApplication']['approvalLoad'],
+  200
+>;
+export type LoanApplicationSubsidyPledgeLookup = ClientInferResponseBody<
+  Contract['loanApplication']['subsidyPledgeLookup'],
   200
 >;

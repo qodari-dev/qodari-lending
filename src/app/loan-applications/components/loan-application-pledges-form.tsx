@@ -1,15 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -21,248 +12,313 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
-import {
-  CreateLoanApplicationBodySchema,
-  LoanApplicationPledgeInput,
-  LoanApplicationPledgeInputSchema,
-} from '@/schemas/loan-application';
-import { formatCurrency, formatDateISO } from '@/utils/formatters';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Controller, type Resolver, useFieldArray, useForm, useFormContext } from 'react-hook-form';
-import { toast } from 'sonner';
+import { useLoanApplicationSubsidyPledgeLookup } from '@/hooks/queries/use-loan-application-queries';
+import { CreateLoanApplicationBodySchema } from '@/schemas/loan-application';
+import { formatCurrency, formatDate } from '@/utils/formatters';
+import { useMemo } from 'react';
+import { Controller, useFormContext, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
 type FormValues = z.infer<typeof CreateLoanApplicationBodySchema>;
 
+function toMoneyString(value: number) {
+  return value.toFixed(2);
+}
+
+function sanitizePledgeAmountInput(rawValue: string) {
+  const normalized = rawValue.replace(',', '.').replace(/[^\d.]/g, '');
+  const [integerPart = '', ...decimalParts] = normalized.split('.');
+
+  if (!decimalParts.length) {
+    return integerPart;
+  }
+
+  return `${integerPart}.${decimalParts.join('').slice(0, 2)}`;
+}
+
+function clampPledgeAmount(rawValue: string, maxValue: number) {
+  if (!rawValue.trim()) return '';
+
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return rawValue;
+
+  const bounded = Math.min(Math.max(parsed, 0), maxValue);
+  return String(bounded);
+}
+
 export function LoanApplicationPledgesForm() {
   const form = useFormContext<FormValues>();
-  const { fields, append, update, remove } = useFieldArray({
+  const thirdPartyId = useWatch({
+    control: form.control,
+    name: 'thirdPartyId',
+  });
+  const pledgesSubsidy = useWatch({
+    control: form.control,
+    name: 'pledgesSubsidy',
+  });
+  const selectedPledges = useWatch({
     control: form.control,
     name: 'loanApplicationPledges',
+  }) ?? [];
+
+  const { data, isLoading, isError, error } = useLoanApplicationSubsidyPledgeLookup(thirdPartyId, {
+    enabled: pledgesSubsidy && typeof thirdPartyId === 'number' && thirdPartyId > 0,
   });
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const lookup = data?.body;
+  const selectedPledgesMap = useMemo(
+    () =>
+      new Map(
+        selectedPledges.map((item) => [
+          item.beneficiaryCode,
+          {
+            documentNumber: item.documentNumber ?? null,
+            beneficiaryCode: item.beneficiaryCode,
+            pledgedAmount: item.pledgedAmount,
+          },
+        ])
+      ),
+    [selectedPledges]
+  );
+  const totalSelectedAmount = useMemo(
+    () =>
+      selectedPledges.reduce((sum, item) => {
+        const parsed = Number(item.pledgedAmount);
+        return sum + (Number.isFinite(parsed) ? parsed : 0);
+      }, 0),
+    [selectedPledges]
+  );
 
-  const dialogForm = useForm<LoanApplicationPledgeInput>({
-    resolver: zodResolver(LoanApplicationPledgeInputSchema) as Resolver<LoanApplicationPledgeInput>,
-    defaultValues: {
-      pledgeCode: '',
-      documentNumber: '',
-      beneficiaryCode: undefined,
-      pledgedAmount: '0',
-      effectiveDate: new Date(),
-    },
-  });
-
-  const hasItems = useMemo(() => fields.length > 0, [fields.length]);
-
-  const handleOpenChange = (open: boolean) => {
-    setIsDialogOpen(open);
-    if (!open) {
-      dialogForm.reset();
-      setEditingIndex(null);
-    }
-  };
-
-  const handleAddClick = () => {
-    dialogForm.reset({
-      pledgeCode: '',
-      documentNumber: '',
-      beneficiaryCode: undefined,
-      pledgedAmount: '0',
-      effectiveDate: new Date(),
+  const updateSelectedPledges = (nextItems: FormValues['loanApplicationPledges']) => {
+    form.setValue('loanApplicationPledges', nextItems, {
+      shouldDirty: true,
+      shouldValidate: true,
     });
-    setEditingIndex(null);
-    setIsDialogOpen(true);
   };
 
-  const handleEditClick = (index: number) => {
-    const current = fields[index];
-    dialogForm.reset({
-      pledgeCode: current?.pledgeCode ?? '',
-      documentNumber: current?.documentNumber ?? '',
-      beneficiaryCode: current?.beneficiaryCode ?? undefined,
-      pledgedAmount: current?.pledgedAmount ?? '0',
-      effectiveDate: current?.effectiveDate ? new Date(current.effectiveDate) : new Date(),
-    });
-    setEditingIndex(index);
-    setIsDialogOpen(true);
-  };
+  const handleToggleBeneficiary = (
+    beneficiary: NonNullable<typeof lookup>['groups'][number]['beneficiaries'][number],
+    checked: boolean
+  ) => {
+    const currentItems = form.getValues('loanApplicationPledges') ?? [];
 
-  const onSave = (values: LoanApplicationPledgeInput) => {
-    const key = `${values.pledgeCode}-${values.beneficiaryCode}`;
-    const isDuplicate = fields.some(
-      (f, idx) => `${f.pledgeCode}-${f.beneficiaryCode}` === key && idx !== editingIndex
-    );
-
-    if (isDuplicate) {
-      toast.error('No puede repetir la pignoracion para el mismo beneficiario');
+    if (!checked) {
+      updateSelectedPledges(
+        currentItems.filter((item) => item.beneficiaryCode !== beneficiary.beneficiaryCode)
+      );
       return;
     }
 
-    if (editingIndex !== null) {
-      update(editingIndex, values);
-    } else {
-      append(values);
+    if (currentItems.some((item) => item.beneficiaryCode === beneficiary.beneficiaryCode)) {
+      return;
     }
-    setIsDialogOpen(false);
+
+    updateSelectedPledges([
+      ...currentItems,
+      {
+        beneficiaryCode: beneficiary.beneficiaryCode,
+        documentNumber: beneficiary.documentNumber,
+        pledgedAmount: toMoneyString(beneficiary.maxSubsidyValue),
+      },
+    ]);
   };
 
+  const handleAmountChange = (beneficiaryCode: string, value: string, maxValue: number) => {
+    const currentItems = form.getValues('loanApplicationPledges') ?? [];
+    updateSelectedPledges(
+      currentItems.map((item) =>
+        item.beneficiaryCode === beneficiaryCode
+          ? {
+              ...item,
+              pledgedAmount: sanitizePledgeAmountInput(value),
+            }
+          : item
+      )
+    );
+  };
+
+  const handleAmountBlur = (beneficiaryCode: string, maxValue: number) => {
+    const currentItems = form.getValues('loanApplicationPledges') ?? [];
+    updateSelectedPledges(
+      currentItems.map((item) =>
+        item.beneficiaryCode === beneficiaryCode
+          ? {
+              ...item,
+              pledgedAmount: clampPledgeAmount(item.pledgedAmount, maxValue),
+            }
+          : item
+      )
+    );
+  };
+
+  if (!pledgesSubsidy) {
+    return (
+      <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+        Active Aplica subsidio en la pestana principal para registrar pignoraciones.
+      </div>
+    );
+  }
+
+  if (!thirdPartyId) {
+    return (
+      <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+        Seleccione primero el solicitante para consultar beneficiarios de subsidio.
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-sm font-medium">Pignoraciones</p>
-          <p className="text-muted-foreground text-sm">
-            Registre beneficiarios y valores pignorados para subsidio.
-          </p>
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-md border p-4">
+          <p className="text-muted-foreground text-xs uppercase tracking-wide">Fuente subsidio</p>
+          <p className="mt-1 text-sm font-medium">{lookup?.source ?? (isLoading ? '...' : '-')}</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
-          <DialogTrigger asChild>
-            <Button type="button" size="sm" onClick={handleAddClick}>
-              <Plus className="h-4 w-4" />
-              Agregar pignoracion
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingIndex !== null ? 'Editar pignoracion' : 'Agregar pignoracion'}
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Controller
-                name="pledgeCode"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="pledgeCode">Codigo pignoracion</FieldLabel>
-                    <Input id="pledgeCode" {...field} value={field.value ?? ''} />
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="documentNumber"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="documentNumber">Documento</FieldLabel>
-                    <Input id="documentNumber" {...field} value={field.value ?? ''} />
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="beneficiaryCode"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="beneficiaryCode">Codigo beneficiario</FieldLabel>
-                    <Input
-                      id="beneficiaryCode"
-                      type="number"
-                      value={field.value ?? ''}
-                      onChange={(event) =>
-                        field.onChange(event.target.value ? Number(event.target.value) : undefined)
-                      }
-                    />
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="pledgedAmount"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="pledgedAmount">Valor pignorado</FieldLabel>
-                    <Input id="pledgedAmount" {...field} value={field.value ?? ''} />
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="effectiveDate"
-                control={dialogForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid} className="col-span-2">
-                    <FieldLabel htmlFor="effectiveDate">Fecha vigencia</FieldLabel>
-                    <DatePicker
-                      id="effectiveDate"
-                      value={field.value ?? null}
-                      onChange={(value) => field.onChange(value ?? new Date())}
-                      ariaInvalid={fieldState.invalid}
-                    />
-                    {fieldState.error && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-            </div>
-
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">
-                  Cancelar
-                </Button>
-              </DialogClose>
-              <Button type="button" onClick={dialogForm.handleSubmit(onSave)}>
-                {editingIndex !== null ? 'Guardar cambios' : 'Agregar pignoracion'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <div className="rounded-md border p-4">
+          <p className="text-muted-foreground text-xs uppercase tracking-wide">
+            Codigo pignoracion
+          </p>
+          <p className="mt-1 text-sm font-medium">{lookup?.pledgeCode ?? '-'}</p>
+        </div>
+        <div className="rounded-md border p-4">
+          <p className="text-muted-foreground text-xs uppercase tracking-wide">Total a descontar</p>
+          <p className="mt-1 text-sm font-medium">{formatCurrency(totalSelectedAmount)}</p>
+        </div>
       </div>
 
-      {hasItems ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Codigo</TableHead>
-              <TableHead>Beneficiario</TableHead>
-              <TableHead>Valor</TableHead>
-              <TableHead>Vigencia</TableHead>
-              <TableHead className="w-30 text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {fields.map((field, index) => (
-              <TableRow key={field.id}>
-                <TableCell>{field.pledgeCode}</TableCell>
-                <TableCell>{field.beneficiaryCode}</TableCell>
-                <TableCell className="font-mono text-xs">
-                  {formatCurrency(field.pledgedAmount)}
-                </TableCell>
-                <TableCell>{formatDateISO(new Date(field.effectiveDate))}</TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditClick(index)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : (
-        <div className={cn('text-muted-foreground rounded-md border border-dashed p-4 text-sm')}>
-          No hay pignoraciones agregadas.
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="rounded-md border p-4">
+          <p className="text-muted-foreground text-xs uppercase tracking-wide">Periodo subsidio</p>
+          <p className="mt-1 text-sm font-medium">
+            {lookup?.currentPeriod?.period ?? 'No disponible'}
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Valor maximo por beneficiario:{' '}
+            {formatCurrency(lookup?.currentPeriod?.subsidyValue ?? 0)}
+          </p>
         </div>
-      )}
+
+        <Controller
+          name="pledgesEffectiveDate"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor="pledgesEffectiveDate">
+                Fecha para empezar a pignorar
+              </FieldLabel>
+              <DatePicker
+                id="pledgesEffectiveDate"
+                value={field.value ?? null}
+                onChange={(value) => field.onChange(value ?? null)}
+                ariaInvalid={fieldState.invalid}
+              />
+              {fieldState.error && <FieldError errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
+      </div>
+
+      {form.formState.errors.loanApplicationPledges ? (
+        <FieldError errors={[form.formState.errors.loanApplicationPledges]} />
+      ) : null}
+
+      {isLoading ? (
+        <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+          Consultando informacion de subsidio...
+        </div>
+      ) : null}
+
+      {isError ? (
+        <div className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+          {error instanceof Error
+            ? error.message
+            : 'No fue posible consultar la informacion de subsidio para pignoracion.'}
+        </div>
+      ) : null}
+
+      {!isLoading && !isError && !lookup?.groups.length ? (
+        <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+          No se encontraron beneficiarios disponibles para pignorar.
+        </div>
+      ) : null}
+
+      {lookup?.groups.map((group) => (
+        <div key={group.groupKey} className="space-y-2 rounded-md border p-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold">{group.groupLabel}</h3>
+            <p className="text-muted-foreground text-xs">
+              {group.spouseDocumentNumber
+                ? `Documento conyuge: ${group.spouseDocumentNumber}`
+                : 'Relacion sin conyuge'}
+              {group.spouseRelationship ? ` | ${group.spouseRelationship}` : ''}
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-24">Pignorar</TableHead>
+                  <TableHead>Documento conyuge</TableHead>
+                  <TableHead>Beneficiario</TableHead>
+                  <TableHead>Codigo beneficiario</TableHead>
+                  <TableHead>Parentesco</TableHead>
+                  <TableHead>Edad</TableHead>
+                  <TableHead>Fec. nac.</TableHead>
+                  <TableHead>Valor max. sub.</TableHead>
+                  <TableHead className="w-44">Valor a descontar</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {group.beneficiaries.map((beneficiary) => {
+                  const selected = selectedPledgesMap.get(beneficiary.beneficiaryCode) ?? null;
+                  const maxValue = beneficiary.maxSubsidyValue;
+
+                  return (
+                    <TableRow key={`${group.groupKey}-${beneficiary.beneficiaryCode}`}>
+                      <TableCell>
+                        <Checkbox
+                          checked={!!selected}
+                          disabled={maxValue <= 0}
+                          onCheckedChange={(checked) =>
+                            handleToggleBeneficiary(beneficiary, checked === true)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>{group.spouseDocumentNumber ?? '-'}</TableCell>
+                      <TableCell>{beneficiary.fullName}</TableCell>
+                      <TableCell>{beneficiary.beneficiaryCode}</TableCell>
+                      <TableCell>{beneficiary.relationship ?? '-'}</TableCell>
+                      <TableCell>{beneficiary.age ?? '-'}</TableCell>
+                      <TableCell>
+                        {beneficiary.birthDate ? formatDate(beneficiary.birthDate) : '-'}
+                      </TableCell>
+                      <TableCell>{formatCurrency(maxValue)}</TableCell>
+                      <TableCell>
+                        <Input
+                          inputMode="decimal"
+                          value={selected?.pledgedAmount ?? ''}
+                          disabled={!selected}
+                          onChange={(event) =>
+                            handleAmountChange(
+                              beneficiary.beneficiaryCode,
+                              event.target.value,
+                              maxValue
+                            )
+                          }
+                          onBlur={() =>
+                            handleAmountBlur(beneficiary.beneficiaryCode, maxValue)
+                          }
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -161,6 +161,10 @@ export function LoanApplicationDetails({
   const applicantCategoryLabel = applicant?.categoryCode
     ? (categoryCodeLabels[applicant.categoryCode] ?? applicant.categoryCode)
     : '-';
+  const totalPledgedAmount = (loanApplication.loanApplicationPledges ?? []).reduce(
+    (sum, item) => sum + Number(item.pledgedAmount ?? 0),
+    0
+  );
 
   const sections: DescriptionSection[] = [
     {
@@ -217,6 +221,7 @@ export function LoanApplicationDetails({
         { label: 'Tipo financiacion', value: financingTypeLabel },
         { label: 'Periodicidad', value: paymentFrequencyLabel },
         { label: 'Cuotas', value: loanApplication.installments },
+        { label: 'Cuotas aprobadas', value: loanApplication.approvedInstallments ?? '-' },
         { label: 'Tasa financiacion', value: formatPercent(loanApplication.financingFactor, 4) },
         { label: 'Tasa seguro', value: formatPercent(loanApplication.insuranceFactor, 4) },
         { label: 'Seguro aprobado', value: loanApplication.isInsuranceApproved ? 'Si' : 'No' },
@@ -532,12 +537,18 @@ export function LoanApplicationDetails({
 
         {loanApplication.pledgesSubsidy ? (
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold">Pignoraciones</h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold">Pignoraciones</h3>
+              <p className="text-muted-foreground text-sm">
+                Total pignorado: {formatCurrency(totalPledgedAmount)}
+              </p>
+            </div>
             {loanApplication.loanApplicationPledges?.length ? (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Codigo</TableHead>
+                    <TableHead>Documento</TableHead>
                     <TableHead>Beneficiario</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead>Fecha</TableHead>
@@ -547,6 +558,7 @@ export function LoanApplicationDetails({
                   {loanApplication.loanApplicationPledges.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell>{row.pledgeCode}</TableCell>
+                      <TableCell>{row.documentNumber ?? '-'}</TableCell>
                       <TableCell>{row.beneficiaryCode}</TableCell>
                       <TableCell>{formatCurrency(row.pledgedAmount)}</TableCell>
                       <TableCell>{formatDate(row.effectiveDate)}</TableCell>

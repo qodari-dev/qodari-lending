@@ -186,7 +186,8 @@ export const SettledCreditsReportRowSchema = z.object({
   thirdPartyDocumentNumber: z.string().nullable(),
   thirdPartyName: z.string().min(1),
   settledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  settledAmount: z.number().nonnegative(),
+  lastPaymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  creditAmount: z.number().nonnegative(),
 });
 export type SettledCreditsReportRow = z.infer<typeof SettledCreditsReportRowSchema>;
 export const GenerateSettledCreditsReportResponseSchema = buildDateRangeResponse(

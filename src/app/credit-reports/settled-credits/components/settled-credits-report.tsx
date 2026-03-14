@@ -52,7 +52,8 @@ export function SettledCreditsReport() {
           { header: 'Documento', accessorKey: 'thirdPartyDocumentNumber', width: 18 },
           { header: 'Tercero', accessorKey: 'thirdPartyName', width: 28 },
           { header: 'Fecha saldado', accessorKey: 'settledDate', width: 18 },
-          { header: 'Valor saldado', width: 18, getValue: (row) => formatCurrency(row.settledAmount) },
+          { header: 'Fecha ultimo pago', accessorKey: 'lastPaymentDate', width: 18 },
+          { header: 'Valor del credito', width: 18, getValue: (row) => formatCurrency(row.creditAmount) },
         ],
       },
       result.rows

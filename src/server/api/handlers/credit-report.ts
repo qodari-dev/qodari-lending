@@ -25,12 +25,12 @@ import { getLoanBalanceSummary, getLoanStatement } from '@/server/utils/loan-sta
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { buildCreditExtractClientStatement } from '@/server/utils/credit-extract-client';
 import { getThirdPartyLabel } from '@/utils/third-party';
-import { formatDateOnly, roundMoney } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
 import { renderTemplateToBase64 } from '@/server/pdf/render';
 import { demoDocumentTemplate } from '@/server/pdf/templates/demo-document';
 import { tsr } from '@ts-rest/serverless/next';
 import { differenceInCalendarDays } from 'date-fns';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { contract } from '../contracts';
 
@@ -254,19 +254,6 @@ function buildMovementVoucherRows(count: number): MovementVoucherReportRow[] {
   });
 }
 
-function buildSettledRows(count: number): SettledCreditsReportRow[] {
-  return Array.from({ length: count }).map((_, index) => {
-    const sequence = index + 1;
-    return {
-      creditNumber: `CRST${String(sequence).padStart(6, '0')}`,
-      thirdPartyDocumentNumber: `10${String(34000000 + sequence)}`,
-      thirdPartyName: `Tercero ${sequence}`,
-      settledDate: formatDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
-      settledAmount: roundMoney(1_000_000 + sequence * 76_000),
-    };
-  });
-}
-
 function buildSuperintendenciaRows(count: number): SuperintendenciaReportRow[] {
   return Array.from({ length: count }).map((_, index) => {
     const sequence = index + 1;
@@ -426,19 +413,64 @@ async function generateSettledCredits(body: GenerateSettledCreditsReportBody, co
   const { request, appRoute } = context;
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
-    const meta = buildRangeMeta(body.startDate, body.endDate, 36);
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
 
-    // TODO(credit-report-settled): consultar creditos saldados en el rango y construir excel final.
+    const settledLoans = await db.query.loans.findMany({
+      where: or(
+        and(eq(loans.status, 'PAID'), gte(loans.lastPaymentDate, startDate), lte(loans.lastPaymentDate, endDate)),
+        and(
+          eq(loans.status, 'PAID'),
+          isNull(loans.lastPaymentDate),
+          gte(loans.statusDate, startDate),
+          lte(loans.statusDate, endDate)
+        )
+      ),
+      columns: {
+        creditNumber: true,
+        principalAmount: true,
+        lastPaymentDate: true,
+        statusDate: true,
+      },
+      with: {
+        borrower: {
+          columns: {
+            documentNumber: true,
+            personType: true,
+            businessName: true,
+            firstName: true,
+            secondName: true,
+            firstLastName: true,
+            secondLastName: true,
+          },
+        },
+      },
+      orderBy: [desc(loans.lastPaymentDate), desc(loans.statusDate), desc(loans.creditNumber)],
+    });
+
+    const rows: SettledCreditsReportRow[] = settledLoans.map((loan) => {
+      const settledDate = loan.lastPaymentDate ?? loan.statusDate;
+
+      return {
+        creditNumber: loan.creditNumber,
+        thirdPartyDocumentNumber: loan.borrower?.documentNumber ?? null,
+        thirdPartyName: getThirdPartyLabel(loan.borrower),
+        settledDate,
+        lastPaymentDate: loan.lastPaymentDate ?? loan.statusDate,
+        creditAmount: roundMoney(toNumber(loan.principalAmount)),
+      };
+    });
+
     return {
       status: 200 as const,
       body: {
         reportType: 'SETTLED_CREDITS' as const,
-        startDate: formatDateOnly(body.startDate),
-        endDate: formatDateOnly(body.endDate),
-        reviewedCredits: meta.reviewedCredits,
-        reportedCredits: meta.reportedCredits,
-        rows: buildSettledRows(meta.reportedCredits),
-        message: 'Reporte de creditos saldados generado (demo).',
+        startDate,
+        endDate,
+        reviewedCredits: rows.length,
+        reportedCredits: rows.length,
+        rows,
+        message: 'Reporte de creditos saldados generado correctamente.',
       },
     };
   } catch (e) {

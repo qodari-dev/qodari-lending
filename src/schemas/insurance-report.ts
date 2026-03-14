@@ -6,6 +6,9 @@ export const InsuranceReportRowSchema = z.object({
   creditNumber: z.string().min(1),
   borrowerDocumentNumber: z.string().nullable(),
   borrowerName: z.string(),
+  borrowerPhone: z.string().nullable(),
+  borrowerEmail: z.string().nullable(),
+  borrowerAddress: z.string().nullable(),
   liquidationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   principalAmount: z.number().nonnegative(),
   insuredAmount: z.number().nonnegative(),
@@ -45,4 +48,3 @@ export type GenerateInsuranceReportResult = ClientInferResponseBody<
   Contract['insuranceReport']['generate'],
   200
 >;
-

@@ -82,6 +82,9 @@ export function InsuranceReport() {
           { header: '# Credito', accessorKey: 'creditNumber', width: 18 },
           { header: 'Documento', accessorKey: 'borrowerDocumentNumber', width: 18 },
           { header: 'Titular', accessorKey: 'borrowerName', width: 30 },
+          { header: 'Telefono', accessorKey: 'borrowerPhone', width: 18 },
+          { header: 'Correo', accessorKey: 'borrowerEmail', width: 28 },
+          { header: 'Direccion', accessorKey: 'borrowerAddress', width: 32 },
           { header: 'Fecha liquidacion', accessorKey: 'liquidationDate', width: 18 },
           {
             header: 'Valor credito',
@@ -104,7 +107,7 @@ export function InsuranceReport() {
     <>
       <PageHeader
         title="Reporte para aseguradoras"
-        description="Seleccione aseguradora y rango de fechas de creditos liquidados para generar excel."
+        description="Seleccione aseguradora y rango de fechas para generar el excel de créditos con seguro."
       />
       <PageContent>
         <Card>
@@ -236,4 +239,3 @@ export function InsuranceReport() {
     </>
   );
 }
-

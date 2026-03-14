@@ -1,47 +1,11 @@
-import { db, insuranceCompanies } from '@/server/db';
+import { db, insuranceCompanies, loans, thirdParties } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
-import { formatDateOnly } from '@/server/utils/value-utils';
+import { formatDateOnly, toNumber } from '@/server/utils/value-utils';
+import { getThirdPartyLabel } from '@/utils/third-party';
 import { tsr } from '@ts-rest/serverless/next';
-import { differenceInCalendarDays } from 'date-fns';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, between, eq, ne } from 'drizzle-orm';
 import { contract } from '../contracts';
-
-function buildMockCounts(startDate: Date, endDate: Date) {
-  const spanDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
-  const reviewedCredits = Math.max(10, spanDays * 6);
-  const reportedCredits = Math.max(3, Math.floor(reviewedCredits * 0.68));
-
-  return {
-    reviewedCredits,
-    reportedCredits,
-  };
-}
-
-function buildMockRows(
-  reportedCredits: number,
-  startDate: Date
-): Array<{
-  creditNumber: string;
-  borrowerDocumentNumber: string;
-  borrowerName: string;
-  liquidationDate: string;
-  principalAmount: number;
-  insuredAmount: number;
-}> {
-  return Array.from({ length: reportedCredits }).map((_, index) => {
-    const sequence = index + 1;
-    const principalAmount = 1_500_000 + sequence * 120_000;
-    return {
-      creditNumber: `CR2502${String(sequence).padStart(6, '0')}`,
-      borrowerDocumentNumber: `10${String(10000000 + sequence)}`,
-      borrowerName: `Titular ${sequence}`,
-      liquidationDate: formatDateOnly(startDate),
-      principalAmount,
-      insuredAmount: Math.round(principalAmount * 0.012),
-    };
-  });
-}
 
 export const insuranceReport = tsr.router(contract.insuranceReport, {
   generate: async ({ body }, { request, appRoute }) => {
@@ -53,6 +17,10 @@ export const insuranceReport = tsr.router(contract.insuranceReport, {
           eq(insuranceCompanies.id, body.insuranceCompanyId),
           eq(insuranceCompanies.isActive, true)
         ),
+        columns: {
+          id: true,
+          businessName: true,
+        },
       });
 
       if (!insuranceCompany) {
@@ -63,27 +31,72 @@ export const insuranceReport = tsr.router(contract.insuranceReport, {
         });
       }
 
-      // TODO(insurance-report): implementar la generacion real del reporte para aseguradoras:
-      // - consultar creditos liquidados por aseguradora en el rango de fechas
-      // - calcular valores asegurados con las reglas vigentes
-      // - marcar filas efectivamente reportadas y persistir trazabilidad del lote
-      const { reviewedCredits, reportedCredits } = buildMockCounts(
-        body.liquidatedCreditsStartDate,
-        body.liquidatedCreditsEndDate
-      );
-      const rows = buildMockRows(reportedCredits, body.liquidatedCreditsStartDate);
+      const startDate = formatDateOnly(body.liquidatedCreditsStartDate);
+      const endDate = formatDateOnly(body.liquidatedCreditsEndDate);
+
+      const creditRows = await db
+        .select({
+          creditNumber: loans.creditNumber,
+          liquidationDate: loans.creditStartDate,
+          principalAmount: loans.principalAmount,
+          insuredAmount: loans.insuranceValue,
+          borrowerDocumentNumber: thirdParties.documentNumber,
+          borrowerPersonType: thirdParties.personType,
+          borrowerBusinessName: thirdParties.businessName,
+          borrowerFirstName: thirdParties.firstName,
+          borrowerSecondName: thirdParties.secondName,
+          borrowerFirstLastName: thirdParties.firstLastName,
+          borrowerSecondLastName: thirdParties.secondLastName,
+          borrowerHomePhone: thirdParties.homePhone,
+          borrowerMobilePhone: thirdParties.mobilePhone,
+          borrowerEmail: thirdParties.email,
+          borrowerHomeAddress: thirdParties.homeAddress,
+          borrowerWorkAddress: thirdParties.workAddress,
+        })
+        .from(loans)
+        .innerJoin(thirdParties, eq(loans.thirdPartyId, thirdParties.id))
+        .where(
+          and(
+            eq(loans.insuranceCompanyId, body.insuranceCompanyId),
+            between(loans.creditStartDate, startDate, endDate),
+            ne(loans.status, 'VOID')
+          )
+        )
+        .orderBy(asc(loans.creditStartDate), asc(loans.creditNumber));
+
+      const rows = creditRows.map((row) => ({
+        creditNumber: row.creditNumber,
+        borrowerDocumentNumber: row.borrowerDocumentNumber,
+        borrowerName: getThirdPartyLabel({
+          personType: row.borrowerPersonType,
+          businessName: row.borrowerBusinessName,
+          firstName: row.borrowerFirstName,
+          secondName: row.borrowerSecondName,
+          firstLastName: row.borrowerFirstLastName,
+          secondLastName: row.borrowerSecondLastName,
+          documentNumber: row.borrowerDocumentNumber,
+        }),
+        borrowerPhone: row.borrowerMobilePhone ?? row.borrowerHomePhone ?? null,
+        borrowerEmail: row.borrowerEmail ?? null,
+        borrowerAddress: row.borrowerHomeAddress ?? row.borrowerWorkAddress ?? null,
+        liquidationDate: row.liquidationDate,
+        principalAmount: toNumber(row.principalAmount),
+        insuredAmount: toNumber(row.insuredAmount),
+      }));
 
       return {
         status: 200 as const,
         body: {
           insuranceCompanyId: insuranceCompany.id,
           insuranceCompanyName: insuranceCompany.businessName,
-          liquidatedCreditsStartDate: formatDateOnly(body.liquidatedCreditsStartDate),
-          liquidatedCreditsEndDate: formatDateOnly(body.liquidatedCreditsEndDate),
-          reviewedCredits,
-          reportedCredits,
+          liquidatedCreditsStartDate: startDate,
+          liquidatedCreditsEndDate: endDate,
+          reviewedCredits: rows.length,
+          reportedCredits: rows.length,
           rows,
-          message: 'Reporte para aseguradora generado.',
+          message: rows.length
+            ? 'Reporte para aseguradora generado correctamente.'
+            : 'No se encontraron créditos para la aseguradora en el rango indicado.',
         },
       };
     } catch (e) {

@@ -2,9 +2,9 @@ import { TsRestMetaData } from '@/schemas/ts-rest';
 import { sanitizeFilename } from '@/server/pdf/format';
 import { renderTemplate } from '@/server/pdf/render';
 import {
-  buildPreLegalCollectionLetterData,
   collectionLetterTemplate,
 } from '@/server/pdf/templates/collection-letter';
+import { buildCollectionLetterData } from '@/server/utils/collection-letter-data';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { NextRequest, NextResponse } from 'next/server';
@@ -32,11 +32,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // TODO(collection-letter-prelegal):
-    // - consultar datos reales del credito por numero
-    // - validar estado de mora para aplicar formato prejuridico
-    // - completar datos reales de titular, saldo exigible y plazo de respuesta
-    const report = buildPreLegalCollectionLetterData(creditNumber);
+    const report = await buildCollectionLetterData(creditNumber, 'pre-legal');
 
     return await renderTemplate(
       report,

@@ -1,6 +1,5 @@
 import { db, loanDisbursementEvents } from '@/server/db';
-
-type DbLike = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+import type { DbOrTx } from '@/server/db/connection';
 
 export type RecordLoanDisbursementEventInput = {
   loanId: number;
@@ -29,7 +28,7 @@ export type RecordLoanDisbursementEventInput = {
 };
 
 export async function recordLoanDisbursementEvent(
-  executor: DbLike,
+  executor: DbOrTx,
   args: RecordLoanDisbursementEventInput
 ) {
   await executor.insert(loanDisbursementEvents).values({

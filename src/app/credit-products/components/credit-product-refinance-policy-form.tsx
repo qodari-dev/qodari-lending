@@ -188,24 +188,6 @@ export function CreditProductRefinancePolicyForm() {
           />
 
           <Controller
-            name="creditProductRefinancePolicy.requireApproval"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="requireApproval">Requiere aprobacion</FieldLabel>
-                <div>
-                  <Switch
-                    checked={field.value ?? false}
-                    onCheckedChange={field.onChange}
-                    aria-invalid={fieldState.invalid}
-                  />
-                </div>
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
-          />
-
-          <Controller
             name="creditProductRefinancePolicy.isActive"
             control={form.control}
             render={({ field, fieldState }) => (

@@ -37,7 +37,7 @@ const loanStatusVariant: Record<
   GENERATED: 'outline',
   ACCOUNTED: 'default',
   VOID: 'destructive',
-  RELIQUIDATED: 'secondary',
+  REFINANCED: 'secondary',
   PAID: 'default',
 };
 

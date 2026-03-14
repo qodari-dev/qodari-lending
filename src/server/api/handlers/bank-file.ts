@@ -65,7 +65,7 @@ type ProcessNoveltyRecord = z.infer<typeof ProcessBankNoveltyBodySchema>['record
 type BankNoveltyLoanRow = {
   id: number;
   creditNumber: string;
-  status: 'GENERATED' | 'ACCOUNTED' | 'VOID' | 'RELIQUIDATED' | 'PAID';
+  status: 'GENERATED' | 'ACCOUNTED' | 'VOID' | 'REFINANCED' | 'PAID';
   disbursementStatus: 'SENT_TO_ACCOUNTING' | 'SENT_TO_BANK' | 'DISBURSED' | 'LIQUIDATED' | 'REJECTED';
   disbursementAmount: string | null;
   firstCollectionDate: string | null;

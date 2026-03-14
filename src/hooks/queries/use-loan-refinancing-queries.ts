@@ -9,3 +9,11 @@ export function useSimulateLoanRefinancing() {
     },
   });
 }
+
+export function useProcessLoanRefinancing() {
+  return api.loanRefinancing.process.useMutation({
+    onError: (error) => {
+      toast.error(getTsRestErrorMessage(error));
+    },
+  });
+}

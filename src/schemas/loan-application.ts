@@ -1,5 +1,6 @@
 import { Contract } from '@/server/api/contracts';
 import { CategoryCodeSchema, categoryCodeLabels } from '@/schemas/category';
+import { decimalStringField } from '@/schemas/shared';
 import {
   BooleanOperatorsSchema,
   createIncludeSchema,
@@ -189,20 +190,6 @@ export const LoanApplicationSubsidyPledgeLookupResponseSchema = z.object({
     .nullable(),
   groups: z.array(LoanApplicationSubsidyPledgeGroupSchema),
 });
-
-function isValidDecimal(value: string | null | undefined): boolean {
-  if (value === null || value === undefined) return false;
-  if (value.trim() === '') return false;
-  const parsed = Number(value);
-  return Number.isFinite(parsed);
-}
-
-function decimalStringField(message: string) {
-  return z
-    .string()
-    .min(1, message)
-    .refine((value) => isValidDecimal(value), { message: 'Valor numerico invalido' });
-}
 
 export const LoanApplicationCoDebtorInputSchema = z.object({
   thirdPartyId: z.number().int().positive(),

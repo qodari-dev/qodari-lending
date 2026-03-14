@@ -5,12 +5,10 @@ import {
   loanApplicationApprovalHistory,
   loanApplications,
 } from '@/server/db';
+import type { DbOrTx } from '@/server/db/connection';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { toNumber } from '@/server/utils/value-utils';
 import { and, asc, eq, sql } from 'drizzle-orm';
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-type DbLike = typeof db | DbTransaction;
 
 type LoanApplicationApprovalState = Pick<
   typeof loanApplications.$inferSelect,
@@ -74,7 +72,7 @@ function validateConfigurationOrder(
   }
 }
 
-async function listActiveLevels(tx: DbLike) {
+async function listActiveLevels(tx: DbOrTx) {
   const levels = await tx.query.loanApprovalLevels.findMany({
     where: eq(loanApprovalLevels.isActive, true),
     columns: {
@@ -97,7 +95,7 @@ async function listActiveLevels(tx: DbLike) {
   return levels;
 }
 
-export async function resolveTargetApprovalLevel(tx: DbLike, requestedAmount: string | number) {
+export async function resolveTargetApprovalLevel(tx: DbOrTx, requestedAmount: string | number) {
   const amount = toNumber(requestedAmount);
   if (!Number.isFinite(amount) || amount <= 0) {
     throwHttpError({
@@ -131,7 +129,7 @@ export async function resolveTargetApprovalLevel(tx: DbLike, requestedAmount: st
 }
 
 async function pickAssigneeForLevel(
-  tx: DbLike,
+  tx: DbOrTx,
   levelId: number,
   options?: {
     fixedUserId?: string;
@@ -218,7 +216,7 @@ async function pickAssigneeForLevel(
 }
 
 async function writeApprovalHistory(
-  tx: DbLike,
+  tx: DbOrTx,
   args: {
     loanApplicationId: number;
     levelId: number | null;
@@ -253,7 +251,7 @@ async function writeApprovalHistory(
 }
 
 export async function assignInitialApproval(
-  tx: DbLike,
+  tx: DbOrTx,
   args: {
     loanApplicationId: number;
     requestedAmount: string | number;
@@ -313,7 +311,7 @@ export async function assignInitialApproval(
 }
 
 export async function ensurePendingAssignment(
-  tx: DbLike,
+  tx: DbOrTx,
   loanApplication: LoanApplicationApprovalState,
   actor?: UserContext
 ) {
@@ -355,7 +353,7 @@ export function assertAssignedApprover(loanApplication: LoanApplicationApprovalS
 }
 
 export async function approveIntermediateLevel(
-  tx: DbLike,
+  tx: DbOrTx,
   args: {
     loanApplicationId: number;
     currentLevelId: number;
@@ -442,7 +440,7 @@ export async function approveIntermediateLevel(
 }
 
 export async function reassignApplicationApproval(
-  tx: DbLike,
+  tx: DbOrTx,
   args: {
     loanApplicationId: number;
     currentLevelId: number;
@@ -491,7 +489,7 @@ export async function reassignApplicationApproval(
 }
 
 export async function recordFinalApproval(
-  tx: DbLike,
+  tx: DbOrTx,
   args: {
     loanApplicationId: number;
     levelId: number | null;
@@ -514,7 +512,7 @@ export async function recordFinalApproval(
 }
 
 export async function recordRejectedOrCanceled(
-  tx: DbLike,
+  tx: DbOrTx,
   args: {
     loanApplicationId: number;
     levelId: number | null;

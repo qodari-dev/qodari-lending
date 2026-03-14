@@ -27,7 +27,7 @@ import {
   resolvePaymentFrequencyIntervalDays,
   resolveSuggestedFirstCollectionDate,
 } from '@/utils/payment-frequency';
-import { getThirdPartyLabel } from '@/utils/third-party';
+import { getApplicantLabel, getThirdPartyLabel } from '@/utils/third-party';
 import { Eye } from 'lucide-react';
 import { useMemo } from 'react';
 
@@ -47,12 +47,6 @@ const approvalActionLabels: Record<
   REJECTED: 'Rechazada',
   CANCELED: 'Cancelada',
 };
-
-function getApplicantLabel(application: LoanApplication): string {
-  const person = application.thirdParty;
-  if (!person) return String(application.thirdPartyId);
-  return getThirdPartyLabel(person);
-}
 
 export function LoanApplicationDetails({
   loanApplication,

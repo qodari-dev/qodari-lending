@@ -132,7 +132,7 @@ export const WORKER_STUDY_CREDIT_STATUS_OPTIONS = [
   'GENERATED',
   'ACCOUNTED',
   'VOID',
-  'RELIQUIDATED',
+  'REFINANCED',
   'PAID',
 ] as const;
 

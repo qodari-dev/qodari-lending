@@ -1,4 +1,6 @@
 import {
+  ProcessLoanRefinancingBodySchema,
+  ProcessLoanRefinancingResponseSchema,
   SimulateLoanRefinancingBodySchema,
   SimulateLoanRefinancingResponseSchema,
 } from '@/schemas/loan-refinancing';
@@ -27,6 +29,27 @@ export const loanRefinancing = c.router(
         401: TsRestErrorSchema,
         403: TsRestErrorSchema,
         404: TsRestErrorSchema,
+        500: TsRestErrorSchema,
+      },
+    },
+    process: {
+      method: 'POST',
+      path: '/process',
+      body: ProcessLoanRefinancingBodySchema,
+      metadata: {
+        auth: 'required',
+        permissionKey: {
+          resourceKey,
+          actionKey: 'refinance',
+        },
+      } satisfies TsRestMetaData,
+      responses: {
+        200: ProcessLoanRefinancingResponseSchema,
+        400: TsRestErrorSchema,
+        401: TsRestErrorSchema,
+        403: TsRestErrorSchema,
+        404: TsRestErrorSchema,
+        409: TsRestErrorSchema,
         500: TsRestErrorSchema,
       },
     },

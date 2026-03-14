@@ -1422,7 +1422,7 @@ export const loanStatusEnum = pgEnum('loan_status', [
   'GENERATED', // G
   'ACCOUNTED', // C (contabilizado)
   'VOID', // X (anulado)
-  'RELIQUIDATED', // R
+  'REFINANCED', // R
   'PAID', // P
 ]);
 
@@ -1727,7 +1727,7 @@ export const installmentRecordStatusEnum = pgEnum('installment_record_status', [
   'GENERATED', // G
   'ACCOUNTED', // C
   'VOID', // X
-  'RELIQUIDATED', // R
+  'REFINANCED', // R
   'CAUSED', // I legacy
 ]);
 
@@ -2470,6 +2470,10 @@ export const creditsSettings = pgTable('credits_settings', {
   writeOffGlAccountId: integer('write_off_gl_account_id').references(() => glAccounts.id, {
     onDelete: 'restrict',
   }),
+  refinancingReceiptTypeId: integer('refinancing_receipt_type_id').references(
+    () => paymentReceiptTypes.id,
+    { onDelete: 'restrict' }
+  ),
 
   // Firmas/cargos
   creditManagerName: varchar('credit_manager_name', { length: 50 }),
@@ -3237,9 +3241,6 @@ export const creditProductRefinancePolicies = pgTable(
 
     // la mora/saldo vencido se suma al nuevo capital refinanciado.
     capitalizeArrears: boolean('capitalize_arrears').notNull().default(false),
-
-    // control
-    requireApproval: boolean('require_approval').notNull().default(false),
 
     isActive: boolean('is_active').notNull().default(true),
 

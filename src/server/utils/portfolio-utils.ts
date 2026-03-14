@@ -1,9 +1,8 @@
 import { db, portfolioEntries } from '@/server/db';
+import type { DbTransaction } from '@/server/db/connection';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
 import { and, eq } from 'drizzle-orm';
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type PortfolioDeltaInput = {
   glAccountId: number;

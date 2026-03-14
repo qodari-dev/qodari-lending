@@ -11,3 +11,6 @@ export const db = drizzle({
   },
   logger: env.NODE_ENV === 'development',
 });
+
+export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type DbOrTx = typeof db | DbTransaction;

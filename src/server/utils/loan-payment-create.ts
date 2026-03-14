@@ -18,9 +18,8 @@ import {
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { applyPortfolioDeltas } from '@/server/utils/portfolio-utils';
 import { formatDateOnly, roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
+import type { DbTransaction } from '@/server/db/connection';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 type LoanPaymentMethodAllocationInput = {
   collectionMethodId: number;

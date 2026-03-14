@@ -1,4 +1,5 @@
 import { Contract } from '@/server/api/contracts';
+import { isValidDecimal } from '@/schemas/shared';
 import {
   BooleanOperatorsSchema,
   createIncludeSchema,
@@ -45,13 +46,6 @@ export type ListLoanApprovalLevelsQuery = z.infer<typeof ListLoanApprovalLevelsQ
 export const GetLoanApprovalLevelQuerySchema = z.object({
   include: LoanApprovalLevelIncludeSchema,
 });
-
-function isValidDecimal(value: string | null | undefined): boolean {
-  if (value === null || value === undefined) return false;
-  if (value.trim() === '') return false;
-  const parsed = Number(value);
-  return Number.isFinite(parsed);
-}
 
 export const LoanApprovalLevelUserInputSchema = z.object({
   userId: z.uuid(),

@@ -127,7 +127,6 @@ export function CreditProductForm({
         minPaidInstallments: 0,
         maxRefinanceCount: 0,
         capitalizeArrears: false,
-        requireApproval: false,
         isActive: false,
       },
       creditProductChargeOffPolicy: {
@@ -250,7 +249,6 @@ export function CreditProductForm({
               minPaidInstallments: creditProduct.creditProductRefinancePolicy.minPaidInstallments,
               maxRefinanceCount: creditProduct.creditProductRefinancePolicy.maxRefinanceCount,
               capitalizeArrears: creditProduct.creditProductRefinancePolicy.capitalizeArrears,
-              requireApproval: creditProduct.creditProductRefinancePolicy.requireApproval,
               isActive: creditProduct.creditProductRefinancePolicy.isActive,
             }
           : {
@@ -262,7 +260,6 @@ export function CreditProductForm({
               minPaidInstallments: 0,
               maxRefinanceCount: 0,
               capitalizeArrears: false,
-              requireApproval: false,
               isActive: false,
             },
         creditProductChargeOffPolicy: creditProduct?.creditProductChargeOffPolicy

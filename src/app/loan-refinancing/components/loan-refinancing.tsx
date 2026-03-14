@@ -24,7 +24,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useSimulateLoanRefinancing } from '@/hooks/queries/use-loan-refinancing-queries';
+import {
+  useProcessLoanRefinancing,
+  useSimulateLoanRefinancing,
+} from '@/hooks/queries/use-loan-refinancing-queries';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useCreditProducts } from '@/hooks/queries/use-credit-product-queries';
 import { useInsuranceCompanies } from '@/hooks/queries/use-insurance-company-queries';
 import { usePaymentFrequencies } from '@/hooks/queries/use-payment-frequency-queries';
@@ -35,7 +48,7 @@ import { getTsRestErrorMessage } from '@/utils/get-ts-rest-error-message';
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from '@/utils/formatters';
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronDownIcon, Lock, Search } from 'lucide-react';
+import { ChevronDownIcon, Search } from 'lucide-react';
 import React from 'react';
 import { Controller, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -222,7 +235,7 @@ export function LoanRefinancing() {
             where: {
               and: [
                 { thirdPartyId: { eq: originItem.thirdPartyId } },
-                { status: { in: ['GENERATED', 'ACCOUNTED', 'RELIQUIDATED'] } },
+                { status: { in: ['GENERATED', 'ACCOUNTED', 'REFINANCED'] } },
               ],
             },
           },
@@ -289,6 +302,40 @@ export function LoanRefinancing() {
   );
 
   const { mutateAsync: simulateRefinancing, isPending: isSimulating } = useSimulateLoanRefinancing();
+  const { mutateAsync: processRefinancing, isPending: isProcessing } = useProcessLoanRefinancing();
+  const [openedConfirmDialog, setOpenedConfirmDialog] = React.useState(false);
+
+  const handleProcess = async () => {
+    if (!simulation || !originLoan) return;
+    setOpenedConfirmDialog(false);
+
+    const values = form.getValues();
+    try {
+      const response = await processRefinancing({
+        body: {
+          originLoanId: originLoan.id,
+          selectedLoanIds,
+          includeOverdueBalance: values.includeOverdueBalance,
+          creditProductId: values.creditProductId,
+          categoryCode: values.categoryCode,
+          installments: values.installments,
+          paymentFrequencyId: values.paymentFrequencyId,
+          firstPaymentDate: values.firstPaymentDate,
+          insuranceCompanyId: values.insuranceCompanyId ?? null,
+          note: null,
+        },
+      });
+      toast.success(
+        `Refinanciacion exitosa. Nuevo credito: ${response.body.newCreditNumber}`
+      );
+      setSimulation(null);
+      setOriginLoan(null);
+      setSelectedLoanIds([]);
+      setCreditNumberInput('');
+    } catch {
+      // toast handled by mutation's onError
+    }
+  };
 
   const onSubmitSimulation = async (values: SimulationParamsForm) => {
     if (!originLoan) {
@@ -665,9 +712,14 @@ export function LoanRefinancing() {
                       {isSimulating ? <Spinner /> : null}
                       Simular
                     </Button>
-                    <Button type="button" variant="secondary" disabled>
-                      <Lock />
-                      Refinanciar (Proximamente)
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!simulation || isProcessing}
+                      onClick={() => setOpenedConfirmDialog(true)}
+                    >
+                      {isProcessing ? <Spinner /> : null}
+                      Refinanciar
                     </Button>
                   </div>
                 </form>
@@ -792,6 +844,37 @@ export function LoanRefinancing() {
           </div>
         ) : null}
       </PageContent>
+
+      <AlertDialog open={openedConfirmDialog} onOpenChange={setOpenedConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar refinanciacion</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Se pagaran {selectedLoanIds.length} credito(s) y se creara un nuevo credito con
+                  los siguientes datos:
+                </p>
+                {simulation && (
+                  <ul className="list-inside list-disc text-sm">
+                    <li>Capital: {formatCurrency(simulation.after.principalToRefinance)}</li>
+                    <li>Cuotas: {simulation.summary.installments}</li>
+                    <li>
+                      Cuota estimada:{' '}
+                      {formatCurrency(simulation.after.projectedMaxInstallmentPayment)}
+                    </li>
+                  </ul>
+                )}
+                <p className="font-medium">Esta accion es irreversible. Desea continuar?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleProcess}>Confirmar refinanciacion</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

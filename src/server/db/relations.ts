@@ -958,6 +958,10 @@ export const creditsSettingsRelations = relations(creditsSettings, ({ one }) => 
     references: [glAccounts.id],
     relationName: 'writeOffGlAccount',
   }),
+  refinancingReceiptType: one(paymentReceiptTypes, {
+    fields: [creditsSettings.refinancingReceiptTypeId],
+    references: [paymentReceiptTypes.id],
+  }),
 }));
 
 // ---------------------------------------------------------------------

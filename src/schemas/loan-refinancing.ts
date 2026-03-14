@@ -71,3 +71,24 @@ export type SimulateLoanRefinancingResult = ClientInferResponseBody<
   Contract['loanRefinancing']['simulate'],
   200
 >;
+
+export const ProcessLoanRefinancingBodySchema = SimulateLoanRefinancingBodySchema.extend({
+  note: z.string().max(255).nullable().optional(),
+});
+
+export const ProcessLoanRefinancingResponseSchema = z.object({
+  newLoanId: z.number().int().positive(),
+  newCreditNumber: z.string(),
+  paidOffLoans: z.array(
+    z.object({
+      loanId: z.number().int().positive(),
+      creditNumber: z.string(),
+      payoffAmount: z.number().nonnegative(),
+    })
+  ),
+});
+
+export type ProcessLoanRefinancingResult = ClientInferResponseBody<
+  Contract['loanRefinancing']['process'],
+  200
+>;

@@ -25,8 +25,10 @@ import {
   useUpdateCreditsSettings,
 } from '@/hooks/queries/use-credits-settings-queries';
 import { useGlAccounts } from '@/hooks/queries/use-gl-account-queries';
+import { usePaymentReceiptTypes } from '@/hooks/queries/use-payment-receipt-type-queries';
 import { UpdateCreditsSettingsBodySchema } from '@/schemas/credits-settings';
 import type { GlAccount } from '@/schemas/gl-account';
+import type { PaymentReceiptType } from '@/schemas/payment-receipt-type';
 import { useHasPermission } from '@/stores/auth-store-provider';
 import { onSubmitError } from '@/utils/on-submit-error';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -54,20 +56,33 @@ export function CreditsSettingsPage() {
       'excessGlAccount',
       'pledgeSubsidyGlAccount',
       'writeOffGlAccount',
+      'refinancingReceiptType',
     ],
   });
 
   // Fetch GL accounts for selects
   const { data: glAccountsData, isLoading: isLoadingGlAccounts } = useGlAccounts({ limit: 500 });
+  const { data: receiptTypesData, isLoading: isLoadingReceiptTypes } = usePaymentReceiptTypes({
+    limit: 500,
+    where: { and: [{ isActive: true }] },
+  });
 
   const glAccounts = React.useMemo(() => glAccountsData?.body?.data ?? [], [glAccountsData]);
+  const receiptTypes = React.useMemo(
+    () => receiptTypesData?.body?.data ?? [],
+    [receiptTypesData]
+  );
   const settings = settingsData?.body;
   const findGlAccount = React.useCallback(
     (id: number | null | undefined) => glAccounts.find((item) => item.id === id) ?? null,
     [glAccounts]
   );
+  const findReceiptType = React.useCallback(
+    (id: number | null | undefined) => receiptTypes.find((item) => item.id === id) ?? null,
+    [receiptTypes]
+  );
 
-  const isLoadingSelects = isLoadingGlAccounts;
+  const isLoadingSelects = isLoadingGlAccounts || isLoadingReceiptTypes;
   const [isFormReady, setIsFormReady] = React.useState(false);
 
   const form = useForm<FormValues>({
@@ -95,6 +110,7 @@ export function CreditsSettingsPage() {
         excessGlAccountId: settings.excessGlAccountId ?? undefined,
         pledgeSubsidyGlAccountId: settings.pledgeSubsidyGlAccountId ?? undefined,
         writeOffGlAccountId: settings.writeOffGlAccountId ?? undefined,
+        refinancingReceiptTypeId: settings.refinancingReceiptTypeId ?? undefined,
         creditManagerName: settings.creditManagerName ?? '',
         creditManagerTitle: settings.creditManagerTitle ?? '',
         adminManagerName: settings.adminManagerName ?? '',
@@ -632,6 +648,58 @@ export function CreditsSettingsPage() {
                                 <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
                                 <ComboboxCollection>
                                   {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="refinancingReceiptTypeId"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Tipo Recibo Refinanciacion</FieldLabel>
+                          <Combobox
+                            items={receiptTypes}
+                            value={findReceiptType(field.value)}
+                            onValueChange={(value: PaymentReceiptType | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: PaymentReceiptType) => String(item.id)}
+                            itemToStringLabel={(item: PaymentReceiptType) =>
+                              `${item.code} - ${item.name}`
+                            }
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar tipo de recibo..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron tipos</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: PaymentReceiptType) => (
                                     <ComboboxItem key={item.id} value={item}>
                                       {item.code} - {item.name}
                                     </ComboboxItem>

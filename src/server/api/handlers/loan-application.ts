@@ -1,14 +1,10 @@
 import {
-  agreements,
   affiliationOffices,
   billingConceptRules,
   creditsSettings,
-  creditProductCategories,
   creditProductBillingConcepts,
-  creditProductDocuments,
   creditProducts,
   db,
-  insuranceCompanies,
   loanApplicationActNumbers,
   loanApplicationCoDebtors,
   loanApplicationDocuments,
@@ -49,16 +45,13 @@ import {
   createSpacesPresignedPutUrl,
 } from '@/server/utils/storage/spaces-presign';
 import { recordLoanDisbursementEvent } from '@/server/utils/loan-disbursement-events';
-import {
-  calculateCreditSimulation,
-  findInsuranceRateRange,
-  resolveInsuranceFactorFromRange,
-} from '@/utils/credit-simulation';
+import { calculateCreditSimulation } from '@/utils/credit-simulation';
 import {
   formatDateOnly,
   toDecimalString,
   toNumber,
   toRateString,
+  roundMoney,
 } from '@/server/utils/value-utils';
 import { normalizeDocumentNumber } from '@/server/utils/string-utils';
 import { calculateLoanApplicationPaymentCapacity } from '@/utils/payment-capacity';
@@ -67,12 +60,11 @@ import {
   resolveSuggestedFirstCollectionDate,
 } from '@/utils/payment-frequency';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { contract } from '../contracts';
 import { env } from '@/env';
 import { pickApplicableBillingRule } from '@/server/utils/billing-concept-resolver';
 import { calculateOneTimeConceptAmount } from '@/server/utils/accounting-utils';
-import { roundMoney } from '@/server/utils/value-utils';
 import {
   approveIntermediateLevel,
   assertAssignedApprover,
@@ -82,6 +74,16 @@ import {
   recordRejectedOrCanceled,
   assignInitialApproval,
 } from '@/server/services/loan-applications/loan-application-approval-service';
+import {
+  buildFallbackBeneficiaryCode,
+  ensureThirdPartiesAreUpToDate,
+  ensureUniqueCreditNumber,
+  getPledgeSubsidyCodeSetting,
+  resolveCategoryAndFinancingFactor,
+  resolveInsuranceFactor,
+  validateLoanApplicationAgreement,
+  validateRequiredDocuments,
+} from '@/server/services/loan-applications/loan-application-validation-service';
 import {
   getSubsidyCurrentPeriod,
   getSubsidyWorkerStudy,
@@ -241,344 +243,6 @@ const LOAN_APPLICATION_INCLUDES = createIncludeMap<typeof db.query.loanApplicati
   },
 });
 
-async function resolveCategoryAndFinancingFactor(args: {
-  creditProductId: number;
-  categoryCode: string;
-  installments: number;
-}) {
-  const category = await db.query.creditProductCategories.findFirst({
-    where: and(
-      eq(creditProductCategories.creditProductId, args.creditProductId),
-      eq(
-        creditProductCategories.categoryCode,
-        args.categoryCode as typeof creditProductCategories.$inferSelect.categoryCode
-      ),
-      lte(creditProductCategories.installmentsFrom, args.installments),
-      gte(creditProductCategories.installmentsTo, args.installments)
-    ),
-  });
-
-  if (!category) {
-    throwHttpError({
-      status: 404,
-      message: 'No existe categoria configurada para la linea y el rango de cuotas seleccionado',
-      code: 'NOT_FOUND',
-    });
-  }
-
-  return {
-    category,
-    financingFactor: toNumber(category.financingFactor),
-  };
-}
-
-async function resolveInsuranceFactor(args: {
-  creditProductId: number;
-  insuranceCompanyId: number | null | undefined;
-  installments: number;
-  requestedAmount: number;
-  product?: typeof creditProducts.$inferSelect | null;
-}) {
-  const product =
-    args.product ??
-    (await db.query.creditProducts.findFirst({
-      where: and(eq(creditProducts.id, args.creditProductId), eq(creditProducts.isActive, true)),
-    }));
-
-  if (!product) {
-    throwHttpError({
-      status: 404,
-      message: 'Linea de credito no encontrada',
-      code: 'NOT_FOUND',
-    });
-  }
-
-  if (!product.paysInsurance) {
-    return {
-      product,
-      insuranceFactor: 0,
-      insuranceCompanyId: null,
-      insuranceRateType: null,
-      insuranceRatePercent: 0,
-      insuranceFixedAmount: 0,
-      insuranceMinimumAmount: 0,
-    };
-  }
-
-  if (!args.insuranceCompanyId) {
-    throwHttpError({
-      status: 400,
-      message: 'Debe seleccionar una aseguradora para esta linea de credito',
-      code: 'BAD_REQUEST',
-    });
-  }
-
-  const insurer = await db.query.insuranceCompanies.findFirst({
-    where: and(
-      eq(insuranceCompanies.id, args.insuranceCompanyId),
-      eq(insuranceCompanies.isActive, true)
-    ),
-    with: {
-      insuranceRateRanges: true,
-    },
-  });
-
-  if (!insurer) {
-    throwHttpError({
-      status: 404,
-      message: 'Aseguradora no encontrada',
-      code: 'NOT_FOUND',
-    });
-  }
-
-  const metricValue =
-    product.insuranceRangeMetric === 'INSTALLMENT_COUNT' ? args.installments : args.requestedAmount;
-
-  const insuranceRange = findInsuranceRateRange({
-    ranges: insurer.insuranceRateRanges,
-    rangeMetric: product.insuranceRangeMetric,
-    metricValue,
-  });
-
-  if (!insuranceRange) {
-    throwHttpError({
-      status: 400,
-      message: 'La aseguradora no tiene un rango de tasa aplicable para esta solicitud',
-      code: 'BAD_REQUEST',
-    });
-  }
-
-  const insuranceResolved = resolveInsuranceFactorFromRange({
-    range: insuranceRange,
-    minimumValue: insurer.minimumValue,
-  });
-
-  return {
-    product,
-    insuranceFactor: insuranceResolved.insuranceFactor,
-    insuranceCompanyId: insurer.id,
-    insuranceRateType: insuranceResolved.insuranceRateType,
-    insuranceRatePercent: insuranceResolved.insuranceRatePercent,
-    insuranceFixedAmount: insuranceResolved.insuranceFixedAmount,
-    insuranceMinimumAmount: insuranceResolved.insuranceMinimumAmount,
-  };
-}
-
-async function validateRequiredDocuments(args: {
-  creditProductId: number;
-  documents: {
-    documentTypeId: number;
-    isDelivered: boolean;
-    fileKey?: string | null;
-  }[];
-}) {
-  const requiredDocs = await db.query.creditProductDocuments.findMany({
-    where: and(
-      eq(creditProductDocuments.creditProductId, args.creditProductId),
-      eq(creditProductDocuments.isRequired, true)
-    ),
-  });
-
-  if (!requiredDocs.length) return;
-
-  const submittedByType = new Map<number, { isDelivered: boolean; fileKey?: string | null }>();
-  for (const doc of args.documents) {
-    submittedByType.set(doc.documentTypeId, doc);
-  }
-
-  for (const requiredDoc of requiredDocs) {
-    const submitted = submittedByType.get(requiredDoc.documentTypeId);
-    if (!submitted || !submitted.isDelivered || !submitted.fileKey) {
-      throwHttpError({
-        status: 400,
-        message: `Debe adjuntar todos los documentos obligatorios del tipo de credito`,
-        code: 'BAD_REQUEST',
-      });
-    }
-  }
-}
-
-async function ensureThirdPartiesAreUpToDate(args: { thirdPartyIds: number[] }) {
-  const ids = [...new Set(args.thirdPartyIds)];
-  if (!ids.length) return;
-
-  const existing = await db.query.thirdParties.findMany({
-    where: inArray(thirdParties.id, ids),
-    columns: { id: true, updatedAt: true },
-  });
-
-  if (existing.length !== ids.length) {
-    throwHttpError({
-      status: 400,
-      message: 'Uno o más terceros asociados no existen',
-      code: 'BAD_REQUEST',
-    });
-  }
-
-  const today = formatDateOnly(new Date());
-  const staleRecords = existing.filter(
-    (thirdParty) => formatDateOnly(thirdParty.updatedAt) !== today
-  );
-
-  if (staleRecords.length) {
-    throwHttpError({
-      status: 400,
-      message: 'Debe actualizar hoy la informacion del solicitante y codeudores antes de guardar',
-      code: 'BAD_REQUEST',
-    });
-  }
-}
-
-async function validateLoanApplicationAgreement(args: {
-  agreementId: number;
-  thirdPartyId: number;
-  referenceDate: string;
-}) {
-  const [agreement, applicant] = await Promise.all([
-    db.query.agreements.findFirst({
-      where: and(eq(agreements.id, args.agreementId), eq(agreements.isActive, true)),
-      columns: {
-        id: true,
-        agreementCode: true,
-        businessName: true,
-        documentNumber: true,
-        startDate: true,
-        endDate: true,
-      },
-    }),
-    db.query.thirdParties.findFirst({
-      where: eq(thirdParties.id, args.thirdPartyId),
-      columns: {
-        id: true,
-        employerDocumentNumber: true,
-        employerBusinessName: true,
-      },
-    }),
-  ]);
-
-  if (!agreement) {
-    throwHttpError({
-      status: 404,
-      message: 'Convenio no encontrado o inactivo',
-      code: 'NOT_FOUND',
-    });
-  }
-
-  if (agreement.startDate && agreement.startDate > args.referenceDate) {
-    throwHttpError({
-      status: 400,
-      message: 'El convenio seleccionado aun no esta vigente para la fecha de la solicitud',
-      code: 'BAD_REQUEST',
-    });
-  }
-
-  if (agreement.endDate && agreement.endDate < args.referenceDate) {
-    throwHttpError({
-      status: 400,
-      message: 'El convenio seleccionado ya no esta vigente para la fecha de la solicitud',
-      code: 'BAD_REQUEST',
-    });
-  }
-
-  if (!applicant) {
-    throwHttpError({
-      status: 404,
-      message: 'Solicitante no encontrado',
-      code: 'NOT_FOUND',
-    });
-  }
-
-  const employerDocument = normalizeDocumentNumber(applicant.employerDocumentNumber ?? '');
-  const agreementDocument = normalizeDocumentNumber(agreement.documentNumber ?? '');
-
-  if (!employerDocument) {
-    throwHttpError({
-      status: 400,
-      message:
-        'El solicitante no tiene empresa empleadora configurada. Actualice el tercero antes de asignar convenio',
-      code: 'BAD_REQUEST',
-    });
-  }
-
-  if (!agreementDocument || employerDocument !== agreementDocument) {
-    throwHttpError({
-      status: 400,
-      message: `El solicitante no pertenece a la empresa del convenio ${agreement.agreementCode} - ${agreement.businessName}`,
-      code: 'BAD_REQUEST',
-    });
-  }
-
-  return agreement;
-}
-
-async function getPledgeSubsidyCodeSetting() {
-  const settings = await db.query.creditsSettings.findFirst({
-    where: eq(creditsSettings.appSlug, env.IAM_APP_SLUG),
-    columns: {
-      pledgeSubsidyCode: true,
-    },
-  });
-
-  const pledgeCode = settings?.pledgeSubsidyCode?.trim() || null;
-  if (!pledgeCode) {
-    throwHttpError({
-      status: 400,
-      message:
-        'No existe codigo de pignoracion configurado en créditos. Actualice credit settings antes de guardar',
-      code: 'BAD_REQUEST',
-    });
-  }
-
-  return pledgeCode;
-}
-
-function buildFallbackBeneficiaryCode(params: {
-  documentNumber: string | null;
-  spouseDocumentNumber: string | null;
-  fullName: string;
-  index: number;
-}) {
-  if (params.documentNumber) return params.documentNumber;
-  return `BEN-${params.spouseDocumentNumber ?? 'SINCONYUGE'}-${params.index + 1}-${params.fullName
-    .trim()
-    .replace(/\s+/g, '-')
-    .toUpperCase()}`;
-}
-
-function generateCreditNumber(prefix: string): string {
-  const now = new Date();
-  const yy = String(now.getFullYear()).slice(-2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mi = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
-  const rnd = Math.floor(Math.random() * 900 + 100);
-  const normalizedPrefix = prefix.trim().toUpperCase().slice(0, 5);
-  return `${normalizedPrefix}${yy}${mm}${dd}${hh}${mi}${ss}${rnd}`;
-}
-
-type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-async function ensureUniqueCreditNumber(prefix: string, dbOrTx: DbOrTx = db) {
-  for (let i = 0; i < 5; i += 1) {
-    const creditNumber = generateCreditNumber(prefix);
-    const exists = await dbOrTx.query.loanApplications.findFirst({
-      where: eq(loanApplications.creditNumber, creditNumber),
-      columns: { id: true },
-    });
-    if (!exists) {
-      return creditNumber;
-    }
-  }
-
-  throwHttpError({
-    status: 500,
-    message: 'No fue posible generar consecutivo para la solicitud',
-    code: 'INTERNAL_SERVER_ERROR',
-  });
-}
-
 export const loanApplication = tsr.router(contract.loanApplication, {
   list: async ({ query }, { request, appRoute }) => {
     try {
@@ -643,16 +307,11 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         offset,
       } = buildQuery({ page, limit, search, where, sort }, LOAN_APPLICATION_QUERY_CONFIG);
 
-      const inboxWhere = whereClause
-        ? and(
-            whereClause,
-            eq(loanApplications.status, 'PENDING'),
-            eq(loanApplications.assignedApprovalUserId, userId)
-          )
-        : and(
-            eq(loanApplications.status, 'PENDING'),
-            eq(loanApplications.assignedApprovalUserId, userId)
-          );
+      const inboxWhere = and(
+        whereClause,
+        eq(loanApplications.status, 'PENDING'),
+        eq(loanApplications.assignedApprovalUserId, userId)
+      );
 
       const [data, countResult] = await Promise.all([
         db.query.loanApplications.findMany({
@@ -840,7 +499,8 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         }>;
       };
 
-      const todayMs = new Date(formatDateOnly(new Date()) + 'T00:00:00').getTime();
+      const todayStr = formatDateOnly(new Date());
+      const todayMs = new Date(todayStr + 'T00:00:00Z').getTime();
 
       const usersMap = new Map<string, ApprovalLoadUserEntry>();
 
@@ -864,11 +524,11 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         const assignedAt = app.approvalAssignedAt ?? app.createdAt;
         const assignedAtIso =
           assignedAt instanceof Date ? assignedAt.toISOString() : String(assignedAt);
-        const assignedDateMs = new Date(formatDateOnly(assignedAt) + 'T00:00:00').getTime();
+        const assignedDateMs = new Date(formatDateOnly(assignedAt) + 'T00:00:00Z').getTime();
         const pendingDays = Math.max(0, Math.round((todayMs - assignedDateMs) / 86_400_000));
         const createdAtIso =
           app.createdAt instanceof Date ? app.createdAt.toISOString() : String(app.createdAt);
-        const createdDateMs = new Date(formatDateOnly(app.createdAt) + 'T00:00:00').getTime();
+        const createdDateMs = new Date(formatDateOnly(app.createdAt) + 'T00:00:00Z').getTime();
         const createdDays = Math.max(0, Math.round((todayMs - createdDateMs) / 86_400_000));
 
         const entry: ApprovalLoadUserEntry = usersMap.get(assignedUserId) ?? {
@@ -1246,7 +906,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
               isDelivered: document.isDelivered,
               fileKey: document.fileKey ?? null,
               uploadedByUserId: document.fileKey ? userId : null,
-              uploadedByUserName: document.fileKey ? userId : null,
+              uploadedByUserName: document.fileKey ? (userName || userId) : null,
             }))
           );
         }
@@ -1550,7 +1210,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
                 isDelivered: document.isDelivered,
                 fileKey: document.fileKey ?? null,
                 uploadedByUserId: document.fileKey ? userId : null,
-                uploadedByUserName: document.fileKey ? userId : null,
+                uploadedByUserName: document.fileKey ? (userName || userId) : null,
               }))
             );
           }
@@ -1720,7 +1380,30 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const statusDate = formatDateOnly(new Date());
 
       const [updated] = await db.transaction(async (tx) => {
-        const pendingApplication = await ensurePendingAssignment(tx, existing, {
+        // Re-read inside tx for consistent fromStatus
+        const current = await tx.query.loanApplications.findFirst({
+          where: eq(loanApplications.id, id),
+          columns: {
+            id: true,
+            status: true,
+            requestedAmount: true,
+            currentApprovalLevelId: true,
+            targetApprovalLevelId: true,
+            assignedApprovalUserId: true,
+            assignedApprovalUserName: true,
+            approvalAssignedAt: true,
+          },
+        });
+
+        if (!current || current.status !== 'PENDING') {
+          throwHttpError({
+            status: 400,
+            message: 'Solo se pueden cancelar solicitudes en estado pendiente',
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        const pendingApplication = await ensurePendingAssignment(tx, current, {
           userId,
           userName: userName || userId,
         });
@@ -1746,7 +1429,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
 
         await tx.insert(loanApplicationStatusHistory).values({
           loanApplicationId: id,
-          fromStatus: existing.status,
+          fromStatus: current.status,
           toStatus: 'CANCELED',
           changedByUserId: userId,
           changedByUserName: userName || userId,
@@ -1858,7 +1541,30 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       const statusDate = formatDateOnly(new Date());
 
       const [updated] = await db.transaction(async (tx) => {
-        const pendingApplication = await ensurePendingAssignment(tx, existing, {
+        // Re-read inside tx for consistent fromStatus
+        const current = await tx.query.loanApplications.findFirst({
+          where: eq(loanApplications.id, id),
+          columns: {
+            id: true,
+            status: true,
+            requestedAmount: true,
+            currentApprovalLevelId: true,
+            targetApprovalLevelId: true,
+            assignedApprovalUserId: true,
+            assignedApprovalUserName: true,
+            approvalAssignedAt: true,
+          },
+        });
+
+        if (!current || current.status !== 'PENDING') {
+          throwHttpError({
+            status: 400,
+            message: 'Solo se pueden rechazar solicitudes en estado pendiente',
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        const pendingApplication = await ensurePendingAssignment(tx, current, {
           userId,
           userName: userName || userId,
         });
@@ -1884,7 +1590,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
 
         await tx.insert(loanApplicationStatusHistory).values({
           loanApplicationId: id,
-          fromStatus: existing.status,
+          fromStatus: current.status,
           toStatus: 'REJECTED',
           changedByUserId: userId,
           changedByUserName: userName || userId,
@@ -1997,6 +1703,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
       }
 
       const { userId, userName } = getRequiredUserContext(session);
+      const today = formatDateOnly(new Date());
 
       if (body.mode === 'STEP') {
         const approvedAmount = toNumber(body.approvedAmount);
@@ -2024,6 +1731,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           db.query.loanApplicationActNumbers.findFirst({
             where: and(
               eq(loanApplicationActNumbers.affiliationOfficeId, existing.affiliationOfficeId),
+              eq(loanApplicationActNumbers.actDate, today),
               eq(loanApplicationActNumbers.actNumber, body.actNumber)
             ),
           }),
@@ -2140,6 +1848,26 @@ export const loanApplication = tsr.router(contract.loanApplication, {
             });
           }
 
+          // Validate approvedAmount does not exceed the level's maxApprovalAmount
+          const currentLevel = await tx.query.loanApprovalLevels.findFirst({
+            where: eq(loanApprovalLevels.id, pendingApplication.currentApprovalLevelId),
+            columns: { maxApprovalAmount: true, name: true },
+          });
+
+          if (
+            currentLevel?.maxApprovalAmount !== null &&
+            currentLevel?.maxApprovalAmount !== undefined
+          ) {
+            const levelMax = toNumber(currentLevel.maxApprovalAmount);
+            if (approvedAmount > levelMax) {
+              throwHttpError({
+                status: 400,
+                message: `El monto aprobado ($${approvedAmount.toLocaleString()}) excede el tope del nivel "${currentLevel.name}" ($${levelMax.toLocaleString()}). Se requiere un nivel superior.`,
+                code: 'BAD_REQUEST',
+              });
+            }
+          }
+
           await tx
             .update(loanApplications)
             .set({
@@ -2228,7 +1956,6 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         });
       }
       const approvedInstallments = finalBody.approvedInstallments;
-      const today = formatDateOnly(new Date());
 
       const [
         affiliationOffice,

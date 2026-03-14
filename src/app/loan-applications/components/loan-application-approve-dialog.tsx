@@ -316,43 +316,43 @@ export function LoanApplicationApproveDialog({
   async function onSubmit(values: ApproveFormValues) {
     if (!loanApplication?.id) return;
 
-    if (mode === 'STEP') {
-      await approveLoanApplication({
-        params: { id: loanApplication.id },
-        body: {
-          mode: 'STEP',
-          repaymentMethodId: values.repaymentMethodId!,
-          paymentGuaranteeTypeId: values.paymentGuaranteeTypeId!,
-          isInsuranceApproved: values.isInsuranceApproved,
-          approvedInstallments: values.approvedInstallments!,
-          approvedAmount: values.approvedAmount.trim(),
-          actNumber: values.actNumber.trim(),
-          approvalNote: values.approvalNote?.trim() ?? '',
-        },
-      });
+    try {
+      if (mode === 'STEP') {
+        await approveLoanApplication({
+          params: { id: loanApplication.id },
+          body: {
+            mode: 'STEP',
+            repaymentMethodId: values.repaymentMethodId!,
+            paymentGuaranteeTypeId: values.paymentGuaranteeTypeId!,
+            isInsuranceApproved: values.isInsuranceApproved,
+            approvedInstallments: values.approvedInstallments!,
+            approvedAmount: values.approvedAmount.trim(),
+            actNumber: values.actNumber.trim(),
+            approvalNote: values.approvalNote?.trim() ?? '',
+          },
+        });
+      } else {
+        await approveLoanApplication({
+          params: { id: loanApplication.id },
+          body: {
+            mode: 'FINAL',
+            repaymentMethodId: values.repaymentMethodId!,
+            paymentGuaranteeTypeId: values.paymentGuaranteeTypeId!,
+            isInsuranceApproved: values.isInsuranceApproved,
+            approvedInstallments: values.approvedInstallments!,
+            approvedAmount: values.approvedAmount.trim(),
+            actNumber: values.actNumber.trim(),
+            payeeThirdPartyId: values.payeeThirdPartyId!,
+            firstCollectionDate: values.firstCollectionDate,
+          },
+        });
+      }
 
       onOpened(false);
       onApproved?.();
-      return;
+    } catch {
+      // toast is handled by the mutation's onError callback
     }
-
-    await approveLoanApplication({
-      params: { id: loanApplication.id },
-      body: {
-        mode: 'FINAL',
-        repaymentMethodId: values.repaymentMethodId!,
-        paymentGuaranteeTypeId: values.paymentGuaranteeTypeId!,
-        isInsuranceApproved: values.isInsuranceApproved,
-        approvedInstallments: values.approvedInstallments!,
-        approvedAmount: values.approvedAmount.trim(),
-        actNumber: values.actNumber.trim(),
-        payeeThirdPartyId: values.payeeThirdPartyId!,
-        firstCollectionDate: values.firstCollectionDate,
-      },
-    });
-
-    onOpened(false);
-    onApproved?.();
   }
 
   const open = opened && !!loanApplication;

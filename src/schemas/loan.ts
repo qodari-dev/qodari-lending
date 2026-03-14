@@ -15,7 +15,7 @@ export const LOAN_STATUS_OPTIONS = [
   'GENERATED',
   'ACCOUNTED',
   'VOID',
-  'RELIQUIDATED',
+  'REFINANCED',
   'PAID',
 ] as const;
 export type LoanStatus = (typeof LOAN_STATUS_OPTIONS)[number];
@@ -45,7 +45,7 @@ export const INSTALLMENT_RECORD_STATUS_OPTIONS = [
   'GENERATED',
   'ACCOUNTED',
   'VOID',
-  'RELIQUIDATED',
+  'REFINANCED',
   'CAUSED',
 ] as const;
 export type InstallmentRecordStatus = (typeof INSTALLMENT_RECORD_STATUS_OPTIONS)[number];
@@ -57,7 +57,7 @@ export const loanStatusLabels: Record<LoanStatus, string> = {
   GENERATED: 'Generado',
   ACCOUNTED: 'Contabilizado',
   VOID: 'Anulado',
-  RELIQUIDATED: 'Reliquidado',
+  REFINANCED: 'Refinanciado',
   PAID: 'Pagado',
 };
 
@@ -84,7 +84,7 @@ export const installmentRecordStatusLabels: Record<InstallmentRecordStatus, stri
   GENERATED: 'Generada',
   ACCOUNTED: 'Contabilizada',
   VOID: 'Anulada',
-  RELIQUIDATED: 'Reliquidada',
+  REFINANCED: 'Refinanciada',
   CAUSED: 'Causada',
 };
 

@@ -623,22 +623,6 @@ export function CreditProductInfo({
                           ),
                         },
                         {
-                          label: 'Requiere aprobacion',
-                          value: (
-                            <Badge
-                              variant={
-                                creditProduct.creditProductRefinancePolicy.requireApproval
-                                  ? 'default'
-                                  : 'outline'
-                              }
-                            >
-                              {creditProduct.creditProductRefinancePolicy.requireApproval
-                                ? 'Si'
-                                : 'No'}
-                            </Badge>
-                          ),
-                        },
-                        {
                           label: 'Estado',
                           value: (
                             <Badge

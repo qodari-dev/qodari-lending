@@ -184,35 +184,47 @@ export function Loans() {
   const submitLiquidate = React.useCallback(async () => {
     if (!loanToLiquidate?.id || !liquidateEntryDate) return;
 
-    await liquidateLoan({
-      params: { id: loanToLiquidate.id },
-      body: { entryDate: liquidateEntryDate },
-    });
+    try {
+      await liquidateLoan({
+        params: { id: loanToLiquidate.id },
+        body: { entryDate: liquidateEntryDate },
+      });
 
-    setOpenedLiquidateDialog(false);
-    setLoanToLiquidate(undefined);
+      setOpenedLiquidateDialog(false);
+      setLoanToLiquidate(undefined);
+    } catch {
+      // toast is handled by the mutation's onError callback
+    }
   }, [liquidateLoan, loanToLiquidate, liquidateEntryDate]);
   const submitSendToSignature = React.useCallback(async () => {
     if (!loanToSendSignature?.id) return;
 
-    await sendToSignature({
-      params: { id: loanToSendSignature.id },
-    });
+    try {
+      await sendToSignature({
+        params: { id: loanToSendSignature.id },
+      });
 
-    setOpenedSendSignatureDialog(false);
-    setLoanToSendSignature(undefined);
+      setOpenedSendSignatureDialog(false);
+      setLoanToSendSignature(undefined);
+    } catch {
+      // toast is handled by the mutation's onError callback
+    }
   }, [loanToSendSignature, sendToSignature]);
   const submitVoid = React.useCallback(async () => {
     if (!loanToVoid?.id || !voidNote.trim()) return;
 
-    await voidLoan({
-      params: { id: loanToVoid.id },
-      body: { note: voidNote.trim() },
-    });
+    try {
+      await voidLoan({
+        params: { id: loanToVoid.id },
+        body: { note: voidNote.trim() },
+      });
 
-    setOpenedVoidDialog(false);
-    setLoanToVoid(undefined);
-    setVoidNote('');
+      setOpenedVoidDialog(false);
+      setLoanToVoid(undefined);
+      setVoidNote('');
+    } catch {
+      // toast is handled by the mutation's onError callback
+    }
   }, [loanToVoid, voidLoan, voidNote]);
   const fetchAllData = React.useCallback(async () => {
     const res = await api.loan.list.query({

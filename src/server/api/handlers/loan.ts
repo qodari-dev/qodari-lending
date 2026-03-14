@@ -39,10 +39,9 @@ import {
   LoanDocumentType,
 } from '@/server/pdf/templates/loan-document-types';
 import {
-  allocateAmountByPercentage,
   buildLiquidationDocumentCode,
-  calculateOneTimeConceptAmount,
 } from '@/server/utils/accounting-utils';
+import { buildLoanLiquidationArtifacts } from '@/server/utils/loan-liquidation-artifacts';
 import {
   ensureLoanExists,
   getLoanBalanceSummary,
@@ -1421,6 +1420,20 @@ export const loan = tsr.router(contract.loan, {
       const { userId, userName } = getRequiredUserContext(session);
 
       const [updatedLoan] = await db.transaction(async (tx) => {
+        // Re-read inside tx for consistent fromStatus
+        const current = await tx.query.loans.findFirst({
+          where: eq(loans.id, id),
+          columns: { id: true, status: true },
+        });
+
+        if (!current || current.status === 'VOID') {
+          throwHttpError({
+            status: 409,
+            message: 'El estado del credito cambio durante la anulacion, intente de nuevo',
+            code: 'CONFLICT',
+          });
+        }
+
         // Void accounting entries if they exist
         await tx
           .update(accountingEntries)
@@ -1458,7 +1471,7 @@ export const loan = tsr.router(contract.loan, {
           .where(
             and(
               eq(loanInstallments.loanId, id),
-              inArray(loanInstallments.status, ['GENERATED', 'ACCOUNTED', 'RELIQUIDATED', 'CAUSED'])
+              inArray(loanInstallments.status, ['GENERATED', 'ACCOUNTED', 'REFINANCED', 'CAUSED'])
             )
           );
 
@@ -1484,7 +1497,7 @@ export const loan = tsr.router(contract.loan, {
 
         await tx.insert(loanStatusHistory).values({
           loanId: id,
-          fromStatus: existingLoan.status,
+          fromStatus: current.status,
           toStatus: 'VOID',
           changedByUserId: userId,
           changedByUserName: userName || userId,
@@ -2183,17 +2196,6 @@ export const loan = tsr.router(contract.loan, {
         });
       }
 
-      const invalidReceivableCreditLine = distributionLines.find(
-        (line) => line.glAccount?.detailType === 'RECEIVABLE' && line.nature === 'CREDIT'
-      );
-      if (invalidReceivableCreditLine) {
-        throwHttpError({
-          status: 400,
-          message: 'La distribucion de capital no puede acreditar cuentas de cartera',
-          code: 'BAD_REQUEST',
-        });
-      }
-
       const loanConceptSnapshots = await db.query.loanBillingConcepts.findMany({
         where: eq(loanBillingConcepts.loanId, existingLoan.id),
         with: {
@@ -2201,519 +2203,29 @@ export const loan = tsr.router(contract.loan, {
           billingConcept: true,
         },
       });
-      // ONE_TIME BILLED_SEPARATELY: chargeable entries (DEBIT cartera + CREDIT concept GL)
-      const oneTimeBilledSeparatelyConcepts = loanConceptSnapshots.filter(
-        (item) =>
-          item.frequency === 'ONE_TIME' &&
-          item.financingMode === 'BILLED_SEPARATELY'
-      );
-      // ONE_TIME FINANCED_IN_LOAN: adjustment entries (DEBIT credit-lines + CREDIT concept GL)
-      // Amount is already included in principalAmount; these entries reverse the bank credit.
-      const oneTimeFinancedConcepts = loanConceptSnapshots.filter(
-        (item) =>
-          item.frequency === 'ONE_TIME' &&
-          item.financingMode === 'FINANCED_IN_LOAN'
-      );
-      // ONE_TIME DISCOUNT_FROM_DISBURSEMENT: adjustment entries (DEBIT credit-lines + CREDIT concept GL)
-      const oneTimeDiscountConcepts = loanConceptSnapshots.filter(
-        (item) =>
-          item.frequency === 'ONE_TIME' &&
-          item.financingMode === 'DISCOUNT_FROM_DISBURSEMENT'
-      );
 
       const documentCode = buildLiquidationDocumentCode(existingLoan.id);
       const entryDate = formatDateOnly(body.entryDate);
       const { userId, userName } = getRequiredUserContext(session);
-      const principalAmount = toNumber(existingLoan.principalAmount);
-      const firstInstallment = installments[0];
-      const firstInstallmentAmount = firstInstallment
-        ? toNumber(firstInstallment.principalAmount) +
-          toNumber(firstInstallment.interestAmount) +
-          toNumber(firstInstallment.insuranceAmount)
-        : 0;
-      let oneTimeConceptAmountTotal = 0;
 
-      // Pre-calculate discount-from-disbursement amounts (needed for disbursementAmount)
-      let totalDiscountAmount = 0;
-      const discountConceptAmounts: Array<{
-        concept: (typeof oneTimeDiscountConcepts)[number];
-        amount: number;
-      }> = [];
-
-      for (const concept of oneTimeDiscountConcepts) {
-        if (!concept.glAccountId) {
-          throwHttpError({
-            status: 400,
-            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name} no tiene auxiliar configurado para liquidacion`,
-            code: 'BAD_REQUEST',
-          });
-        }
-        if (concept.glAccount?.detailType === 'RECEIVABLE') {
-          throwHttpError({
-            status: 400,
-            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name}: descontar de desembolso no puede usar una cuenta de cartera`,
-            code: 'BAD_REQUEST',
-          });
-        }
-
-        const conceptAmount = calculateOneTimeConceptAmount({
-          concept: {
-            calcMethod: concept.calcMethod,
-            baseAmount: concept.baseAmount,
-            rate: concept.rate,
-            amount: concept.amount,
-            minAmount: concept.minAmount,
-            maxAmount: concept.maxAmount,
-            roundingMode: concept.roundingMode,
-            roundingDecimals: concept.roundingDecimals,
+      const { accountingEntriesPayload, portfolioDeltas, disbursementAmount } =
+        buildLoanLiquidationArtifacts({
+          loan: {
+            id: existingLoan.id,
+            creditNumber: existingLoan.creditNumber,
+            costCenterId: existingLoan.costCenterId,
+            thirdPartyId: existingLoan.thirdPartyId,
+            creditStartDate: existingLoan.creditStartDate,
+            principalAmount: existingLoan.principalAmount,
           },
-          principal: principalAmount,
-          firstInstallmentAmount,
-        });
-
-        if (conceptAmount > 0) {
-          discountConceptAmounts.push({ concept, amount: conceptAmount });
-          totalDiscountAmount = roundMoney(totalDiscountAmount + conceptAmount);
-        }
-      }
-
-      // Pre-calculate financed-in-loan amounts (use computedAmount from approval snapshot)
-      let totalFinancedAmount = 0;
-      const financedConceptAmounts: Array<{
-        concept: (typeof oneTimeFinancedConcepts)[number];
-        amount: number;
-      }> = [];
-
-      for (const concept of oneTimeFinancedConcepts) {
-        if (!concept.glAccountId) {
-          throwHttpError({
-            status: 400,
-            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name} no tiene auxiliar configurado para liquidacion`,
-            code: 'BAD_REQUEST',
-          });
-        }
-        if (concept.glAccount?.detailType === 'RECEIVABLE') {
-          throwHttpError({
-            status: 400,
-            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name}: financiado en credito no puede usar una cuenta de cartera`,
-            code: 'BAD_REQUEST',
-          });
-        }
-
-        // Use pre-computed amount from approval; fall back to recalculation if missing
-        const conceptAmount = concept.computedAmount
-          ? toNumber(concept.computedAmount)
-          : calculateOneTimeConceptAmount({
-              concept: {
-                calcMethod: concept.calcMethod,
-                baseAmount: concept.baseAmount,
-                rate: concept.rate,
-                amount: concept.amount,
-                minAmount: concept.minAmount,
-                maxAmount: concept.maxAmount,
-                roundingMode: concept.roundingMode,
-                roundingDecimals: concept.roundingDecimals,
-              },
-              principal: principalAmount,
-              firstInstallmentAmount,
-            });
-
-        if (conceptAmount > 0) {
-          financedConceptAmounts.push({ concept, amount: conceptAmount });
-          totalFinancedAmount = roundMoney(totalFinancedAmount + conceptAmount);
-        }
-      }
-
-      const disbursementAmount = roundMoney(principalAmount - totalFinancedAmount - totalDiscountAmount);
-      if (disbursementAmount <= 0) {
-        throwHttpError({
-          status: 400,
-          message: 'El monto a desembolsar no puede ser cero o negativo despues de descontar conceptos',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      let sequence = 1;
-      const accountingEntriesPayload: Array<typeof accountingEntries.$inferInsert> = [];
-      const portfolioDelta = new Map<
-        string,
-        {
-          glAccountId: number;
-          thirdPartyId: number;
-          loanId: number;
-          installmentNumber: number;
-          dueDate: string;
-          chargeAmount: number;
-          paymentAmount: number;
-        }
-      >();
-
-      for (const installment of installments) {
-        const installmentPrincipal = toNumber(installment.principalAmount);
-        if (installmentPrincipal <= 0) continue;
-
-        const debitAmounts = allocateAmountByPercentage({
-          totalAmount: installmentPrincipal,
-          lines: debitLines,
-        });
-        const creditAmounts = allocateAmountByPercentage({
-          totalAmount: installmentPrincipal,
-          lines: creditLines,
-        });
-
-        for (const line of debitLines) {
-          const amount = debitAmounts.get(line.id) ?? 0;
-          if (amount <= 0) continue;
-
-          accountingEntriesPayload.push({
-            processType: 'CREDIT',
-            documentCode,
-            sequence,
-            entryDate,
-            glAccountId: line.glAccountId,
-            costCenterId: existingLoan.costCenterId ?? null,
-            thirdPartyId: existingLoan.thirdPartyId,
-            description:
-              `Liquidacion credito ${existingLoan.creditNumber} cuota ${installment.installmentNumber}`.slice(
-                0,
-                255
-              ),
-            nature: 'DEBIT',
-            amount: toDecimalString(amount),
-            loanId: existingLoan.id,
-            installmentNumber: installment.installmentNumber,
-            dueDate: installment.dueDate,
-            status: 'DRAFT',
-            statusDate: entryDate,
-            sourceType: 'LOAN_APPROVAL',
-            sourceId: String(existingLoan.id),
-          });
-          sequence += 1;
-
-          if (line.glAccount?.detailType === 'RECEIVABLE') {
-            const key = `${line.glAccountId}:${existingLoan.thirdPartyId}:${existingLoan.id}:${installment.installmentNumber}`;
-            const current = portfolioDelta.get(key) ?? {
-              glAccountId: line.glAccountId,
-              thirdPartyId: existingLoan.thirdPartyId,
-              loanId: existingLoan.id,
-              installmentNumber: installment.installmentNumber,
-              dueDate: installment.dueDate,
-              chargeAmount: 0,
-              paymentAmount: 0,
-            };
-            current.chargeAmount = roundMoney(current.chargeAmount + amount);
-            portfolioDelta.set(key, current);
-          }
-        }
-
-        for (const line of creditLines) {
-          const amount = creditAmounts.get(line.id) ?? 0;
-          if (amount <= 0) continue;
-
-          accountingEntriesPayload.push({
-            processType: 'CREDIT',
-            documentCode,
-            sequence,
-            entryDate,
-            glAccountId: line.glAccountId,
-            costCenterId: existingLoan.costCenterId ?? null,
-            thirdPartyId: existingLoan.thirdPartyId,
-            description:
-              `Liquidacion credito ${existingLoan.creditNumber} cuota ${installment.installmentNumber}`.slice(
-                0,
-                255
-              ),
-            nature: 'CREDIT',
-            amount: toDecimalString(amount),
-            loanId: existingLoan.id,
-            installmentNumber: installment.installmentNumber,
-            dueDate: installment.dueDate,
-            status: 'DRAFT',
-            statusDate: entryDate,
-            sourceType: 'LOAN_APPROVAL',
-            sourceId: String(existingLoan.id),
-          });
-          sequence += 1;
-        }
-      }
-
-      // DISCOUNT_FROM_DISBURSEMENT: adjustment entries (DEBIT credit-lines + CREDIT concept GL)
-      for (const { concept, amount: conceptAmount } of discountConceptAmounts) {
-        oneTimeConceptAmountTotal = roundMoney(oneTimeConceptAmountTotal + conceptAmount);
-
-        // DEBIT to credit distribution lines (reverses part of bank/disbursement credit)
-        const reversalAmounts = allocateAmountByPercentage({
-          totalAmount: conceptAmount,
-          lines: creditLines,
-        });
-
-        for (const line of creditLines) {
-          const lineAmount = reversalAmounts.get(line.id) ?? 0;
-          if (lineAmount <= 0) continue;
-
-          accountingEntriesPayload.push({
-            processType: 'CREDIT',
-            documentCode,
-            sequence,
-            entryDate,
-            glAccountId: line.glAccountId,
-            costCenterId: existingLoan.costCenterId ?? null,
-            thirdPartyId: existingLoan.thirdPartyId,
-            description:
-              `Descuento desembolso concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
-                0,
-                255
-              ),
-            nature: 'DEBIT',
-            amount: toDecimalString(lineAmount),
-            loanId: existingLoan.id,
-            installmentNumber: firstInstallment?.installmentNumber ?? 1,
-            dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
-            status: 'DRAFT',
-            statusDate: entryDate,
-            sourceType: 'LOAN_APPROVAL',
-            sourceId: String(existingLoan.id),
-          });
-          sequence += 1;
-        }
-
-        // CREDIT to concept GL account (fee/income recognition)
-        accountingEntriesPayload.push({
-          processType: 'CREDIT',
+          installments,
+          distributionLines,
+          loanConceptSnapshots,
           documentCode,
-          sequence,
           entryDate,
-          glAccountId: concept.glAccountId!,
-          costCenterId: existingLoan.costCenterId ?? null,
-          thirdPartyId: existingLoan.thirdPartyId,
-          description:
-            `Descuento desembolso concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
-              0,
-              255
-            ),
-          nature: 'CREDIT',
-          amount: toDecimalString(conceptAmount),
-          loanId: existingLoan.id,
-          installmentNumber: firstInstallment?.installmentNumber ?? 1,
-          dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
-          status: 'DRAFT',
-          statusDate: entryDate,
           sourceType: 'LOAN_APPROVAL',
           sourceId: String(existingLoan.id),
         });
-        sequence += 1;
-      }
-
-      // FINANCED_IN_LOAN: adjustment entries (DEBIT credit-lines + CREDIT concept GL)
-      // Amount is already included in principalAmount; these entries reverse the bank credit
-      // portion so the net bank outflow equals disbursementAmount.
-      for (const { concept, amount: conceptAmount } of financedConceptAmounts) {
-        oneTimeConceptAmountTotal = roundMoney(oneTimeConceptAmountTotal + conceptAmount);
-
-        // DEBIT to credit distribution lines (reverses part of bank/disbursement credit)
-        const reversalAmounts = allocateAmountByPercentage({
-          totalAmount: conceptAmount,
-          lines: creditLines,
-        });
-
-        for (const line of creditLines) {
-          const lineAmount = reversalAmounts.get(line.id) ?? 0;
-          if (lineAmount <= 0) continue;
-
-          accountingEntriesPayload.push({
-            processType: 'CREDIT',
-            documentCode,
-            sequence,
-            entryDate,
-            glAccountId: line.glAccountId,
-            costCenterId: existingLoan.costCenterId ?? null,
-            thirdPartyId: existingLoan.thirdPartyId,
-            description:
-              `Financiado en credito concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
-                0,
-                255
-              ),
-            nature: 'DEBIT',
-            amount: toDecimalString(lineAmount),
-            loanId: existingLoan.id,
-            installmentNumber: firstInstallment?.installmentNumber ?? 1,
-            dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
-            status: 'DRAFT',
-            statusDate: entryDate,
-            sourceType: 'LOAN_APPROVAL',
-            sourceId: String(existingLoan.id),
-          });
-          sequence += 1;
-        }
-
-        // CREDIT to concept GL account (fee/income recognition)
-        accountingEntriesPayload.push({
-          processType: 'CREDIT',
-          documentCode,
-          sequence,
-          entryDate,
-          glAccountId: concept.glAccountId!,
-          costCenterId: existingLoan.costCenterId ?? null,
-          thirdPartyId: existingLoan.thirdPartyId,
-          description:
-            `Financiado en credito concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
-              0,
-              255
-            ),
-          nature: 'CREDIT',
-          amount: toDecimalString(conceptAmount),
-          loanId: existingLoan.id,
-          installmentNumber: firstInstallment?.installmentNumber ?? 1,
-          dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
-          status: 'DRAFT',
-          statusDate: entryDate,
-          sourceType: 'LOAN_APPROVAL',
-          sourceId: String(existingLoan.id),
-        });
-        sequence += 1;
-      }
-
-      // BILLED_SEPARATELY: chargeable entries (DEBIT cartera + CREDIT concept GL)
-      for (const concept of oneTimeBilledSeparatelyConcepts) {
-        if (!concept.glAccountId) {
-          throwHttpError({
-            status: 400,
-            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name} no tiene auxiliar configurado para liquidacion`,
-            code: 'BAD_REQUEST',
-          });
-        }
-        if (concept.glAccount?.detailType === 'RECEIVABLE') {
-          throwHttpError({
-            status: 400,
-            message: `Concepto #${concept.billingConceptId} - ${concept.billingConcept.name} no puede acreditar una cuenta de cartera`,
-            code: 'BAD_REQUEST',
-          });
-        }
-
-        // Use pre-computed amount from approval; fall back to recalculation if missing
-        const conceptAmount = concept.computedAmount
-          ? toNumber(concept.computedAmount)
-          : calculateOneTimeConceptAmount({
-              concept: {
-                calcMethod: concept.calcMethod,
-                baseAmount: concept.baseAmount,
-                rate: concept.rate,
-                amount: concept.amount,
-                minAmount: concept.minAmount,
-                maxAmount: concept.maxAmount,
-                roundingMode: concept.roundingMode,
-                roundingDecimals: concept.roundingDecimals,
-              },
-              principal: principalAmount,
-              firstInstallmentAmount,
-            });
-
-        if (conceptAmount <= 0) continue;
-        oneTimeConceptAmountTotal = roundMoney(oneTimeConceptAmountTotal + conceptAmount);
-
-        const debitAmounts = allocateAmountByPercentage({
-          totalAmount: conceptAmount,
-          lines: debitLines,
-        });
-
-        for (const line of debitLines) {
-          const amount = debitAmounts.get(line.id) ?? 0;
-          if (amount <= 0) continue;
-
-          accountingEntriesPayload.push({
-            processType: 'CREDIT',
-            documentCode,
-            sequence,
-            entryDate,
-            glAccountId: line.glAccountId,
-            costCenterId: existingLoan.costCenterId ?? null,
-            thirdPartyId: existingLoan.thirdPartyId,
-            description:
-              `Liquidacion concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
-                0,
-                255
-              ),
-            nature: 'DEBIT',
-            amount: toDecimalString(amount),
-            loanId: existingLoan.id,
-            installmentNumber: firstInstallment?.installmentNumber ?? 1,
-            dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
-            status: 'DRAFT',
-            statusDate: entryDate,
-            sourceType: 'LOAN_APPROVAL',
-            sourceId: String(existingLoan.id),
-          });
-          sequence += 1;
-
-          if (line.glAccount?.detailType === 'RECEIVABLE') {
-            const conceptInstallmentNumber = firstInstallment?.installmentNumber ?? 1;
-            const conceptDueDate = firstInstallment?.dueDate ?? existingLoan.creditStartDate;
-            const key = `${line.glAccountId}:${existingLoan.thirdPartyId}:${existingLoan.id}:${conceptInstallmentNumber}`;
-            const current = portfolioDelta.get(key) ?? {
-              glAccountId: line.glAccountId,
-              thirdPartyId: existingLoan.thirdPartyId,
-              loanId: existingLoan.id,
-              installmentNumber: conceptInstallmentNumber,
-              dueDate: conceptDueDate,
-              chargeAmount: 0,
-              paymentAmount: 0,
-            };
-            current.chargeAmount = roundMoney(current.chargeAmount + amount);
-            portfolioDelta.set(key, current);
-          }
-        }
-
-        accountingEntriesPayload.push({
-          processType: 'CREDIT',
-          documentCode,
-          sequence,
-          entryDate,
-          glAccountId: concept.glAccountId,
-          costCenterId: existingLoan.costCenterId ?? null,
-          thirdPartyId: existingLoan.thirdPartyId,
-          description:
-            `Liquidacion concepto ${concept.billingConceptId} credito ${existingLoan.creditNumber}`.slice(
-              0,
-              255
-            ),
-          nature: 'CREDIT',
-          amount: toDecimalString(conceptAmount),
-          loanId: existingLoan.id,
-          installmentNumber: firstInstallment?.installmentNumber ?? 1,
-          dueDate: firstInstallment?.dueDate ?? existingLoan.creditStartDate,
-          status: 'DRAFT',
-          statusDate: entryDate,
-          sourceType: 'LOAN_APPROVAL',
-          sourceId: String(existingLoan.id),
-        });
-        sequence += 1;
-      }
-
-      if (!accountingEntriesPayload.length) {
-        throwHttpError({
-          status: 400,
-          message: 'No se generaron movimientos para liquidar el credito',
-          code: 'BAD_REQUEST',
-        });
-      }
-
-      const debitTotal = roundMoney(
-        accountingEntriesPayload
-          .filter((item) => item.nature === 'DEBIT')
-          .reduce((sum, item) => sum + toNumber(item.amount), 0)
-      );
-      const creditTotal = roundMoney(
-        accountingEntriesPayload
-          .filter((item) => item.nature === 'CREDIT')
-          .reduce((sum, item) => sum + toNumber(item.amount), 0)
-      );
-      if (Math.abs(debitTotal - creditTotal) > 0.01) {
-        throwHttpError({
-          status: 400,
-          message: 'Liquidacion descuadrada: debitos y creditos no coinciden',
-          code: 'BAD_REQUEST',
-        });
-      }
 
       const [updatedLoan] = await db.transaction(async (tx) => {
         const alreadyLiquidatedEntry = await tx.query.accountingEntries.findFirst({
@@ -2737,15 +2249,7 @@ export const loan = tsr.router(contract.loan, {
 
         await applyPortfolioDeltas(tx, {
           movementDate: entryDate,
-          deltas: Array.from(portfolioDelta.values()).map((item) => ({
-            glAccountId: item.glAccountId,
-            thirdPartyId: item.thirdPartyId,
-            loanId: item.loanId,
-            installmentNumber: item.installmentNumber,
-            dueDate: item.dueDate,
-            chargeDelta: item.chargeAmount,
-            paymentDelta: item.paymentAmount,
-          })),
+          deltas: portfolioDeltas,
         });
 
         const [loanUpdated] = await tx
@@ -2802,14 +2306,8 @@ export const loan = tsr.router(contract.loan, {
         metadata: {
           accountingDocumentCode: documentCode,
           entriesGenerated: accountingEntriesPayload.length,
-          oneTimeBilledSeparatelyConceptsCount: oneTimeBilledSeparatelyConcepts.length,
-          oneTimeFinancedConceptsCount: oneTimeFinancedConcepts.length,
-          oneTimeDiscountConceptsCount: oneTimeDiscountConcepts.length,
-          oneTimeConceptsAmount: toDecimalString(oneTimeConceptAmountTotal),
           disbursementAmount: toDecimalString(disbursementAmount),
-          totalFinancedAmount: toDecimalString(totalFinancedAmount),
-          totalDiscountAmount: toDecimalString(totalDiscountAmount),
-          portfolioRows: portfolioDelta.size,
+          portfolioRows: portfolioDeltas.length,
         },
         ipAddress,
         userAgent,

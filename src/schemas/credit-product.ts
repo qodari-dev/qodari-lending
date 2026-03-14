@@ -256,7 +256,6 @@ export const CreditProductRefinancePolicyInputSchema = z.object({
   minPaidInstallments: z.number().int().min(0),
   maxRefinanceCount: z.number().int().min(0),
   capitalizeArrears: z.boolean(),
-  requireApproval: z.boolean(),
   isActive: z.boolean(),
 });
 

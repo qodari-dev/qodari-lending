@@ -8,6 +8,14 @@ type ThirdPartyLabelInput = {
   documentNumber?: string | null;
 };
 
+export function getApplicantLabel(application: {
+  thirdParty?: ThirdPartyLabelInput | null;
+  thirdPartyId: number | string;
+}): string {
+  if (!application.thirdParty) return String(application.thirdPartyId);
+  return getThirdPartyLabel(application.thirdParty);
+}
+
 export function getThirdPartyLabel(item: ThirdPartyLabelInput | null | undefined): string {
   if (!item) return '-';
 

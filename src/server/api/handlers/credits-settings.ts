@@ -35,6 +35,10 @@ const CREDITS_SETTINGS_INCLUDES = createIncludeMap<typeof db.query.creditsSettin
     relation: 'writeOffGlAccount',
     config: true,
   },
+  refinancingReceiptType: {
+    relation: 'refinancingReceiptType',
+    config: true,
+  },
 });
 
 const DEFAULT_APP_SLUG = env.IAM_APP_SLUG;

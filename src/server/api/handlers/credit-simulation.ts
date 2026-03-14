@@ -374,7 +374,7 @@ export const creditSimulation = tsr.router(contract.creditSimulation, {
         loanApplicationId: number;
         recordDate: string;
         creditStartDate: string;
-        status: 'GENERATED' | 'ACCOUNTED' | 'VOID' | 'RELIQUIDATED' | 'PAID';
+        status: 'GENERATED' | 'ACCOUNTED' | 'VOID' | 'REFINANCED' | 'PAID';
         disbursementStatus:
           | 'LIQUIDATED'
           | 'SENT_TO_ACCOUNTING'

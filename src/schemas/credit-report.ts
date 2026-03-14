@@ -238,25 +238,6 @@ export type GenerateCancelledRejectedCreditsReportResult = ClientInferResponseBo
   200
 >;
 
-// Comprobante de movimientos
-export const GenerateMovementVoucherReportBodySchema = buildDateRangeBodySchema();
-export const MovementVoucherReportRowSchema = z.object({
-  creditNumber: z.string().min(1),
-  movementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  voucherNumber: z.string().min(1),
-  movementType: z.string().min(1),
-  amount: z.number().nonnegative(),
-});
-export type MovementVoucherReportRow = z.infer<typeof MovementVoucherReportRowSchema>;
-export const GenerateMovementVoucherReportResponseSchema = buildDateRangeResponse(
-  'MOVEMENT_VOUCHER',
-  MovementVoucherReportRowSchema
-);
-export type GenerateMovementVoucherReportResult = ClientInferResponseBody<
-  Contract['creditReport']['generateMovementVoucher'],
-  200
->;
-
 // Creditos saldados
 export const GenerateSettledCreditsReportBodySchema = buildDateRangeBodySchema();
 export const SettledCreditsReportRowSchema = z.object({
@@ -274,26 +255,6 @@ export const GenerateSettledCreditsReportResponseSchema = buildDateRangeResponse
 );
 export type GenerateSettledCreditsReportResult = ClientInferResponseBody<
   Contract['creditReport']['generateSettledCredits'],
-  200
->;
-
-// Superintendencia
-export const GenerateSuperintendenciaReportBodySchema = buildDateRangeBodySchema();
-export const SuperintendenciaReportRowSchema = z.object({
-  creditNumber: z.string().min(1),
-  thirdPartyDocumentNumber: z.string().nullable(),
-  thirdPartyName: z.string().min(1),
-  status: z.string().min(1),
-  outstandingBalance: z.number().nonnegative(),
-  reportCode: z.string().min(1),
-});
-export type SuperintendenciaReportRow = z.infer<typeof SuperintendenciaReportRowSchema>;
-export const GenerateSuperintendenciaReportResponseSchema = buildDateRangeResponse(
-  'SUPERINTENDENCIA',
-  SuperintendenciaReportRowSchema
-);
-export type GenerateSuperintendenciaReportResult = ClientInferResponseBody<
-  Contract['creditReport']['generateSuperintendencia'],
   200
 >;
 

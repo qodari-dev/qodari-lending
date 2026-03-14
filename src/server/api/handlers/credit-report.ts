@@ -7,20 +7,16 @@ import {
   GenerateLiquidatedCreditsReportBodySchema,
   GenerateLiquidatedNotDisbursedCreditsReportBodySchema,
   GenerateMinutesPdfBodySchema,
-  GenerateMovementVoucherReportBodySchema,
   GenerateNonLiquidatedCreditsReportBodySchema,
   GeneratePaidInstallmentsReportBodySchema,
   GenerateSettledCreditsReportBodySchema,
-  GenerateSuperintendenciaReportBodySchema,
   GenerateThirdPartyClearancePdfBodySchema,
   GetCreditExtractReportQuerySchema,
   LiquidatedCreditsReportRow,
   LiquidatedNotDisbursedCreditsReportRow,
   MinutesReportOption,
-  MovementVoucherReportRow,
   NonLiquidatedCreditsReportRow,
   SettledCreditsReportRow,
-  SuperintendenciaReportRow,
 } from '@/schemas/credit-report';
 import { accountingEntries, db, loanApplicationActNumbers, loanApplications, loans } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
@@ -56,9 +52,7 @@ type GenerateNonLiquidatedCreditsReportBody = z.infer<
 type GenerateCancelledRejectedCreditsReportBody = z.infer<
   typeof GenerateCancelledRejectedCreditsReportBodySchema
 >;
-type GenerateMovementVoucherReportBody = z.infer<typeof GenerateMovementVoucherReportBodySchema>;
 type GenerateSettledCreditsReportBody = z.infer<typeof GenerateSettledCreditsReportBodySchema>;
-type GenerateSuperintendenciaReportBody = z.infer<typeof GenerateSuperintendenciaReportBodySchema>;
 type GenerateMinutesPdfBody = z.infer<typeof GenerateMinutesPdfBodySchema>;
 type GenerateCreditClearancePdfBody = z.infer<typeof GenerateCreditClearancePdfBodySchema>;
 type GenerateThirdPartyClearancePdfBody = z.infer<typeof GenerateThirdPartyClearancePdfBodySchema>;
@@ -193,33 +187,6 @@ async function getCreditExtractReportDataByLoanId(loanId: number): Promise<Credi
   }
 
   return buildExtractResponse(loan);
-}
-
-function buildMovementVoucherRows(count: number): MovementVoucherReportRow[] {
-  return Array.from({ length: count }).map((_, index) => {
-    const sequence = index + 1;
-    return {
-      creditNumber: `CRMV${String(sequence).padStart(6, '0')}`,
-      movementDate: formatDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
-      voucherNumber: `CMP-${String(sequence).padStart(7, '0')}`,
-      movementType: sequence % 2 === 0 ? 'ABONO' : 'CAUSACION',
-      amount: roundMoney(120_000 + sequence * 11_500),
-    };
-  });
-}
-
-function buildSuperintendenciaRows(count: number): SuperintendenciaReportRow[] {
-  return Array.from({ length: count }).map((_, index) => {
-    const sequence = index + 1;
-    return {
-      creditNumber: `CRSP${String(sequence).padStart(6, '0')}`,
-      thirdPartyDocumentNumber: `10${String(35000000 + sequence)}`,
-      thirdPartyName: `Tercero ${sequence}`,
-      status: sequence % 3 === 0 ? 'EN MORA' : 'ACTIVO',
-      outstandingBalance: roundMoney(1_350_000 + sequence * 70_000),
-      reportCode: `SUP-${String((sequence % 9) + 1)}`,
-    };
-  });
 }
 
 async function generatePaidInstallments(
@@ -681,35 +648,6 @@ async function generateCancelledRejectedCredits(
   }
 }
 
-async function generateMovementVoucher(
-  body: GenerateMovementVoucherReportBody,
-  context: HandlerContext
-) {
-  const { request, appRoute } = context;
-  try {
-    await getAuthContextAndValidatePermission(request, appRoute.metadata);
-    const meta = buildRangeMeta(body.startDate, body.endDate, 70);
-
-    // TODO(credit-report-movement-voucher): consultar movimientos en el rango y construir comprobante en excel.
-    return {
-      status: 200 as const,
-      body: {
-        reportType: 'MOVEMENT_VOUCHER' as const,
-        startDate: formatDateOnly(body.startDate),
-        endDate: formatDateOnly(body.endDate),
-        reviewedCredits: meta.reviewedCredits,
-        reportedCredits: meta.reportedCredits,
-        rows: buildMovementVoucherRows(meta.reportedCredits),
-        message: 'Comprobante de movimientos generado (demo).',
-      },
-    };
-  } catch (e) {
-    return genericTsRestErrorResponse(e, {
-      genericMsg: 'Error al generar comprobante de movimientos',
-    });
-  }
-}
-
 async function generateSettledCredits(body: GenerateSettledCreditsReportBody, context: HandlerContext) {
   const { request, appRoute } = context;
   try {
@@ -776,33 +714,6 @@ async function generateSettledCredits(body: GenerateSettledCreditsReportBody, co
     };
   } catch (e) {
     return genericTsRestErrorResponse(e, { genericMsg: 'Error al generar reporte de creditos saldados' });
-  }
-}
-
-async function generateSuperintendencia(
-  body: GenerateSuperintendenciaReportBody,
-  context: HandlerContext
-) {
-  const { request, appRoute } = context;
-  try {
-    await getAuthContextAndValidatePermission(request, appRoute.metadata);
-    const meta = buildRangeMeta(body.startDate, body.endDate, 68);
-
-    // TODO(credit-report-superintendencia): construir reporte oficial de superintendencia con reglas vigentes.
-    return {
-      status: 200 as const,
-      body: {
-        reportType: 'SUPERINTENDENCIA' as const,
-        startDate: formatDateOnly(body.startDate),
-        endDate: formatDateOnly(body.endDate),
-        reviewedCredits: meta.reviewedCredits,
-        reportedCredits: meta.reportedCredits,
-        rows: buildSuperintendenciaRows(meta.reportedCredits),
-        message: 'Reporte de superintendencia generado (demo).',
-      },
-    };
-  } catch (e) {
-    return genericTsRestErrorResponse(e, { genericMsg: 'Error al generar reporte de superintendencia' });
   }
 }
 
@@ -961,9 +872,7 @@ export const creditReport = tsr.router(contract.creditReport, {
     generateLiquidatedNotDisbursedCredits(body, context),
   generateCancelledRejectedCredits: ({ body }, context) =>
     generateCancelledRejectedCredits(body, context),
-  generateMovementVoucher: ({ body }, context) => generateMovementVoucher(body, context),
   generateSettledCredits: ({ body }, context) => generateSettledCredits(body, context),
-  generateSuperintendencia: ({ body }, context) => generateSuperintendencia(body, context),
   generateMinutesPdf: ({ body }, context) => generateMinutesPdf(body, context),
   listMinutesOptions: (_, context) => listMinutesOptions(context),
   generateCreditClearancePdf: ({ body }, context) => generateCreditClearancePdf(body, context),

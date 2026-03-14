@@ -341,12 +341,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   { title: 'Acta', url: `/credit-reports/minutes` },
                   { title: 'Paz y Salvo de un Credito', url: `/credit-reports/credit-clearance` },
                   { title: 'Paz y Salvo de Tercero', url: `/credit-reports/third-party-clearance` },
-                  { title: 'Comprobante de Movimientos', url: `/credit-reports/movement-voucher` },
                   { title: 'Creditos Saldados', url: `/credit-reports/settled-credits` },
-                  {
-                    title: 'Superintendencia de sociedades',
-                    url: `/credit-reports/superintendencia`,
-                  },
                 ],
               },
               {

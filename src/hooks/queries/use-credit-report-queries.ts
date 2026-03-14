@@ -65,16 +65,8 @@ export function useGenerateCancelledRejectedCreditsReport() {
   return api.creditReport.generateCancelledRejectedCredits.useMutation({ onError });
 }
 
-export function useGenerateMovementVoucherReport() {
-  return api.creditReport.generateMovementVoucher.useMutation({ onError });
-}
-
 export function useGenerateSettledCreditsReport() {
   return api.creditReport.generateSettledCredits.useMutation({ onError });
-}
-
-export function useGenerateSuperintendenciaReport() {
-  return api.creditReport.generateSuperintendencia.useMutation({ onError });
 }
 
 export function useGenerateMinutesPdf() {

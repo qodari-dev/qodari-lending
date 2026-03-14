@@ -8,9 +8,19 @@ function onError(error: unknown) {
 
 export const creditReportKeys = {
   all: ['credit-reports'] as const,
+  minutesOptions: () => [...creditReportKeys.all, 'minutes-options'] as const,
   extract: (creditNumber: string) => [...creditReportKeys.all, 'extract', creditNumber] as const,
   extractByLoanId: (loanId: number) => [...creditReportKeys.all, 'extract-by-loan', loanId] as const,
 };
+
+export function useMinutesReportOptions() {
+  return api.creditReport.listMinutesOptions.useQuery({
+    queryKey: creditReportKeys.minutesOptions(),
+    queryData: {
+      query: {},
+    },
+  });
+}
 
 export function useCreditExtractReport(creditNumber: string, enabled = true) {
   return api.creditReport.getExtract.useQuery({

@@ -223,6 +223,12 @@ export type GenerateSuperintendenciaReportResult = ClientInferResponseBody<
 export const GenerateMinutesPdfBodySchema = z.object({
   minutesNumber: z.string().trim().min(1).max(50),
 });
+export const MinutesReportOptionSchema = z.object({
+  minutesNumber: z.string().min(1),
+  actDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reviewedApplicationsCount: z.number().int().nonnegative(),
+});
+export const ListMinutesReportOptionsResponseSchema = z.array(MinutesReportOptionSchema);
 export const GenerateMinutesPdfResponseSchema = z.object({
   reportType: z.literal('MINUTES_PDF'),
   minutesNumber: z.string().min(1),
@@ -230,6 +236,11 @@ export const GenerateMinutesPdfResponseSchema = z.object({
   pdfBase64: z.string().min(1),
   message: z.string(),
 });
+export type MinutesReportOption = z.infer<typeof MinutesReportOptionSchema>;
+export type ListMinutesReportOptionsResult = ClientInferResponseBody<
+  Contract['creditReport']['listMinutesOptions'],
+  200
+>;
 export type GenerateMinutesPdfResult = ClientInferResponseBody<
   Contract['creditReport']['generateMinutesPdf'],
   200

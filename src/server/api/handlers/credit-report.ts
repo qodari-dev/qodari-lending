@@ -13,13 +13,14 @@ import {
   GenerateThirdPartyClearancePdfBodySchema,
   GetCreditExtractReportQuerySchema,
   LiquidatedCreditsReportRow,
+  MinutesReportOption,
   MovementVoucherReportRow,
   NonLiquidatedCreditsReportRow,
   PaidInstallmentsReportRow,
   SettledCreditsReportRow,
   SuperintendenciaReportRow,
 } from '@/schemas/credit-report';
-import { db, loans } from '@/server/db';
+import { db, loanApplicationActNumbers, loanApplications, loans } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary, getLoanStatement } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
@@ -27,10 +28,16 @@ import { buildCreditExtractClientStatement } from '@/server/utils/credit-extract
 import { getThirdPartyLabel } from '@/utils/third-party';
 import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
 import { renderTemplateToBase64 } from '@/server/pdf/render';
+import { creditClearanceTemplate } from '@/server/pdf/templates/credit-clearance';
 import { demoDocumentTemplate } from '@/server/pdf/templates/demo-document';
+import { minutesReportTemplate } from '@/server/pdf/templates/minutes-report';
+import { thirdPartyClearanceTemplate } from '@/server/pdf/templates/third-party-clearance';
+import { buildCreditClearanceData } from '@/server/utils/credit-clearance-data';
+import { buildMinutesReportData } from '@/server/utils/minutes-report-data';
+import { buildThirdPartyClearanceData } from '@/server/utils/third-party-clearance-data';
 import { tsr } from '@ts-rest/serverless/next';
 import { differenceInCalendarDays } from 'date-fns';
-import { and, desc, eq, gte, isNull, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { contract } from '../contracts';
 
@@ -509,21 +516,58 @@ async function generateMinutesPdf(body: GenerateMinutesPdfBody, context: Handler
   const { request, appRoute } = context;
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const normalizedMinutesNumber = body.minutesNumber.trim().toUpperCase();
+    const data = await buildMinutesReportData(normalizedMinutesNumber);
+    const pdfBase64 = await renderTemplateToBase64(data, minutesReportTemplate);
 
-    // TODO(credit-report-minutes-pdf): generar PDF oficial del acta desde datos reales y plantilla institucional.
-    const pdfBase64 = await buildDemoPdfBase64('ACTA', [`Numero: ${body.minutesNumber.trim()}`]);
     return {
       status: 200 as const,
       body: {
         reportType: 'MINUTES_PDF' as const,
-        minutesNumber: body.minutesNumber.trim(),
-        fileName: `acta-${body.minutesNumber.trim().toLowerCase().replace(/\s+/g, '-')}.pdf`,
+        minutesNumber: normalizedMinutesNumber,
+        fileName: `acta-${normalizedMinutesNumber.toLowerCase().replace(/\s+/g, '-')}.pdf`,
         pdfBase64,
-        message: 'PDF de acta generado (demo).',
+        message: 'PDF de acta generado correctamente.',
       },
     };
   } catch (e) {
     return genericTsRestErrorResponse(e, { genericMsg: 'Error al generar PDF de acta' });
+  }
+}
+
+async function listMinutesOptions(context: HandlerContext) {
+  const { request, appRoute } = context;
+  try {
+    await getAuthContextAndValidatePermission(request, appRoute.metadata);
+
+    const rows = await db
+      .select({
+        minutesNumber: loanApplicationActNumbers.actNumber,
+        actDate: loanApplicationActNumbers.actDate,
+        reviewedApplicationsCount: count(loanApplications.id),
+      })
+      .from(loanApplicationActNumbers)
+      .innerJoin(
+        loanApplications,
+        eq(loanApplications.actNumber, loanApplicationActNumbers.actNumber)
+      )
+      .where(isNotNull(loanApplications.actNumber))
+      .groupBy(loanApplicationActNumbers.id)
+      .orderBy(desc(loanApplicationActNumbers.actDate), desc(loanApplicationActNumbers.actNumber))
+      .limit(200);
+
+    const body: MinutesReportOption[] = rows.map((row) => ({
+      minutesNumber: row.minutesNumber,
+      actDate: row.actDate,
+      reviewedApplicationsCount: row.reviewedApplicationsCount,
+    }));
+
+    return {
+      status: 200 as const,
+      body,
+    };
+  } catch (e) {
+    return genericTsRestErrorResponse(e, { genericMsg: 'Error al listar actas para el reporte' });
   }
 }
 
@@ -535,18 +579,18 @@ async function generateCreditClearancePdf(
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-    // TODO(credit-report-credit-clearance-pdf): generar PDF oficial de paz y salvo de credito.
-    const pdfBase64 = await buildDemoPdfBase64('PAZ Y SALVO CREDITO', [
-      `Credito: ${body.creditNumber.trim()}`,
-    ]);
+    const normalizedCreditNumber = body.creditNumber.trim().toUpperCase();
+    const data = await buildCreditClearanceData(normalizedCreditNumber);
+    const pdfBase64 = await renderTemplateToBase64(data, creditClearanceTemplate);
+
     return {
       status: 200 as const,
       body: {
         reportType: 'CREDIT_CLEARANCE_PDF' as const,
-        creditNumber: body.creditNumber.trim(),
-        fileName: `paz-y-salvo-credito-${body.creditNumber.trim().toLowerCase().replace(/\s+/g, '-')}.pdf`,
+        creditNumber: normalizedCreditNumber,
+        fileName: `paz-y-salvo-credito-${normalizedCreditNumber.toLowerCase().replace(/\s+/g, '-')}.pdf`,
         pdfBase64,
-        message: 'PDF de paz y salvo de credito generado (demo).',
+        message: 'PDF de paz y salvo de credito generado correctamente.',
       },
     };
   } catch (e) {
@@ -562,18 +606,18 @@ async function generateThirdPartyClearancePdf(
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-    // TODO(credit-report-third-party-clearance-pdf): generar PDF oficial de paz y salvo por tercero.
-    const pdfBase64 = await buildDemoPdfBase64('PAZ Y SALVO TERCERO', [
-      `Documento: ${body.thirdPartyDocumentNumber.trim()}`,
-    ]);
+    const normalizedDocumentNumber = body.thirdPartyDocumentNumber.trim();
+    const data = await buildThirdPartyClearanceData(normalizedDocumentNumber);
+    const pdfBase64 = await renderTemplateToBase64(data, thirdPartyClearanceTemplate);
+
     return {
       status: 200 as const,
       body: {
         reportType: 'THIRD_PARTY_CLEARANCE_PDF' as const,
-        thirdPartyDocumentNumber: body.thirdPartyDocumentNumber.trim(),
-        fileName: `paz-y-salvo-tercero-${body.thirdPartyDocumentNumber.trim().toLowerCase().replace(/\s+/g, '-')}.pdf`,
+        thirdPartyDocumentNumber: normalizedDocumentNumber,
+        fileName: `paz-y-salvo-tercero-${normalizedDocumentNumber.toLowerCase().replace(/\s+/g, '-')}.pdf`,
         pdfBase64,
-        message: 'PDF de paz y salvo de tercero generado (demo).',
+        message: 'PDF de paz y salvo de tercero generado correctamente.',
       },
     };
   } catch (e) {
@@ -625,6 +669,7 @@ export const creditReport = tsr.router(contract.creditReport, {
   generateSettledCredits: ({ body }, context) => generateSettledCredits(body, context),
   generateSuperintendencia: ({ body }, context) => generateSuperintendencia(body, context),
   generateMinutesPdf: ({ body }, context) => generateMinutesPdf(body, context),
+  listMinutesOptions: (_, context) => listMinutesOptions(context),
   generateCreditClearancePdf: ({ body }, context) => generateCreditClearancePdf(body, context),
   generateThirdPartyClearancePdf: ({ body }, context) =>
     generateThirdPartyClearancePdf(body, context),

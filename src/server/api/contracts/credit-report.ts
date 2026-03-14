@@ -21,6 +21,7 @@ import {
   GenerateThirdPartyClearancePdfBodySchema,
   GenerateThirdPartyClearancePdfResponseSchema,
   GetCreditExtractReportQuerySchema,
+  ListMinutesReportOptionsResponseSchema,
 } from '@/schemas/credit-report';
 import { IdParamSchema } from '@/schemas/shared';
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
@@ -102,6 +103,13 @@ export const creditReport = c.router(
       body: GenerateMinutesPdfBodySchema,
       metadata,
       responses: { 200: GenerateMinutesPdfResponseSchema, ...errorResponses },
+    },
+    listMinutesOptions: {
+      method: 'GET',
+      path: '/minutes/options',
+      query: c.type<Record<string, never>>(),
+      metadata,
+      responses: { 200: ListMinutesReportOptionsResponseSchema, ...errorResponses },
     },
     generateCreditClearancePdf: {
       method: 'POST',

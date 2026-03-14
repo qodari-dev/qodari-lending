@@ -159,6 +159,7 @@ const LOAN_INCLUDE_OPTIONS = [
   'accountingEntries',
   'loanAgreementHistory',
   'loanDisbursementEvents',
+  'riskCenterReportItems',
   'loanStatusHistory',
   'loanBillingConcepts',
   'loanDocumentInstances',

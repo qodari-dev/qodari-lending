@@ -11,6 +11,7 @@ import {
   loanAgreementHistory,
   loanDisbursementEvents,
   loanBillingConcepts,
+  riskCenterReportItems,
   loanDocumentInstances,
   loanInstallments,
   loanPayments,
@@ -260,6 +261,15 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
     relation: 'loanDisbursementEvents',
     config: {
       orderBy: [desc(loanDisbursementEvents.changedAt)],
+    },
+  },
+  riskCenterReportItems: {
+    relation: 'riskCenterReportItems',
+    config: {
+      with: {
+        riskCenterReportRun: true,
+      },
+      orderBy: [desc(riskCenterReportItems.reportDate), desc(riskCenterReportItems.id)],
     },
   },
   loanStatusHistory: {

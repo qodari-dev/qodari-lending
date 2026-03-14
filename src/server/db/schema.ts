@@ -46,6 +46,8 @@ export const processTypeEnum = pgEnum('process_type', [
   'LATE_INTEREST',
 ]);
 
+export const riskCenterTypeEnum = pgEnum('risk_center_type', ['CIFIN', 'DATACREDITO']);
+
 // ---------------------------------------------------------------------
 // Ciudades
 // Nota:
@@ -1556,9 +1558,9 @@ export const loans = pgTable(
       onDelete: 'restrict',
     }),
 
-    // CIFIN / centrales (mejor default false)
-    isReportedToCifin: boolean('is_reported_to_cifin').notNull().default(false),
-    cifinReportDate: date('cifin_report_date'),
+    // Centrales de riesgo (último estado reportado)
+    isReportedToRiskCenter: boolean('is_reported_to_risk_center').notNull().default(false),
+    riskCenterReportDate: date('risk_center_report_date'),
 
     // Jurídico
     hasLegalProcess: boolean('has_legal_process').notNull().default(false),
@@ -1720,6 +1722,82 @@ export const loanDisbursementEvents = pgTable(
     index('idx_loan_disbursement_events_loan').on(t.loanId),
     index('idx_loan_disbursement_events_changed_at').on(t.changedAt),
     index('idx_loan_disbursement_events_type').on(t.eventType),
+  ]
+);
+
+// ---------------------------------------------------------------------
+// Historial de corridas de reporte a centrales de riesgo
+// Nota (ES):
+// Guarda cada generación de archivo a CIFIN/DATACREDITO con sus fechas de corte
+// y conteos principales. El detalle por crédito vive en risk_center_report_items.
+// ---------------------------------------------------------------------
+export const riskCenterReportRuns = pgTable(
+  'risk_center_report_runs',
+  {
+    id: serial('id').primaryKey(),
+    riskCenterType: riskCenterTypeEnum('risk_center_type').notNull(),
+    creditCutoffDate: date('credit_cutoff_date').notNull(),
+    paymentCutoffDate: date('payment_cutoff_date').notNull(),
+    reviewedCredits: integer('reviewed_credits').notNull().default(0),
+    reportedCredits: integer('reported_credits').notNull().default(0),
+    fileName: varchar('file_name', { length: 255 }).notNull(),
+    generatedByUserId: uuid('generated_by_user_id').notNull(),
+    generatedByUserName: varchar('generated_by_user_name', { length: 255 }).notNull(),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
+    note: varchar('note', { length: 255 }),
+    metadata: jsonb('metadata'),
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_risk_center_runs_type_generated').on(t.riskCenterType, t.generatedAt),
+    index('idx_risk_center_runs_type_payment_cutoff').on(t.riskCenterType, t.paymentCutoffDate),
+    index('idx_risk_center_runs_credit_cutoff').on(t.creditCutoffDate),
+  ]
+);
+
+// ---------------------------------------------------------------------
+// Historial por crédito en cada corrida de central de riesgo
+// Nota (ES):
+// 1 fila por crédito revisado en la corrida. Permite saber si entró o salió
+// del reporte, con saldos y días de mora del último envío.
+// ---------------------------------------------------------------------
+export const riskCenterReportItems = pgTable(
+  'risk_center_report_items',
+  {
+    id: serial('id').primaryKey(),
+    riskCenterReportRunId: integer('risk_center_report_run_id')
+      .notNull()
+      .references(() => riskCenterReportRuns.id, { onDelete: 'cascade' }),
+    loanId: integer('loan_id')
+      .notNull()
+      .references(() => loans.id, { onDelete: 'cascade' }),
+    riskCenterType: riskCenterTypeEnum('risk_center_type').notNull(),
+    reportDate: date('report_date').notNull(),
+    wasReported: boolean('was_reported').notNull().default(false),
+    reportedStatus: varchar('reported_status', { length: 40 }).notNull(),
+    daysPastDue: integer('days_past_due').notNull().default(0),
+    currentBalance: decimal('current_balance', { precision: 14, scale: 2 })
+      .notNull()
+      .default('0'),
+    overdueBalance: decimal('overdue_balance', { precision: 14, scale: 2 })
+      .notNull()
+      .default('0'),
+    reportedThirdPartiesCount: integer('reported_third_parties_count').notNull().default(0),
+    note: varchar('note', { length: 255 }),
+    metadata: jsonb('metadata'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uniq_risk_center_items_run_loan').on(t.riskCenterReportRunId, t.loanId),
+    index('idx_risk_center_items_run').on(t.riskCenterReportRunId),
+    index('idx_risk_center_items_run_reported_balance').on(
+      t.riskCenterReportRunId,
+      t.wasReported,
+      t.currentBalance
+    ),
+    index('idx_risk_center_items_loan_date').on(t.loanId, t.reportDate),
+    index('idx_risk_center_items_loan_type_date').on(t.loanId, t.riskCenterType, t.reportDate),
+    index('idx_risk_center_items_type_reported').on(t.riskCenterType, t.wasReported, t.reportDate),
   ]
 );
 

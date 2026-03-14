@@ -379,6 +379,20 @@
       "when": 1773511231013,
       "tag": "0053_rare_devos",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1773521488519,
+      "tag": "0054_risk_center_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1773521519614,
+      "tag": "0055_risk_center_history_indexes",
+      "breakpoints": true
     }
   ]
 }

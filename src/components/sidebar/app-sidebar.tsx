@@ -356,6 +356,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 items: [
                   { title: 'Cifin', url: `/risk-center-reports/cifin` },
                   { title: 'Datacredito', url: `/risk-center-reports/datacredito` },
+                  { title: 'Historial', url: `/risk-center-reports/history` },
                 ],
               },
               {

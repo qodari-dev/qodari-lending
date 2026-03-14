@@ -3,6 +3,10 @@ import {
   GenerateRiskCenterCifinResponseSchema,
   GenerateRiskCenterDatacreditoBodySchema,
   GenerateRiskCenterDatacreditoResponseSchema,
+  GetRiskCenterReportRunItemsPathParamsSchema,
+  GetRiskCenterReportRunItemsResponseSchema,
+  ListRiskCenterReportRunsQuerySchema,
+  ListRiskCenterReportRunsResponseSchema,
 } from '@/schemas/risk-center-report';
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
 import { initContract } from '@ts-rest/core';
@@ -48,7 +52,26 @@ export const riskCenterReport = c.router(
         ...errorResponses,
       },
     },
+    listRuns: {
+      method: 'GET',
+      path: '/runs',
+      query: ListRiskCenterReportRunsQuerySchema,
+      metadata,
+      responses: {
+        200: ListRiskCenterReportRunsResponseSchema,
+        ...errorResponses,
+      },
+    },
+    getRunItems: {
+      method: 'GET',
+      path: '/runs/:id',
+      pathParams: GetRiskCenterReportRunItemsPathParamsSchema,
+      metadata,
+      responses: {
+        200: GetRiskCenterReportRunItemsResponseSchema,
+        ...errorResponses,
+      },
+    },
   },
   { pathPrefix: '/risk-center-reports' }
 );
-

@@ -41,6 +41,8 @@ import {
   loans,
   loanAgreementHistory,
   loanDisbursementEvents,
+  riskCenterReportRuns,
+  riskCenterReportItems,
   loanStatusHistory,
   loanInstallments,
   loanApplicationActNumbers,
@@ -708,6 +710,7 @@ export const loansRelations = relations(loans, ({ one, many }) => ({
   loanAgreementHistory: many(loanAgreementHistory),
   loanStatusHistory: many(loanStatusHistory),
   loanDisbursementEvents: many(loanDisbursementEvents),
+  riskCenterReportItems: many(riskCenterReportItems),
   subsidyPledgePaymentVoucherItems: many(subsidyPledgePaymentVoucherItems),
   loanBillingConcepts: many(loanBillingConcepts),
   loanDocumentInstances: many(loanDocumentInstances),
@@ -741,6 +744,21 @@ export const loanStatusHistoryRelations = relations(loanStatusHistory, ({ one })
 export const loanDisbursementEventsRelations = relations(loanDisbursementEvents, ({ one }) => ({
   loan: one(loans, {
     fields: [loanDisbursementEvents.loanId],
+    references: [loans.id],
+  }),
+}));
+
+export const riskCenterReportRunsRelations = relations(riskCenterReportRuns, ({ many }) => ({
+  riskCenterReportItems: many(riskCenterReportItems),
+}));
+
+export const riskCenterReportItemsRelations = relations(riskCenterReportItems, ({ one }) => ({
+  riskCenterReportRun: one(riskCenterReportRuns, {
+    fields: [riskCenterReportItems.riskCenterReportRunId],
+    references: [riskCenterReportRuns.id],
+  }),
+  loan: one(loans, {
+    fields: [riskCenterReportItems.loanId],
     references: [loans.id],
   }),
 }));

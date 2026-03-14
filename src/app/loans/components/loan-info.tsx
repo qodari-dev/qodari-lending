@@ -229,6 +229,7 @@ const LOAN_DETAIL_INCLUDES: LoanInclude[] = [
   'accountingEntries',
   'loanAgreementHistory',
   'loanDisbursementEvents',
+  'riskCenterReportItems',
   'loanStatusHistory',
   'loanBillingConcepts',
   'loanDocumentInstances',
@@ -274,6 +275,8 @@ export function LoanInfo({
     ?.loanProcessStates;
   const loanDisbursementEventsRaw = (detail as { loanDisbursementEvents?: unknown } | undefined)
     ?.loanDisbursementEvents;
+  const riskCenterReportItemsRaw = (detail as { riskCenterReportItems?: unknown } | undefined)
+    ?.riskCenterReportItems;
   const loanProcessStatesRows = (
     Array.isArray(loanProcessStatesRaw)
       ? loanProcessStatesRaw
@@ -308,6 +311,26 @@ export function LoanInfo({
     changedByUserId?: string | null;
     changedByUserName?: string | null;
     note?: string | null;
+  }>;
+  const riskCenterReportItemRows = (Array.isArray(riskCenterReportItemsRaw)
+    ? riskCenterReportItemsRaw
+    : []) as Array<{
+    id: number;
+    reportDate: string;
+    riskCenterType: string;
+    wasReported: boolean;
+    reportedStatus: string;
+    daysPastDue: number;
+    currentBalance: string;
+    overdueBalance: string;
+    reportedThirdPartiesCount: number;
+    note?: string | null;
+    riskCenterReportRun?: {
+      generatedAt: string | Date;
+      generatedByUserName?: string | null;
+      generatedByUserId?: string | null;
+      fileName: string;
+    } | null;
   }>;
   const signatureDocuments = [...(detail?.loanDocumentInstances ?? [])].sort(
     (a, b) => toTimestamp(b.generatedAt) - toTimestamp(a.generatedAt)
@@ -523,12 +546,12 @@ export function LoanInfo({
               value: formatDate(detail.paymentAgreementDate),
             },
             {
-              label: 'Reportado a CIFIN',
-              value: detail.isReportedToCifin ? 'Si' : 'No',
+              label: 'Ultimo reporte a central',
+              value: detail.isReportedToRiskCenter ? 'Si' : 'No',
             },
             {
-              label: 'Fecha reporte CIFIN',
-              value: formatDate(detail.cifinReportDate),
+              label: 'Fecha ultimo reporte',
+              value: formatDate(detail.riskCenterReportDate),
             },
             { label: 'Ultimo pago', value: formatDate(detail.lastPaymentDate) },
             { label: 'Valor saldo retenido', value: formatCurrency(detail.withheldBalanceValue) },
@@ -1058,6 +1081,50 @@ export function LoanInfo({
                   ) : (
                     <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
                       No hay cambios de convenio registrados.
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Historial de centrales de riesgo</h3>
+                  {riskCenterReportItemRows.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha corte</TableHead>
+                          <TableHead>Central</TableHead>
+                          <TableHead>Reportado</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Dias mora</TableHead>
+                          <TableHead>Saldo</TableHead>
+                          <TableHead>Saldo mora</TableHead>
+                          <TableHead>Terceros</TableHead>
+                          <TableHead>Usuario</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {riskCenterReportItemRows.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{formatDate(item.reportDate)}</TableCell>
+                            <TableCell>{item.riskCenterType}</TableCell>
+                            <TableCell>{item.wasReported ? 'Si' : 'No'}</TableCell>
+                            <TableCell>{item.reportedStatus}</TableCell>
+                            <TableCell>{item.daysPastDue}</TableCell>
+                            <TableCell>{formatCurrency(item.currentBalance)}</TableCell>
+                            <TableCell>{formatCurrency(item.overdueBalance)}</TableCell>
+                            <TableCell>{item.reportedThirdPartiesCount}</TableCell>
+                            <TableCell>
+                              {item.riskCenterReportRun?.generatedByUserName ??
+                                item.riskCenterReportRun?.generatedByUserId ??
+                                '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                      No hay historial registrado de reportes a centrales de riesgo.
                     </div>
                   )}
                 </div>

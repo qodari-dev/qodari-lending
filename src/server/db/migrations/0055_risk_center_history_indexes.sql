@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "uniq_risk_center_items_run_loan" ON "risk_center_report_items" USING btree ("risk_center_report_run_id","loan_id");--> statement-breakpoint
+CREATE INDEX "idx_risk_center_items_run_reported_balance" ON "risk_center_report_items" USING btree ("risk_center_report_run_id","was_reported","current_balance");

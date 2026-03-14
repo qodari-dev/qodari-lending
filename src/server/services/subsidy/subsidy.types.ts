@@ -76,11 +76,19 @@ export type SubsidyCompanyHistory = {
 
 export type SubsidyPayment = {
   period: string;
+  beneficiaryCode: string | null;
+  workerDocumentNumber: string | null;
   beneficiaryRelationship: string | null;
   paymentType: string | null;
   installmentNumber: string | null;
   installmentValue: number;
+  discountedCreditValue: number;
+  adjustmentValue: number;
+  mark: string | null;
+  documentNumber: string | null;
   transferPeriod: string | null;
+  assignedAt: string | null;
+  deliveredAt: string | null;
   isVoided: boolean;
 };
 

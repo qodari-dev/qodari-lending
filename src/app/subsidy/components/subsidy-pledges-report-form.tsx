@@ -87,13 +87,23 @@ export function SubsidyPledgesReportForm({ variant, title, description }: Props)
           filename: `pignoraciones-realizadas-${result.period.toLowerCase().replace(/\s+/g, '-')}`,
           columns: [
             { header: '# Credito', accessorKey: 'creditNumber', width: 18 },
-            { header: 'Documento', accessorKey: 'borrowerDocumentNumber', width: 18 },
+            { header: 'Documento tercero', accessorKey: 'borrowerDocumentNumber', width: 18 },
             { header: 'Tercero', accessorKey: 'borrowerName', width: 28 },
+            { header: 'Documento trabajador', accessorKey: 'workerDocumentNumber', width: 18 },
+            { header: 'Cod. beneficiario', accessorKey: 'beneficiaryCode', width: 18 },
+            { header: 'Marca', accessorKey: 'subsidyMark', width: 14 },
+            { header: 'Documento subsidio', accessorKey: 'subsidyDocument', width: 20 },
             {
               header: 'Valor descontado',
               width: 18,
               getValue: (row) => formatCurrency(row.discountedAmount),
             },
+            {
+              header: 'Valor aplicado',
+              width: 18,
+              getValue: (row) => formatCurrency(row.appliedAmount),
+            },
+            { header: '# Abono', accessorKey: 'paymentNumber', width: 18 },
           ],
         },
         result.rows
@@ -105,13 +115,22 @@ export function SubsidyPledgesReportForm({ variant, title, description }: Props)
           filename: `pignoraciones-no-realizadas-${result.period.toLowerCase().replace(/\s+/g, '-')}`,
           columns: [
             { header: '# Credito', accessorKey: 'creditNumber', width: 18 },
-            { header: 'Documento', accessorKey: 'borrowerDocumentNumber', width: 18 },
+            { header: 'Documento tercero', accessorKey: 'borrowerDocumentNumber', width: 18 },
             { header: 'Tercero', accessorKey: 'borrowerName', width: 28 },
+            { header: 'Documento trabajador', accessorKey: 'workerDocumentNumber', width: 18 },
+            { header: 'Cod. beneficiario', accessorKey: 'beneficiaryCode', width: 18 },
+            { header: 'Doc. beneficiario', accessorKey: 'beneficiaryDocumentNumber', width: 18 },
             {
               header: 'Valor esperado',
               width: 18,
               getValue: (row) => formatCurrency(row.expectedDiscountedAmount),
             },
+            {
+              header: 'Valor descontado subsidio',
+              width: 18,
+              getValue: (row) => formatCurrency(row.subsidyDiscountedAmount),
+            },
+            { header: 'Estado subsidio', accessorKey: 'subsidyObservation', width: 28 },
             { header: 'Novedad', accessorKey: 'reason', width: 30 },
           ],
         },
@@ -144,7 +163,7 @@ export function SubsidyPledgesReportForm({ variant, title, description }: Props)
                         id="period"
                         {...field}
                         value={field.value ?? ''}
-                        placeholder="Ej: 2026-01, ENE-2026"
+                        placeholder="Ej: 202603 o 2026-03"
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>

@@ -3,6 +3,7 @@ import { createBillingConceptsWorker } from './billing-concepts';
 import { createCurrentInsuranceWorker } from './current-insurance';
 import { createCurrentInterestWorker } from './current-interest';
 import { createLateInterestWorker } from './late-interest';
+import { createSubsidyPledgePaymentVoucherWorker } from './subsidy-pledge-payment-voucher';
 
 declare global {
   var __workersBootstrapDone: boolean | undefined;
@@ -17,4 +18,5 @@ export function startWorkers() {
   createCurrentInterestWorker();
   createCurrentInsuranceWorker();
   createLateInterestWorker();
+  createSubsidyPledgePaymentVoucherWorker();
 }

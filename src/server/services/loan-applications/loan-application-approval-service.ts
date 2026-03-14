@@ -1,5 +1,4 @@
 import {
-  db,
   loanApprovalLevels,
   loanApprovalLevelUsers,
   loanApplicationApprovalHistory,

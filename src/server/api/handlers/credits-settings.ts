@@ -31,6 +31,10 @@ const CREDITS_SETTINGS_INCLUDES = createIncludeMap<typeof db.query.creditsSettin
     relation: 'pledgeSubsidyGlAccount',
     config: true,
   },
+  pledgePaymentReceiptType: {
+    relation: 'pledgePaymentReceiptType',
+    config: true,
+  },
   writeOffGlAccount: {
     relation: 'writeOffGlAccount',
     config: true,

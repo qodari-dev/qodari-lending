@@ -53,6 +53,8 @@ import {
   payrollExcessPayments,
   loanPayments,
   loanPaymentMethodAllocations,
+  subsidyPledgePaymentVouchers,
+  subsidyPledgePaymentVoucherItems,
   creditsSettings,
   billingConcepts,
   billingConceptRules,
@@ -268,6 +270,12 @@ export const paymentReceiptTypesRelations = relations(paymentReceiptTypes, ({ ma
   loanPayments: many(loanPayments),
   userPaymentReceiptTypes: many(userPaymentReceiptTypes),
   payrollExcessPayments: many(payrollExcessPayments),
+  creditsSettingsAsPledgePaymentReceipt: many(creditsSettings, {
+    relationName: 'pledgePaymentReceiptType',
+  }),
+  creditsSettingsAsRefinancingReceiptType: many(creditsSettings, {
+    relationName: 'refinancingReceiptType',
+  }),
   glAccount: one(glAccounts, {
     fields: [paymentReceiptTypes.glAccountId],
     references: [glAccounts.id],
@@ -700,6 +708,7 @@ export const loansRelations = relations(loans, ({ one, many }) => ({
   loanAgreementHistory: many(loanAgreementHistory),
   loanStatusHistory: many(loanStatusHistory),
   loanDisbursementEvents: many(loanDisbursementEvents),
+  subsidyPledgePaymentVoucherItems: many(subsidyPledgePaymentVoucherItems),
   loanBillingConcepts: many(loanBillingConcepts),
   loanDocumentInstances: many(loanDocumentInstances),
   signatureEnvelopes: many(signatureEnvelopes),
@@ -909,8 +918,34 @@ export const loanPaymentsRelations = relations(loanPayments, ({ one, many }) => 
     fields: [loanPayments.billingDispatchId],
     references: [agreementBillingEmailDispatches.id],
   }),
+  subsidyPledgePaymentVoucherItems: many(subsidyPledgePaymentVoucherItems),
   loanPaymentMethodAllocations: many(loanPaymentMethodAllocations),
 }));
+
+export const subsidyPledgePaymentVouchersRelations = relations(
+  subsidyPledgePaymentVouchers,
+  ({ many }) => ({
+    items: many(subsidyPledgePaymentVoucherItems),
+  })
+);
+
+export const subsidyPledgePaymentVoucherItemsRelations = relations(
+  subsidyPledgePaymentVoucherItems,
+  ({ one }) => ({
+    voucher: one(subsidyPledgePaymentVouchers, {
+      fields: [subsidyPledgePaymentVoucherItems.voucherId],
+      references: [subsidyPledgePaymentVouchers.id],
+    }),
+    loan: one(loans, {
+      fields: [subsidyPledgePaymentVoucherItems.loanId],
+      references: [loans.id],
+    }),
+    loanPayment: one(loanPayments, {
+      fields: [subsidyPledgePaymentVoucherItems.loanPaymentId],
+      references: [loanPayments.id],
+    }),
+  })
+);
 
 // ---------------------------------------------------------------------
 // Concr35 - Valores por formas de pago en abonos
@@ -961,6 +996,12 @@ export const creditsSettingsRelations = relations(creditsSettings, ({ one }) => 
   refinancingReceiptType: one(paymentReceiptTypes, {
     fields: [creditsSettings.refinancingReceiptTypeId],
     references: [paymentReceiptTypes.id],
+    relationName: 'refinancingReceiptType',
+  }),
+  pledgePaymentReceiptType: one(paymentReceiptTypes, {
+    fields: [creditsSettings.pledgePaymentReceiptTypeId],
+    references: [paymentReceiptTypes.id],
+    relationName: 'pledgePaymentReceiptType',
   }),
 }));
 

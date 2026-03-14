@@ -68,8 +68,6 @@ async function processCredits(body: ProcessCreditsBody, context: HandlerContext)
 
     const loanIds = [...new Set(draftCreditEntries.map((item) => item.loanId).filter((value): value is number => !!value))];
 
-    let processedRecords = 0;
-
     if (loanIds.length) {
       await db.transaction(async (tx) => {
         await tx

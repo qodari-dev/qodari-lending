@@ -1,4 +1,4 @@
-import { db, loanDisbursementEvents } from '@/server/db';
+import { loanDisbursementEvents } from '@/server/db';
 import type { DbOrTx } from '@/server/db/connection';
 
 export type RecordLoanDisbursementEventInput = {

@@ -56,10 +56,11 @@ export function LoanApplicationPledgesForm() {
     control: form.control,
     name: 'pledgesSubsidy',
   });
-  const selectedPledges = useWatch({
+  const watchedSelectedPledges = useWatch({
     control: form.control,
     name: 'loanApplicationPledges',
-  }) ?? [];
+  });
+  const selectedPledges = useMemo(() => watchedSelectedPledges ?? [], [watchedSelectedPledges]);
 
   const { data, isLoading, isError, error } = useLoanApplicationSubsidyPledgeLookup(thirdPartyId, {
     enabled: pledgesSubsidy && typeof thirdPartyId === 'number' && thirdPartyId > 0,
@@ -123,7 +124,7 @@ export function LoanApplicationPledgesForm() {
     ]);
   };
 
-  const handleAmountChange = (beneficiaryCode: string, value: string, maxValue: number) => {
+  const handleAmountChange = (beneficiaryCode: string, value: string) => {
     const currentItems = form.getValues('loanApplicationPledges') ?? [];
     updateSelectedPledges(
       currentItems.map((item) =>
@@ -302,8 +303,7 @@ export function LoanApplicationPledgesForm() {
                           onChange={(event) =>
                             handleAmountChange(
                               beneficiary.beneficiaryCode,
-                              event.target.value,
-                              maxValue
+                              event.target.value
                             )
                           }
                           onBlur={() =>

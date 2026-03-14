@@ -50,14 +50,15 @@ export function CreditsSettingsPage() {
     refetch,
     isFetching,
   } = useCreditsSettings({
-    include: [
-      'cashGlAccount',
-      'majorGlAccount',
-      'excessGlAccount',
-      'pledgeSubsidyGlAccount',
-      'writeOffGlAccount',
-      'refinancingReceiptType',
-    ],
+      include: [
+        'cashGlAccount',
+        'majorGlAccount',
+        'excessGlAccount',
+        'pledgeSubsidyGlAccount',
+        'pledgePaymentReceiptType',
+        'writeOffGlAccount',
+        'refinancingReceiptType',
+      ],
   });
 
   // Fetch GL accounts for selects
@@ -71,6 +72,10 @@ export function CreditsSettingsPage() {
   const receiptTypes = React.useMemo(
     () => receiptTypesData?.body?.data ?? [],
     [receiptTypesData]
+  );
+  const pledgeReceiptTypes = React.useMemo(
+    () => receiptTypes.filter((item) => item.movementType === 'PLEDGE'),
+    [receiptTypes]
   );
   const settings = settingsData?.body;
   const findGlAccount = React.useCallback(
@@ -109,6 +114,7 @@ export function CreditsSettingsPage() {
         minimumMajorPaidAmount: settings.minimumMajorPaidAmount ?? null,
         excessGlAccountId: settings.excessGlAccountId ?? undefined,
         pledgeSubsidyGlAccountId: settings.pledgeSubsidyGlAccountId ?? undefined,
+        pledgePaymentReceiptTypeId: settings.pledgePaymentReceiptTypeId ?? undefined,
         writeOffGlAccountId: settings.writeOffGlAccountId ?? undefined,
         refinancingReceiptTypeId: settings.refinancingReceiptTypeId ?? undefined,
         creditManagerName: settings.creditManagerName ?? '',
@@ -598,6 +604,58 @@ export function CreditsSettingsPage() {
                                 <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
                                 <ComboboxCollection>
                                   {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="pledgePaymentReceiptTypeId"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Tipo Recibo Pignoración</FieldLabel>
+                          <Combobox
+                            items={pledgeReceiptTypes}
+                            value={findReceiptType(field.value)}
+                            onValueChange={(value: PaymentReceiptType | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: PaymentReceiptType) => String(item.id)}
+                            itemToStringLabel={(item: PaymentReceiptType) =>
+                              `${item.code} - ${item.name}`
+                            }
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar tipo de recibo..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron tipos</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: PaymentReceiptType) => (
                                     <ComboboxItem key={item.id} value={item}>
                                       {item.code} - {item.name}
                                     </ComboboxItem>

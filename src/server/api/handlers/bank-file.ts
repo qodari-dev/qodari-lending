@@ -6,7 +6,6 @@ import {
   loanInstallments,
   loanPayments,
   loans,
-  paymentFrequencies,
   portfolioEntries,
 } from '@/server/db';
 import { UnifiedAuthContext } from '@/server/utils/auth-context';
@@ -28,7 +27,6 @@ import {
 } from '@/schemas/bank-file';
 import type { PaymentScheduleMode } from '@/schemas/payment-frequency';
 import {
-  buildDueDates,
   calculateCreditSimulation,
   findInsuranceRateRange,
   resolveInsuranceFactorFromRange,
@@ -197,49 +195,6 @@ function buildNoveltyPreviewRows(
     rows,
     summary: buildNoveltyPreviewSummary(rows),
   };
-}
-
-function resolveNewDueDates(loan: BankNoveltyLoanRow, newFirstCollectionDate: string) {
-  if (!loan.paymentFrequency) {
-    throwHttpError({
-      status: 400,
-      code: 'BAD_REQUEST',
-      message: `El crédito ${loan.creditNumber} no tiene periodicidad de pago configurada.`,
-    });
-  }
-
-  const paymentFrequencyIntervalDays = resolvePaymentFrequencyIntervalDays({
-    scheduleMode: loan.paymentFrequency.scheduleMode,
-    intervalDays: loan.paymentFrequency.intervalDays,
-    dayOfMonth: loan.paymentFrequency.dayOfMonth,
-    semiMonthDay1: loan.paymentFrequency.semiMonthDay1,
-    semiMonthDay2: loan.paymentFrequency.semiMonthDay2,
-  });
-
-  if (paymentFrequencyIntervalDays <= 0) {
-    throwHttpError({
-      status: 400,
-      code: 'BAD_REQUEST',
-      message: `La periodicidad del crédito ${loan.creditNumber} no es válida.`,
-    });
-  }
-
-  const dueDates = buildDueDates({
-    financingType: 'FIXED_AMOUNT',
-    principal: 0,
-    annualRatePercent: 0,
-    installments: loan.installments,
-    firstPaymentDate: new Date(`${newFirstCollectionDate}T00:00:00`),
-    disbursementDate: new Date(`${loan.creditStartDate}T00:00:00`),
-    daysInterval: paymentFrequencyIntervalDays,
-    paymentScheduleMode: loan.paymentFrequency.scheduleMode,
-    dayOfMonth: loan.paymentFrequency.dayOfMonth,
-    semiMonthDay1: loan.paymentFrequency.semiMonthDay1,
-    semiMonthDay2: loan.paymentFrequency.semiMonthDay2,
-    useEndOfMonthFallback: loan.paymentFrequency.useEndOfMonthFallback ?? true,
-  });
-
-  return dueDates.map((item) => formatDateOnly(item));
 }
 
 function buildEntryValueSignature(entries: Array<AdjustmentEntryLike | typeof accountingEntries.$inferInsert>) {

@@ -3,8 +3,11 @@ import {
   GenerateNotPerformedPledgesReportResponseSchema,
   GeneratePerformedPledgesReportBodySchema,
   GeneratePerformedPledgesReportResponseSchema,
+  GetSubsidyPledgePaymentVoucherParamsSchema,
   GeneratePledgePaymentVoucherBodySchema,
   GeneratePledgePaymentVoucherResponseSchema,
+  ListSubsidyPledgePaymentVouchersQuerySchema,
+  ListSubsidyPledgePaymentVouchersResponseSchema,
 } from '@/schemas/subsidy';
 import { TsRestErrorSchema, TsRestMetaData } from '@/schemas/ts-rest';
 import { initContract } from '@ts-rest/core';
@@ -30,6 +33,26 @@ const errorResponses = {
 
 export const subsidy = c.router(
   {
+    listPledgePaymentVouchers: {
+      method: 'GET',
+      path: '/pledge-payment-voucher',
+      query: ListSubsidyPledgePaymentVouchersQuerySchema,
+      metadata,
+      responses: {
+        200: ListSubsidyPledgePaymentVouchersResponseSchema,
+        ...errorResponses,
+      },
+    },
+    getPledgePaymentVoucher: {
+      method: 'GET',
+      path: '/pledge-payment-voucher/:id',
+      pathParams: GetSubsidyPledgePaymentVoucherParamsSchema,
+      metadata,
+      responses: {
+        200: GeneratePledgePaymentVoucherResponseSchema,
+        ...errorResponses,
+      },
+    },
     generatePledgePaymentVoucher: {
       method: 'POST',
       path: '/pledge-payment-voucher/generate',

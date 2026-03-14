@@ -8,6 +8,7 @@ import { billingConceptsQueue } from './billing-concepts';
 import { currentInsuranceQueue } from './current-insurance';
 import { currentInterestQueue } from './current-interest';
 import { lateInterestQueue } from './late-interest';
+import { subsidyPledgePaymentVoucherQueue } from './subsidy-pledge-payment-voucher';
 
 const QUEUE_BOARD_BASE_PATH = '/api/queues';
 
@@ -26,6 +27,7 @@ function buildQueueBoardApp() {
       new BullMQAdapter(currentInterestQueue),
       new BullMQAdapter(currentInsuranceQueue),
       new BullMQAdapter(lateInterestQueue),
+      new BullMQAdapter(subsidyPledgePaymentVoucherQueue),
     ],
     serverAdapter,
     options: {

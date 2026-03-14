@@ -57,9 +57,15 @@ import { CalendarIcon, ChevronDownIcon } from 'lucide-react';
 import React from 'react';
 import { Controller, type Resolver, useForm } from 'react-hook-form';
 import { useDebounce } from 'use-debounce';
-import { z } from 'zod';
 import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 type ApproveFormValues = {
   mode: 'FINAL' | 'STEP';
@@ -92,7 +98,9 @@ function readMetadataValue(
   return String(value);
 }
 
-function renderApprovalMetadata(item: NonNullable<LoanApplication['loanApplicationApprovalHistory']>[number]) {
+function renderApprovalMetadata(
+  item: NonNullable<LoanApplication['loanApplicationApprovalHistory']>[number]
+) {
   const metadata = (item.metadata ?? null) as Record<string, unknown> | null;
   if (!metadata) return null;
 
@@ -184,7 +192,10 @@ export function LoanApplicationApproveDialog({
   const [pinnedThirdParty, setPinnedThirdParty] = React.useState<ThirdParty | null>(null);
   const [openedHistoryDialog, setOpenedHistoryDialog] = React.useState(false);
   const validationSchema = React.useMemo(
-    () => (mode === 'FINAL' ? FinalApproveLoanApplicationBodySchema : StepApproveLoanApplicationBodySchema),
+    () =>
+      mode === 'FINAL'
+        ? FinalApproveLoanApplicationBodySchema
+        : StepApproveLoanApplicationBodySchema,
     [mode]
   );
 
@@ -286,9 +297,15 @@ export function LoanApplicationApproveDialog({
       mode,
       repaymentMethodId: loanApplication.repaymentMethodId ?? undefined,
       paymentGuaranteeTypeId: loanApplication.paymentGuaranteeTypeId ?? undefined,
-      isInsuranceApproved: loanApplication.isInsuranceApproved ?? loanApplication.creditProduct?.paysInsurance ?? false,
-      approvedInstallments: loanApplication.approvedInstallments ?? loanApplication.installments ?? 1,
-      approvedAmount: String(loanApplication.approvedAmount ?? loanApplication.requestedAmount ?? '0'),
+      isInsuranceApproved:
+        loanApplication.isInsuranceApproved ??
+        loanApplication.creditProduct?.paysInsurance ??
+        false,
+      approvedInstallments:
+        loanApplication.approvedInstallments ?? loanApplication.installments ?? 1,
+      approvedAmount: String(
+        loanApplication.approvedAmount ?? loanApplication.requestedAmount ?? '0'
+      ),
       actNumber: loanApplication.actNumber ?? '',
       payeeThirdPartyId: loanApplication.thirdPartyId ?? undefined,
       firstCollectionDate: suggestedFirstCollectionDate,
@@ -361,125 +378,177 @@ export function LoanApplicationApproveDialog({
     <>
       <Dialog open={open} onOpenChange={onOpened}>
         <DialogContent ref={dialogContentRef} className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>
-            {mode === 'FINAL' ? 'Aprobacion final de solicitud' : 'Aprobar y enviar al siguiente nivel'}
-          </DialogTitle>
-          <DialogDescription>
-            {mode === 'FINAL'
-              ? 'Complete los datos de aprobacion para generar el credito y su tabla de amortizacion.'
-              : 'Guarde la propuesta de aprobacion y envie la solicitud al siguiente nivel.'}
-          </DialogDescription>
-        </DialogHeader>
+          <DialogHeader>
+            <DialogTitle>
+              {mode === 'FINAL'
+                ? 'Aprobacion final de solicitud'
+                : 'Aprobar y enviar al siguiente nivel'}
+            </DialogTitle>
+            <DialogDescription>
+              {mode === 'FINAL'
+                ? 'Complete los datos de aprobacion para generar el credito y su tabla de amortizacion.'
+                : 'Guarde la propuesta de aprobacion y envie la solicitud al siguiente nivel.'}
+            </DialogDescription>
+          </DialogHeader>
 
-        {loanApplication?.agreement ? (
-          <div className="rounded-md border px-3 py-2 text-sm">
-            <span className="font-medium">Convenio:</span>{' '}
-            {loanApplication.agreement.agreementCode} - {loanApplication.agreement.businessName}
-          </div>
-        ) : null}
+          {loanApplication?.agreement ? (
+            <div className="rounded-md border px-3 py-2 text-sm">
+              <span className="font-medium">Convenio:</span>{' '}
+              {loanApplication.agreement.agreementCode} - {loanApplication.agreement.businessName}
+            </div>
+          ) : null}
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <Controller
-              name="repaymentMethodId"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="approveRepaymentMethodId">Forma de pago</Label>
-                  <Select
-                    value={field.value ? String(field.value) : ''}
-                    onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
-                  >
-                    <SelectTrigger id="approveRepaymentMethodId">
-                      <SelectValue placeholder="Seleccione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {repaymentMethods.map((item) => (
-                        <SelectItem key={item.id} value={String(item.id)}>
-                          {item.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {fieldState.error ? (
-                    <p className="text-destructive text-xs">{fieldState.error.message}</p>
-                  ) : null}
-                </div>
-              )}
-            />
-
-            <Controller
-              name="paymentGuaranteeTypeId"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="approvePaymentGuaranteeTypeId">Garantia de pago</Label>
-                  <Select
-                    value={field.value ? String(field.value) : ''}
-                    onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
-                  >
-                    <SelectTrigger id="approvePaymentGuaranteeTypeId">
-                      <SelectValue placeholder="Seleccione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paymentGuaranteeTypes.map((item) => (
-                        <SelectItem key={item.id} value={String(item.id)}>
-                          {item.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {fieldState.error ? (
-                    <p className="text-destructive text-xs">{fieldState.error.message}</p>
-                  ) : null}
-                </div>
-              )}
-            />
-
-            <Controller
-              name="actNumber"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="approveActNumber">Acta</Label>
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) => field.onChange(value)}
-                    disabled={isLoadingActNumbers}
-                  >
-                    <SelectTrigger id="approveActNumber">
-                      <SelectValue
-                        placeholder={isLoadingActNumbers ? 'Cargando...' : 'Seleccione...'}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {actNumbers.map((item) => (
-                        <SelectItem key={item.id} value={item.actNumber}>
-                          {item.actNumber}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {fieldState.error ? (
-                    <p className="text-destructive text-xs">{fieldState.error.message}</p>
-                  ) : null}
-                </div>
-              )}
-            />
-
-            {mode === 'STEP' ? (
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
               <Controller
-                name="approvalNote"
+                name="repaymentMethodId"
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <div className="col-span-2 space-y-2">
-                    <Label htmlFor="approveStepNote">Nota de aprobacion</Label>
-                    <Textarea
-                      id="approveStepNote"
+                    <Label htmlFor="approveRepaymentMethodId">Forma de pago</Label>
+                    <Select
+                      value={field.value ? String(field.value) : ''}
+                      onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                    >
+                      <SelectTrigger id="approveRepaymentMethodId">
+                        <SelectValue placeholder="Seleccione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {repaymentMethods.map((item) => (
+                          <SelectItem key={item.id} value={String(item.id)}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {fieldState.error ? (
+                      <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                    ) : null}
+                  </div>
+                )}
+              />
+
+              <Controller
+                name="paymentGuaranteeTypeId"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="approvePaymentGuaranteeTypeId">Garantia de pago</Label>
+                    <Select
+                      value={field.value ? String(field.value) : ''}
+                      onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                    >
+                      <SelectTrigger id="approvePaymentGuaranteeTypeId">
+                        <SelectValue placeholder="Seleccione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentGuaranteeTypes.map((item) => (
+                          <SelectItem key={item.id} value={String(item.id)}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {fieldState.error ? (
+                      <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                    ) : null}
+                  </div>
+                )}
+              />
+
+              <Controller
+                name="actNumber"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="approveActNumber">Acta</Label>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => field.onChange(value)}
+                      disabled={isLoadingActNumbers}
+                    >
+                      <SelectTrigger id="approveActNumber">
+                        <SelectValue
+                          placeholder={isLoadingActNumbers ? 'Cargando...' : 'Seleccione...'}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {actNumbers.map((item) => (
+                          <SelectItem key={item.id} value={item.actNumber}>
+                            {item.actNumber}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {fieldState.error ? (
+                      <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                    ) : null}
+                  </div>
+                )}
+              />
+
+              {mode === 'STEP' ? (
+                <Controller
+                  name="approvalNote"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <div className="col-span-2 space-y-2">
+                      <Label htmlFor="approveStepNote">Nota de aprobacion</Label>
+                      <Textarea
+                        id="approveStepNote"
+                        value={field.value ?? ''}
+                        onChange={(event) => field.onChange(event.target.value)}
+                        placeholder="Ingrese observaciones para el siguiente nivel..."
+                      />
+                      {fieldState.error ? (
+                        <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                      ) : null}
+                    </div>
+                  )}
+                />
+              ) : null}
+
+              {loanApplication?.creditProduct?.paysInsurance ? (
+                <Controller
+                  name="isInsuranceApproved"
+                  control={form.control}
+                  render={({ field }) => (
+                    <div className="col-span-2 flex items-center justify-between rounded-md border px-3 py-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="approveInsuranceApproved">Seguro aprobado</Label>
+                        <p className="text-muted-foreground text-xs">
+                          Si no se aprueba, el crédito se genera sin cobro de seguro.
+                        </p>
+                      </div>
+                      <Switch
+                        id="approveInsuranceApproved"
+                        checked={Boolean(field.value)}
+                        onCheckedChange={field.onChange}
+                      />
+                    </div>
+                  )}
+                />
+              ) : null}
+
+              <Controller
+                name="approvedInstallments"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <div className="space-y-2">
+                    <Label htmlFor="approveInstallments">Numero cuotas aprobadas</Label>
+                    <Input
+                      id="approveInstallments"
+                      type="number"
+                      min={1}
                       value={field.value ?? ''}
-                      onChange={(event) => field.onChange(event.target.value)}
-                      placeholder="Ingrese observaciones para el siguiente nivel..."
+                      onChange={(event) =>
+                        field.onChange(
+                          event.target.value === ''
+                            ? undefined
+                            : Number.parseInt(event.target.value, 10)
+                        )
+                      }
+                      placeholder="0"
                     />
                     {fieldState.error ? (
                       <p className="text-destructive text-xs">{fieldState.error.message}</p>
@@ -487,260 +556,209 @@ export function LoanApplicationApproveDialog({
                   </div>
                 )}
               />
-            ) : null}
 
-            {loanApplication?.creditProduct?.paysInsurance ? (
               <Controller
-                name="isInsuranceApproved"
+                name="approvedAmount"
                 control={form.control}
-                render={({ field }) => (
-                  <div className="col-span-2 flex items-center justify-between rounded-md border px-3 py-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="approveInsuranceApproved">Seguro aprobado</Label>
-                      <p className="text-muted-foreground text-xs">
-                        Si no se aprueba, el crédito se genera sin cobro de seguro.
-                      </p>
-                    </div>
-                    <Switch
-                      id="approveInsuranceApproved"
-                      checked={Boolean(field.value)}
-                      onCheckedChange={field.onChange}
+                render={({ field, fieldState }) => (
+                  <div className="space-y-2">
+                    <Label htmlFor="approveApprovedAmount">Valor aprobado</Label>
+                    <Input
+                      id="approveApprovedAmount"
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      placeholder="0"
                     />
+                    {fieldState.error ? (
+                      <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                    ) : null}
                   </div>
                 )}
               />
-            ) : null}
 
-            <Controller
-              name="approvedInstallments"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <div className="space-y-2">
-                  <Label htmlFor="approveInstallments">Numero cuotas aprobadas</Label>
-                  <Input
-                    id="approveInstallments"
-                    type="number"
-                    min={1}
-                    value={field.value ?? ''}
-                    onChange={(event) =>
-                      field.onChange(
-                        event.target.value === ''
-                          ? undefined
-                          : Number.parseInt(event.target.value, 10)
-                      )
-                    }
-                    placeholder="0"
-                  />
-                  {fieldState.error ? (
-                    <p className="text-destructive text-xs">{fieldState.error.message}</p>
-                  ) : null}
-                </div>
-              )}
-            />
-
-            <Controller
-              name="approvedAmount"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <div className="space-y-2">
-                  <Label htmlFor="approveApprovedAmount">Valor aprobado</Label>
-                  <Input
-                    id="approveApprovedAmount"
-                    value={field.value}
-                    onChange={(event) => field.onChange(event.target.value)}
-                    placeholder="0"
-                  />
-                  {fieldState.error ? (
-                    <p className="text-destructive text-xs">{fieldState.error.message}</p>
-                  ) : null}
-                </div>
-              )}
-            />
-
-            {mode === 'FINAL' ? (
-              <>
-                <Controller
-                  name="payeeThirdPartyId"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <div className="col-span-2 space-y-2">
-                      <Label>Tercero desembolso</Label>
-                      <Combobox
-                        items={thirdParties}
-                        value={thirdParties.find((item) => item.id === field.value) ?? null}
-                        filter={null}
-                        onOpenChange={(isOpen) => {
-                          if (!isOpen) setThirdPartySearch('');
-                        }}
-                        onInputValueChange={(value, details) => {
-                          if (
-                            details.reason === 'input-change' ||
-                            details.reason === 'input-clear'
-                          ) {
-                            setThirdPartySearch(value);
+              {mode === 'FINAL' ? (
+                <>
+                  <Controller
+                    name="payeeThirdPartyId"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <div className="col-span-2 space-y-2">
+                        <Label>Tercero desembolso</Label>
+                        <Combobox
+                          items={thirdParties}
+                          value={thirdParties.find((item) => item.id === field.value) ?? null}
+                          filter={null}
+                          onOpenChange={(isOpen) => {
+                            if (!isOpen) setThirdPartySearch('');
+                          }}
+                          onInputValueChange={(value, details) => {
+                            if (
+                              details.reason === 'input-change' ||
+                              details.reason === 'input-clear'
+                            ) {
+                              setThirdPartySearch(value);
+                            }
+                          }}
+                          onValueChange={(value: ThirdParty | null) => {
+                            field.onChange(value?.id ?? undefined);
+                            if (value) setPinnedThirdParty(value);
+                          }}
+                          itemToStringValue={(item: ThirdParty) => String(item.id)}
+                          itemToStringLabel={(item: ThirdParty) =>
+                            `${getThirdPartyLabel(item)} (${item.documentNumber})`
                           }
-                        }}
-                        onValueChange={(value: ThirdParty | null) => {
-                          field.onChange(value?.id ?? undefined);
-                          if (value) setPinnedThirdParty(value);
-                        }}
-                        itemToStringValue={(item: ThirdParty) => String(item.id)}
-                        itemToStringLabel={(item: ThirdParty) =>
-                          `${getThirdPartyLabel(item)} (${item.documentNumber})`
-                        }
-                      >
-                        <ComboboxTrigger
-                          render={
+                        >
+                          <ComboboxTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-between font-normal"
+                              >
+                                <ComboboxValue placeholder="Seleccione..." />
+                                <ChevronDownIcon className="text-muted-foreground size-4" />
+                              </Button>
+                            }
+                          />
+                          <ComboboxContent portalContainer={dialogContentRef}>
+                            <ComboboxInput
+                              placeholder="Buscar tercero..."
+                              showClear
+                              showTrigger={false}
+                            />
+                            <ComboboxList>
+                              <ComboboxEmpty>No se encontraron terceros</ComboboxEmpty>
+                              <ComboboxCollection>
+                                {(item: ThirdParty) => (
+                                  <ComboboxItem key={item.id} value={item}>
+                                    {getThirdPartyLabel(item)} ({item.documentNumber})
+                                  </ComboboxItem>
+                                )}
+                              </ComboboxCollection>
+                            </ComboboxList>
+                          </ComboboxContent>
+                        </Combobox>
+                        {fieldState.error ? (
+                          <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                        ) : null}
+                      </div>
+                    )}
+                  />
+
+                  <Controller
+                    name="firstCollectionDate"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="approveFirstCollectionDate">Fecha primer recaudo</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
                             <Button
+                              id="approveFirstCollectionDate"
                               type="button"
                               variant="outline"
-                              className="w-full justify-between font-normal"
-                            >
-                              <ComboboxValue placeholder="Seleccione..." />
-                              <ChevronDownIcon className="text-muted-foreground size-4" />
-                            </Button>
-                          }
-                        />
-                        <ComboboxContent portalContainer={dialogContentRef}>
-                          <ComboboxInput
-                            placeholder="Buscar tercero..."
-                            showClear
-                            showTrigger={false}
-                          />
-                          <ComboboxList>
-                            <ComboboxEmpty>No se encontraron terceros</ComboboxEmpty>
-                            <ComboboxCollection>
-                              {(item: ThirdParty) => (
-                                <ComboboxItem key={item.id} value={item}>
-                                  {getThirdPartyLabel(item)} ({item.documentNumber})
-                                </ComboboxItem>
+                              className={cn(
+                                'w-full justify-start text-left font-normal',
+                                !field.value && 'text-muted-foreground'
                               )}
-                            </ComboboxCollection>
-                          </ComboboxList>
-                        </ComboboxContent>
-                      </Combobox>
-                      {fieldState.error ? (
-                        <p className="text-destructive text-xs">{fieldState.error.message}</p>
-                      ) : null}
-                    </div>
-                  )}
-                />
+                            >
+                              <CalendarIcon className="mr-2 size-4" />
+                              {field.value ? formatDate(field.value) : 'Seleccione fecha'}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={(value) => field.onChange(value)}
+                              disabled={(date) => date < suggestedFirstCollectionDate}
+                              captionLayout="dropdown"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <p className="text-muted-foreground text-xs">
+                          Sugerida desde {formatDate(suggestedFirstCollectionDate)} (mínimo{' '}
+                          {minimumDaysBeforeFirstCollection} días).
+                        </p>
+                        {fieldState.error ? (
+                          <p className="text-destructive text-xs">{fieldState.error.message}</p>
+                        ) : null}
+                      </div>
+                    )}
+                  />
+                </>
+              ) : null}
+            </div>
 
-                <Controller
-                  name="firstCollectionDate"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="approveFirstCollectionDate">Fecha primer recaudo</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            id="approveFirstCollectionDate"
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              'w-full justify-start text-left font-normal',
-                              !field.value && 'text-muted-foreground'
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 size-4" />
-                            {field.value ? formatDate(field.value) : 'Seleccione fecha'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={(value) => field.onChange(value)}
-                            disabled={(date) => date < suggestedFirstCollectionDate}
-                            captionLayout="dropdown"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <p className="text-muted-foreground text-xs">
-                        Sugerida desde {formatDate(suggestedFirstCollectionDate)} (mínimo{' '}
-                        {minimumDaysBeforeFirstCollection} días).
-                      </p>
-                      {fieldState.error ? (
-                        <p className="text-destructive text-xs">{fieldState.error.message}</p>
-                      ) : null}
-                    </div>
-                  )}
-                />
-              </>
-            ) : null}
-          </div>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setOpenedHistoryDialog(true)}
+              >
+                Ver historial completo
+              </Button>
+            </div>
 
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setOpenedHistoryDialog(true)}
-            >
-              Ver historial completo
-            </Button>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpened(false)}>
-              Cerrar
-            </Button>
-            <Button type="submit" disabled={isApproving || !form.formState.isValid}>
-              {isApproving && <Spinner />}
-              {mode === 'FINAL' ? 'Aprobar solicitud' : 'Aprobar y continuar'}
-            </Button>
-          </DialogFooter>
-        </form>
-
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpened(false)}>
+                Cerrar
+              </Button>
+              <Button type="submit" disabled={isApproving || !form.formState.isValid}>
+                {isApproving && <Spinner />}
+                {mode === 'FINAL' ? 'Aprobar solicitud' : 'Aprobar y continuar'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
       {openedHistoryDialog ? (
         <Dialog open={openedHistoryDialog} onOpenChange={setOpenedHistoryDialog}>
           <DialogContent className="sm:max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>Historial completo de aprobacion</DialogTitle>
-            <DialogDescription>
-              Revise notas, usuarios y metadata registrada por cada nivel.
-            </DialogDescription>
-          </DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Historial completo de aprobacion</DialogTitle>
+              <DialogDescription>
+                Revise notas, usuarios y metadata registrada por cada nivel.
+              </DialogDescription>
+            </DialogHeader>
 
-          {loanApplication?.loanApplicationApprovalHistory?.length ? (
-            <div className="max-h-[70vh] overflow-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Accion</TableHead>
-                    <TableHead>Nivel</TableHead>
-                    <TableHead>Usuario</TableHead>
-                    <TableHead>Nota</TableHead>
-                    <TableHead>Metadata</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loanApplication.loanApplicationApprovalHistory.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{formatDateTime(item.occurredAt)}</TableCell>
-                      <TableCell>{approvalActionLabels[item.action] ?? item.action}</TableCell>
-                      <TableCell>{item.level?.name ?? '-'}</TableCell>
-                      <TableCell>{item.actorUserName ?? item.actorUserId ?? '-'}</TableCell>
-                      <TableCell className="max-w-80 whitespace-pre-wrap break-words">
-                        {item.note ?? '-'}
-                      </TableCell>
-                      <TableCell className="max-w-96 align-top">
-                        {renderApprovalMetadata(item) ?? '-'}
-                      </TableCell>
+            {loanApplication?.loanApplicationApprovalHistory?.length ? (
+              <div className="max-h-[70vh] overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Accion</TableHead>
+                      <TableHead>Nivel</TableHead>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead>Nota</TableHead>
+                      <TableHead>Metadata</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-              No hay historial de aprobacion registrado.
-            </div>
-          )}
+                  </TableHeader>
+                  <TableBody>
+                    {loanApplication.loanApplicationApprovalHistory.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{formatDateTime(item.occurredAt)}</TableCell>
+                        <TableCell>{approvalActionLabels[item.action] ?? item.action}</TableCell>
+                        <TableCell>{item.level?.name ?? '-'}</TableCell>
+                        <TableCell>{item.actorUserName ?? item.actorUserId ?? '-'}</TableCell>
+                        <TableCell className="wrap-break-words max-w-80 whitespace-pre-wrap">
+                          {item.note ?? '-'}
+                        </TableCell>
+                        <TableCell className="max-w-96 align-top">
+                          {renderApprovalMetadata(item) ?? '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+                No hay historial de aprobacion registrado.
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       ) : null}

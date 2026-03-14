@@ -11,7 +11,6 @@ import {
   creditProductCategories,
   creditProductRefinancePolicies,
   creditProducts,
-  creditsSettings,
   db,
   insuranceCompanies,
   loanBillingConcepts,
@@ -604,7 +603,6 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
       }
 
       // ── 9. Insurance ───────────────────────────────────────────────────
-      let insuranceFactor = 0;
       let insuranceRatePercent = 0;
       let insuranceFixedAmount = 0;
       let insuranceMinimumAmount = 0;
@@ -655,7 +653,6 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
           minimumValue: insurer.minimumValue,
         });
 
-        insuranceFactor = resolved.insuranceFactor;
         insuranceRatePercent = resolved.insuranceRatePercent;
         insuranceFixedAmount = resolved.insuranceFixedAmount;
         insuranceMinimumAmount = resolved.insuranceMinimumAmount;

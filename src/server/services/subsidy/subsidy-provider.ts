@@ -25,6 +25,8 @@ export interface SubsidyProvider {
   getSalaryHistory(input: SubsidyLookupInput): Promise<SubsidySalaryHistory[]>;
   getContributions(input: SubsidyLookupInput): Promise<SubsidyContribution[]>;
   getSubsidyPayments(input: SubsidyLookupInput): Promise<SubsidyPayment[]>;
+  getSubsidyPaymentsByPeriod(period: string): Promise<SubsidyPayment[]>;
   getPledges(input: SubsidyLookupInput): Promise<SubsidyPledge[]>;
+  getPledgeByMarkDocument(mark: string, documentNumber: string): Promise<SubsidyPledge | null>;
   getCurrentPeriod(): Promise<SubsidyCurrentPeriod | null>;
 }

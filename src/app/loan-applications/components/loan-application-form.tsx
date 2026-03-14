@@ -615,11 +615,8 @@ export function LoanApplicationForm({
       if (form.getValues('pledgesEffectiveDate')) {
         form.setValue('pledgesEffectiveDate', null, { shouldDirty: true, shouldValidate: true });
       }
-      if (activeTab === 'pledges') {
-        setActiveTab('application');
-      }
     }
-  }, [activeTab, form, opened, pledgesSubsidy]);
+  }, [form, opened, pledgesSubsidy]);
 
   useEffect(() => {
     if (!opened) return;
@@ -633,13 +630,10 @@ export function LoanApplicationForm({
     if (previousThirdPartyId !== selectedThirdPartyId) {
       form.setValue('loanApplicationPledges', [], { shouldDirty: true, shouldValidate: true });
       form.setValue('pledgesEffectiveDate', null, { shouldDirty: true, shouldValidate: true });
-      if (activeTab === 'pledges') {
-        setActiveTab('application');
-      }
     }
 
     lastPledgeThirdPartyIdRef.current = selectedThirdPartyId;
-  }, [activeTab, form, opened, selectedThirdPartyId]);
+  }, [form, opened, selectedThirdPartyId]);
 
   useEffect(() => {
     form.setValue('paymentCapacity', calculatedPaymentCapacity.toFixed(2), {
@@ -983,6 +977,9 @@ export function LoanApplicationForm({
                               }
                             }}
                             onValueChange={(value) => {
+                              if (value?.id !== field.value && activeTab === 'pledges') {
+                                setActiveTab('application');
+                              }
                               field.onChange(value?.id ?? undefined);
                               if (value) addKnownThirdParty(value);
                             }}

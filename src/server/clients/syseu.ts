@@ -377,6 +377,9 @@ class SyseuClient {
     const cleanPeriod = period.trim();
     const data = await this.request<SyseuSubsidyPaymentRecord[]>('/giroSubsidio', {
       periodo: cleanPeriod,
+    }, {
+      allowNoData: true,
+      emptyValue: [],
     });
 
     return data ?? [];
@@ -416,6 +419,24 @@ class SyseuClient {
     );
 
     return data?.subsi43 ?? [];
+  }
+
+  async getPledgeByMarkDocument(mark: string, documentNumber: string): Promise<SyseuPledgeRecord | null> {
+    const cleanMark = mark.trim();
+    const cleanDocumentNumber = normalizeDocumentNumber(documentNumber);
+    const data = await this.request<{ subsi43?: SyseuPledgeRecord[] | null }>(
+      '/traerSubsi43',
+      {
+        marca: cleanMark,
+        documento: cleanDocumentNumber,
+      },
+      {
+        allowNoData: true,
+        emptyValue: { subsi43: [] },
+      }
+    );
+
+    return data?.subsi43?.[0] ?? null;
   }
 
   async getWorkerByDocument(documentNumber: string) {

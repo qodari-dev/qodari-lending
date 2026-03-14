@@ -243,3 +243,52 @@ export async function getSubsidyPledges(input: GetSubsidyWorkerStudyInput): Prom
     return null;
   }
 }
+
+export async function getSubsidyPaymentsByPeriod(period: string): Promise<{
+  source: SubsidyWorkerStudyData['source'];
+  payments: SubsidyPayment[];
+} | null> {
+  const provider = getSubsidyProvider();
+
+  if (!provider) {
+    return null;
+  }
+
+  try {
+    const payments = await provider.getSubsidyPaymentsByPeriod(period);
+
+    return {
+      source: provider.key,
+      payments,
+    };
+  } catch (error) {
+    console.error('[subsidy-service] provider error', error);
+    return null;
+  }
+}
+
+export async function getSubsidyPledgeByMarkDocument(
+  mark: string,
+  documentNumber: string
+): Promise<{
+  source: SubsidyWorkerStudyData['source'];
+  pledge: SubsidyPledge | null;
+} | null> {
+  const provider = getSubsidyProvider();
+
+  if (!provider) {
+    return null;
+  }
+
+  try {
+    const pledge = await provider.getPledgeByMarkDocument(mark, documentNumber);
+
+    return {
+      source: provider.key,
+      pledge,
+    };
+  } catch (error) {
+    console.error('[subsidy-service] provider error', error);
+    return null;
+  }
+}

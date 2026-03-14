@@ -214,11 +214,19 @@ function mapContribution(
 function mapSubsidyPayment(record: SyseuSubsidyPaymentRecord): SubsidyPayment {
   return {
     period: record.periodo?.trim() ?? '',
+    beneficiaryCode: record.codigo_beneficiario?.trim() || null,
+    workerDocumentNumber: normalizeAlphanumericDocument(record.cedula_trabajador),
     beneficiaryRelationship: record.parentesco_beneficiario?.trim() || null,
     paymentType: record.tipo_pago?.trim() || null,
     installmentNumber: record.numero_cuota?.trim() || null,
     installmentValue: toNumber(record.valor_cuota),
+    discountedCreditValue: toNumber(record.valcre),
+    adjustmentValue: toNumber(record.valaju),
+    mark: record.marca?.trim() || null,
+    documentNumber: normalizeAlphanumericDocument(record.documento),
     transferPeriod: record.periodo_giro?.trim() || null,
+    assignedAt: parseDateToISO(record.fecha_asignacion),
+    deliveredAt: parseDateToISO(record.fecha_entrega),
     isVoided: String(record.anulado ?? '').trim().toUpperCase() === 'S',
   };
 }
@@ -314,9 +322,19 @@ class SyseuSubsidyProvider implements SubsidyProvider {
     return payments.map(mapSubsidyPayment);
   }
 
+  async getSubsidyPaymentsByPeriod(period: string): Promise<SubsidyPayment[]> {
+    const payments = await syseuClient.getSubsidyPaymentsByPeriod(period);
+    return payments.map(mapSubsidyPayment);
+  }
+
   async getPledges(input: SubsidyLookupInput): Promise<SubsidyPledge[]> {
     const records = await syseuClient.getPledgesByDocument(input.documentNumber);
     return records.map(mapPledge);
+  }
+
+  async getPledgeByMarkDocument(mark: string, documentNumber: string): Promise<SubsidyPledge | null> {
+    const record = await syseuClient.getPledgeByMarkDocument(mark, documentNumber);
+    return record ? mapPledge(record) : null;
   }
 
   async getCurrentPeriod(): Promise<SubsidyCurrentPeriod | null> {

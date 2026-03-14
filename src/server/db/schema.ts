@@ -2284,6 +2284,26 @@ export const loanPaymentStatusEnum = pgEnum('loan_payment_status', [
   'VOID', // A (anulado)
 ]);
 
+export const subsidyPledgePaymentVoucherStatusEnum = pgEnum(
+  'subsidy_pledge_payment_voucher_status',
+  [
+    'QUEUED',
+    'RUNNING',
+    'COMPLETED',
+    'PARTIAL',
+    'FAILED',
+  ]
+);
+
+export const subsidyPledgePaymentVoucherItemStatusEnum = pgEnum(
+  'subsidy_pledge_payment_voucher_item_status',
+  [
+    'PROCESSED',
+    'SKIPPED',
+    'ERROR',
+  ]
+);
+
 // ---------------------------------------------------------------------
 // Concr32 - Abonos
 // Nota (ES):
@@ -2372,6 +2392,73 @@ export const loanPayments = pgTable(
     uniqueIndex('uniq_loan_payment_receipt').on(t.receiptTypeId, t.paymentNumber),
     index('idx_loan_payment_loan_date').on(t.loanId, t.paymentDate),
     index('idx_loan_payment_status').on(t.status),
+  ]
+);
+
+export const subsidyPledgePaymentVouchers = pgTable(
+  'subsidy_pledge_payment_vouchers',
+  {
+    id: serial('id').primaryKey(),
+    period: varchar('period', { length: 50 }).notNull(),
+    movementGenerationDate: date('movement_generation_date').notNull(),
+    subsidySource: varchar('subsidy_source', { length: 20 }).notNull(),
+    totalRows: integer('total_rows').notNull().default(0),
+    processedCredits: integer('processed_credits').notNull().default(0),
+    processedPayments: integer('processed_payments').notNull().default(0),
+    skippedRows: integer('skipped_rows').notNull().default(0),
+    errorRows: integer('error_rows').notNull().default(0),
+    totalDiscountedAmount: decimal('total_discounted_amount', {
+      precision: 14,
+      scale: 2,
+    }).notNull().default('0'),
+    totalAppliedAmount: decimal('total_applied_amount', {
+      precision: 14,
+      scale: 2,
+    }).notNull().default('0'),
+    status: subsidyPledgePaymentVoucherStatusEnum('status').notNull().default('QUEUED'),
+    message: text('message'),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    createdByUserId: uuid('created_by_user_id').notNull(),
+    createdByUserName: varchar('created_by_user_name', { length: 255 }).notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_subsidy_pledge_payment_vouchers_period').on(t.period),
+    index('idx_subsidy_pledge_payment_vouchers_status').on(t.status),
+  ]
+);
+
+export const subsidyPledgePaymentVoucherItems = pgTable(
+  'subsidy_pledge_payment_voucher_items',
+  {
+    id: serial('id').primaryKey(),
+    voucherId: integer('voucher_id')
+      .notNull()
+      .references(() => subsidyPledgePaymentVouchers.id, { onDelete: 'cascade' }),
+    sourceFingerprint: varchar('source_fingerprint', { length: 255 }).notNull(),
+    workerDocumentNumber: varchar('worker_document_number', { length: 20 }),
+    subsidyMark: varchar('subsidy_mark', { length: 20 }),
+    subsidyDocument: varchar('subsidy_document', { length: 50 }),
+    subsidyCrossDocumentNumber: varchar('subsidy_cross_document_number', { length: 50 }),
+    creditNumber: varchar('credit_number', { length: 50 }),
+    loanId: integer('loan_id').references(() => loans.id, { onDelete: 'set null' }),
+    loanPaymentId: integer('loan_payment_id').references(() => loanPayments.id, {
+      onDelete: 'set null',
+    }),
+    discountedAmount: decimal('discounted_amount', { precision: 14, scale: 2 }).notNull(),
+    appliedAmount: decimal('applied_amount', { precision: 14, scale: 2 }),
+    status: subsidyPledgePaymentVoucherItemStatusEnum('status').notNull(),
+    message: text('message'),
+    metadata: jsonb('metadata'),
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_subsidy_pledge_payment_voucher_items_voucher').on(t.voucherId),
+    index('idx_subsidy_pledge_payment_voucher_items_status').on(t.status),
+    index('idx_subsidy_pledge_payment_voucher_items_loan').on(t.loanId),
+    index('idx_subsidy_pledge_payment_voucher_items_payment').on(t.loanPaymentId),
+    index('idx_subsidy_pledge_payment_voucher_items_fingerprint').on(t.sourceFingerprint),
   ]
 );
 
@@ -2465,6 +2552,10 @@ export const creditsSettings = pgTable('credits_settings', {
   }),
   pledgeSubsidyGlAccountId: integer('pledge_subsidy_gl_account_id').references(
     () => glAccounts.id,
+    { onDelete: 'restrict' }
+  ),
+  pledgePaymentReceiptTypeId: integer('pledge_payment_receipt_type_id').references(
+    () => paymentReceiptTypes.id,
     { onDelete: 'restrict' }
   ),
   writeOffGlAccountId: integer('write_off_gl_account_id').references(() => glAccounts.id, {

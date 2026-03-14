@@ -1,4 +1,4 @@
-import { db, portfolioEntries } from '@/server/db';
+import { portfolioEntries } from '@/server/db';
 import type { DbTransaction } from '@/server/db/connection';
 import { throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';

@@ -144,9 +144,17 @@ class ComfenalcoSubsidyProvider implements SubsidyProvider {
     return [];
   }
 
+  async getSubsidyPaymentsByPeriod(_period: string): Promise<SubsidyPayment[]> {
+    return [];
+  }
+
   async getPledges(_input: SubsidyLookupInput): Promise<SubsidyPledge[]> {
     // Comfenalco no devuelve pignoraciones todavía
     return [];
+  }
+
+  async getPledgeByMarkDocument(_mark: string, _documentNumber: string): Promise<SubsidyPledge | null> {
+    return null;
   }
 
   async getCurrentPeriod(): Promise<SubsidyCurrentPeriod | null> {

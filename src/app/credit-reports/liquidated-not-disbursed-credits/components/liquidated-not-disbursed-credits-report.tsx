@@ -5,11 +5,11 @@ import { PageContent, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { useGenerateNonLiquidatedCreditsReport } from '@/hooks/queries/use-credit-report-queries';
+import { useGenerateLiquidatedNotDisbursedCreditsReport } from '@/hooks/queries/use-credit-report-queries';
 import {
-  GenerateNonLiquidatedCreditsReportBodySchema,
-  GenerateNonLiquidatedCreditsReportResult,
-  NonLiquidatedCreditsReportRow,
+  GenerateLiquidatedNotDisbursedCreditsReportBodySchema,
+  GenerateLiquidatedNotDisbursedCreditsReportResult,
+  LiquidatedNotDisbursedCreditsReportRow,
 } from '@/schemas/credit-report';
 import { formatCurrency } from '@/utils/formatters';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,11 +19,12 @@ import { type Resolver, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const FormSchema = GenerateNonLiquidatedCreditsReportBodySchema;
+const FormSchema = GenerateLiquidatedNotDisbursedCreditsReportBodySchema;
 type FormValues = z.infer<typeof FormSchema>;
 
-export function NonLiquidatedCreditsReport() {
-  const [result, setResult] = React.useState<GenerateNonLiquidatedCreditsReportResult | null>(null);
+export function LiquidatedNotDisbursedCreditsReport() {
+  const [result, setResult] =
+    React.useState<GenerateLiquidatedNotDisbursedCreditsReportResult | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema) as Resolver<FormValues>,
@@ -31,7 +32,7 @@ export function NonLiquidatedCreditsReport() {
   });
 
   const { mutateAsync: generateReport, isPending: isGenerating } =
-    useGenerateNonLiquidatedCreditsReport();
+    useGenerateLiquidatedNotDisbursedCreditsReport();
 
   const onSubmit = async (values: FormValues) => {
     const response = await generateReport({ body: values });
@@ -41,10 +42,10 @@ export function NonLiquidatedCreditsReport() {
 
   const onDownload = React.useCallback(async () => {
     if (!result) return;
-    await exportToExcel<NonLiquidatedCreditsReportRow>(
+    await exportToExcel<LiquidatedNotDisbursedCreditsReportRow>(
       {
-        title: 'Reporte de creditos no liquidados',
-        filename: 'creditos-no-liquidados',
+        title: 'Reporte de creditos liquidados no desembolsados',
+        filename: 'creditos-liquidados-no-desembolsados',
         columns: [
           { header: '# Credito', accessorKey: 'creditNumber', width: 18 },
           { header: 'Solicitud', accessorKey: 'requestNumber', width: 18 },
@@ -53,9 +54,24 @@ export function NonLiquidatedCreditsReport() {
           { header: 'Linea credito', accessorKey: 'creditProductName', width: 24 },
           { header: 'Oficina', accessorKey: 'affiliationOfficeName', width: 24 },
           { header: 'Fecha solicitud', accessorKey: 'applicationDate', width: 18 },
-          { header: 'Estado', accessorKey: 'status', width: 16 },
-          { header: 'Valor solicitado', width: 18, getValue: (row) => formatCurrency(row.requestedAmount) },
-          { header: 'Valor aprobado', width: 18, getValue: (row) => formatCurrency(row.approvedAmount) },
+          { header: 'Fecha liquidacion', accessorKey: 'liquidatedDate', width: 18 },
+          { header: 'Estado credito', accessorKey: 'status', width: 18 },
+          { header: 'Estado desembolso', accessorKey: 'disbursementStatus', width: 24 },
+          {
+            header: 'Valor solicitado',
+            width: 18,
+            getValue: (row) => formatCurrency(row.requestedAmount),
+          },
+          {
+            header: 'Valor aprobado',
+            width: 18,
+            getValue: (row) => formatCurrency(row.approvedAmount),
+          },
+          {
+            header: 'Valor desembolso',
+            width: 18,
+            getValue: (row) => formatCurrency(row.disbursementAmount),
+          },
         ],
       },
       result.rows
@@ -66,14 +82,16 @@ export function NonLiquidatedCreditsReport() {
   return (
     <>
       <PageHeader
-        title="Reporte creditos no liquidados"
-        description="Genere Excel con todos los creditos generados que aun no tienen liquidacion."
+        title="Creditos liquidados no desembolsados"
+        description="Genere Excel con creditos ya liquidados que aun no han sido desembolsados."
       />
       <PageContent>
         <Card>
           <CardHeader>
             <CardTitle>Generacion</CardTitle>
-            <CardDescription>No requiere filtros. Se listan todos los creditos pendientes de liquidar.</CardDescription>
+            <CardDescription>
+              No requiere filtros. Se listan todos los creditos liquidados pendientes de desembolso.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -84,6 +102,7 @@ export function NonLiquidatedCreditsReport() {
             </form>
           </CardContent>
         </Card>
+
         {result ? (
           <Card>
             <CardHeader>

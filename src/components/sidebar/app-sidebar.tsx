@@ -331,6 +331,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     url: `/credit-reports/non-liquidated-credits`,
                   },
                   {
+                    title: 'Creditos liquidados no desembolsados',
+                    url: `/credit-reports/liquidated-not-disbursed-credits`,
+                  },
+                  {
                     title: 'Creditos Anulados o rechazados',
                     url: `/credit-reports/cancelled-rejected-credits`,
                   },

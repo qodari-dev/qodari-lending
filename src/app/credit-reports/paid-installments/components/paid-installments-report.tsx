@@ -1,39 +1,40 @@
 'use client';
 
-import { exportToExcel } from '@/components/data-table/export/export-excel';
 import { PageContent, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { useGeneratePaidInstallmentsReport } from '@/hooks/queries/use-credit-report-queries';
 import {
   GeneratePaidInstallmentsReportBodySchema,
   GeneratePaidInstallmentsReportResult,
-  PaidInstallmentsReportRow,
 } from '@/schemas/credit-report';
-import { formatCurrency, formatDate } from '@/utils/formatters';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FileDown } from 'lucide-react';
 import React from 'react';
-import { Controller, type Resolver, useForm } from 'react-hook-form';
+import { type Resolver, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { downloadPdfFromBase64 } from '../../components/pdf-download';
 
 const FormSchema = GeneratePaidInstallmentsReportBodySchema;
 type FormValues = z.infer<typeof FormSchema>;
 
 export function PaidInstallmentsReport() {
   const [result, setResult] = React.useState<GeneratePaidInstallmentsReportResult | null>(null);
-  const today = React.useMemo(() => new Date(), []);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema) as Resolver<FormValues>,
-    defaultValues: { startDate: today, endDate: today },
+    defaultValues: { creditNumber: '' },
   });
 
   const { mutateAsync: generateReport, isPending: isGenerating } = useGeneratePaidInstallmentsReport();
+  const creditNumberValue = useWatch({
+    control: form.control,
+    name: 'creditNumber',
+  });
 
   const onSubmit = async (values: FormValues) => {
     const response = await generateReport({ body: values });
@@ -41,75 +42,45 @@ export function PaidInstallmentsReport() {
     toast.success('Reporte generado');
   };
 
-  const onDownload = React.useCallback(async () => {
+  const onDownload = React.useCallback(() => {
     if (!result) return;
-    await exportToExcel<PaidInstallmentsReportRow>(
-      {
-        title: 'Reporte de cuotas pagadas',
-        filename: `cuotas-pagadas-${result.startDate}-${result.endDate}`,
-        columns: [
-          { header: '# Credito', accessorKey: 'creditNumber', width: 18 },
-          { header: 'Documento', accessorKey: 'thirdPartyDocumentNumber', width: 18 },
-          { header: 'Tercero', accessorKey: 'thirdPartyName', width: 28 },
-          { header: 'Cuotas pagadas', accessorKey: 'paidInstallments', width: 16 },
-          { header: 'Valor pagado', width: 18, getValue: (row) => formatCurrency(row.paidAmount) },
-        ],
-      },
-      result.rows
-    );
-    toast.success('Excel generado correctamente');
+    downloadPdfFromBase64(result.pdfBase64, result.fileName);
+    toast.success('PDF descargado correctamente');
   }, [result]);
 
   return (
     <>
       <PageHeader
         title="Reporte cuotas pagadas"
-        description="Genere Excel de cuotas pagadas por rango de fechas."
+        description="Genere el PDF resumen de cuotas pagadas por numero de credito."
       />
       <PageContent>
         <Card>
           <CardHeader>
             <CardTitle>Parametros</CardTitle>
-            <CardDescription>Defina el rango de fechas para generar el reporte.</CardDescription>
+            <CardDescription>Digite el numero de credito para generar el PDF.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FieldGroup className="grid gap-4 md:grid-cols-3">
-                <Controller
-                  name="startDate"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="startDate">Fecha inicial</FieldLabel>
-                      <DatePicker
-                        id="startDate"
-                        value={field.value ?? null}
-                        onChange={(value) => field.onChange(value ?? null)}
-                        ariaInvalid={fieldState.invalid}
-                      />
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="endDate"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="endDate">Fecha final</FieldLabel>
-                      <DatePicker
-                        id="endDate"
-                        value={field.value ?? null}
-                        onChange={(value) => field.onChange(value ?? null)}
-                        ariaInvalid={fieldState.invalid}
-                      />
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                <Button type="submit" className="self-end" disabled={isGenerating}>
+              <FieldGroup className="grid gap-4 md:grid-cols-[1fr_auto]">
+                <Field data-invalid={Boolean(form.formState.errors.creditNumber)}>
+                  <FieldLabel htmlFor="creditNumber">Numero de credito</FieldLabel>
+                  <Input
+                    id="creditNumber"
+                    placeholder="Ej: 0205700"
+                    {...form.register('creditNumber')}
+                  />
+                  {form.formState.errors.creditNumber ? (
+                    <FieldError errors={[form.formState.errors.creditNumber]} />
+                  ) : null}
+                </Field>
+                <Button
+                  type="submit"
+                  className="self-end"
+                  disabled={isGenerating || !creditNumberValue.trim()}
+                >
                   {isGenerating ? <Spinner /> : null}
-                  Generar reporte
+                  Generar PDF
                 </Button>
               </FieldGroup>
             </form>
@@ -120,35 +91,31 @@ export function PaidInstallmentsReport() {
             <CardHeader>
               <CardTitle>Resultado</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-5">
+            <CardContent className="grid gap-3 md:grid-cols-4">
               <div>
-                <p className="text-muted-foreground text-xs">Rango inicial</p>
-                <p className="font-medium">{formatDate(result.startDate)}</p>
+                <p className="text-muted-foreground text-xs">Reporte</p>
+                <p className="font-medium">{result.reportType}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Rango final</p>
-                <p className="font-medium">{formatDate(result.endDate)}</p>
+                <p className="text-muted-foreground text-xs">Credito</p>
+                <p className="font-medium">{result.creditNumber}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Creditos revisados</p>
-                <p className="font-medium">{result.reviewedCredits}</p>
+                <p className="text-muted-foreground text-xs">Archivo</p>
+                <p className="font-medium">{result.fileName}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Creditos reportados</p>
-                <p className="font-medium">{result.reportedCredits}</p>
+                <p className="text-muted-foreground text-xs">Observaciones</p>
+                <p className="font-medium">Sin observaciones</p>
               </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Registros</p>
-                <p className="font-medium">{result.rows.length}</p>
-              </div>
-              <div className="md:col-span-5">
+              <div className="md:col-span-4">
                 <p className="text-muted-foreground text-xs">Mensaje</p>
                 <p className="font-medium">{result.message}</p>
               </div>
-              <div className="md:col-span-5">
+              <div className="md:col-span-4">
                 <Button type="button" variant="outline" onClick={onDownload}>
                   <FileDown />
-                  Descargar Excel
+                  Descargar PDF
                 </Button>
               </div>
             </CardContent>

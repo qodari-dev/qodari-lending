@@ -1,9 +1,11 @@
 import {
+  cancelledRejectedCreditsReportTypeLabels,
   CreditExtractReportResponse,
   CancelledRejectedCreditsReportRow,
   GenerateCancelledRejectedCreditsReportBodySchema,
   GenerateCreditClearancePdfBodySchema,
   GenerateLiquidatedCreditsReportBodySchema,
+  GenerateLiquidatedNotDisbursedCreditsReportBodySchema,
   GenerateMinutesPdfBodySchema,
   GenerateMovementVoucherReportBodySchema,
   GenerateNonLiquidatedCreditsReportBodySchema,
@@ -13,14 +15,14 @@ import {
   GenerateThirdPartyClearancePdfBodySchema,
   GetCreditExtractReportQuerySchema,
   LiquidatedCreditsReportRow,
+  LiquidatedNotDisbursedCreditsReportRow,
   MinutesReportOption,
   MovementVoucherReportRow,
   NonLiquidatedCreditsReportRow,
-  PaidInstallmentsReportRow,
   SettledCreditsReportRow,
   SuperintendenciaReportRow,
 } from '@/schemas/credit-report';
-import { db, loanApplicationActNumbers, loanApplications, loans } from '@/server/db';
+import { accountingEntries, db, loanApplicationActNumbers, loanApplications, loans } from '@/server/db';
 import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { getLoanBalanceSummary, getLoanStatement } from '@/server/utils/loan-statement';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
@@ -29,20 +31,25 @@ import { getThirdPartyLabel } from '@/utils/third-party';
 import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
 import { renderTemplateToBase64 } from '@/server/pdf/render';
 import { creditClearanceTemplate } from '@/server/pdf/templates/credit-clearance';
-import { demoDocumentTemplate } from '@/server/pdf/templates/demo-document';
 import { minutesReportTemplate } from '@/server/pdf/templates/minutes-report';
+import { paidInstallmentsReportTemplate } from '@/server/pdf/templates/paid-installments-report';
 import { thirdPartyClearanceTemplate } from '@/server/pdf/templates/third-party-clearance';
 import { buildCreditClearanceData } from '@/server/utils/credit-clearance-data';
 import { buildMinutesReportData } from '@/server/utils/minutes-report-data';
+import { buildPaidInstallmentsReportData } from '@/server/utils/paid-installments-report-data';
 import { buildThirdPartyClearanceData } from '@/server/utils/third-party-clearance-data';
 import { tsr } from '@ts-rest/serverless/next';
 import { differenceInCalendarDays } from 'date-fns';
-import { and, count, desc, eq, gte, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { contract } from '../contracts';
+import { loanDisbursementStatusLabels, loanStatusLabels } from '@/schemas/loan';
 
 type GeneratePaidInstallmentsReportBody = z.infer<typeof GeneratePaidInstallmentsReportBodySchema>;
 type GenerateLiquidatedCreditsReportBody = z.infer<typeof GenerateLiquidatedCreditsReportBodySchema>;
+type GenerateLiquidatedNotDisbursedCreditsReportBody = z.infer<
+  typeof GenerateLiquidatedNotDisbursedCreditsReportBodySchema
+>;
 type GenerateNonLiquidatedCreditsReportBody = z.infer<
   typeof GenerateNonLiquidatedCreditsReportBodySchema
 >;
@@ -70,10 +77,6 @@ function buildRangeMeta(startDate: Date, endDate: Date, base: number) {
   const reviewedCredits = base + spanDays * 4;
   const reportedCredits = Math.max(10, Math.floor(reviewedCredits * 0.74));
   return { reviewedCredits, reportedCredits };
-}
-
-async function buildDemoPdfBase64(title: string, lines: string[]): Promise<string> {
-  return renderTemplateToBase64({ title, lines }, demoDocumentTemplate);
 }
 
 const EXTRACT_LOAN_COLUMNS = {
@@ -192,62 +195,6 @@ async function getCreditExtractReportDataByLoanId(loanId: number): Promise<Credi
   return buildExtractResponse(loan);
 }
 
-function buildPaidInstallmentsRows(count: number): PaidInstallmentsReportRow[] {
-  return Array.from({ length: count }).map((_, index) => {
-    const sequence = index + 1;
-    return {
-      creditNumber: `CRPI${String(sequence).padStart(6, '0')}`,
-      thirdPartyDocumentNumber: `10${String(30000000 + sequence)}`,
-      thirdPartyName: `Tercero ${sequence}`,
-      paidInstallments: 2 + (sequence % 8),
-      paidAmount: roundMoney((2 + (sequence % 8)) * 145_000),
-    };
-  });
-}
-
-function buildLiquidatedRows(count: number): LiquidatedCreditsReportRow[] {
-  return Array.from({ length: count }).map((_, index) => {
-    const sequence = index + 1;
-    return {
-      creditNumber: `CRLQ${String(sequence).padStart(6, '0')}`,
-      thirdPartyDocumentNumber: `10${String(31000000 + sequence)}`,
-      thirdPartyName: `Tercero ${sequence}`,
-      liquidatedAt: formatDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
-      liquidatedAmount: roundMoney(1_400_000 + sequence * 82_000),
-    };
-  });
-}
-
-function buildNonLiquidatedRows(count: number): NonLiquidatedCreditsReportRow[] {
-  return Array.from({ length: count }).map((_, index) => {
-    const sequence = index + 1;
-    const outstandingBalance = roundMoney(1_100_000 + sequence * 90_000);
-    return {
-      creditNumber: `CRNL${String(sequence).padStart(6, '0')}`,
-      thirdPartyDocumentNumber: `10${String(32000000 + sequence)}`,
-      thirdPartyName: `Tercero ${sequence}`,
-      status: sequence % 4 === 0 ? 'EN MORA' : 'ACTIVO',
-      outstandingBalance,
-      daysPastDue: sequence % 4 === 0 ? 25 + sequence : 0,
-    };
-  });
-}
-
-function buildCancelledRejectedRows(count: number): CancelledRejectedCreditsReportRow[] {
-  return Array.from({ length: count }).map((_, index) => {
-    const sequence = index + 1;
-    const rejected = sequence % 2 === 0;
-    return {
-      requestNumber: `SOL${String(sequence).padStart(6, '0')}`,
-      thirdPartyDocumentNumber: `10${String(33000000 + sequence)}`,
-      thirdPartyName: `Tercero ${sequence}`,
-      status: rejected ? 'RECHAZADO' : 'ANULADO',
-      rejectionReason: rejected ? 'Capacidad de pago insuficiente' : 'Desistimiento',
-      statusDate: formatDateOnly(new Date(2026, 0, ((sequence % 27) || 1))),
-    };
-  });
-}
-
 function buildMovementVoucherRows(count: number): MovementVoucherReportRow[] {
   return Array.from({ length: count }).map((_, index) => {
     const sequence = index + 1;
@@ -282,19 +229,18 @@ async function generatePaidInstallments(
   const { request, appRoute } = context;
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
-    const meta = buildRangeMeta(body.startDate, body.endDate, 65);
+    const normalizedCreditNumber = body.creditNumber.trim().toUpperCase();
+    const data = await buildPaidInstallmentsReportData(normalizedCreditNumber);
+    const pdfBase64 = await renderTemplateToBase64(data, paidInstallmentsReportTemplate);
 
-    // TODO(credit-report-paid-installments): consultar cuotas pagadas en el rango y construir excel final.
     return {
       status: 200 as const,
       body: {
-        reportType: 'PAID_INSTALLMENTS' as const,
-        startDate: formatDateOnly(body.startDate),
-        endDate: formatDateOnly(body.endDate),
-        reviewedCredits: meta.reviewedCredits,
-        reportedCredits: meta.reportedCredits,
-        rows: buildPaidInstallmentsRows(meta.reportedCredits),
-        message: 'Reporte de cuotas pagadas generado (demo).',
+        reportType: 'PAID_INSTALLMENTS_PDF' as const,
+        creditNumber: normalizedCreditNumber,
+        fileName: `cuotas-pagadas-${normalizedCreditNumber.toLowerCase()}.pdf`,
+        pdfBase64,
+        message: 'PDF de cuotas pagadas generado correctamente.',
       },
     };
   } catch (e) {
@@ -309,19 +255,78 @@ async function generateLiquidatedCredits(
   const { request, appRoute } = context;
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
-    const meta = buildRangeMeta(body.startDate, body.endDate, 40);
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
 
-    // TODO(credit-report-liquidated): consultar creditos liquidados en el rango y construir excel final.
+    const liquidatedEntries = await db.query.accountingEntries.findMany({
+      where: and(
+        eq(accountingEntries.processType, 'CREDIT'),
+        inArray(accountingEntries.status, ['DRAFT', 'ACCOUNTED']),
+        gte(accountingEntries.entryDate, startDate),
+        lte(accountingEntries.entryDate, endDate)
+      ),
+      columns: {
+        loanId: true,
+        entryDate: true,
+      },
+      orderBy: [desc(accountingEntries.entryDate)],
+    });
+
+    const liquidationDatesByLoanId = new Map<number, string>();
+    for (const entry of liquidatedEntries) {
+      if (typeof entry.loanId !== 'number' || liquidationDatesByLoanId.has(entry.loanId)) continue;
+      liquidationDatesByLoanId.set(entry.loanId, entry.entryDate);
+    }
+
+    const loanIds = Array.from(liquidationDatesByLoanId.keys());
+
+    const liquidatedLoans = loanIds.length
+      ? await db.query.loans.findMany({
+          where: inArray(loans.id, loanIds),
+          columns: {
+            id: true,
+            creditNumber: true,
+            disbursementAmount: true,
+            principalAmount: true,
+          },
+          with: {
+            borrower: {
+              columns: {
+                documentNumber: true,
+                personType: true,
+                businessName: true,
+                firstName: true,
+                secondName: true,
+                firstLastName: true,
+                secondLastName: true,
+              },
+            },
+          },
+        })
+      : [];
+
+    const rows: LiquidatedCreditsReportRow[] = liquidatedLoans
+      .map((loan) => ({
+        creditNumber: loan.creditNumber,
+        thirdPartyDocumentNumber: loan.borrower?.documentNumber ?? null,
+        thirdPartyName: getThirdPartyLabel(loan.borrower),
+        liquidatedAt: liquidationDatesByLoanId.get(loan.id) ?? startDate,
+        liquidatedAmount: roundMoney(
+          toNumber(loan.disbursementAmount) || toNumber(loan.principalAmount)
+        ),
+      }))
+      .sort((a, b) => b.liquidatedAt.localeCompare(a.liquidatedAt) || b.creditNumber.localeCompare(a.creditNumber));
+
     return {
       status: 200 as const,
       body: {
         reportType: 'LIQUIDATED_CREDITS' as const,
-        startDate: formatDateOnly(body.startDate),
-        endDate: formatDateOnly(body.endDate),
-        reviewedCredits: meta.reviewedCredits,
-        reportedCredits: meta.reportedCredits,
-        rows: buildLiquidatedRows(meta.reportedCredits),
-        message: 'Reporte de creditos liquidados generado (demo).',
+        startDate,
+        endDate,
+        reviewedCredits: loanIds.length,
+        reportedCredits: rows.length,
+        rows,
+        message: 'Reporte de creditos liquidados generado correctamente.',
       },
     };
   } catch (e) {
@@ -330,30 +335,203 @@ async function generateLiquidatedCredits(
 }
 
 async function generateNonLiquidatedCredits(
-  body: GenerateNonLiquidatedCreditsReportBody,
+  _body: GenerateNonLiquidatedCreditsReportBody,
   context: HandlerContext
 ) {
   const { request, appRoute } = context;
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
-    const meta = buildRangeMeta(body.startDate, body.endDate, 58);
+    const liquidatedLoanEntries = await db.query.accountingEntries.findMany({
+      where: and(eq(accountingEntries.processType, 'CREDIT'), inArray(accountingEntries.status, ['DRAFT', 'ACCOUNTED'])),
+      columns: {
+        loanId: true,
+      },
+    });
 
-    // TODO(credit-report-non-liquidated): consultar creditos no liquidados en el rango y construir excel final.
+    const liquidatedLoanIds = new Set(
+      liquidatedLoanEntries.map((entry) => entry.loanId).filter((loanId): loanId is number => typeof loanId === 'number')
+    );
+
+    const generatedLoans = await db.query.loans.findMany({
+      where: eq(loans.status, 'GENERATED'),
+      columns: {
+        creditNumber: true,
+      },
+      with: {
+        borrower: {
+          columns: {
+            documentNumber: true,
+            personType: true,
+            businessName: true,
+            firstName: true,
+            secondName: true,
+            firstLastName: true,
+            secondLastName: true,
+          },
+        },
+        affiliationOffice: {
+          columns: {
+            name: true,
+          },
+        },
+        loanApplication: {
+          columns: {
+            id: true,
+            creditNumber: true,
+            applicationDate: true,
+            requestedAmount: true,
+            approvedAmount: true,
+            status: true,
+          },
+          with: {
+            creditProduct: {
+              columns: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [desc(loans.creditNumber)],
+    });
+
+    const rows: NonLiquidatedCreditsReportRow[] = generatedLoans
+      .filter((loan) => !liquidatedLoanIds.has(loan.loanApplication.id))
+      .map((loan) => ({
+        creditNumber: loan.creditNumber,
+        requestNumber: loan.loanApplication.creditNumber,
+        thirdPartyDocumentNumber: loan.borrower?.documentNumber ?? null,
+        thirdPartyName: getThirdPartyLabel(loan.borrower),
+        creditProductName: loan.loanApplication.creditProduct?.name ?? null,
+        affiliationOfficeName: loan.affiliationOffice?.name ?? null,
+        applicationDate: loan.loanApplication.applicationDate,
+        status: 'GENERADO',
+        requestedAmount: roundMoney(toNumber(loan.loanApplication.requestedAmount)),
+        approvedAmount: roundMoney(toNumber(loan.loanApplication.approvedAmount)),
+      }));
+
     return {
       status: 200 as const,
       body: {
         reportType: 'NON_LIQUIDATED_CREDITS' as const,
-        startDate: formatDateOnly(body.startDate),
-        endDate: formatDateOnly(body.endDate),
-        reviewedCredits: meta.reviewedCredits,
-        reportedCredits: meta.reportedCredits,
-        rows: buildNonLiquidatedRows(meta.reportedCredits),
-        message: 'Reporte de creditos no liquidados generado (demo).',
+        reviewedCredits: generatedLoans.length,
+        reportedCredits: rows.length,
+        rows,
+        message: 'Reporte de creditos no liquidados generado correctamente.',
       },
     };
   } catch (e) {
     return genericTsRestErrorResponse(e, {
       genericMsg: 'Error al generar reporte de creditos no liquidados',
+    });
+  }
+}
+
+async function generateLiquidatedNotDisbursedCredits(
+  _body: GenerateLiquidatedNotDisbursedCreditsReportBody,
+  context: HandlerContext
+) {
+  const { request, appRoute } = context;
+  try {
+    await getAuthContextAndValidatePermission(request, appRoute.metadata);
+
+    const liquidatedLoanEntries = await db.query.accountingEntries.findMany({
+      where: and(
+        eq(accountingEntries.processType, 'CREDIT'),
+        inArray(accountingEntries.status, ['DRAFT', 'ACCOUNTED'])
+      ),
+      columns: {
+        loanId: true,
+        entryDate: true,
+      },
+      orderBy: [desc(accountingEntries.entryDate)],
+    });
+
+    const liquidatedDatesByLoanId = new Map<number, string>();
+    for (const entry of liquidatedLoanEntries) {
+      if (typeof entry.loanId !== 'number' || liquidatedDatesByLoanId.has(entry.loanId)) continue;
+      liquidatedDatesByLoanId.set(entry.loanId, entry.entryDate);
+    }
+
+    const loansPendingDisbursement = await db.query.loans.findMany({
+      where: and(
+        inArray(loans.status, ['GENERATED', 'ACCOUNTED']),
+        inArray(loans.disbursementStatus, ['LIQUIDATED', 'SENT_TO_ACCOUNTING', 'SENT_TO_BANK', 'REJECTED'])
+      ),
+      columns: {
+        id: true,
+        creditNumber: true,
+        status: true,
+        disbursementStatus: true,
+        disbursementAmount: true,
+      },
+      with: {
+        borrower: {
+          columns: {
+            documentNumber: true,
+            personType: true,
+            businessName: true,
+            firstName: true,
+            secondName: true,
+            firstLastName: true,
+            secondLastName: true,
+          },
+        },
+        affiliationOffice: {
+          columns: {
+            name: true,
+          },
+        },
+        loanApplication: {
+          columns: {
+            creditNumber: true,
+            applicationDate: true,
+            requestedAmount: true,
+            approvedAmount: true,
+          },
+          with: {
+            creditProduct: {
+              columns: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [desc(loans.creditNumber)],
+    });
+
+    const rows: LiquidatedNotDisbursedCreditsReportRow[] = loansPendingDisbursement
+      .filter((loan) => liquidatedDatesByLoanId.has(loan.id))
+      .map((loan) => ({
+        creditNumber: loan.creditNumber,
+        requestNumber: loan.loanApplication.creditNumber,
+        thirdPartyDocumentNumber: loan.borrower?.documentNumber ?? null,
+        thirdPartyName: getThirdPartyLabel(loan.borrower),
+        creditProductName: loan.loanApplication.creditProduct?.name ?? null,
+        affiliationOfficeName: loan.affiliationOffice?.name ?? null,
+        applicationDate: loan.loanApplication.applicationDate,
+        liquidatedDate: liquidatedDatesByLoanId.get(loan.id) ?? null,
+        status: loanStatusLabels[loan.status],
+        disbursementStatus: loanDisbursementStatusLabels[loan.disbursementStatus],
+        requestedAmount: roundMoney(toNumber(loan.loanApplication.requestedAmount)),
+        approvedAmount: roundMoney(toNumber(loan.loanApplication.approvedAmount)),
+        disbursementAmount: roundMoney(toNumber(loan.disbursementAmount)),
+      }));
+
+    return {
+      status: 200 as const,
+      body: {
+        reportType: 'LIQUIDATED_NOT_DISBURSED_CREDITS' as const,
+        reviewedCredits: loansPendingDisbursement.length,
+        reportedCredits: rows.length,
+        rows,
+        message: 'Reporte de creditos liquidados no desembolsados generado correctamente.',
+      },
+    };
+  } catch (e) {
+    return genericTsRestErrorResponse(e, {
+      genericMsg: 'Error al generar reporte de creditos liquidados no desembolsados',
     });
   }
 }
@@ -365,19 +543,135 @@ async function generateCancelledRejectedCredits(
   const { request, appRoute } = context;
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
-    const meta = buildRangeMeta(body.startDate, body.endDate, 32);
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
 
-    // TODO(credit-report-cancelled-rejected): consultar creditos anulados/rechazados en el rango y construir excel final.
+    let rows: CancelledRejectedCreditsReportRow[] = [];
+
+    if (body.reportType === 'VOID') {
+      const voidedLoans = await db.query.loans.findMany({
+        where: and(
+          eq(loans.status, 'VOID'),
+          gte(loans.statusDate, startDate),
+          lte(loans.statusDate, endDate)
+        ),
+        columns: {
+          creditNumber: true,
+          statusDate: true,
+          note: true,
+        },
+        with: {
+          borrower: {
+            columns: {
+              documentNumber: true,
+              personType: true,
+              businessName: true,
+              firstName: true,
+              secondName: true,
+              firstLastName: true,
+              secondLastName: true,
+            },
+          },
+          loanApplication: {
+            columns: {
+              creditNumber: true,
+              applicationDate: true,
+              requestedAmount: true,
+              approvedAmount: true,
+            },
+            with: {
+              creditProduct: {
+                columns: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [desc(loans.statusDate), desc(loans.creditNumber)],
+      });
+
+      rows = voidedLoans.map((loan) => ({
+          requestNumber: loan.loanApplication.creditNumber,
+          creditNumber: loan.creditNumber,
+          thirdPartyDocumentNumber: loan.borrower?.documentNumber ?? null,
+          thirdPartyName: getThirdPartyLabel(loan.borrower),
+          creditProductName: loan.loanApplication.creditProduct?.name ?? null,
+          applicationDate: loan.loanApplication.applicationDate,
+          status: cancelledRejectedCreditsReportTypeLabels.VOID,
+          rejectionReason: loan.note ?? null,
+          statusDate: loan.statusDate,
+          requestedAmount: roundMoney(toNumber(loan.loanApplication.requestedAmount)),
+          approvedAmount: roundMoney(toNumber(loan.loanApplication.approvedAmount)),
+        }));
+    } else {
+      const applications = await db.query.loanApplications.findMany({
+        where: and(
+          eq(loanApplications.status, body.reportType),
+          gte(loanApplications.statusDate, startDate),
+          lte(loanApplications.statusDate, endDate)
+        ),
+        columns: {
+          creditNumber: true,
+          applicationDate: true,
+          status: true,
+          statusDate: true,
+          requestedAmount: true,
+          approvedAmount: true,
+          statusNote: true,
+        },
+        with: {
+          thirdParty: {
+            columns: {
+              documentNumber: true,
+              personType: true,
+              businessName: true,
+              firstName: true,
+              secondName: true,
+              firstLastName: true,
+              secondLastName: true,
+            },
+          },
+          creditProduct: {
+            columns: {
+              name: true,
+            },
+          },
+          rejectionReason: {
+            columns: {
+              name: true,
+            },
+          },
+        },
+        orderBy: [desc(loanApplications.statusDate), desc(loanApplications.creditNumber)],
+      });
+
+      rows = applications.map((application) => ({
+        requestNumber: application.creditNumber,
+        creditNumber: null,
+        thirdPartyDocumentNumber: application.thirdParty?.documentNumber ?? null,
+        thirdPartyName: getThirdPartyLabel(application.thirdParty),
+        creditProductName: application.creditProduct?.name ?? null,
+        applicationDate: application.applicationDate,
+        status: cancelledRejectedCreditsReportTypeLabels[body.reportType],
+        rejectionReason: application.rejectionReason?.name ?? application.statusNote ?? null,
+        statusDate: application.statusDate ?? application.applicationDate,
+        requestedAmount: roundMoney(toNumber(application.requestedAmount)),
+        approvedAmount: roundMoney(toNumber(application.approvedAmount)),
+      }));
+    }
+
     return {
       status: 200 as const,
       body: {
         reportType: 'CANCELLED_REJECTED_CREDITS' as const,
-        startDate: formatDateOnly(body.startDate),
-        endDate: formatDateOnly(body.endDate),
-        reviewedCredits: meta.reviewedCredits,
-        reportedCredits: meta.reportedCredits,
-        rows: buildCancelledRejectedRows(meta.reportedCredits),
-        message: 'Reporte de creditos anulados o rechazados generado (demo).',
+        filterType: body.reportType,
+        startDate,
+        endDate,
+        reviewedCredits: rows.length,
+        reportedCredits: rows.length,
+        rows,
+        message: `Reporte de ${cancelledRejectedCreditsReportTypeLabels[body.reportType].toLowerCase()} generado correctamente.`,
       },
     };
   } catch (e) {
@@ -663,6 +957,8 @@ export const creditReport = tsr.router(contract.creditReport, {
   generatePaidInstallments: ({ body }, context) => generatePaidInstallments(body, context),
   generateLiquidatedCredits: ({ body }, context) => generateLiquidatedCredits(body, context),
   generateNonLiquidatedCredits: ({ body }, context) => generateNonLiquidatedCredits(body, context),
+  generateLiquidatedNotDisbursedCredits: ({ body }, context) =>
+    generateLiquidatedNotDisbursedCredits(body, context),
   generateCancelledRejectedCredits: ({ body }, context) =>
     generateCancelledRejectedCredits(body, context),
   generateMovementVoucher: ({ body }, context) => generateMovementVoucher(body, context),

@@ -6,9 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { useGenerateCancelledRejectedCreditsReport } from '@/hooks/queries/use-credit-report-queries';
 import {
+  cancelledRejectedCreditsReportTypeLabels,
   CancelledRejectedCreditsReportRow,
   GenerateCancelledRejectedCreditsReportBodySchema,
   GenerateCancelledRejectedCreditsReportResult,
@@ -32,7 +40,11 @@ export function CancelledRejectedCreditsReport() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema) as Resolver<FormValues>,
-    defaultValues: { startDate: today, endDate: today },
+    defaultValues: {
+      startDate: today,
+      endDate: today,
+      reportType: 'CANCELED',
+    },
   });
 
   const { mutateAsync: generateReport, isPending: isGenerating } =
@@ -49,14 +61,19 @@ export function CancelledRejectedCreditsReport() {
     await exportToExcel<CancelledRejectedCreditsReportRow>(
       {
         title: 'Reporte de creditos anulados o rechazados',
-        filename: `creditos-anulados-rechazados-${result.startDate}-${result.endDate}`,
+        filename: `creditos-${result.filterType.toLowerCase()}-${result.startDate}-${result.endDate}`,
         columns: [
           { header: 'Solicitud', accessorKey: 'requestNumber', width: 18 },
+          { header: 'Credito', accessorKey: 'creditNumber', width: 18 },
           { header: 'Documento', accessorKey: 'thirdPartyDocumentNumber', width: 18 },
           { header: 'Tercero', accessorKey: 'thirdPartyName', width: 28 },
+          { header: 'Linea credito', accessorKey: 'creditProductName', width: 28 },
+          { header: 'Fecha solicitud', accessorKey: 'applicationDate', width: 18 },
           { header: 'Estado', accessorKey: 'status', width: 16 },
           { header: 'Motivo', accessorKey: 'rejectionReason', width: 28 },
           { header: 'Fecha estado', accessorKey: 'statusDate', width: 18 },
+          { header: 'Valor solicitado', accessorKey: 'requestedAmount', width: 18 },
+          { header: 'Valor aprobado', accessorKey: 'approvedAmount', width: 18 },
         ],
       },
       result.rows
@@ -68,23 +85,49 @@ export function CancelledRejectedCreditsReport() {
     <>
       <PageHeader
         title="Reporte creditos anulados o rechazados"
-        description="Genere Excel de creditos anulados/rechazados por rango de fechas."
+        description="Genere Excel de creditos cancelados, rechazados o anulados por fecha de estado."
       />
       <PageContent>
         <Card>
           <CardHeader>
             <CardTitle>Parametros</CardTitle>
-            <CardDescription>Defina el rango de fechas para generar el reporte.</CardDescription>
+            <CardDescription>
+              Defina el tipo y el rango de fecha del cambio de estado.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FieldGroup className="grid gap-4 md:grid-cols-3">
+              <FieldGroup className="grid gap-4 md:grid-cols-4">
+                <Controller
+                  name="reportType"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="reportType">Tipo</FieldLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="reportType">
+                          <SelectValue placeholder="Seleccione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(cancelledRejectedCreditsReportTypeLabels).map(
+                            ([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
                 <Controller
                   name="startDate"
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="startDate">Fecha inicial</FieldLabel>
+                      <FieldLabel htmlFor="startDate">Estado inicial</FieldLabel>
                       <DatePicker
                         id="startDate"
                         value={field.value ?? null}
@@ -100,7 +143,7 @@ export function CancelledRejectedCreditsReport() {
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="endDate">Fecha final</FieldLabel>
+                      <FieldLabel htmlFor="endDate">Estado final</FieldLabel>
                       <DatePicker
                         id="endDate"
                         value={field.value ?? null}
@@ -124,13 +167,17 @@ export function CancelledRejectedCreditsReport() {
             <CardHeader>
               <CardTitle>Resultado</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-5">
+            <CardContent className="grid gap-3 md:grid-cols-6">
               <div>
-                <p className="text-muted-foreground text-xs">Rango inicial</p>
+                <p className="text-muted-foreground text-xs">Tipo</p>
+                <p className="font-medium">{cancelledRejectedCreditsReportTypeLabels[result.filterType]}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Estado inicial</p>
                 <p className="font-medium">{formatDate(result.startDate)}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Rango final</p>
+                <p className="text-muted-foreground text-xs">Estado final</p>
                 <p className="font-medium">{formatDate(result.endDate)}</p>
               </div>
               <div>

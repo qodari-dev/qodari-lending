@@ -6,6 +6,8 @@ import {
   GenerateCreditClearancePdfResponseSchema,
   GenerateLiquidatedCreditsReportBodySchema,
   GenerateLiquidatedCreditsReportResponseSchema,
+  GenerateLiquidatedNotDisbursedCreditsReportBodySchema,
+  GenerateLiquidatedNotDisbursedCreditsReportResponseSchema,
   GenerateMinutesPdfBodySchema,
   GenerateMinutesPdfResponseSchema,
   GenerateMovementVoucherReportBodySchema,
@@ -68,6 +70,16 @@ export const creditReport = c.router(
       body: GenerateNonLiquidatedCreditsReportBodySchema,
       metadata,
       responses: { 200: GenerateNonLiquidatedCreditsReportResponseSchema, ...errorResponses },
+    },
+    generateLiquidatedNotDisbursedCredits: {
+      method: 'POST',
+      path: '/liquidated-not-disbursed-credits/generate',
+      body: GenerateLiquidatedNotDisbursedCreditsReportBodySchema,
+      metadata,
+      responses: {
+        200: GenerateLiquidatedNotDisbursedCreditsReportResponseSchema,
+        ...errorResponses,
+      },
     },
     generateCancelledRejectedCredits: {
       method: 'POST',

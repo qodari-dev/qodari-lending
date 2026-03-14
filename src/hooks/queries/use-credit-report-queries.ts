@@ -57,6 +57,10 @@ export function useGenerateNonLiquidatedCreditsReport() {
   return api.creditReport.generateNonLiquidatedCredits.useMutation({ onError });
 }
 
+export function useGenerateLiquidatedNotDisbursedCreditsReport() {
+  return api.creditReport.generateLiquidatedNotDisbursedCredits.useMutation({ onError });
+}
+
 export function useGenerateCancelledRejectedCreditsReport() {
   return api.creditReport.generateCancelledRejectedCredits.useMutation({ onError });
 }

@@ -83,19 +83,16 @@ export type CreditExtractReportResponse = {
 };
 
 // Cuotas pagadas
-export const GeneratePaidInstallmentsReportBodySchema = buildDateRangeBodySchema();
-export const PaidInstallmentsReportRowSchema = z.object({
-  creditNumber: z.string().min(1),
-  thirdPartyDocumentNumber: z.string().nullable(),
-  thirdPartyName: z.string().min(1),
-  paidInstallments: z.number().int().nonnegative(),
-  paidAmount: z.number().nonnegative(),
+export const GeneratePaidInstallmentsReportBodySchema = z.object({
+  creditNumber: z.string().trim().min(1).max(20),
 });
-export type PaidInstallmentsReportRow = z.infer<typeof PaidInstallmentsReportRowSchema>;
-export const GeneratePaidInstallmentsReportResponseSchema = buildDateRangeResponse(
-  'PAID_INSTALLMENTS',
-  PaidInstallmentsReportRowSchema
-);
+export const GeneratePaidInstallmentsReportResponseSchema = z.object({
+  reportType: z.literal('PAID_INSTALLMENTS_PDF'),
+  creditNumber: z.string().min(1),
+  fileName: z.string().min(1),
+  pdfBase64: z.string().min(1),
+  message: z.string(),
+});
 export type GeneratePaidInstallmentsReportResult = ClientInferResponseBody<
   Contract['creditReport']['generatePaidInstallments'],
   200
@@ -121,40 +118,121 @@ export type GenerateLiquidatedCreditsReportResult = ClientInferResponseBody<
 >;
 
 // Creditos no liquidados
-export const GenerateNonLiquidatedCreditsReportBodySchema = buildDateRangeBodySchema();
+export const GenerateNonLiquidatedCreditsReportBodySchema = z.object({});
 export const NonLiquidatedCreditsReportRowSchema = z.object({
   creditNumber: z.string().min(1),
+  requestNumber: z.string().min(1),
   thirdPartyDocumentNumber: z.string().nullable(),
   thirdPartyName: z.string().min(1),
+  creditProductName: z.string().nullable(),
+  affiliationOfficeName: z.string().nullable(),
+  applicationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   status: z.string().min(1),
-  outstandingBalance: z.number().nonnegative(),
-  daysPastDue: z.number().int().nonnegative(),
+  requestedAmount: z.number().nonnegative(),
+  approvedAmount: z.number().nonnegative(),
 });
 export type NonLiquidatedCreditsReportRow = z.infer<typeof NonLiquidatedCreditsReportRowSchema>;
-export const GenerateNonLiquidatedCreditsReportResponseSchema = buildDateRangeResponse(
-  'NON_LIQUIDATED_CREDITS',
-  NonLiquidatedCreditsReportRowSchema
-);
+export const GenerateNonLiquidatedCreditsReportResponseSchema = z.object({
+  reportType: z.literal('NON_LIQUIDATED_CREDITS'),
+  reviewedCredits: z.number().int().nonnegative(),
+  reportedCredits: z.number().int().nonnegative(),
+  rows: z.array(NonLiquidatedCreditsReportRowSchema),
+  message: z.string(),
+});
 export type GenerateNonLiquidatedCreditsReportResult = ClientInferResponseBody<
   Contract['creditReport']['generateNonLiquidatedCredits'],
   200
 >;
 
-// Creditos anulados/rechazados
-export const GenerateCancelledRejectedCreditsReportBodySchema = buildDateRangeBodySchema();
-export const CancelledRejectedCreditsReportRowSchema = z.object({
+// Creditos liquidados no desembolsados
+export const GenerateLiquidatedNotDisbursedCreditsReportBodySchema = z.object({});
+export const LiquidatedNotDisbursedCreditsReportRowSchema = z.object({
+  creditNumber: z.string().min(1),
   requestNumber: z.string().min(1),
   thirdPartyDocumentNumber: z.string().nullable(),
   thirdPartyName: z.string().min(1),
+  creditProductName: z.string().nullable(),
+  affiliationOfficeName: z.string().nullable(),
+  applicationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  liquidatedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  status: z.string().min(1),
+  disbursementStatus: z.string().min(1),
+  requestedAmount: z.number().nonnegative(),
+  approvedAmount: z.number().nonnegative(),
+  disbursementAmount: z.number().nonnegative(),
+});
+export type LiquidatedNotDisbursedCreditsReportRow = z.infer<
+  typeof LiquidatedNotDisbursedCreditsReportRowSchema
+>;
+export const GenerateLiquidatedNotDisbursedCreditsReportResponseSchema = z.object({
+  reportType: z.literal('LIQUIDATED_NOT_DISBURSED_CREDITS'),
+  reviewedCredits: z.number().int().nonnegative(),
+  reportedCredits: z.number().int().nonnegative(),
+  rows: z.array(LiquidatedNotDisbursedCreditsReportRowSchema),
+  message: z.string(),
+});
+export type GenerateLiquidatedNotDisbursedCreditsReportResult = ClientInferResponseBody<
+  Contract['creditReport']['generateLiquidatedNotDisbursedCredits'],
+  200
+>;
+
+// Creditos anulados/rechazados
+export const CANCELLED_REJECTED_CREDITS_REPORT_TYPE_OPTIONS = [
+  'CANCELED',
+  'REJECTED',
+  'VOID',
+] as const;
+export type CancelledRejectedCreditsReportType =
+  (typeof CANCELLED_REJECTED_CREDITS_REPORT_TYPE_OPTIONS)[number];
+
+export const cancelledRejectedCreditsReportTypeLabels: Record<
+  CancelledRejectedCreditsReportType,
+  string
+> = {
+  CANCELED: 'Cancelados',
+  REJECTED: 'Rechazados',
+  VOID: 'Anulados',
+};
+
+export const GenerateCancelledRejectedCreditsReportBodySchema = z
+  .object({
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date(),
+    reportType: z.enum(CANCELLED_REJECTED_CREDITS_REPORT_TYPE_OPTIONS),
+  })
+  .superRefine((value, ctx) => {
+    if (value.endDate < value.startDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['endDate'],
+        message: 'La fecha final de estado debe ser mayor o igual a la inicial',
+      });
+    }
+  });
+export const CancelledRejectedCreditsReportRowSchema = z.object({
+  requestNumber: z.string().min(1),
+  creditNumber: z.string().nullable(),
+  thirdPartyDocumentNumber: z.string().nullable(),
+  thirdPartyName: z.string().min(1),
+  creditProductName: z.string().nullable(),
+  applicationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   status: z.string().min(1),
   rejectionReason: z.string().nullable(),
   statusDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  requestedAmount: z.number().nonnegative(),
+  approvedAmount: z.number().nonnegative(),
 });
 export type CancelledRejectedCreditsReportRow = z.infer<typeof CancelledRejectedCreditsReportRowSchema>;
-export const GenerateCancelledRejectedCreditsReportResponseSchema = buildDateRangeResponse(
-  'CANCELLED_REJECTED_CREDITS',
-  CancelledRejectedCreditsReportRowSchema
-);
+export const GenerateCancelledRejectedCreditsReportResponseSchema = z.object({
+  reportType: z.literal('CANCELLED_REJECTED_CREDITS'),
+  filterType: z.enum(CANCELLED_REJECTED_CREDITS_REPORT_TYPE_OPTIONS),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reviewedCredits: z.number().int().nonnegative(),
+  reportedCredits: z.number().int().nonnegative(),
+  rows: z.array(CancelledRejectedCreditsReportRowSchema),
+  message: z.string(),
+});
 export type GenerateCancelledRejectedCreditsReportResult = ClientInferResponseBody<
   Contract['creditReport']['generateCancelledRejectedCredits'],
   200

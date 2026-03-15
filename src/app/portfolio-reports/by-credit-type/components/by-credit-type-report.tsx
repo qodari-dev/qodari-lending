@@ -4,9 +4,10 @@ import { exportToExcel } from '@/components/data-table/export/export-excel';
 import { PageContent, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { useCreditProducts } from '@/hooks/queries/use-credit-product-queries';
 import { useGeneratePortfolioByCreditTypeReport } from '@/hooks/queries/use-portfolio-report-queries';
 import {
   GeneratePortfolioByCreditTypeBodySchema,
@@ -26,11 +27,20 @@ type FormValues = z.infer<typeof FormSchema>;
 
 export function ByCreditTypeReport() {
   const [result, setResult] = React.useState<GeneratePortfolioByCreditTypeReportResult | null>(null);
-  const today = React.useMemo(() => new Date(), []);
+  const { data: creditProductsData, isLoading: isLoadingCreditProducts } = useCreditProducts({
+    limit: 1000,
+    include: [],
+    where: { and: [{ isActive: true }] },
+    sort: [{ field: 'name', order: 'asc' }],
+  });
+  const creditProducts = React.useMemo(
+    () => creditProductsData?.body.data ?? [],
+    [creditProductsData]
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema) as Resolver<FormValues>,
-    defaultValues: { cutoffDate: today },
+    defaultValues: { creditProductId: undefined },
   });
 
   const { mutateAsync: generateReport, isPending: isGenerating } =
@@ -49,14 +59,14 @@ export function ByCreditTypeReport() {
         title: 'Reporte cartera por tipo de credito',
         filename: `cartera-por-tipo-de-credito-${result.cutoffDate}`,
         columns: [
-          { header: '# Credito', accessorKey: 'creditNumber', width: 18 },
+          { header: 'Item', width: 10, getValue: (row) => String(row.item) },
+          { header: 'Linea de credito', width: 24, getValue: () => result.creditProductName },
           { header: 'Documento', accessorKey: 'thirdPartyDocumentNumber', width: 18 },
-          { header: 'Tercero', accessorKey: 'thirdPartyName', width: 28 },
-          { header: 'Convenio', accessorKey: 'agreementName', width: 22 },
-          { header: 'Tipo credito', accessorKey: 'creditProductName', width: 20 },
-          { header: 'Estado', accessorKey: 'status', width: 16 },
+          { header: 'Tercero', accessorKey: 'thirdPartyName', width: 32 },
+          { header: '# Credito', accessorKey: 'creditNumber', width: 18 },
+          { header: 'Valor', width: 18, getValue: (row) => formatCurrency(row.creditValue) },
+          { header: 'Abonos', width: 18, getValue: (row) => formatCurrency(row.paidAmount) },
           { header: 'Saldo', width: 18, getValue: (row) => formatCurrency(row.outstandingBalance) },
-          { header: 'Saldo vencido', width: 18, getValue: (row) => formatCurrency(row.overdueBalance) },
           { header: 'Nota', accessorKey: 'note', width: 30 },
         ],
       },
@@ -69,29 +79,43 @@ export function ByCreditTypeReport() {
     <>
       <PageHeader
         title="Reporte cartera por tipo de credito"
-        description="Genere reporte de cartera agrupada por tipo de credito."
+        description="Genere reporte básico de cartera por línea de crédito."
       />
       <PageContent>
         <Card>
           <CardHeader>
             <CardTitle>Parametros</CardTitle>
-            <CardDescription>Seleccione la fecha de corte para generar el reporte.</CardDescription>
+            <CardDescription>Seleccione la línea de crédito para generar el reporte.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FieldGroup className="grid gap-4 md:grid-cols-[1fr_auto]">
                 <Controller
-                  name="cutoffDate"
+                  name="creditProductId"
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="cutoffDate">Fecha de corte</FieldLabel>
-                      <DatePicker
-                        id="cutoffDate"
-                        value={field.value ?? null}
-                        onChange={(value) => field.onChange(value ?? null)}
-                        ariaInvalid={fieldState.invalid}
-                      />
+                      <FieldLabel htmlFor="creditProductId">Linea de credito</FieldLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                        value={field.value ? String(field.value) : ''}
+                        disabled={isLoadingCreditProducts}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              isLoadingCreditProducts ? 'Cargando lineas...' : 'Seleccione...'
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {creditProducts.map((item) => (
+                            <SelectItem key={item.id} value={String(item.id)}>
+                              {item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
@@ -114,6 +138,10 @@ export function ByCreditTypeReport() {
               <div>
                 <p className="text-muted-foreground text-xs">Reporte</p>
                 <p className="font-medium">{result.reportType}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Linea de credito</p>
+                <p className="font-medium">{result.creditProductName}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Fecha corte</p>

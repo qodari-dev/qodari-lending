@@ -15,7 +15,7 @@ import React from 'react';
 
 export function RiskCenterReportHistory() {
   const { data, isLoading } = useRiskCenterReportRuns();
-  const runs = data?.body ?? [];
+  const runs = React.useMemo(() => data?.body ?? [], [data]);
   const [selectedRunId, setSelectedRunId] = React.useState<number | undefined>(undefined);
 
   React.useEffect(() => {

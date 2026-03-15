@@ -35,7 +35,6 @@ import { buildMinutesReportData } from '@/server/utils/minutes-report-data';
 import { buildPaidInstallmentsReportData } from '@/server/utils/paid-installments-report-data';
 import { buildThirdPartyClearanceData } from '@/server/utils/third-party-clearance-data';
 import { tsr } from '@ts-rest/serverless/next';
-import { differenceInCalendarDays } from 'date-fns';
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { contract } from '../contracts';
@@ -65,13 +64,6 @@ type HandlerContext = {
   request: PermissionRequest;
   appRoute: { metadata: PermissionMetadata };
 };
-
-function buildRangeMeta(startDate: Date, endDate: Date, base: number) {
-  const spanDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
-  const reviewedCredits = base + spanDays * 4;
-  const reportedCredits = Math.max(10, Math.floor(reviewedCredits * 0.74));
-  return { reviewedCredits, reportedCredits };
-}
 
 const EXTRACT_LOAN_COLUMNS = {
   id: true,

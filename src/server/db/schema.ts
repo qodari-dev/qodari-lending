@@ -430,6 +430,11 @@ export const paymentReceiptMovementTypeEnum = pgEnum('payment_receipt_movement_t
   'OTHER', // 7 - OTROS
 ]);
 
+export const provisionAccountingStatusEnum = pgEnum('provision_accounting_status', [
+  'PENDING',
+  'ACCOUNTED',
+]);
+
 // ---------------------------------------------------------------------
 // Concr29 - Tipos de recibos de abonos
 // Nota:
@@ -2628,6 +2633,24 @@ export const creditsSettings = pgTable('credits_settings', {
   excessGlAccountId: integer('excess_gl_account_id').references(() => glAccounts.id, {
     onDelete: 'restrict',
   }),
+  provisionExpenseGlAccountId: integer('provision_expense_gl_account_id').references(
+    () => glAccounts.id,
+    {
+      onDelete: 'restrict',
+    }
+  ),
+  portfolioProvisionGlAccountId: integer('portfolio_provision_gl_account_id').references(
+    () => glAccounts.id,
+    {
+      onDelete: 'restrict',
+    }
+  ),
+  provisionRecoveryGlAccountId: integer('provision_recovery_gl_account_id').references(
+    () => glAccounts.id,
+    {
+      onDelete: 'restrict',
+    }
+  ),
   pledgeSubsidyGlAccountId: integer('pledge_subsidy_gl_account_id').references(
     () => glAccounts.id,
     { onDelete: 'restrict' }
@@ -3540,6 +3563,15 @@ export const portfolioProvisionSnapshots = pgTable(
       scale: 2,
     }).notNull(),
 
+    accountingStatus: provisionAccountingStatusEnum('accounting_status')
+      .notNull()
+      .default('PENDING'),
+    accountedAt: timestamp('accounted_at', { withTimezone: true }),
+    accountedByUserId: uuid('accounted_by_user_id'),
+    accountedByUserName: varchar('accounted_by_user_name', { length: 255 }),
+    accountingDocumentCode: varchar('accounting_document_code', { length: 20 }),
+    accountingNote: varchar('accounting_note', { length: 255 }),
+
     note: varchar('note', { length: 255 }),
     metadata: jsonb('metadata'),
 
@@ -3554,6 +3586,7 @@ export const portfolioProvisionSnapshots = pgTable(
 
     index('idx_provision_snapshot_period').on(t.accountingPeriodId),
     index('idx_provision_snapshot_profile').on(t.agingProfileId),
+    index('idx_provision_snapshot_accounting_status').on(t.accountingStatus),
   ]
 );
 

@@ -54,6 +54,9 @@ export function CreditsSettingsPage() {
         'cashGlAccount',
         'majorGlAccount',
         'excessGlAccount',
+        'provisionExpenseGlAccount',
+        'portfolioProvisionGlAccount',
+        'provisionRecoveryGlAccount',
         'pledgeSubsidyGlAccount',
         'pledgePaymentReceiptType',
         'writeOffGlAccount',
@@ -113,6 +116,9 @@ export function CreditsSettingsPage() {
         majorGlAccountId: settings.majorGlAccountId ?? undefined,
         minimumMajorPaidAmount: settings.minimumMajorPaidAmount ?? null,
         excessGlAccountId: settings.excessGlAccountId ?? undefined,
+        provisionExpenseGlAccountId: settings.provisionExpenseGlAccountId ?? undefined,
+        portfolioProvisionGlAccountId: settings.portfolioProvisionGlAccountId ?? undefined,
+        provisionRecoveryGlAccountId: settings.provisionRecoveryGlAccountId ?? undefined,
         pledgeSubsidyGlAccountId: settings.pledgeSubsidyGlAccountId ?? undefined,
         pledgePaymentReceiptTypeId: settings.pledgePaymentReceiptTypeId ?? undefined,
         writeOffGlAccountId: settings.writeOffGlAccountId ?? undefined,
@@ -522,6 +528,156 @@ export function CreditsSettingsPage() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel>Cuenta Excedente</FieldLabel>
+                          <Combobox
+                            items={glAccounts}
+                            value={findGlAccount(field.value)}
+                            onValueChange={(value: GlAccount | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: GlAccount) => String(item.id)}
+                            itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar cuenta..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="provisionExpenseGlAccountId"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Cuenta Gasto Provisión</FieldLabel>
+                          <Combobox
+                            items={glAccounts}
+                            value={findGlAccount(field.value)}
+                            onValueChange={(value: GlAccount | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: GlAccount) => String(item.id)}
+                            itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar cuenta..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="portfolioProvisionGlAccountId"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Cuenta Provisión Cartera</FieldLabel>
+                          <Combobox
+                            items={glAccounts}
+                            value={findGlAccount(field.value)}
+                            onValueChange={(value: GlAccount | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: GlAccount) => String(item.id)}
+                            itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar cuenta..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="provisionRecoveryGlAccountId"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Cuenta Recuperación Provisión</FieldLabel>
                           <Combobox
                             items={glAccounts}
                             value={findGlAccount(field.value)}

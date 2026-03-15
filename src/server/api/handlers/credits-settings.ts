@@ -27,6 +27,18 @@ const CREDITS_SETTINGS_INCLUDES = createIncludeMap<typeof db.query.creditsSettin
     relation: 'excessGlAccount',
     config: true,
   },
+  provisionExpenseGlAccount: {
+    relation: 'provisionExpenseGlAccount',
+    config: true,
+  },
+  portfolioProvisionGlAccount: {
+    relation: 'portfolioProvisionGlAccount',
+    config: true,
+  },
+  provisionRecoveryGlAccount: {
+    relation: 'provisionRecoveryGlAccount',
+    config: true,
+  },
   pledgeSubsidyGlAccount: {
     relation: 'pledgeSubsidyGlAccount',
     config: true,

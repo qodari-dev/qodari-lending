@@ -1001,6 +1001,21 @@ export const creditsSettingsRelations = relations(creditsSettings, ({ one }) => 
     references: [glAccounts.id],
     relationName: 'excessGlAccount',
   }),
+  provisionExpenseGlAccount: one(glAccounts, {
+    fields: [creditsSettings.provisionExpenseGlAccountId],
+    references: [glAccounts.id],
+    relationName: 'provisionExpenseGlAccount',
+  }),
+  portfolioProvisionGlAccount: one(glAccounts, {
+    fields: [creditsSettings.portfolioProvisionGlAccountId],
+    references: [glAccounts.id],
+    relationName: 'portfolioProvisionGlAccount',
+  }),
+  provisionRecoveryGlAccount: one(glAccounts, {
+    fields: [creditsSettings.provisionRecoveryGlAccountId],
+    references: [glAccounts.id],
+    relationName: 'provisionRecoveryGlAccount',
+  }),
   pledgeSubsidyGlAccount: one(glAccounts, {
     fields: [creditsSettings.pledgeSubsidyGlAccountId],
     references: [glAccounts.id],

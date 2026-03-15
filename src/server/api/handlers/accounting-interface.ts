@@ -9,17 +9,21 @@ import {
 } from '@/schemas/accounting-interface';
 import {
   accountingEntries,
+  creditsSettings,
   db,
   loanInstallments,
   loanDisbursementEvents,
+  loanPayments,
   loans,
   loanStatusHistory,
+  portfolioProvisionSnapshots,
 } from '@/server/db';
-import { genericTsRestErrorResponse } from '@/server/utils/generic-ts-rest-error';
+import { env } from '@/env';
+import { genericTsRestErrorResponse, throwHttpError } from '@/server/utils/generic-ts-rest-error';
 import { recordLoanDisbursementEvent } from '@/server/utils/loan-disbursement-events';
 import { getAuthContextAndValidatePermission } from '@/server/utils/require-permission';
 import { getRequiredUserContext } from '@/server/utils/required-user-context';
-import { formatDateOnly } from '@/server/utils/value-utils';
+import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, between, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
@@ -42,6 +46,22 @@ type HandlerContext = {
   request: PermissionRequest;
   appRoute: { metadata: PermissionMetadata };
 };
+
+const PAYMENT_INTERFACE_PROCESS_TYPES = [
+  'RECEIPT',
+  'PLEDGE',
+  'PAYROLL',
+  'DEPOSIT',
+  'OTHER',
+] as const;
+
+function buildProvisionSnapshotDocumentCode(snapshotId: number): string {
+  return `PROV${String(snapshotId).padStart(6, '0')}`;
+}
+
+function buildMonthKey(date: Date): number {
+  return date.getFullYear() * 100 + (date.getMonth() + 1);
+}
 
 async function processCredits(body: ProcessCreditsBody, context: HandlerContext) {
   const { request, appRoute } = context;
@@ -338,19 +358,53 @@ async function processCurrentInterest(body: ProcessCurrentInterestBody, context:
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-    // TODO(accounting-interface-current-interest): implementar interface contable de interes corriente
-    // - consultar causacion de interes corriente en el rango
-    // - construir comprobante segun reglas contables
-    // - integrar y registrar trazabilidad del lote
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
+    const transactionDate = formatDateOnly(body.transactionDate);
+
+    const draftInterestEntries = await db.query.accountingEntries.findMany({
+      where: and(
+        eq(accountingEntries.processType, 'INTEREST'),
+        eq(accountingEntries.sourceType, 'PROCESS_RUN'),
+        eq(accountingEntries.status, 'DRAFT'),
+        between(accountingEntries.entryDate, startDate, endDate)
+      ),
+      columns: {
+        id: true,
+        processRunId: true,
+      },
+    });
+
+    const entryIds = draftInterestEntries.map((item) => item.id);
+    const processRunIds = [
+      ...new Set(
+        draftInterestEntries
+          .map((item) => item.processRunId)
+          .filter((value): value is number => value !== null && Number.isInteger(value) && value > 0)
+      ),
+    ];
+
+    if (entryIds.length) {
+      await db
+        .update(accountingEntries)
+        .set({
+          status: 'ACCOUNTED',
+          statusDate: transactionDate,
+        })
+        .where(inArray(accountingEntries.id, entryIds));
+    }
+
     return {
       status: 200 as const,
       body: {
         interfaceType: 'CURRENT_INTEREST' as const,
-        periodStartDate: formatDateOnly(body.startDate),
-        periodEndDate: formatDateOnly(body.endDate),
-        transactionDate: formatDateOnly(body.transactionDate),
-        processedRecords: 0,
-        message: 'Interfaz contable de Interes corriente recibida. Pendiente implementacion.',
+        periodStartDate: startDate,
+        periodEndDate: endDate,
+        transactionDate,
+        processedRecords: processRunIds.length,
+        message: processRunIds.length
+          ? `Interfaz contable de Interes corriente procesada. Se contabilizaron ${processRunIds.length} corrida(s).`
+          : 'No se encontraron causaciones de interes corriente pendientes por contabilizar en el rango seleccionado.',
       },
     };
   } catch (e) {
@@ -366,19 +420,53 @@ async function processLateInterest(body: ProcessLateInterestBody, context: Handl
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-    // TODO(accounting-interface-late-interest): implementar interface contable de interes mora
-    // - consultar causacion de interes mora en el rango
-    // - construir comprobante segun reglas contables
-    // - integrar y registrar trazabilidad del lote
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
+    const transactionDate = formatDateOnly(body.transactionDate);
+
+    const draftLateInterestEntries = await db.query.accountingEntries.findMany({
+      where: and(
+        eq(accountingEntries.processType, 'LATE_INTEREST'),
+        eq(accountingEntries.sourceType, 'PROCESS_RUN'),
+        eq(accountingEntries.status, 'DRAFT'),
+        between(accountingEntries.entryDate, startDate, endDate)
+      ),
+      columns: {
+        id: true,
+        processRunId: true,
+      },
+    });
+
+    const entryIds = draftLateInterestEntries.map((item) => item.id);
+    const processRunIds = [
+      ...new Set(
+        draftLateInterestEntries
+          .map((item) => item.processRunId)
+          .filter((value): value is number => value !== null && Number.isInteger(value) && value > 0)
+      ),
+    ];
+
+    if (entryIds.length) {
+      await db
+        .update(accountingEntries)
+        .set({
+          status: 'ACCOUNTED',
+          statusDate: transactionDate,
+        })
+        .where(inArray(accountingEntries.id, entryIds));
+    }
+
     return {
       status: 200 as const,
       body: {
         interfaceType: 'LATE_INTEREST' as const,
-        periodStartDate: formatDateOnly(body.startDate),
-        periodEndDate: formatDateOnly(body.endDate),
-        transactionDate: formatDateOnly(body.transactionDate),
-        processedRecords: 0,
-        message: 'Interfaz contable de Interes mora recibida. Pendiente implementacion.',
+        periodStartDate: startDate,
+        periodEndDate: endDate,
+        transactionDate,
+        processedRecords: processRunIds.length,
+        message: processRunIds.length
+          ? `Interfaz contable de Interes mora procesada. Se contabilizaron ${processRunIds.length} corrida(s).`
+          : 'No se encontraron causaciones de interes mora pendientes por contabilizar en el rango seleccionado.',
       },
     };
   } catch (e) {
@@ -394,19 +482,64 @@ async function processPayments(body: ProcessPaymentsBody, context: HandlerContex
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
 
-    // TODO(accounting-interface-payments): implementar interface contable de abonos
-    // - consultar abonos aplicados en el rango
-    // - construir comprobante segun reglas contables
-    // - integrar y registrar trazabilidad del lote
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
+    const transactionDate = formatDateOnly(body.transactionDate);
+
+    const draftPaymentEntries = await db.query.accountingEntries.findMany({
+      where: and(
+        inArray(accountingEntries.processType, PAYMENT_INTERFACE_PROCESS_TYPES),
+        eq(accountingEntries.sourceType, 'LOAN_PAYMENT'),
+        eq(accountingEntries.status, 'DRAFT'),
+        between(accountingEntries.entryDate, startDate, endDate)
+      ),
+      columns: {
+        id: true,
+        sourceId: true,
+      },
+    });
+
+    const entryIds = draftPaymentEntries.map((item) => item.id);
+    const paymentIds = [
+      ...new Set(
+        draftPaymentEntries
+          .map((item) => Number(item.sourceId))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      ),
+    ];
+
+    if (entryIds.length) {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(accountingEntries)
+          .set({
+            status: 'ACCOUNTED',
+            statusDate: transactionDate,
+          })
+          .where(inArray(accountingEntries.id, entryIds));
+
+        if (paymentIds.length) {
+          await tx
+            .update(loanPayments)
+            .set({
+              updatedAt: new Date(),
+            })
+            .where(inArray(loanPayments.id, paymentIds));
+        }
+      });
+    }
+
     return {
       status: 200 as const,
       body: {
         interfaceType: 'PAYMENTS' as const,
-        periodStartDate: formatDateOnly(body.startDate),
-        periodEndDate: formatDateOnly(body.endDate),
-        transactionDate: formatDateOnly(body.transactionDate),
-        processedRecords: 0,
-        message: 'Interfaz contable de Abonos recibida. Pendiente implementacion.',
+        periodStartDate: startDate,
+        periodEndDate: endDate,
+        transactionDate,
+        processedRecords: paymentIds.length,
+        message: paymentIds.length
+          ? `Interfaz contable de Abonos procesada. Se contabilizaron ${paymentIds.length} abono(s).`
+          : 'No se encontraron abonos pendientes por contabilizar en el rango seleccionado.',
       },
     };
   } catch (e) {
@@ -448,21 +581,134 @@ async function processProvision(body: ProcessProvisionBody, context: HandlerCont
   const { request, appRoute } = context;
 
   try {
-    await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const session = await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const { userId, userName } = getRequiredUserContext(session!);
 
-    // TODO(accounting-interface-provision): implementar interface contable de provision
-    // - consultar provisiones del rango
-    // - construir comprobante segun reglas contables
-    // - integrar y registrar trazabilidad del lote
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
+    const transactionDate = formatDateOnly(body.transactionDate);
+    const startMonthKey = buildMonthKey(body.startDate);
+    const endMonthKey = buildMonthKey(body.endDate);
+
+    const settings = await db.query.creditsSettings.findFirst({
+      columns: {
+        provisionExpenseGlAccountId: true,
+        portfolioProvisionGlAccountId: true,
+        provisionRecoveryGlAccountId: true,
+      },
+      where: eq(creditsSettings.appSlug, env.IAM_APP_SLUG),
+    });
+
+    const pendingSnapshots = await db.query.portfolioProvisionSnapshots.findMany({
+      where: eq(portfolioProvisionSnapshots.accountingStatus, 'PENDING'),
+      columns: {
+        id: true,
+        deltaToPost: true,
+        metadata: true,
+      },
+      with: {
+        accountingPeriod: {
+          columns: {
+            id: true,
+            year: true,
+            month: true,
+          },
+        },
+      },
+    });
+
+    const snapshotsToProcess = pendingSnapshots.filter((snapshot) => {
+      const period = snapshot.accountingPeriod;
+      const monthKey = period.year * 100 + period.month;
+      return monthKey >= startMonthKey && monthKey <= endMonthKey;
+    });
+
+    for (const snapshot of snapshotsToProcess) {
+      const delta = roundMoney(toNumber(snapshot.deltaToPost));
+      if (delta > 0) {
+        if (!settings?.provisionExpenseGlAccountId || !settings.portfolioProvisionGlAccountId) {
+          throwHttpError({
+            status: 400,
+            message:
+              'Debe configurar cuenta de gasto de provisión y cuenta de provisión de cartera',
+            code: 'BAD_REQUEST',
+          });
+        }
+      } else if (delta < 0) {
+        if (!settings?.provisionRecoveryGlAccountId || !settings.portfolioProvisionGlAccountId) {
+          throwHttpError({
+            status: 400,
+            message:
+              'Debe configurar cuenta de recuperación de provisión y cuenta de provisión de cartera',
+            code: 'BAD_REQUEST',
+          });
+        }
+      }
+    }
+
+    if (snapshotsToProcess.length) {
+      await db.transaction(async (tx) => {
+        for (const snapshot of snapshotsToProcess) {
+          const delta = roundMoney(toNumber(snapshot.deltaToPost));
+          const direction =
+            delta > 0 ? 'INCREASE' : delta < 0 ? 'REVERSAL' : 'NO_MOVEMENT';
+          const debitGlAccountId =
+            delta > 0
+              ? settings?.provisionExpenseGlAccountId ?? null
+              : delta < 0
+                ? settings?.portfolioProvisionGlAccountId ?? null
+                : null;
+          const creditGlAccountId =
+            delta > 0
+              ? settings?.portfolioProvisionGlAccountId ?? null
+              : delta < 0
+                ? settings?.provisionRecoveryGlAccountId ?? null
+                : null;
+          const documentCode = buildProvisionSnapshotDocumentCode(snapshot.id);
+          const previousMetadata =
+            snapshot.metadata && typeof snapshot.metadata === 'object' ? snapshot.metadata : {};
+
+          await tx
+            .update(portfolioProvisionSnapshots)
+            .set({
+              accountingStatus: 'ACCOUNTED',
+              accountedAt: new Date(),
+              accountedByUserId: userId,
+              accountedByUserName: userName || userId,
+              accountingDocumentCode: documentCode,
+              accountingNote:
+                direction === 'NO_MOVEMENT'
+                  ? 'Snapshot contabilizado sin delta pendiente'
+                  : `Base contable preparada sin inserción automática (${direction})`,
+              metadata: {
+                ...previousMetadata,
+                accountingInterface: {
+                  transactionDate,
+                  direction,
+                  deltaToPost: delta,
+                  debitGlAccountId,
+                  creditGlAccountId,
+                  insertedAccountingEntries: false,
+                },
+              },
+              updatedAt: new Date(),
+            })
+            .where(eq(portfolioProvisionSnapshots.id, snapshot.id));
+        }
+      });
+    }
+
     return {
       status: 200 as const,
       body: {
         interfaceType: 'PROVISION' as const,
-        periodStartDate: formatDateOnly(body.startDate),
-        periodEndDate: formatDateOnly(body.endDate),
-        transactionDate: formatDateOnly(body.transactionDate),
-        processedRecords: 0,
-        message: 'Interfaz contable de Provision recibida. Pendiente implementacion.',
+        periodStartDate: startDate,
+        periodEndDate: endDate,
+        transactionDate,
+        processedRecords: snapshotsToProcess.length,
+        message: snapshotsToProcess.length
+          ? `Interfaz base de provisión procesada. Se marcaron ${snapshotsToProcess.length} snapshot(s) como contabilizados sin insertar asientos contables.`
+          : 'No se encontraron snapshots de provisión pendientes por contabilizar en el rango seleccionado.',
       },
     };
   } catch (e) {

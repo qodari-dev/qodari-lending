@@ -1,5 +1,8 @@
+import { env } from '@/env';
+import { db, creditsSettings } from '@/server/db';
 import { monthsDiff } from '@/server/utils/string-utils';
 import { roundMoney } from '@/server/utils/value-utils';
+import { eq } from 'drizzle-orm';
 import { getSubsidyProvider } from './subsidy-provider-factory';
 import type {
   SubsidyBeneficiary,
@@ -18,6 +21,17 @@ type GetSubsidyWorkerStudyInput = {
   identificationTypeCode: string;
   documentNumber: string;
 };
+
+async function isSubsidyEnabled(): Promise<boolean> {
+  const settings = await db.query.creditsSettings.findFirst({
+    where: eq(creditsSettings.appSlug, env.IAM_APP_SLUG),
+    columns: {
+      subsidyEnabled: true,
+    },
+  });
+
+  return settings?.subsidyEnabled ?? false;
+}
 
 function toSafeMoney(value: number): number {
   if (!Number.isFinite(value) || value < 0) return 0;
@@ -110,6 +124,10 @@ function buildStudyFromProvider(params: {
 export async function getSubsidyWorkerStudy(
   input: GetSubsidyWorkerStudyInput
 ): Promise<SubsidyWorkerStudyData | null> {
+  if (!(await isSubsidyEnabled())) {
+    return null;
+  }
+
   const provider = getSubsidyProvider();
 
   if (!provider) {
@@ -165,6 +183,10 @@ export async function getSubsidyWorkerStudy(
 export async function getSubsidyWorkerBasicData(
   input: GetSubsidyWorkerStudyInput
 ): Promise<Pick<SubsidyWorkerStudyData, 'source' | 'worker'> | null> {
+  if (!(await isSubsidyEnabled())) {
+    return null;
+  }
+
   const provider = getSubsidyProvider();
 
   if (!provider) {
@@ -195,6 +217,10 @@ export async function getSubsidyCurrentPeriod(): Promise<{
   source: SubsidyWorkerStudyData['source'];
   period: SubsidyCurrentPeriod;
 } | null> {
+  if (!(await isSubsidyEnabled())) {
+    return null;
+  }
+
   const provider = getSubsidyProvider();
 
   if (!provider) {
@@ -222,6 +248,10 @@ export async function getSubsidyPledges(input: GetSubsidyWorkerStudyInput): Prom
   source: SubsidyWorkerStudyData['source'];
   pledges: SubsidyPledge[];
 } | null> {
+  if (!(await isSubsidyEnabled())) {
+    return null;
+  }
+
   const provider = getSubsidyProvider();
 
   if (!provider) {
@@ -248,6 +278,10 @@ export async function getSubsidyPaymentsByPeriod(period: string): Promise<{
   source: SubsidyWorkerStudyData['source'];
   payments: SubsidyPayment[];
 } | null> {
+  if (!(await isSubsidyEnabled())) {
+    return null;
+  }
+
   const provider = getSubsidyProvider();
 
   if (!provider) {
@@ -274,6 +308,10 @@ export async function getSubsidyPledgeByMarkDocument(
   source: SubsidyWorkerStudyData['source'];
   pledge: SubsidyPledge | null;
 } | null> {
+  if (!(await isSubsidyEnabled())) {
+    return null;
+  }
+
   const provider = getSubsidyProvider();
 
   if (!provider) {

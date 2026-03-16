@@ -90,6 +90,7 @@ export type SubsidyPayment = {
   assignedAt: string | null;
   deliveredAt: string | null;
   isVoided: boolean;
+  pledge: SubsidyPledge | null;
 };
 
 export type SubsidyCurrentPeriod = {
@@ -112,6 +113,20 @@ export type SubsidyPledge = {
   status: string | null;
   statusDate: string | null;
   isIndexed: boolean;
+};
+
+export type SubsidyPledgeCreationInput = {
+  workerDocumentNumber: string;
+  spouseDocumentNumber: string | null;
+  requestedValue: number;
+  creditValue: number;
+  paymentValue: number;
+  discountValue: number;
+  accountingCode: string;
+  crossDocumentNumber: string;
+  effectiveDate: string;
+  status: string;
+  isApplied: boolean;
 };
 
 export type SubsidyWorkerStudyData = {

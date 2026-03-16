@@ -1,5 +1,6 @@
 import type {
   SubsidyBeneficiary,
+  SubsidyPledgeCreationInput,
   SubsidyCurrentPeriod,
   SubsidyContribution,
   SubsidyPayment,
@@ -28,5 +29,6 @@ export interface SubsidyProvider {
   getSubsidyPaymentsByPeriod(period: string): Promise<SubsidyPayment[]>;
   getPledges(input: SubsidyLookupInput): Promise<SubsidyPledge[]>;
   getPledgeByMarkDocument(mark: string, documentNumber: string): Promise<SubsidyPledge | null>;
+  createPledge?(input: SubsidyPledgeCreationInput): Promise<void>;
   getCurrentPeriod(): Promise<SubsidyCurrentPeriod | null>;
 }

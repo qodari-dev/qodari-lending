@@ -106,6 +106,7 @@ export type SyseuSubsidyPaymentRecord = {
   fecha_entrega?: string;
   tipo_subsidio?: string;
   reemplazo?: string;
+  subsi43?: SyseuPledgeRecord | null;
 };
 
 export type SyseuContributionHeaderRecord = {
@@ -244,6 +245,20 @@ export type SyseuPledgeRecord = {
   estado?: string;
   fecha_estado?: string;
   indice?: string;
+};
+
+export type SyseuCreatePledgeInput = {
+  workerDocumentNumber: string;
+  spouseDocumentNumber: string | null;
+  requestedValue: string | number;
+  creditValue: string | number;
+  paymentValue: string | number;
+  discountValue: string | number;
+  accountingCode: string;
+  crossDocumentNumber: string;
+  effectiveDate: string;
+  status: string;
+  isApplied: string;
 };
 
 function normalizeDocumentNumber(value: string): string {
@@ -424,19 +439,35 @@ class SyseuClient {
   async getPledgeByMarkDocument(mark: string, documentNumber: string): Promise<SyseuPledgeRecord | null> {
     const cleanMark = mark.trim();
     const cleanDocumentNumber = normalizeDocumentNumber(documentNumber);
-    const data = await this.request<{ subsi43?: SyseuPledgeRecord[] | null }>(
-      '/traerSubsi43',
+    const data = await this.request<SyseuPledgeRecord | null>(
+      '/traerSubsi43Unique',
       {
         marca: cleanMark,
         documento: cleanDocumentNumber,
       },
       {
         allowNoData: true,
-        emptyValue: { subsi43: [] },
+        emptyValue: null,
       }
     );
 
-    return data?.subsi43?.[0] ?? null;
+    return data ?? null;
+  }
+
+  async createPledge(input: SyseuCreatePledgeInput): Promise<void> {
+    await this.request<unknown>('/llenarSubsi43', {
+      cedtra: normalizeDocumentNumber(input.workerDocumentNumber),
+      cedcon: input.spouseDocumentNumber ? normalizeDocumentNumber(input.spouseDocumentNumber) : '',
+      valsol: String(input.requestedValue),
+      valcre: String(input.creditValue),
+      valabo: String(input.paymentValue),
+      valdes: String(input.discountValue),
+      codcon: input.accountingCode.trim(),
+      doccru: normalizeDocumentNumber(input.crossDocumentNumber),
+      fecha: input.effectiveDate.trim(),
+      estado: input.status.trim(),
+      indapl: input.isApplied.trim(),
+    });
   }
 
   async getWorkerByDocument(documentNumber: string) {

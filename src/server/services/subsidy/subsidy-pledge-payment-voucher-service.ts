@@ -330,8 +330,11 @@ export async function executeSubsidyPledgePaymentVoucher(voucherId: number) {
       continue;
     }
 
-    const pledgeResult = await getSubsidyPledgeByMarkDocument(row.mark, row.documentNumber);
-    const pledge = pledgeResult?.pledge ?? null;
+    const embeddedPledge = row.pledge ?? null;
+    const pledgeResult = embeddedPledge
+      ? null
+      : await getSubsidyPledgeByMarkDocument(row.mark, row.documentNumber);
+    const pledge = embeddedPledge ?? pledgeResult?.pledge ?? null;
     const creditNumber = pledge?.crossDocumentNumber?.trim()
       ? normalizeUpperCase(pledge.crossDocumentNumber)
       : null;

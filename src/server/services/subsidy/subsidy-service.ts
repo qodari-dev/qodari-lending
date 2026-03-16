@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { getSubsidyProvider } from './subsidy-provider-factory';
 import type {
   SubsidyBeneficiary,
+  SubsidyPledgeCreationInput,
   SubsidyCurrentPeriod,
   SubsidyCompanyHistory,
   SubsidyContribution,
@@ -328,5 +329,25 @@ export async function getSubsidyPledgeByMarkDocument(
   } catch (error) {
     console.error('[subsidy-service] provider error', error);
     return null;
+  }
+}
+
+export async function createSubsidyPledge(input: SubsidyPledgeCreationInput): Promise<boolean> {
+  if (!(await isSubsidyEnabled())) {
+    return false;
+  }
+
+  const provider = getSubsidyProvider();
+
+  if (!provider?.createPledge) {
+    return false;
+  }
+
+  try {
+    await provider.createPledge(input);
+    return true;
+  } catch (error) {
+    console.error('[subsidy-service] provider error', error);
+    return false;
   }
 }

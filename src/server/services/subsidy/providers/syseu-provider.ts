@@ -16,6 +16,7 @@ import {
 import { toNumber } from '@/server/utils/value-utils';
 import type { SubsidyProvider, SubsidyLookupInput } from '../subsidy-provider';
 import type {
+  SubsidyPledgeCreationInput,
   SubsidyBeneficiary,
   SubsidyCurrentPeriod,
   SubsidyContribution,
@@ -228,6 +229,7 @@ function mapSubsidyPayment(record: SyseuSubsidyPaymentRecord): SubsidyPayment {
     assignedAt: parseDateToISO(record.fecha_asignacion),
     deliveredAt: parseDateToISO(record.fecha_entrega),
     isVoided: String(record.anulado ?? '').trim().toUpperCase() === 'S',
+    pledge: record.subsi43 ? mapPledge(record.subsi43) : null,
   };
 }
 
@@ -335,6 +337,22 @@ class SyseuSubsidyProvider implements SubsidyProvider {
   async getPledgeByMarkDocument(mark: string, documentNumber: string): Promise<SubsidyPledge | null> {
     const record = await syseuClient.getPledgeByMarkDocument(mark, documentNumber);
     return record ? mapPledge(record) : null;
+  }
+
+  async createPledge(input: SubsidyPledgeCreationInput): Promise<void> {
+    await syseuClient.createPledge({
+      workerDocumentNumber: input.workerDocumentNumber,
+      spouseDocumentNumber: input.spouseDocumentNumber,
+      requestedValue: input.requestedValue,
+      creditValue: input.creditValue,
+      paymentValue: input.paymentValue,
+      discountValue: input.discountValue,
+      accountingCode: input.accountingCode,
+      crossDocumentNumber: input.crossDocumentNumber,
+      effectiveDate: input.effectiveDate,
+      status: input.status,
+      isApplied: input.isApplied ? 'S' : 'N',
+    });
   }
 
   async getCurrentPeriod(): Promise<SubsidyCurrentPeriod | null> {

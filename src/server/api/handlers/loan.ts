@@ -68,6 +68,11 @@ import {
   downloadBufferFromSpaces,
   uploadBufferToSpaces,
 } from '@/server/utils/storage/spaces-object';
+import {
+  createSubsidyPledge,
+  getSubsidyWorkerStudy,
+} from '@/server/services/subsidy/subsidy-service';
+import { normalizeDocumentNumber } from '@/server/utils/string-utils';
 import { formatDateOnly, roundMoney, toDecimalString, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
@@ -105,6 +110,94 @@ const LOAN_QUERY_CONFIG: QueryConfig = {
   searchFields: [loans.creditNumber],
   defaultSort: { column: loans.createdAt, order: 'desc' },
 };
+
+async function syncSubsidyPledgesOnLiquidation(args: {
+  loanCreditNumber: string;
+  loanApplication: NonNullable<
+    Awaited<ReturnType<typeof db.query.loanApplications.findFirst>>
+  > & {
+    loanApplicationPledges?: Array<{
+      beneficiaryCode: string;
+      pledgeCode: string;
+      pledgedAmount: string;
+      effectiveDate: string;
+    }>;
+    thirdParty?: {
+      documentNumber: string;
+      identificationType?: {
+        code: string | null;
+      } | null;
+    } | null;
+  };
+}) {
+  const pledges = args.loanApplication.loanApplicationPledges ?? [];
+
+  if (!args.loanApplication.pledgesSubsidy || !pledges.length) {
+    return {
+      attempted: 0,
+      created: 0,
+      failed: 0,
+    };
+  }
+
+  const workerDocumentNumber = args.loanApplication.thirdParty?.documentNumber?.trim();
+  if (!workerDocumentNumber) {
+    return {
+      attempted: pledges.length,
+      created: 0,
+      failed: pledges.length,
+    };
+  }
+
+  const identificationTypeCode = args.loanApplication.thirdParty?.identificationType?.code?.trim();
+  const spouseByBeneficiaryCode = new Map<string, string | null>();
+
+  if (identificationTypeCode) {
+    const study = await getSubsidyWorkerStudy({
+      identificationTypeCode,
+      documentNumber: normalizeDocumentNumber(workerDocumentNumber),
+    });
+
+    for (const beneficiary of study?.beneficiaries ?? []) {
+      if (!beneficiary.beneficiaryCode) continue;
+      spouseByBeneficiaryCode.set(
+        beneficiary.beneficiaryCode,
+        beneficiary.relatedSpouseDocumentNumber ?? null
+      );
+    }
+  }
+
+  let created = 0;
+  let failed = 0;
+
+  for (const pledge of pledges) {
+    const wasCreated = await createSubsidyPledge({
+      workerDocumentNumber: normalizeDocumentNumber(workerDocumentNumber),
+      spouseDocumentNumber: spouseByBeneficiaryCode.get(pledge.beneficiaryCode) ?? null,
+      requestedValue: toNumber(pledge.pledgedAmount),
+      creditValue: toNumber(pledge.pledgedAmount),
+      paymentValue: 0,
+      discountValue: toNumber(pledge.pledgedAmount),
+      accountingCode: pledge.pledgeCode,
+      crossDocumentNumber: args.loanCreditNumber,
+      effectiveDate: pledge.effectiveDate,
+      status: 'A',
+      isApplied: true,
+    });
+
+    if (wasCreated) {
+      created += 1;
+    } else {
+      failed += 1;
+    }
+  }
+
+  return {
+    attempted: pledges.length,
+    created,
+    failed,
+  };
+}
 
 const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
   loanApplication: {
@@ -2071,6 +2164,16 @@ export const loan = tsr.router(contract.loan, {
         where: eq(loanApplications.id, existingLoan.loanApplicationId),
         with: {
           creditProduct: true,
+          loanApplicationPledges: true,
+          thirdParty: {
+            with: {
+              identificationType: {
+                columns: {
+                  code: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -2303,6 +2406,11 @@ export const loan = tsr.router(contract.loan, {
         return [loanUpdated];
       });
 
+      const subsidyPledgeSync = await syncSubsidyPledgesOnLiquidation({
+        loanCreditNumber: updatedLoan.creditNumber,
+        loanApplication,
+      });
+
       await logAudit(session, {
         resourceKey: appRoute.metadata.permissionKey.resourceKey,
         actionKey: appRoute.metadata.permissionKey.actionKey,
@@ -2318,6 +2426,7 @@ export const loan = tsr.router(contract.loan, {
           entriesGenerated: accountingEntriesPayload.length,
           disbursementAmount: toDecimalString(disbursementAmount),
           portfolioRows: portfolioDeltas.length,
+          subsidyPledgeSync,
         },
         ipAddress,
         userAgent,

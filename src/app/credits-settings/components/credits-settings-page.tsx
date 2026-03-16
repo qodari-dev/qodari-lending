@@ -60,6 +60,7 @@ export function CreditsSettingsPage() {
         'pledgeSubsidyGlAccount',
         'pledgePaymentReceiptType',
         'writeOffGlAccount',
+        'writeOffExpenseGlAccount',
         'refinancingReceiptType',
       ],
   });
@@ -122,6 +123,7 @@ export function CreditsSettingsPage() {
         pledgeSubsidyGlAccountId: settings.pledgeSubsidyGlAccountId ?? undefined,
         pledgePaymentReceiptTypeId: settings.pledgePaymentReceiptTypeId ?? undefined,
         writeOffGlAccountId: settings.writeOffGlAccountId ?? undefined,
+        writeOffExpenseGlAccountId: settings.writeOffExpenseGlAccountId ?? undefined,
         refinancingReceiptTypeId: settings.refinancingReceiptTypeId ?? undefined,
         creditManagerName: settings.creditManagerName ?? '',
         creditManagerTitle: settings.creditManagerTitle ?? '',
@@ -830,6 +832,56 @@ export function CreditsSettingsPage() {
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel>Cuenta Castigo Cartera</FieldLabel>
+                          <Combobox
+                            items={glAccounts}
+                            value={findGlAccount(field.value)}
+                            onValueChange={(value: GlAccount | null) =>
+                              field.onChange(value?.id ?? null)
+                            }
+                            itemToStringValue={(item: GlAccount) => String(item.id)}
+                            itemToStringLabel={(item: GlAccount) => `${item.code} - ${item.name}`}
+                          >
+                            <ComboboxTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={!canUpdate}
+                                >
+                                  <ComboboxValue placeholder="Seleccione..." />
+                                  <ChevronDownIcon className="text-muted-foreground size-4" />
+                                </Button>
+                              }
+                            />
+                            <ComboboxContent>
+                              <ComboboxInput
+                                placeholder="Buscar cuenta..."
+                                showClear
+                                showTrigger={false}
+                              />
+                              <ComboboxList>
+                                <ComboboxEmpty>No se encontraron cuentas</ComboboxEmpty>
+                                <ComboboxCollection>
+                                  {(item: GlAccount) => (
+                                    <ComboboxItem key={item.id} value={item}>
+                                      {item.code} - {item.name}
+                                    </ComboboxItem>
+                                  )}
+                                </ComboboxCollection>
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="writeOffExpenseGlAccountId"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel>Cuenta Gasto Castigo</FieldLabel>
                           <Combobox
                             items={glAccounts}
                             value={findGlAccount(field.value)}

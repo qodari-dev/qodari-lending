@@ -59,12 +59,15 @@ function summarizeSelectedRows(selectedRows: LoanWriteOffProposalRow[]) {
       return {
         selectedOutstandingBalance: acc.selectedOutstandingBalance + row.outstandingBalance,
         selectedProvisionAmount: acc.selectedProvisionAmount + row.provisionAmount,
+        selectedEstimatedUncoveredAmount:
+          acc.selectedEstimatedUncoveredAmount + row.estimatedUncoveredAmount,
         selectedRecommendedWriteOff: acc.selectedRecommendedWriteOff + row.recommendedWriteOffAmount,
       };
     },
     {
       selectedOutstandingBalance: 0,
       selectedProvisionAmount: 0,
+      selectedEstimatedUncoveredAmount: 0,
       selectedRecommendedWriteOff: 0,
     }
   );
@@ -79,6 +82,7 @@ export function LoanWriteOff() {
   const [unmatchedFromFile, setUnmatchedFromFile] = React.useState<string[]>([]);
 
   const today = React.useMemo(() => new Date(), []);
+  const [movementDate, setMovementDate] = React.useState<Date | null>(today);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema) as Resolver<FormValues>,
@@ -98,8 +102,12 @@ export function LoanWriteOff() {
     return reviewedRows.filter((row) => selectedCreditNumbersSet.has(row.creditNumber.toUpperCase()));
   }, [reviewedRows, selectedCreditNumbersSet]);
 
-  const { selectedOutstandingBalance, selectedProvisionAmount, selectedRecommendedWriteOff } =
-    React.useMemo(() => summarizeSelectedRows(selectedRows), [selectedRows]);
+  const {
+    selectedOutstandingBalance,
+    selectedProvisionAmount,
+    selectedEstimatedUncoveredAmount,
+    selectedRecommendedWriteOff,
+  } = React.useMemo(() => summarizeSelectedRows(selectedRows), [selectedRows]);
 
   const allRowsSelected = reviewedRows.length > 0 && selectedRows.length === reviewedRows.length;
   const someRowsSelected = selectedRows.length > 0 && selectedRows.length < reviewedRows.length;
@@ -238,21 +246,28 @@ export function LoanWriteOff() {
       return;
     }
 
+    if (!movementDate) {
+      toast.error('Debe definir la fecha de movimiento del castigo');
+      return;
+    }
+
     const response = await executeWriteOff({
       body: {
         proposalId: review.proposalId,
+        movementDate,
         selectedCreditNumbers: selectedRows.map((row) => row.creditNumber),
       },
     });
+
     setExecution(response.body);
-    toast.success('Ejecucion enviada al backend');
-  }, [executeWriteOff, review, selectedRows]);
+    toast.success('Castigo ejecutado');
+  }, [executeWriteOff, movementDate, review, selectedRows]);
 
   return (
     <>
       <PageHeader
         title="Castiga cartera"
-        description="Flujo sugerido: generar propuesta, revisar candidatos y ejecutar castigo."
+        description="Construya una propuesta real al corte, priorizada por mora, saldo y antigüedad del crédito."
       />
       <PageContent>
         <Card>
@@ -316,8 +331,20 @@ export function LoanWriteOff() {
                 <p className="font-medium">{formatCurrency(proposal.totalOutstandingBalance)}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Castigo sugerido</p>
+                <p className="text-muted-foreground text-xs">Provisión estimada</p>
+                <p className="font-medium">{formatCurrency(proposal.totalProvisionAmount)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Descubierto estimado</p>
+                <p className="font-medium">{formatCurrency(proposal.totalEstimatedUncoveredAmount)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Castigo propuesto</p>
                 <p className="font-medium">{formatCurrency(proposal.totalRecommendedWriteOff)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Snapshot provisión</p>
+                <p className="font-medium">{proposal.provisionSnapshotPeriodLabel ?? 'Sin snapshot previo'}</p>
               </div>
               <div className="md:col-span-6">
                 <p className="text-muted-foreground text-xs">Mensaje</p>
@@ -360,8 +387,20 @@ export function LoanWriteOff() {
                     <p className="font-medium">{formatCurrency(review.totalOutstandingBalance)}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-xs">Castigo sugerido</p>
+                    <p className="text-muted-foreground text-xs">Provisión estimada</p>
+                    <p className="font-medium">{formatCurrency(review.totalProvisionAmount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Descubierto estimado</p>
+                    <p className="font-medium">{formatCurrency(review.totalEstimatedUncoveredAmount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Castigo propuesto</p>
                     <p className="font-medium">{formatCurrency(review.totalRecommendedWriteOff)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Snapshot provisión</p>
+                    <p className="font-medium">{review.provisionSnapshotPeriodLabel ?? 'Sin snapshot previo'}</p>
                   </div>
                 </div>
 
@@ -402,17 +441,21 @@ export function LoanWriteOff() {
                       <p className="font-medium">{formatCurrency(selectedProvisionAmount)}</p>
                     </div>
                     <div>
+                      <p className="text-muted-foreground text-xs">Descubierto seleccionado</p>
+                      <p className="font-medium">{formatCurrency(selectedEstimatedUncoveredAmount)}</p>
+                    </div>
+                    <div>
                       <p className="text-muted-foreground text-xs">Castigo seleccionado</p>
                       <p className="font-medium">{formatCurrency(selectedRecommendedWriteOff)}</p>
                     </div>
                     {selectionFileName ? (
-                      <div className="md:col-span-4">
+                      <div className="md:col-span-5">
                         <p className="text-muted-foreground text-xs">Archivo cargado</p>
                         <p className="font-medium">{selectionFileName}</p>
                       </div>
                     ) : null}
                     {unmatchedFromFile.length ? (
-                      <div className="md:col-span-4">
+                      <div className="md:col-span-5">
                         <p className="text-muted-foreground text-xs">No encontrados en propuesta</p>
                         <p className="font-medium">{unmatchedFromFile.join(', ')}</p>
                       </div>
@@ -424,16 +467,26 @@ export function LoanWriteOff() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-14">Sel.</TableHead>
+                      <TableHead>Prioridad</TableHead>
                       <TableHead># Credito</TableHead>
+                      <TableHead>Documento</TableHead>
                       <TableHead>Tercero</TableHead>
+                      <TableHead>Línea</TableHead>
+                      <TableHead>Oficina</TableHead>
                       <TableHead>Dias mora</TableHead>
+                      <TableHead>Política</TableHead>
+                      <TableHead>Jurídico</TableHead>
+                      <TableHead>Últ. pago</TableHead>
                       <TableHead>Saldo</TableHead>
+                      <TableHead>Vencido</TableHead>
+                      <TableHead>Corriente</TableHead>
                       <TableHead>Provision</TableHead>
-                      <TableHead>Castigo sugerido</TableHead>
+                      <TableHead>Descubierto</TableHead>
+                      <TableHead>Castigo propuesto</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {review.rows.map((row) => {
+                    {review.rows.map((row, index) => {
                       const isSelected = selectedCreditNumbersSet.has(row.creditNumber.toUpperCase());
 
                       return (
@@ -446,11 +499,21 @@ export function LoanWriteOff() {
                               }
                             />
                           </TableCell>
+                          <TableCell>{index + 1}</TableCell>
                           <TableCell>{row.creditNumber}</TableCell>
+                          <TableCell>{row.thirdPartyDocumentNumber}</TableCell>
                           <TableCell>{row.thirdPartyName}</TableCell>
+                          <TableCell>{row.creditProductName}</TableCell>
+                          <TableCell>{row.affiliationOfficeName}</TableCell>
                           <TableCell>{row.daysPastDue}</TableCell>
+                          <TableCell>{`>= ${row.minDaysPastDue}`}</TableCell>
+                          <TableCell>{row.hasLegalProcess ? 'Si' : 'No'}</TableCell>
+                          <TableCell>{row.lastPaymentDate ? formatDate(row.lastPaymentDate) : '-'}</TableCell>
                           <TableCell>{formatCurrency(row.outstandingBalance)}</TableCell>
+                          <TableCell>{formatCurrency(row.overdueBalance)}</TableCell>
+                          <TableCell>{formatCurrency(row.currentBalance)}</TableCell>
                           <TableCell>{formatCurrency(row.provisionAmount)}</TableCell>
+                          <TableCell>{formatCurrency(row.estimatedUncoveredAmount)}</TableCell>
                           <TableCell>{formatCurrency(row.recommendedWriteOffAmount)}</TableCell>
                         </TableRow>
                       );
@@ -466,25 +529,49 @@ export function LoanWriteOff() {
           <CardHeader>
             <CardTitle>Paso 3: Ejecutar</CardTitle>
             <CardDescription>
-              Ejecute el castigo para los creditos seleccionados de la propuesta revisada.
+              Genere los movimientos contables en borrador y marque los créditos castigados.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button
-              type="button"
-              onClick={onExecute}
-              disabled={!review || !selectedRows.length || isExecuting}
-            >
-              {isExecuting ? <Spinner /> : null}
-              Ejecutar castiga cartera
-            </Button>
+            <FieldGroup className="grid gap-4 md:grid-cols-[1fr_auto]">
+              <Field>
+                <FieldLabel htmlFor="writeOffMovementDate">Fecha de movimiento</FieldLabel>
+                <DatePicker
+                  id="writeOffMovementDate"
+                  value={movementDate}
+                  onChange={setMovementDate}
+                />
+              </Field>
 
-            {review ? (
-              <p className="text-muted-foreground text-xs">
-                Se enviaran {selectedRows.length} credito(s) por un castigo total de{' '}
-                {formatCurrency(selectedRecommendedWriteOff)}.
-              </p>
-            ) : null}
+              <Button
+                type="button"
+                onClick={onExecute}
+                disabled={!review || !selectedRows.length || !movementDate || isExecuting}
+                className="self-end"
+              >
+                {isExecuting ? <Spinner /> : null}
+                Ejecutar castiga cartera
+              </Button>
+            </FieldGroup>
+
+            <div className="grid gap-3 md:grid-cols-4">
+              <div>
+                <p className="text-muted-foreground text-xs">Seleccionados</p>
+                <p className="font-medium">{selectedRows.length}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Castigo propuesto</p>
+                <p className="font-medium">{formatCurrency(selectedRecommendedWriteOff)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Provisión disponible</p>
+                <p className="font-medium">{formatCurrency(selectedProvisionAmount)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Descubierto estimado</p>
+                <p className="font-medium">{formatCurrency(selectedEstimatedUncoveredAmount)}</p>
+              </div>
+            </div>
 
             {execution ? (
               <div className="grid gap-3 md:grid-cols-4">
@@ -493,7 +580,7 @@ export function LoanWriteOff() {
                   <p className="font-medium">{execution.proposalId}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Creditos ejecutados</p>
+                  <p className="text-muted-foreground text-xs">Créditos ejecutados</p>
                   <p className="font-medium">{execution.executedCredits}</p>
                 </div>
                 <div>
@@ -510,6 +597,11 @@ export function LoanWriteOff() {
                 </div>
               </div>
             ) : null}
+
+            <p className="text-muted-foreground text-xs">
+              La ejecución crea movimientos `DRAFT` de castigo. Luego la `Interface contable -
+              Castiga cartera` los pasa a `ACCOUNTED`.
+            </p>
           </CardContent>
         </Card>
       </PageContent>

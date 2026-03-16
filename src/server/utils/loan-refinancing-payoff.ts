@@ -27,11 +27,11 @@ export type CreateRefinancingPayoffInput = {
   userId: string;
   userName: string;
   payoffDate: string; // YYYY-MM-DD
-  refinancingLoanId: number;
 };
 
 export type RefinancingPayoffResult = {
   paymentId: number;
+  statusHistoryId: number;
   payoffAmount: number;
   creditNumber: string;
 };
@@ -224,7 +224,7 @@ export async function createRefinancingPayoff(
       createdByUserId: input.userId,
       createdByUserName: input.userName,
       glAccountId: receiptType.glAccountId,
-      note: `Refinanciacion - nuevo credito ID: ${input.refinancingLoanId}`,
+      note: 'Refinanciacion en proceso',
     })
     .returning();
 
@@ -334,22 +334,25 @@ export async function createRefinancingPayoff(
     .where(eq(loans.id, existingLoan.id));
 
   // 11. Record status history
-  await tx.insert(loanStatusHistory).values({
-    loanId: existingLoan.id,
-    fromStatus: existingLoan.status,
-    toStatus: 'REFINANCED',
-    changedByUserId: input.userId,
-    changedByUserName: input.userName,
-    note: `Credito refinanciado. Nuevo credito ID: ${input.refinancingLoanId}`,
-    metadata: {
-      refinancingLoanId: input.refinancingLoanId,
-      payoffAmount: totalBalance,
-      paymentId: createdPayment.id,
-    },
-  });
+  const [createdStatusHistory] = await tx
+    .insert(loanStatusHistory)
+    .values({
+      loanId: existingLoan.id,
+      fromStatus: existingLoan.status,
+      toStatus: 'REFINANCED',
+      changedByUserId: input.userId,
+      changedByUserName: input.userName,
+      note: 'Credito refinanciado',
+      metadata: {
+        payoffAmount: totalBalance,
+        paymentId: createdPayment.id,
+      },
+    })
+    .returning({ id: loanStatusHistory.id });
 
   return {
     paymentId: createdPayment.id,
+    statusHistoryId: createdStatusHistory!.id,
     payoffAmount: totalBalance,
     creditNumber: existingLoan.creditNumber,
   };

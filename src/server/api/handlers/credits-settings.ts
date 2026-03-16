@@ -51,6 +51,10 @@ const CREDITS_SETTINGS_INCLUDES = createIncludeMap<typeof db.query.creditsSettin
     relation: 'writeOffGlAccount',
     config: true,
   },
+  writeOffExpenseGlAccount: {
+    relation: 'writeOffExpenseGlAccount',
+    config: true,
+  },
   refinancingReceiptType: {
     relation: 'refinancingReceiptType',
     config: true,

@@ -25,7 +25,7 @@ import { getAuthContextAndValidatePermission } from '@/server/utils/require-perm
 import { getRequiredUserContext } from '@/server/utils/required-user-context';
 import { formatDateOnly, roundMoney, toNumber } from '@/server/utils/value-utils';
 import { tsr } from '@ts-rest/serverless/next';
-import { and, between, eq, inArray } from 'drizzle-orm';
+import { and, between, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { contract } from '../contracts';
 
@@ -554,20 +554,58 @@ async function processWriteOff(body: ProcessWriteOffBody, context: HandlerContex
 
   try {
     await getAuthContextAndValidatePermission(request, appRoute.metadata);
+    const startDate = formatDateOnly(body.startDate);
+    const endDate = formatDateOnly(body.endDate);
+    const transactionDate = formatDateOnly(body.transactionDate);
 
-    // TODO(accounting-interface-write-off): implementar interface contable de castiga cartera
-    // - consultar creditos castigados en el rango
-    // - construir comprobante segun reglas contables
-    // - integrar y registrar trazabilidad del lote
+    const pendingEntries = await db
+      .select({
+        id: accountingEntries.id,
+        loanId: accountingEntries.loanId,
+      })
+      .from(accountingEntries)
+      .where(
+        and(
+          eq(accountingEntries.processType, 'WRITE_OFF'),
+          eq(accountingEntries.sourceType, 'MANUAL_ADJUSTMENT'),
+          eq(accountingEntries.status, 'DRAFT'),
+          gte(accountingEntries.entryDate, startDate),
+          lte(accountingEntries.entryDate, endDate)
+        )
+      );
+
+    const entryIds = pendingEntries.map((item) => item.id);
+    const processedLoanIds = Array.from(
+      new Set(
+        pendingEntries
+          .map((item) => item.loanId)
+          .filter((loanId): loanId is number => typeof loanId === 'number')
+      )
+    );
+
+    if (entryIds.length) {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(accountingEntries)
+          .set({
+            status: 'ACCOUNTED',
+            statusDate: transactionDate,
+          })
+          .where(inArray(accountingEntries.id, entryIds));
+      });
+    }
+
     return {
       status: 200 as const,
       body: {
         interfaceType: 'WRITE_OFF' as const,
-        periodStartDate: formatDateOnly(body.startDate),
-        periodEndDate: formatDateOnly(body.endDate),
-        transactionDate: formatDateOnly(body.transactionDate),
-        processedRecords: 0,
-        message: 'Interfaz contable de Castiga cartera recibida. Pendiente implementacion.',
+        periodStartDate: startDate,
+        periodEndDate: endDate,
+        transactionDate,
+        processedRecords: processedLoanIds.length,
+        message: processedLoanIds.length
+          ? `Interfaz contable de Castiga cartera procesada. Se contabilizaron ${processedLoanIds.length} crédito(s) castigados.`
+          : 'No se encontraron castigos pendientes por contabilizar en el rango seleccionado.',
       },
     };
   } catch (e) {

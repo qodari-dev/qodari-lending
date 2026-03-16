@@ -161,7 +161,11 @@ function allocateAmountByWeight<T>(args: {
 }
 
 async function getLoanCandidates(run: typeof processRuns.$inferSelect): Promise<LoanCandidate[]> {
-  const conditions = [eq(loans.status, 'ACCOUNTED'), eq(loans.disbursementStatus, 'DISBURSED')];
+  const conditions = [
+    eq(loans.status, 'ACCOUNTED'),
+    eq(loans.disbursementStatus, 'DISBURSED'),
+    eq(loans.isWrittenOff, false),
+  ];
 
   if (run.scopeType === 'LOAN') {
     conditions.push(eq(loans.id, run.scopeId));

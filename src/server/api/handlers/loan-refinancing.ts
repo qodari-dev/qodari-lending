@@ -15,6 +15,7 @@ import {
   insuranceCompanies,
   loanBillingConcepts,
   loanInstallments,
+  loanPayments,
   loanRefinancingLinks,
   loanStatusHistory,
   loans,
@@ -84,11 +85,23 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
         });
       }
 
-      const invalidStatusLoan = selectedLoans.find((loan) => ['VOID', 'PAID'].includes(loan.status));
+      const invalidStatusLoan = selectedLoans.find((loan) =>
+        ['VOID', 'PAID', 'REFINANCED'].includes(loan.status)
+      );
       if (invalidStatusLoan) {
         throwHttpError({
           status: 400,
           message: `El credito ${invalidStatusLoan.creditNumber} no es elegible para refinanciacion`,
+          code: 'BAD_REQUEST',
+        });
+      }
+      const invalidAccountingStatusLoan = selectedLoans.find(
+        (loan) => loan.status !== 'ACCOUNTED' || loan.disbursementStatus !== 'DISBURSED'
+      );
+      if (invalidAccountingStatusLoan) {
+        throwHttpError({
+          status: 400,
+          message: `El credito ${invalidAccountingStatusLoan.creditNumber} debe estar contabilizado y desembolsado para refinanciar`,
           code: 'BAD_REQUEST',
         });
       }
@@ -119,6 +132,39 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
           message: 'Periodicidad de pago no encontrada',
           code: 'NOT_FOUND',
         });
+      }
+
+      const refinancePolicy = await db.query.creditProductRefinancePolicies.findFirst({
+        where: and(
+          eq(creditProductRefinancePolicies.creditProductId, body.creditProductId),
+          eq(creditProductRefinancePolicies.isActive, true)
+        ),
+      });
+
+      if (!refinancePolicy?.allowRefinance) {
+        throwHttpError({
+          status: 400,
+          message: 'La linea de credito no permite refinanciacion',
+          code: 'BAD_REQUEST',
+        });
+      }
+
+      if (selectedLoanIds.length > 1) {
+        if (!refinancePolicy.allowConsolidation) {
+          throwHttpError({
+            status: 400,
+            message: 'La linea de credito no permite consolidacion de creditos',
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        if (selectedLoanIds.length > refinancePolicy.maxLoansToConsolidate) {
+          throwHttpError({
+            status: 400,
+            message: `Maximo ${refinancePolicy.maxLoansToConsolidate} creditos para consolidar`,
+            code: 'BAD_REQUEST',
+          });
+        }
       }
 
       const paymentFrequencyIntervalDays = resolvePaymentFrequencyIntervalDays({
@@ -179,6 +225,54 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
           };
         })
       );
+
+      for (const { loan, summary } of selectedLoanSummaries) {
+        const loanAgeDays = Math.floor(
+          (Date.now() - new Date(loan.creditStartDate).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        if (loanAgeDays < refinancePolicy.minLoanAgeDays) {
+          throwHttpError({
+            status: 400,
+            message: `El credito ${loan.creditNumber} no cumple la antiguedad minima (${refinancePolicy.minLoanAgeDays} dias)`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        if (toNumber(summary.overdueBalance) > 0 && summary.nextDueDate) {
+          const daysPastDue = Math.floor(
+            (Date.now() - new Date(summary.nextDueDate).getTime()) / (1000 * 60 * 60 * 24)
+          );
+          if (daysPastDue > refinancePolicy.maxDaysPastDue) {
+            throwHttpError({
+              status: 400,
+              message: `El credito ${loan.creditNumber} excede los dias de mora permitidos (${refinancePolicy.maxDaysPastDue})`,
+              code: 'BAD_REQUEST',
+            });
+          }
+        }
+
+        const paidInstallments = loan.installments - summary.openInstallments;
+        if (paidInstallments < refinancePolicy.minPaidInstallments) {
+          throwHttpError({
+            status: 400,
+            message: `El credito ${loan.creditNumber} no cumple el minimo de cuotas pagadas (${refinancePolicy.minPaidInstallments})`,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        const existingRefinanceCount = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(loanRefinancingLinks)
+          .where(eq(loanRefinancingLinks.referenceLoanId, loan.id));
+
+        if ((existingRefinanceCount[0]?.count ?? 0) >= refinancePolicy.maxRefinanceCount) {
+          throwHttpError({
+            status: 400,
+            message: `El credito ${loan.creditNumber} ya alcanzo el maximo de refinanciaciones (${refinancePolicy.maxRefinanceCount})`,
+            code: 'BAD_REQUEST',
+          });
+        }
+      }
 
       const selectedLoanRows = selectedLoanSummaries.map(({ loan, summary }) => ({
         loanId: loan.id,
@@ -301,11 +395,6 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
       );
       const estimatedNewInstallment = calculation.summary.maxInstallmentPayment;
 
-      // TODO(loan-refinancing): completar la logica real de refinanciacion:
-      // - validar politica del producto (consolidacion, antiguedad, mora y maximo refinanciaciones)
-      // - incluir cargos/seguros/intereses causados segun reglas de negocio
-      // - generar el credito refinanciado y relacionarlo con loan_refinancing_links
-      // - actualizar estado/contabilidad de creditos origen dentro de una transaccion
       return {
         status: 200 as const,
         body: {
@@ -861,7 +950,13 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
       // ── 14. Single transaction ─────────────────────────────────────────
       const result = await db.transaction(async (tx) => {
         // a) Pay off origin loans
-        const payoffResults: Array<{ loanId: number; creditNumber: string; payoffAmount: number }> = [];
+        const payoffResults: Array<{
+          loanId: number;
+          creditNumber: string;
+          payoffAmount: number;
+          paymentId: number;
+          statusHistoryId: number;
+        }> = [];
         for (const loan of selectedLoans) {
           const payoff = await createRefinancingPayoff(tx, {
             loanId: loan.id,
@@ -869,12 +964,13 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
             userId,
             userName: userName || userId,
             payoffDate: today,
-            refinancingLoanId: 0, // placeholder — updated after loan creation
           });
           payoffResults.push({
             loanId: loan.id,
             creditNumber: payoff.creditNumber,
             payoffAmount: payoff.payoffAmount,
+            paymentId: payoff.paymentId,
+            statusHistoryId: payoff.statusHistoryId,
           });
         }
 
@@ -917,6 +1013,35 @@ export const loanRefinancing = tsr.router(contract.loanRefinancing, {
             paymentGuaranteeTypeId: originLoan.paymentGuaranteeTypeId,
           })
           .returning();
+
+        for (const payoff of payoffResults) {
+          await tx
+            .update(loans)
+            .set({
+              note: `Refinanciado en ${newLoan.creditNumber}`.slice(0, 255),
+            })
+            .where(eq(loans.id, payoff.loanId));
+
+          await tx
+            .update(loanPayments)
+            .set({
+              note: `Refinanciacion - nuevo credito ID: ${newLoan.id} (${newLoan.creditNumber})`,
+            })
+            .where(eq(loanPayments.id, payoff.paymentId));
+
+          await tx
+            .update(loanStatusHistory)
+            .set({
+              note: `Credito refinanciado. Nuevo credito ${newLoan.creditNumber}`,
+              metadata: {
+                refinancingLoanId: newLoan.id,
+                refinancingCreditNumber: newLoan.creditNumber,
+                payoffAmount: payoff.payoffAmount,
+                paymentId: payoff.paymentId,
+              },
+            })
+            .where(eq(loanStatusHistory.id, payoff.statusHistoryId));
+        }
 
         // d) Status history + disbursement event
         await tx.insert(loanStatusHistory).values({

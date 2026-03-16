@@ -231,7 +231,8 @@ export async function closeCausationPeriod(
           eq(portfolioEntries.status, 'OPEN'),
           sql`${portfolioEntries.balance} > 0`,
           eq(loans.status, 'ACCOUNTED'),
-          eq(loans.disbursementStatus, 'DISBURSED')
+          eq(loans.disbursementStatus, 'DISBURSED'),
+          eq(loans.isWrittenOff, false)
         )
       );
 

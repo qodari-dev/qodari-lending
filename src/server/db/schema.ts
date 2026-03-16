@@ -44,6 +44,7 @@ export const processTypeEnum = pgEnum('process_type', [
   'OTHER',
   'INSURANCE',
   'LATE_INTEREST',
+  'WRITE_OFF',
 ]);
 
 export const riskCenterTypeEnum = pgEnum('risk_center_type', ['CIFIN', 'DATACREDITO']);
@@ -2662,6 +2663,12 @@ export const creditsSettings = pgTable('credits_settings', {
   writeOffGlAccountId: integer('write_off_gl_account_id').references(() => glAccounts.id, {
     onDelete: 'restrict',
   }),
+  writeOffExpenseGlAccountId: integer('write_off_expense_gl_account_id').references(
+    () => glAccounts.id,
+    {
+      onDelete: 'restrict',
+    }
+  ),
   refinancingReceiptTypeId: integer('refinancing_receipt_type_id').references(
     () => paymentReceiptTypes.id,
     { onDelete: 'restrict' }

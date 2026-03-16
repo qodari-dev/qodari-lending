@@ -138,7 +138,8 @@ async function buildLoansData(agreementId: number, runDate: string): Promise<Dis
     where: and(
       eq(loans.agreementId, agreementId),
       eq(loans.status, 'ACCOUNTED'),
-      eq(loans.disbursementStatus, 'DISBURSED')
+      eq(loans.disbursementStatus, 'DISBURSED'),
+      eq(loans.isWrittenOff, false)
     ),
     columns: {
       id: true,

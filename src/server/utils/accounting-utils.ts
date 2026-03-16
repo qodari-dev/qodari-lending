@@ -36,6 +36,10 @@ export function buildPaymentVoidDocumentCode(loanPaymentId: number): string {
   return buildNumericDocumentCode('V', loanPaymentId);
 }
 
+export function buildWriteOffDocumentCode(loanId: number): string {
+  return buildNumericDocumentCode('W', loanId);
+}
+
 export function buildProcessRunDocumentCode(
   processType: 'INTEREST' | 'LATE_INTEREST' | 'INSURANCE' | 'OTHER',
   processRunId: number

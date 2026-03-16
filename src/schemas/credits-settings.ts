@@ -17,6 +17,7 @@ const CREDITS_SETTINGS_INCLUDE_OPTIONS = [
   'pledgeSubsidyGlAccount',
   'pledgePaymentReceiptType',
   'writeOffGlAccount',
+  'writeOffExpenseGlAccount',
   'refinancingReceiptType',
 ] as const;
 
@@ -72,6 +73,7 @@ export const UpdateCreditsSettingsBodySchema = z.object({
   pledgeSubsidyGlAccountId: z.number().nullable().optional(),
   pledgePaymentReceiptTypeId: z.number().nullable().optional(),
   writeOffGlAccountId: z.number().nullable().optional(),
+  writeOffExpenseGlAccountId: z.number().nullable().optional(),
   refinancingReceiptTypeId: z.number().nullable().optional(),
 
   // Signatures

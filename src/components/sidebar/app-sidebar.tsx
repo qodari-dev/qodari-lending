@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { useAuthUser, useHasPermission } from '@/stores/auth-store-provider';
-import appLogo from '../../../public/app-logo.png';
+import appLogo from '../../../public/lending-logo.png';
 
 // Helper to check if any subitem matches the current pathname
 function isMenuActive(items: { url: string }[] | undefined, pathname: string): boolean {
@@ -194,9 +194,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {
                 title: 'Facturación',
                 icon: Mail,
-                items: [
-                  { title: 'Instrucciones de cobro', url: `/billing-dispatches` },
-                ],
+                items: [{ title: 'Instrucciones de cobro', url: `/billing-dispatches` }],
               },
             ],
             pathname

@@ -39,9 +39,7 @@ import {
   LoanDocumentData,
   LoanDocumentType,
 } from '@/server/pdf/templates/loan-document-types';
-import {
-  buildLiquidationDocumentCode,
-} from '@/server/utils/accounting-utils';
+import { buildLiquidationDocumentCode } from '@/server/utils/accounting-utils';
 import { buildLoanLiquidationArtifacts } from '@/server/utils/loan-liquidation-artifacts';
 import {
   ensureLoanExists,
@@ -113,9 +111,7 @@ const LOAN_QUERY_CONFIG: QueryConfig = {
 
 async function syncSubsidyPledgesOnLiquidation(args: {
   loanCreditNumber: string;
-  loanApplication: NonNullable<
-    Awaited<ReturnType<typeof db.query.loanApplications.findFirst>>
-  > & {
+  loanApplication: NonNullable<Awaited<ReturnType<typeof db.query.loanApplications.findFirst>>> & {
     loanApplicationPledges?: Array<{
       beneficiaryCode: string;
       pledgeCode: string;
@@ -398,11 +394,13 @@ const LOAN_INCLUDES = createIncludeMap<typeof db.query.loans>()({
       with: {
         signatureEnvelopeDocuments: {
           with: {
-            loanDocumentInstance: {
-              with: {
-                documentTemplate: true,
-              },
-            },
+            loanDocumentInstance: true,
+            //TODO: drizzle issue
+            // loanDocumentInstance: {
+            //   with: {
+            //     documentTemplate: true,
+            //   },
+            // },
           },
           orderBy: [asc(signatureEnvelopeDocuments.docOrder), asc(signatureEnvelopeDocuments.id)],
         },
@@ -819,12 +817,16 @@ export const loan = tsr.router(contract.loan, {
       }
 
       const rulesWithTemplates = documentRules.filter(
-        (rule): rule is typeof rule & { documentTemplate: NonNullable<typeof rule.documentTemplate> } =>
+        (
+          rule
+        ): rule is typeof rule & { documentTemplate: NonNullable<typeof rule.documentTemplate> } =>
           Boolean(rule.documentTemplate)
       );
 
       const hasBorrowerTemplate = rulesWithTemplates.some((rule) =>
-        rule.documentTemplate.templateSignerRules.some((signerRule) => signerRule.signerRole === 'BORROWER')
+        rule.documentTemplate.templateSignerRules.some(
+          (signerRule) => signerRule.signerRole === 'BORROWER'
+        )
       );
       if (!hasBorrowerTemplate) {
         throwHttpError({
@@ -927,16 +929,14 @@ export const loan = tsr.router(contract.loan, {
       const signerPayload = Array.from(signerRulesByRole.entries())
         .sort((a, b) => a[1].signOrder - b[1].signOrder)
         .flatMap(([role, config]) => {
-          let signer:
-            | {
-                thirdPartyId: number | null;
-                fullName: string;
-                email: string | null;
-                phone: string | null;
-                documentTypeCode: string | null;
-                documentNumber: string | null;
-              }
-            | null = null;
+          let signer: {
+            thirdPartyId: number | null;
+            fullName: string;
+            email: string | null;
+            phone: string | null;
+            documentTypeCode: string | null;
+            documentNumber: string | null;
+          } | null = null;
 
           switch (role) {
             case 'BORROWER':
@@ -1005,8 +1005,9 @@ export const loan = tsr.router(contract.loan, {
       const printDate = formatDateOnly(new Date());
       const sentAt = new Date();
 
-      const documentsToInsert: Array<typeof loanDocumentInstances.$inferInsert & { documentOrder: number }> =
-        [];
+      const documentsToInsert: Array<
+        typeof loanDocumentInstances.$inferInsert & { documentOrder: number }
+      > = [];
 
       for (const rule of rulesWithTemplates) {
         const template = rule.documentTemplate;
@@ -1051,9 +1052,7 @@ export const loan = tsr.router(contract.loan, {
       const [envelopeCreated] = await db.transaction(async (tx) => {
         const insertedDocuments = await tx
           .insert(loanDocumentInstances)
-          .values(
-            documentsToInsert.map(({ documentOrder: _documentOrder, ...item }) => item)
-          )
+          .values(documentsToInsert.map(({ documentOrder: _documentOrder, ...item }) => item))
           .returning({
             id: loanDocumentInstances.id,
             documentTemplateId: loanDocumentInstances.documentTemplateId,
@@ -1077,7 +1076,9 @@ export const loan = tsr.router(contract.loan, {
 
         await tx.insert(signatureEnvelopeDocuments).values(
           documentsToInsert.map((item) => {
-            const loanDocumentInstanceId = documentInstanceByTemplateId.get(item.documentTemplateId);
+            const loanDocumentInstanceId = documentInstanceByTemplateId.get(
+              item.documentTemplateId
+            );
             if (!loanDocumentInstanceId) {
               throwHttpError({
                 status: 500,
@@ -2186,10 +2187,7 @@ export const loan = tsr.router(contract.loan, {
       }
 
       const signatureDocumentRules = await db.query.creditProductDocumentRules.findMany({
-        where: eq(
-          creditProductDocumentRules.creditProductId,
-          loanApplication.creditProduct.id
-        ),
+        where: eq(creditProductDocumentRules.creditProductId, loanApplication.creditProduct.id),
         columns: {
           documentTemplateId: true,
         },
@@ -2244,8 +2242,7 @@ export const loan = tsr.router(contract.loan, {
         if (pendingTemplateIds.length) {
           throwHttpError({
             status: 409,
-            message:
-              'No se puede liquidar. Hay documentos de firma digital pendientes por firmar',
+            message: 'No se puede liquidar. Hay documentos de firma digital pendientes por firmar',
             code: 'CONFLICT',
           });
         }

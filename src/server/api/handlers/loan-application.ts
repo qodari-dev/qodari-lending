@@ -730,7 +730,9 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         left.groupLabel.localeCompare(right.groupLabel, 'es')
       );
       groups.forEach((group) => {
-        group.beneficiaries.sort((left, right) => left.fullName.localeCompare(right.fullName, 'es'));
+        group.beneficiaries.sort((left, right) =>
+          left.fullName.localeCompare(right.fullName, 'es')
+        );
       });
 
       return {
@@ -906,7 +908,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
               isDelivered: document.isDelivered,
               fileKey: document.fileKey ?? null,
               uploadedByUserId: document.fileKey ? userId : null,
-              uploadedByUserName: document.fileKey ? (userName || userId) : null,
+              uploadedByUserName: document.fileKey ? userName || userId : null,
             }))
           );
         }
@@ -1210,7 +1212,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
                 isDelivered: document.isDelivered,
                 fileKey: document.fileKey ?? null,
                 uploadedByUserId: document.fileKey ? userId : null,
-                uploadedByUserName: document.fileKey ? (userName || userId) : null,
+                uploadedByUserName: document.fileKey ? userName || userId : null,
               }))
             );
           }
@@ -1786,8 +1788,7 @@ export const loanApplication = tsr.router(contract.loanApplication, {
           });
         }
 
-        const stepIsInsuranceApproved =
-          product.paysInsurance && Boolean(body.isInsuranceApproved);
+        const stepIsInsuranceApproved = product.paysInsurance && Boolean(body.isInsuranceApproved);
 
         const [updated] = await db.transaction(async (tx) => {
           const current = await tx.query.loanApplications.findFirst({
@@ -2183,7 +2184,11 @@ export const loanApplication = tsr.router(contract.loanApplication, {
         const effectiveFrequency = item.overrideFrequency ?? concept.defaultFrequency;
         const effectiveFinancingMode = item.overrideFinancingMode ?? concept.defaultFinancingMode;
 
-        if (effectiveFinancingMode !== 'BILLED_SEPARATELY' && effectiveFrequency !== 'ONE_TIME') {
+        if (
+          effectiveFinancingMode !== 'BILLED_SEPARATELY' &&
+          effectiveFrequency !== 'ONE_TIME' &&
+          !concept.isSystem
+        ) {
           throwHttpError({
             status: 400,
             message: `Concepto "${concept.name}": ${effectiveFinancingMode} solo aplica para frecuencia unica vez`,

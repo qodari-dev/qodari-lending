@@ -149,7 +149,8 @@ export async function createLoanPaymentTx(
     });
   }
 
-  const selectedGlAccountId = input.glAccountId ?? availableReceiptType.paymentReceiptType.glAccountId;
+  const selectedGlAccountId =
+    input.glAccountId ?? availableReceiptType.paymentReceiptType.glAccountId;
   if (!selectedGlAccountId) {
     throwHttpError({
       status: 400,
@@ -184,7 +185,10 @@ export async function createLoanPaymentTx(
   }
 
   const activeCollectionMethods = await tx.query.paymentTenderTypes.findMany({
-    where: and(inArray(paymentTenderTypes.id, collectionMethodIds), eq(paymentTenderTypes.isActive, true)),
+    where: and(
+      inArray(paymentTenderTypes.id, collectionMethodIds),
+      eq(paymentTenderTypes.isActive, true)
+    ),
     columns: { id: true },
   });
 
@@ -228,7 +232,9 @@ export async function createLoanPaymentTx(
     });
   }
 
-  const totalOutstanding = roundMoney(openPortfolio.reduce((acc, row) => acc + toNumber(row.balance), 0));
+  const totalOutstanding = roundMoney(
+    openPortfolio.reduce((acc, row) => acc + toNumber(row.balance), 0)
+  );
   const cappedPaymentAmount = roundMoney(Math.min(requestedPaymentAmount, totalOutstanding));
   const overflowByCap = roundMoney(Math.max(0, requestedPaymentAmount - cappedPaymentAmount));
 
@@ -255,11 +261,12 @@ export async function createLoanPaymentTx(
                 with: {
                   paymentAllocationPolicyRules: {
                     orderBy: [asc(paymentAllocationPolicyRules.priority)],
-                    with: {
-                      billingConcept: {
-                        columns: { id: true, conceptType: true },
-                      },
-                    },
+                    //TODO: drizzle issue
+                    // with: {
+                    //   billingConcept: {
+                    //     columns: { id: true, conceptType: true },
+                    //   },
+                    // },
                   },
                 },
               },
@@ -409,9 +416,7 @@ export async function createLoanPaymentTx(
         policyRemainder = applyToEntries(capitalEntries, policyRemainder);
       } else if (handling === 'APPLY_TO_FUTURE_INSTALLMENTS') {
         const remainingEntries = sortBackToFront(
-          openPortfolio.filter(
-            (e) => (effectiveBalances.get(e.id) ?? 0) > 0
-          )
+          openPortfolio.filter((e) => (effectiveBalances.get(e.id) ?? 0) > 0)
         );
         policyRemainder = applyToEntries(remainingEntries, policyRemainder);
       }
@@ -534,10 +539,11 @@ export async function createLoanPaymentTx(
       glAccountId: row.glAccountId,
       costCenterId: null,
       thirdPartyId: existingLoan.thirdPartyId,
-      description: `Abono ${paymentNumber} credito ${existingLoan.creditNumber} cuota ${row.installmentNumber}`.slice(
-        0,
-        255
-      ),
+      description:
+        `Abono ${paymentNumber} credito ${existingLoan.creditNumber} cuota ${row.installmentNumber}`.slice(
+          0,
+          255
+        ),
       nature: 'CREDIT',
       amount: toDecimalString(row.amount),
       loanId: existingLoan.id,
